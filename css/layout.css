@@ -1,0 +1,112 @@
+/* ==========================================================================
+ * GraphCalc 布局样式
+ * --------------------------------------------------------------------------
+ * 负责整个应用的骨架:
+ *   - Three.js 视口
+ *   - 三个面板的定位/尺寸与折叠
+ *   - 面板拖拽调整大小的手柄
+ *
+ * 不包含面板内部具体控件的视觉细节.
+ * ========================================================================== */
+
+/* 3D 视口铺满整个应用,位于所有面板下方 */
+#viewport {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
+/* 面板通用容器:绝对定位在视口边缘,内部按列排列 */
+.panel {
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: #141828;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+/* 左侧源码面板:贴左/纵向铺满 */
+#left-panel {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--left-panel-width);
+    z-index: 20;
+}
+
+/* 右侧参数面板:贴右/纵向铺满 */
+#right-panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--right-panel-width);
+    z-index: 20;
+}
+
+/* 底部输出面板:位于左右面板之间 */
+#bottom-panel {
+    left: var(--left-panel-width);
+    right: var(--right-panel-width);
+    bottom: 0;
+    height: var(--footer-height);
+}
+
+/* 左右面板折叠后只保留一条窄边,方便再次展开 */
+#left-panel.collapsed,
+#right-panel.collapsed {
+    width: var(--collapsed-side-width);
+    bottom: auto;
+}
+
+/* 底部面板折叠后只保留顶部标题条 */
+#bottom-panel.collapsed {
+    height: var(--collapsed-footer-height);
+}
+
+/* ==========================================================================
+ * 面板拖拽手柄
+ * --------------------------------------------------------------------------
+ * 手柄自身默认透明,悬停时显示高亮,拖拽逻辑由 PanelController 处理.
+ * ========================================================================== */
+
+.resize-handle {
+    position: absolute;
+    z-index: 30;
+    touch-action: none;
+    user-select: none;
+    background: transparent;
+}
+
+.resize-handle:hover {
+    background: rgba(109, 213, 255, 0.18);
+}
+
+/* 左侧面板右侧边缘:水平拖拽调整宽度 */
+.resize-handle-right {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+}
+
+/* 右侧面板左侧边缘:水平拖拽调整宽度 */
+.resize-handle-left {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+}
+
+/* 底部面板顶部边缘:垂直拖拽调整高度 */
+.resize-handle-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    cursor: ns-resize;
+}

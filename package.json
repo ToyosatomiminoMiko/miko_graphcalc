@@ -1,0 +1,36 @@
+{
+  "name": "miko_graphcalc",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GraphCalc DSL",
+  "type": "module",
+  "dependencies": {
+    "katex": "^0.18.5",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.8",
+    "@types/node": "^26.4.1",
+    "@types/three": "^0.185.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
+  },
+  "scripts": {
+    "dev": "vite",
+    "clean": "node -e 'const fs = require(\"node:fs\"); for (const p of [\"dist\", \"src/wasm\"]) fs.rmSync(p, { recursive: true, force: true });'",
+    "prepare": "node -e \"try{require('node:child_process').execSync('git config --local core.hooksPath .githooks',{stdio:'ignore'})}catch{}\"",
+    "build:wasm:math": "cd src/math/math_rs && wasm-pack build --release --target web --out-dir ../../wasm/math_rs",
+    "build:wasm:compiler": "cd src/compiler/compiler_rs && wasm-pack build --release --target web --out-dir ../../wasm/compiler_rs",
+    "build:wasm:render": "cd src/render/render_rs && wasm-pack build --release --target web --out-dir ../../wasm/render_rs",
+    "build:wasm": "npm run build:wasm:math && npm run build:wasm:compiler && npm run build:wasm:render",
+    "build:app": "npm run typecheck && vite build",
+    "build:all": "npm run lint:rs && npm run clean && npm run build:wasm && npm test && npm run build:app",
+    "build": "npm run build:all",
+    "lint:rs": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters"
+  }
+}

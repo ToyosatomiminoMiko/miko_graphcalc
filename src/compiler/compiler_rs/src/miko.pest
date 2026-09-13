@@ -1,0 +1,82 @@
+// .miko 外层声明式语法.
+//
+// 这里只负责把一条条声明切出来,数学表达式的优先级与结合性
+// 不在这里实现:表达式作为原始片段捕获,交给 Rust 符号引擎归一化.
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" | COMMENT }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
+
+ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+// 普通表达式:到分号或选项块为止.
+expr = @{ (!(";" | "{" | "}") ~ ANY)+ }
+
+// param 的取值需要在 `in [...]` 前截断,这里用前置空白保证
+// 不会误伤 `sin(...)` 这类标识符里的 "in".
+// `in cyclic [...]`(循环类系数)由 Rust 侧在 param_value 文本上显式切分,
+// 见 parser_wasm.rs 的 split_cyclic_param_value:语法层继续只认"值到 in 为止",
+// 这样 `a in[...]` / `1in[0,1,1]` / `2sin(x)` 等既有边界行为一字不改.
+// 第二个前瞻 `" in" ~ 空白+ ~ "cyclic"` 是为循环类系数准备的:让
+// `param_value` 在 `in cyclic` 前停下,后面交给 param_ui 里的 cyclic 规则.
+// 这里必须有空白,in 与 cyclic 才不会粘成一个标识符(incyclic);
+// 循环写法本就写作 `in cyclic [...]`,不牺牲任何既有写法.
+param_value = @{ (!( " in" ~ (" " | "\t")* ~ "[" | " in" ~ (" " | "\t")+ ~ "cyclic" | ";" | "{" | "}") ~ ANY)+ }
+
+param_stmt = { "param" ~ ident ~ "=" ~ param_value ~ param_ui? ~ ";" }
+// param_ui:参数 UI 区间,可选前置 `cyclic` 显式声明"循环类系数".
+// 循环参数(球坐标方位角 φ ∈ (-π, π] 这类)的取值在 min/max 两端相接:
+// 越界值按区间长度取模回绕,而不是像普通参数一样被夹到端点.它是**显式**
+// 声明--不写 cyclic 的参数永远是普通参数,不做任何隐式周期猜测;
+// 也必须在 `in [...]` 里写(没有区间的循环参数没有意义,pest 直接拒绝).
+// JSON 里仅当写了 cyclic 才带 "cyclic": true 字段(见 parser_wasm.rs).
+param_ui = { "in" ~ cyclic? ~ "[" ~ number ~ "," ~ number ~ "," ~ number ~ "]" }
+cyclic = @{ "cyclic" }
+
+tensor_kind = { "scalar" | "vector" | "matrix" | "transform" }
+tensor_stmt = { tensor_kind ~ ident ~ "=" ~ expr ~ ";" }
+
+animation_stmt = { "animation" ~ ident ~ "=" ~ expr ~ stmt_end }
+
+// `implicit` 是隐式标量场声明:`f(x,y)=0`(二维等值线)或 `f(x,y,z)=0`
+// (三维等值面),维度由表达式里出现的坐标变量推断(见 objects/build.ts).
+// 它只有隐式方程本身,没有显式的 y=/z= 左端,因此与 curve/surface 并列.
+object_kind = { "curve" | "surface" | "vector_field" | "point" | "vector" | "sphere" | "box" | "cylinder" | "cone" | "frustum" | "region" | "implicit" }
+object_stmt = { object_kind ~ ident ~ "=" ~ expr ~ stmt_end }
+options = { "{" ~ option* ~ "}" }
+option = { ident ~ "=" ~ value ~ ";" }
+value = @{ (!(";" | "}") ~ ANY)+ }
+stmt_end = { options ~ ";"? | ";" }
+
+analysis_op = { "gradient" | "divergence" | "curl" | "jacobian" | "laplacian" }
+op_call = { ident ~ "(" ~ op_arg ~ ")" ~ at? }
+op_arg = @{ (!")" ~ ANY)+ }
+// at 有两种显式形式,不隐式猜测语义:
+// - 笛卡尔:`at [x, y]` / `at [x, y, z]`;
+// - 球坐标:`at spherical(r, θ, φ)`(θ/φ 约定见 numericConfig,显式写
+//   spherical 关键字).三维球坐标允许省略 r:`at spherical(θ, φ)` 时 r 取
+//   源球体半径(源不是 sphere 时编译期报错).
+// at_expr 允许参数里嵌套括号(如 `asin(0.5)`,`sqrt(2)`),因此用自递归的
+// 平衡括号规则;at_arg 仍是"撞到 ] 才停"的简单片段(方向量 at 用).
+at = { "at" ~ (spherical_at | cartesian_at) }
+spherical_at = { "spherical" ~ "(" ~ at_expr ~ ("," ~ at_expr)+ ~ ")" }
+at_expr = @{ ( "(" ~ at_expr ~ ")" | !("," | ")") ~ ANY )+ }
+cartesian_at = { "[" ~ at_arg ~ ("," ~ at_arg)+ ~ "]" }
+at_arg = @{ (!( "," | "]") ~ ANY)+ }
+analysis_stmt = { analysis_op ~ ident ~ "=" ~ op_call ~ stmt_end }
+
+integral_stmt = { "integral" ~ ident ~ "=" ~ integral_call ~ stmt_end }
+integral_call = { "integral" ~ "(" ~ ident ~ ")" }
+
+intersection_kind = { "intersection" | "intersect" }
+intersection_call = { intersection_kind ~ "(" ~ ident ~ "," ~ ident ~ ")" }
+intersection_stmt = { intersection_kind ~ ident ~ "=" ~ intersection_call ~ stmt_end }
+
+// 求导语句:`derivative 名称 = derivative(源对象 [, 变量]);`.
+// 源对象必须是已声明的 curve(surface 需在第二个参数给出 x 或 y).
+// 函数名遵循项目全名习惯,不缩写.
+derivative_stmt = { "derivative" ~ ident ~ "=" ~ derivative_call ~ stmt_end }
+derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
+
+statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt }
+program = { SOI ~ statement* ~ EOI }

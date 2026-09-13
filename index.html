@@ -1,1 +1,399 @@
-<h1>ToyosatomiminoMiko/miko_graphcalc</h1>
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>GraphCalc DSL</title>
+    <meta name="theme-color" content="#0d0d0d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GraphCalc">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link href="css/base.css" rel="stylesheet" type="text/css">
+    <link href="css/layout.css" rel="stylesheet" type="text/css">
+    <link href="css/panels.css" rel="stylesheet" type="text/css">
+    <link href="css/controls.css" rel="stylesheet" type="text/css">
+    <link href="css/diagnostics.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+    <div id="app">
+        <div id="viewport"></div>
+
+        <aside id="left-panel" class="panel">
+            <header class="panel-header">
+                <span class="panel-title">源码</span>
+                <button id="run-btn">运行</button>
+                <button data-panel-toggle="#left-panel">收起</button>
+            </header>
+            <section id="editor-panel">
+                <div id="dsl-editor-box">
+                    <div id="dsl-editor-gutter" aria-hidden="true">
+                        <pre id="dsl-editor-lines"></pre>
+                    </div>
+                    <textarea id="dsl-editor" spellcheck="false">
+point P = [0, 0, 0];
+
+// 临时示例,后续统一加入文档
+
+// 定义系数
+param a = 1 in [-5, 5, 0.1];
+param b = 1 in [-5, 5, 0.1];
+param j = 0 in [-5, 5, 0.1];
+param k = 0 in [-5, 5, 0.1];
+
+// 点
+point Q = [a, b, 3] {
+    color = "#6dd5ff";
+}
+
+// 向量
+vector V = [[0, j, 0], [1, k, 0]] {
+    color = "#ff6b8a";
+}
+
+// 矩阵
+matrix M = [
+    [1, 0, 0, 2],
+    [0, 1, 0, 3],
+    [0, 0, 1, 4],
+    [0, 0, 0, 1],
+];
+
+
+curve c1 = sin(x * a) * cos(x * b) {
+    color = "#6dd5ff";
+    range = [-8, 8];
+    segments = 256;
+}
+
+curve c2 = 1 {
+    color = "#ffffff";
+    range = [-8, 8];
+    segments = 1;
+}
+
+// 曲线积分
+integral I1 = integral(c1) {
+    method = riemann:mid;
+    range = [-4, 4];
+    segments = 32;
+};
+
+surface s1 = sin(x * a) * cos(y * b) {
+    color = "#ff6b8a";
+    range = [-6, 6, -6, 6];
+    segments = 96;
+}
+
+// 梯度计算
+gradient g = grad(s1) at [j, k] {
+    show = [point, normal, tangent_plane];
+}
+
+// 曲面积分
+integral I2 = integral(s1) {
+    method = lebesgue;
+    range = [-3, 3, -3, 3];
+    segments = 32;
+    layers = 16;
+};
+// 曲面积分:梯形法
+integral I3 = integral(s1) {
+    method = trapezoid;
+    range = [-3, 3, -3, 3];
+    segments = 32;
+    layers = 16;
+};
+
+// 向量场
+vector_field VF = [y*a, x*b, a*j] {
+    range = [-4, 4, -4, 4, -4, 4];
+    grid = [8, 8, 8];
+    scale = 1.2;
+}
+
+divergence d = div(VF) at [1, 2, 3];
+
+curl c = curl(VF) at [1, 2, 3];
+
+// 三维变换
+transform T = as_transform(M);
+
+// 动画:每次只给一个矩阵,复杂动画用列表按顺序播放
+animation spin = rotate([0, 0, pi / 2]) {
+    duration = 3;
+};
+
+animation orbit = translate([3, 0, 0]) {
+    duration = 2;
+};
+
+sphere S = [0, 1, 0] {
+    radius = 2;
+    color = "#6dd5ff";
+    opacity = 0.55;
+    animation = [spin, orbit];
+};
+
+// 区域:由两条曲线围成的 z=0 平面图形(面积图形),可被积分引用为域 D
+region R = region(c1, c2) {
+    range    = [-4, 4];     // x 区间;缺省取两曲线 x-range 交集
+    color    = "#6bffb8";
+    opacity  = 0.35;
+};
+
+// 二重积分:∬_D integrand dA;缺省 integrand=1 即求区域面积
+integral I = integral(R) {
+    method    = simpson;
+    integrand = x*x + y*y;  // 缺省 "1"
+    segments  = 64;
+};
+
+// 实体积分:三重积分:∭_V integrand dV;缺省 integrand=1 即求体积
+integral W = integral(S) {
+    method    = simpson;
+    integrand = x*y + z*z;  // 缺省 "1";x,y,z 为世界坐标
+    segments  = 48;
+};
+
+box B = [1, 2, 3] {
+    size = [2, 1, 1];
+    color = "#ff6b8a";
+    transform = T;
+};
+
+cylinder C = [0, 0, 0] {
+    base = 1;
+    height = 2;
+};
+
+cone K = [0, 0, 1] {
+    base = 2;
+    height = 3;
+};
+
+frustum F = [0, 0, -1] {
+    base = 2;
+    height = 3;
+    top = 1;
+};
+
+transform T2 = translate([2, 1, 0]) 
+    * rotate([0, 0, pi / 4]) 
+    * scale([1.5, 1, 1]);
+
+// 求交示例:曲面与曲面
+surface s2 = j {
+    color = "#ffd93d";
+    range = [-4, 4, -4, 4];
+    segments = 64;
+}
+
+intersection X = intersection(s1, s2) {
+    color = "#ffffff";
+    segments = 96;
+};
+
+</textarea>
+                </div>
+            </section>
+            <div class="resize-handle resize-handle-right" data-resize-panel="left-panel"></div>
+        </aside>
+
+        <aside id="right-panel" class="panel">
+            <header class="panel-header">
+                <span class="panel-title">参数</span>
+                <button data-panel-toggle="#right-panel">收起</button>
+            </header>
+            <section id="params-panel"></section>
+            <section id="diagnostics" aria-live="polite"></section>
+
+            <header class="panel-header">视图</header>
+            <section id="view-controls">
+                <div class="cam-toggle">
+                    <!-- 透视/正交切换:data-cam 为模式的唯一标识;
+                         下面的 active/checked 只是首屏占位,与
+                         RENDER_CONFIG.camera.defaultMode 同为 orthographic,
+                         运行时由 CameraToggle 依配置统一覆盖 -->
+                    <span class="cam-label" data-cam="perspective">透视</span>
+                    <label class="switch">
+                        <input type="checkbox" id="camToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span class="cam-label active" data-cam="orthographic">正交</span>
+                    <!-- 旋转锁定开关 -->
+                    <span>锁定旋转</span>
+                    <label class="switch">
+                        <input type="checkbox" id="rotationLockToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="viewcube" class="viewcube">
+                    <button type="button" data-view="top">上</button>
+                    <button type="button" data-view="front">前</button>
+                    <button type="button" data-view="right">右</button>
+                    <button type="button" data-view="isometric" class="active">ISO</button>
+                </div>
+
+                <section id="point-controls" class="point-controls">
+                    <header class="point-title">点</header>
+                    <div class="point-row">
+                        <span>全局可见</span>
+                        <label class="switch">
+                            <input type="checkbox" id="pointVisible" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="point-mode">
+                        <button type="button" data-point-mode="size" class="active">设定大小</button>
+                        <button type="button" data-point-mode="scale">按比例缩放</button>
+                    </div>
+                    <div class="point-row">
+                        <label for="pointValue" id="pointValueLabel">大小</label>
+                        <input type="number" id="pointValue" min="0" step="0.05" value="0.2">
+                    </div>
+                </section>
+
+                <section id="axis-controls" class="axis-controls">
+                    <header class="axis-title">坐标轴</header>
+                    <div class="axis-row">
+                        <span>向上</span>
+                        <div class="axis-up-mode">
+                            <button type="button" data-axis-up="x">X</button>
+                            <button type="button" data-axis-up="y">Y</button>
+                            <button type="button" data-axis-up="z" class="active">Z</button>
+                        </div>
+                    </div>
+                    <div class="axis-row">
+                        <label for="axisLineWidth">线宽</label>
+                        <input type="number" id="axisLineWidth" min="1" step="0.5" value="3">
+                    </div>
+                    <div class="axis-row">
+                        <span>刻度</span>
+                        <label class="switch">
+                            <input type="checkbox" id="axisTicksVisible" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="axis-row">
+                        <span>π 单位</span>
+                        <label class="switch">
+                            <input type="checkbox" id="axisTicksPiUnit">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="axis-row">
+                        <span>标签</span>
+                        <div class="axis-switch-group">
+                            <span>X</span>
+                            <label class="switch">
+                                <input type="checkbox" id="axisLabelX" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="axis-switch-group">
+                            <span>Y</span>
+                            <label class="switch">
+                                <input type="checkbox" id="axisLabelY" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="axis-switch-group">
+                            <span>Z</span>
+                            <label class="switch">
+                                <input type="checkbox" id="axisLabelZ" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="axis-row">
+                        <span>网格</span>
+                        <div class="axis-switch-group">
+                            <span>XZ</span>
+                            <label class="switch">
+                                <input type="checkbox" id="gridVisibleXZ" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="axis-switch-group">
+                            <span>XY</span>
+                            <label class="switch">
+                                <input type="checkbox" id="gridVisibleXY" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="axis-switch-group">
+                            <span>YZ</span>
+                            <label class="switch">
+                                <input type="checkbox" id="gridVisibleYZ" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="axis-row">
+                        <label for="gridMajorWidth">大刻度线宽</label>
+                        <input type="number" id="gridMajorWidth" min="1" step="0.5" value="1.5">
+                    </div>
+                    <div class="axis-row">
+                        <label for="gridMinorWidth">小刻度线宽</label>
+                        <input type="number" id="gridMinorWidth" min="0.5" step="0.25" value="0.75">
+                    </div>
+                </section>
+
+                <section id="surface-controls" class="surface-controls">
+                    <header class="surface-title">曲面</header>
+                    <div class="surface-row">
+                        <span>网格</span>
+                        <label class="switch">
+                            <input type="checkbox" id="surfaceWireframeVisible" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="surface-row">
+                        <span>颜色映射</span>
+                        <label class="switch">
+                            <input type="checkbox" id="surfaceColorMapEnabled" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </section>
+            </section>
+            <div class="resize-handle resize-handle-left" data-resize-panel="right-panel"></div>
+        </aside>
+
+        <footer id="bottom-panel" class="panel">
+            <header class="panel-header">
+                <span class="panel-title">对象</span>
+                <!-- 复制提示只有这一处:公式可点,文案在这里回显 -->
+                <span id="formula-copy-hint" class="object-list-hint">点击公式复制 TeX</span>
+                <button data-panel-toggle="#bottom-panel">收起</button>
+            </header>
+            <section id="object-panel">
+                <div class="object-list-column">
+                    <header class="object-list-title">
+                        <span>实体对象</span>
+                    </header>
+                    <div id="entity-object-list" class="object-list-body"></div>
+                </div>
+                <div class="object-list-column">
+                    <header class="object-list-title">求值对象</header>
+                    <div id="evaluation-object-list" class="object-list-body">
+                        <div id="analysis-object-list" class="object-sublist"></div>
+                        <div id="integral-object-list" class="object-sublist"></div>
+                        <div id="intersection-object-list" class="object-sublist"></div>
+                    </div>
+                </div>
+            </section>
+            <div class="resize-handle resize-handle-top" data-resize-panel="bottom-panel"></div>
+        </footer>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+</body>
+
+</html>

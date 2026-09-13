@@ -1,0 +1,200 @@
+/* ==========================================================================
+ * GraphCalc 视图控制样式
+ * --------------------------------------------------------------------------
+ * 负责右侧面板中的相机/视图交互控件:
+ *   - 透视/正交相机切换
+ *   - 旋转锁定开关
+ *   - 预置视角按钮(ViewCube)
+ *
+ * 相机切换与旋转锁定共用 .switch/.slider 开关样式.
+ * ========================================================================== */
+
+/* 视图控制区域整体布局 */
+#view-controls {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 相机模式切换行:文字标签与开关横向排列 */
+.cam-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #8e9fc7;
+}
+
+/* 当前激活的相机模式文字高亮 */
+.cam-label.active {
+    color: #aac8ff;
+}
+
+/* ==========================================================================
+ * 开关组件
+ * ========================================================================== */
+
+/* 开关容器:固定尺寸,便于滑块在其中移动 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+}
+
+/* 原生 checkbox 仅保留交互,视觉上完全隐藏 */
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* 开关轨道 */
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 22px;
+    transition: background 0.3s;
+}
+
+/* 开关圆钮 */
+.slider::before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: #8e9fc7;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+/* 选中状态:轨道变蓝 */
+.switch input:checked + .slider {
+    background: rgba(70, 130, 255, 0.35);
+}
+
+/* 选中状态:圆钮右移并点亮 */
+.switch input:checked + .slider::before {
+    transform: translateX(18px);
+    background: #6dd5ff;
+}
+
+/* ==========================================================================
+ * ViewCube 预置视角
+ * ========================================================================== */
+
+/* 四个视角按钮等宽排列 */
+.viewcube {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.viewcube button {
+    padding: 5px 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #8e9fc7;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 当前视角按钮高亮 */
+.viewcube button.active {
+    background: rgba(70, 130, 255, 0.25);
+    border-color: rgba(70, 130, 255, 0.45);
+    color: #aac8ff;
+}
+
+/* ==========================================================================
+ * 点对象控制
+ * ========================================================================== */
+
+.point-controls,
+.axis-controls,
+.surface-controls {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.point-title,
+.axis-title,
+.surface-title {
+    font-size: 12px;
+    color: #aac8ff;
+}
+
+.point-row,
+.axis-row,
+.surface-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #8e9fc7;
+}
+
+.point-row input[type="number"],
+.axis-row input[type="number"] {
+    width: 76px;
+    margin-left: auto;
+    background: #0d1120;
+    color: #dbe4ff;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+/* 同一行内的开关组(如 X/Y/Z 标签,刻度/网格) */
+.axis-switch-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #8e9fc7;
+}
+
+/* 向上轴三选一按钮组(X/Y/Z) */
+.axis-up-mode {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    flex: 1;
+    max-width: 150px;
+    margin-left: auto;
+}
+
+/* 大小/缩放模式切换按钮 */
+.point-mode {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.point-mode button,
+.axis-up-mode button {
+    padding: 5px 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #8e9fc7;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.point-mode button.active,
+.axis-up-mode button.active {
+    background: rgba(70, 130, 255, 0.25);
+    border-color: rgba(70, 130, 255, 0.45);
+    color: #aac8ff;
+}

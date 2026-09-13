@@ -1,0 +1,547 @@
+/* ==========================================================================
+ * GraphCalc 面板内部样式
+ * --------------------------------------------------------------------------
+ * 负责面板的内容结构:
+ *   - 面板标题栏与折叠按钮
+ *   - 源码编辑器
+ *   - 参数滑块列表
+ *   - 底部输出区域
+ * ========================================================================== */
+
+/* 标题栏:显示面板名称,按钮靠右排列 */
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    color: #8e9fc7;
+    background: rgba(20, 24, 40, 0.96);
+}
+
+/* 标题栏按钮(运行/收起)使用统一的轻量边框样式 */
+.panel-header button {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #8e9fc7;
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* 面板标题保持单行,避免折叠时换行 */
+.panel-title {
+    white-space: nowrap;
+}
+
+/* 折叠时隐藏标题和左侧"运行"按钮,仅保留展开按钮 */
+.panel.collapsed .panel-title,
+.panel.collapsed #run-btn,
+.panel.collapsed .object-list-hint {
+    display: none;
+}
+
+/* 折叠后按钮不再需要 auto 推右,改为紧贴边缘 */
+.panel.collapsed .panel-header button {
+    margin-left: 0;
+}
+
+/* ==========================================================================
+ * 左侧源码编辑器
+ * ========================================================================== */
+
+/* 编辑器容器占满左侧面板剩余高度 */
+#editor-panel {
+    flex: 1;
+    min-height: 0;
+    padding: 8px;
+}
+
+/* --------------------------------------------------------------------------
+ * 行号栏布局:gutter + textarea 拼排.
+ *
+ * 对齐的两条铁律(与 src/ui/EditorLineNumbers.ts 配套):
+ * 1. textarea 关闭软换行(white-space: pre),"源码行 == 视觉行",
+ *    行号只需按 \n 计数即可逐行对应;
+ * 2. gutter 与 textarea 使用完全相同的字体/字号/行高,并且起始位置一致
+ *    (外框 border 1px + textarea padding-top 10px = gutter padding-top 11px),
+ *    这样纵向滚动时只需把 gutter 内容按 -scrollTop 平移.
+ * -------------------------------------------------------------------------- */
+
+/* 外框:统一承担圆角/边框/底色,textarea 内部滚动不越界 */
+#dsl-editor-box {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: #0d1120;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+/* 行号槽:宽度随字体与行数变化,内容超出时裁剪,靠 translate 跟随滚动 */
+#dsl-editor-gutter {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    /* 由 EditorLineNumbers 按 "最大行号位数 x 实际字体数字宽 + 内边距/边框"
+       写入,写死宽度会在 3 位行号或更大的字号下裁掉行号 */
+    width: var(--code-gutter-width, 32px);
+    padding: 11px 0 11px 8px; /* 顶部 11px = 外框 border 1px + 编辑区 padding 10px */
+    overflow: hidden;
+    background: #0a0e1c;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    color: #55618c;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 行号本体:与 textarea 同一字族/字号/行高(全部来自 UI_CONFIG);transform 由 TS 同步 */
+#dsl-editor-lines {
+    margin: 0;
+    font-family: var(--code-font-family);
+    font-size: var(--code-font-size);
+    line-height: var(--code-line-height);
+    white-space: pre;
+    text-align: right;
+    padding-right: 6px;
+    will-change: transform;
+}
+
+/* DSL 源码输入框:使用等宽字体,禁止缩放,不软换行 */
+#dsl-editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    resize: none;
+    background: transparent;
+    color: #dbe4ff;
+    border: 0;
+    outline: none;
+    padding: 10px 12px;
+    font-family: var(--code-font-family);
+    font-size: var(--code-font-size);
+    line-height: var(--code-line-height);
+    white-space: pre;
+    overflow-wrap: normal;
+    tab-size: var(--code-tab-size, 4);
+}
+
+/* ==========================================================================
+ * 右侧参数面板
+ * ========================================================================== */
+
+/* 参数列表容器:内容超出时纵向滚动 */
+#params-panel {
+    flex: 1;
+    min-height: 0;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+/* 单条参数:名称 + 滑块 + 数值输入框 */
+.param-row {
+    display: grid;
+    grid-template-columns: 48px 1fr 76px;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.param-row input[type="range"] {
+    width: 100%;
+}
+
+.param-row input[type="number"] {
+    width: 100%;
+    background: #0d1120;
+    color: #dbe4ff;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+/* 循环类系数(DSL 显式写 in cyclic [...]):名字后的 ↻ 说明取值在圆周上,
+   越界输入会回绕而不是夹到端点.只做提示,不改变取值语义. */
+.param-row.is-cyclic label {
+    color: #6dd5ff;
+}
+
+/* ==========================================================================
+ * 底部对象列表面板
+ * ========================================================================== */
+
+/* 对象列表容器:左右两栏,占满 footer 剩余高度 */
+#object-panel {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 8px;
+    overflow: hidden;
+}
+
+.object-list-column {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: #0d1120;
+    overflow: hidden;
+}
+
+.object-list-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12px;
+    color: #8e9fc7;
+    background: rgba(20, 24, 40, 0.96);
+}
+
+/* 复制提示:唯一一处"公式可点"文案,复制成功/失败复用同一元素回显. */
+.object-list-hint {
+    font-size: 10px;
+    color: #5f6f96;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.object-list-hint.is-copied {
+    color: #8ee6a5;
+}
+
+.object-list-hint.is-error {
+    color: #ff9aa8;
+}
+
+.object-list-body {
+    flex: 1;
+    min-height: 0;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+}
+
+.object-sublist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.object-sublist:empty {
+    display: none;
+}
+
+.object-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.object-row.is-hidden {
+    opacity: 0.6;
+}
+
+/* 显隐状态文字:透明度之外的第二条线索(色觉/低对比度用户). */
+.row-state {
+    align-self: flex-start;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: #ffd38f;
+    background: rgba(255, 211, 143, 0.12);
+}
+
+.object-row.has-error {
+    border-color: rgba(255, 90, 110, 0.35);
+}
+
+/* 行首显隐按钮:业务动作(隐藏 = Three.js 里不渲染且不参与计算),
+   与 <details> 的开合无关--它挂在行上,不在 <summary> 里,点它不会开合细节. */
+.row-visibility-btn {
+    flex: 0 0 auto;
+    padding: 3px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #8e9fc7;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.row-visibility-btn:hover {
+    color: #dbe4ff;
+    border-color: rgba(109, 213, 255, 0.45);
+}
+
+.row-visibility-btn:focus-visible {
+    outline: 2px solid rgba(109, 213, 255, 0.6);
+    outline-offset: 1px;
+}
+
+.kind-badge {
+    flex: 0 0 auto;
+    min-width: 40px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    text-align: center;
+    color: #0d1120;
+    background: #7b8bb8;
+}
+
+.kind-curve {
+    background: #6dd5ff;
+}
+
+.kind-surface {
+    background: #ff6b8a;
+}
+
+.kind-vector_field,
+.kind-vector {
+    background: #b49cff;
+}
+
+.kind-point {
+    background: #ffd38f;
+}
+
+/* 体积/场类实体:与曲线/曲面的既有配色同一套饱和度,保证一栏里能按色相区分. */
+.kind-sphere {
+    background: #7ee0c8;
+}
+
+.kind-box {
+    background: #ff9f6b;
+}
+
+.kind-conic {
+    background: #d08cff;
+}
+
+.kind-region {
+    background: #a9e07b;
+}
+
+.kind-implicit {
+    background: #9fb3ff;
+}
+
+.kind-analysis {
+    color: #dbe4ff;
+    background: rgba(109, 213, 255, 0.16);
+}
+
+/* 算子维度:梯度/散度/旋度同属"分析"的深色底浅色字体系,只微调色相,
+   既一眼归为同类,又能把三个算子区分开. */
+.kind-analysis-gradient {
+    background: rgba(109, 213, 255, 0.16);
+}
+
+.kind-analysis-divergence {
+    background: rgba(142, 230, 165, 0.16);
+}
+
+.kind-analysis-curl {
+    background: rgba(255, 194, 109, 0.18);
+}
+
+.kind-integral {
+    color: #0d1120;
+    background: #8ee6a5;
+}
+
+.kind-intersection {
+    color: #0d1120;
+    background: #ffd93d;
+}
+
+.object-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.object-name {
+    font-size: 12px;
+    color: #dbe4ff;
+}
+
+.object-expr,
+.eval-result {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    color: #8e9fc7;
+    overflow-wrap: anywhere;
+}
+
+/* KaTeX 生成的公式继承对象列表配色,不套用代码字体;字号由 UI_CONFIG 控制. */
+.object-expr .katex {
+    color: inherit;
+    font-size: var(--katex-font-size, 1em);
+}
+
+/* 可复制公式:光标与悬停色表达"可点",提示文案不放在这里. */
+.object-expr[data-tex] {
+    cursor: pointer;
+}
+
+.object-expr[data-tex]:hover {
+    color: #dbe4ff;
+}
+
+.eval-result.is-pending {
+    color: #ffd38f;
+}
+
+/* 就绪态:结果行自己就是 KaTeX 公式根节点(内部只挂 KaTeX 生成的 .katex),
+   不再套一层同名类名的 span. */
+.eval-result.is-ready {
+    color: #9fd4ff;
+}
+
+.eval-result.is-error {
+    color: #ff9aa8;
+}
+
+.eval-result.is-disabled {
+    color: #7b8bb8;
+    opacity: 0.75;
+}
+
+/* ==========================================================================
+ * 求值条目的折叠细节(分析/积分/求交)
+ *
+ * 条目 = 行首显隐按钮 + 摘要行(<summary>:彩色类型标签 + 变量名 + 一行
+ * KaTeX)+ 折叠细节(<details>,默认收起:展开后每行一段 KaTeX,结果行在最后).
+ * 开合完全是 <details>/<summary> 的原生行为(点摘要行即开合),没有自建开合
+ * 按钮,因此这里也不隐藏 ::marker,让浏览器自带的三角作为唯一标识.
+ * 行首的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
+ * 它是 .object-main 的兄弟而不是 <summary> 的子节点,点它不会开合细节.
+ * 复制只在展开细节行上生效:摘要公式不带 data-tex,点它只开合.
+ * 细节里的公式一行排不下时不换行(KaTeX 换行会破坏公式语义),由横向滚动承接.
+ * ========================================================================== */
+
+.eval-summary {
+    /* 原生 summary 自带热区与三角;这里只负责把标签/名字/公式排成一行. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    cursor: pointer;
+}
+
+/* 公式与前面的"标签 + 名字"多留一点距离,一行里读出三段结构. */
+.eval-summary .eval-summary-formula {
+    margin-left: 2px;
+}
+
+/* 公式行在右侧:名字列宽固定,便于多行条目纵向对齐. */
+.eval-summary .object-name {
+    flex: 0 0 auto;
+    max-width: 30%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* KaTeX 生成的公式继承列表配色;字号与实体对象公式一致(见 uiConfig). */
+.eval-summary-formula,
+.eval-detail-line {
+    min-width: 0;
+    color: #9fd4ff;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+}
+
+.eval-summary-formula .katex,
+.eval-detail-line .katex,
+.eval-result .katex {
+    color: inherit;
+    font-size: var(--katex-font-size, 1em);
+}
+
+/* 可复制公式:与实体对象公式同一套交互(FormulaCopyController 事件委托). */
+.eval-summary-formula[data-tex],
+.eval-detail-line[data-tex] {
+    cursor: pointer;
+}
+
+.eval-summary-formula[data-tex]:hover,
+.eval-detail-line[data-tex]:hover {
+    color: #dbe4ff;
+}
+
+/* 可复制公式可聚焦(键盘入口,见 UI-P3.6):焦点环是"当前焦点在公式上"的
+   唯一线索,不能只靠 :hover 表达可操作. */
+.object-expr[data-tex]:focus-visible,
+.eval-detail-line[data-tex]:focus-visible {
+    outline: 1px solid rgba(109, 213, 255, 0.65);
+    outline-offset: 2px;
+    border-radius: 3px;
+    color: #dbe4ff;
+}
+
+/* 展开细节的公式块:DOM 是 <details class="eval-details"> 下的
+   <div class="eval-detail-body">(控制器 createDetailSections 创建).
+   注意:带左边框/底色的**只包公式行**;域/方法/分段/分层这些纯文本元信息
+   在它外面(见 .eval-detail-meta-block),不再混进公式块. */
+.eval-detail-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 4px 0 2px;
+    padding: 6px 8px;
+    border-left: 2px solid rgba(109, 213, 255, 0.25);
+    border-radius: 0 6px 6px 0;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.eval-detail-line {
+    display: block;
+    color: #8e9fc7;
+}
+
+/* 纯文本元信息块(积分域/方法/分段/分层;求交采样分段):在公式块之外,
+   无左竖线/底色,字号小一档,颜色暗一档,一眼能看出是说明文字. */
+.eval-detail-meta-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2px 0 0;
+}
+
+.eval-detail-meta {
+    display: block;
+    font-size: 12px;
+    color: #7f8db3;
+    overflow-wrap: anywhere;
+}

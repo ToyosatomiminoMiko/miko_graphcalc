@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "src/math/math_rs",
+    "src/compiler/compiler_rs",
+    "src/render/render_rs",
+]
+resolver = "2"

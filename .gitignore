@@ -1,0 +1,7 @@
+node_modules/
+target/
+src/wasm/
+dist/
+.vscode
+__pycache__/
+*.pyc
