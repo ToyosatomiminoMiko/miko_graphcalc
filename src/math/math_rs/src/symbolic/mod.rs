@@ -33,7 +33,11 @@ mod parser;
 mod printing;
 mod simplify;
 
-pub(crate) use eval::{compile_runtime_expr, evaluate_runtime_expr};
+pub(crate) use eval::compile_runtime_expr;
+/// 查表版求值器只在测试里作为预绑定路径的参照物(见 `eval.rs`).
+#[cfg(test)]
+pub(crate) use eval::evaluate_runtime_expr;
+pub(crate) use eval::{bind_expression, evaluate_bound, BoundExpr, EvalContext};
 pub use latex::latex_expression;
 
 use std::collections::HashSet;

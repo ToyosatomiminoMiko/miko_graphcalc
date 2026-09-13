@@ -6,7 +6,9 @@ use crate::symbolic::{BinOp, Expr, UnaryOp};
 ///
 /// 每个函数只在这里登记一次:求值,符号求导和 LaTeX 显示都从这一张表取.
 /// 多参数/别名函数(pow,sec,log 等)在表达式归一化阶段改写为基础函数.
-type UnaryMathFunction = fn(f64) -> f64;
+/// 一元求值函数指针;`eval::bind_expression` 会在编译期把函数名解析成它
+/// (见 [`unary_eval`]),热点循环里不再按名字线性扫表.
+pub(crate) type UnaryMathFunction = fn(f64) -> f64;
 type DerivativeFunction = fn(&Expr) -> Expr;
 
 #[derive(Clone, Copy)]
@@ -330,6 +332,18 @@ pub(crate) fn apply_unary(name: &str, value: f64) -> Result<f64, String> {
         .find(|builtin| builtin.name == name)
         .map(|builtin| (builtin.eval)(value))
         .ok_or_else(|| format!("表达式暂不支持函数 {name}"))
+}
+
+/// 返回一元内置函数的求值函数指针;名字未登记时返回 `None`.
+///
+/// 供预绑定求值路径(`eval::bind_expression`)在**编译期**把 17 项线性扫
+/// (`apply_unary`)解析成函数指针,热点循环里不再按名字查找;见
+/// prompt/refactor-and-rust-migration.md §9.5.
+pub(crate) fn unary_eval(name: &str) -> Option<UnaryMathFunction> {
+    MATH_FUNCTIONS
+        .iter()
+        .find(|builtin| builtin.name == name)
+        .map(|builtin| builtin.eval)
 }
 
 /// 返回函数对应的 LaTeX 样式;不属于基础函数时返回 `None`.

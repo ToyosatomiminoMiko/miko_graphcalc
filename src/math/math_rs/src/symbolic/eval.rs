@@ -8,6 +8,8 @@
 //! - 非有限结果返回 `Ok(None)`(掩码语义),不是 `Err`;见 `eval_core.rs`
 //!   文件头契约.
 
+/// 只被测试里的查表版参考实现使用(见 `evaluate_runtime_expr`).
+#[cfg(test)]
 use std::collections::HashMap;
 
 use super::parser::{parse_expr, rewrite_aliases, validate_supported};
@@ -96,6 +98,190 @@ pub(crate) fn evaluate_with_lookup(
                 .map_err(|_| EvalError::UnsupportedCall(name.clone()))
         }
         Expr::List(_) => Err(EvalError::ListNotEvaluable),
+    }
+}
+
+// ============================================================
+// 预绑定求值(202609 性能改造 P0)
+// ============================================================
+//
+// 背景:`evaluate_with_lookup` 每个点都要按**名字**查一次上下文,而
+// `CompiledEvaluator` 旧实现更是每点 `ctx.insert(name.to_string(), value)`
+// --一次堆分配 + 一次字符串哈希.实测 context 记账占求值成本的 94-99%
+// (见 prompt/refactor-and-rust-migration.md §7.3).
+//
+// 这里在**构造期**把符号解析成槽位([`SymBinding`]),求值期只剩数组下标与
+// 一次匹配:零字符串,零哈希,零分配.语义必须与查表版逐点一致,
+// 由 `eval_core.rs` 的 `bound_and_lookup_paths_agree_pointwise` 对拍守住.
+
+/// 符号在求值期的取值来源(构造期解析一次).
+#[derive(Debug, Clone)]
+pub(crate) enum SymBinding {
+    /// 采样坐标槽:x=0,y=1,z=2.`x` 在所有维度都被覆写,所以永远是坐标.
+    Coord(u8),
+    /// 系数槽:`coefficients[index]`.
+    Coefficient(usize),
+    /// `y`/`z` 且存在同名系数:当前求值维度覆写了该坐标就取坐标,否则取系数.
+    ///
+    /// 这是历史语义的精确表达(见 `eval_core.rs` 文件头契约):`y`/`z` 在
+    /// 1D(interval/curve)与 2D 语境可以是合法参数名,只有被 eval_2d/eval_at
+    /// 覆写时才冲突.用运行期维度位判断,而不是在构造期猜维度--同一个
+    /// evaluator 先 eval_at 再 eval_1d 的旧行为也能逐点复现.
+    CoordOrCoefficient(u8, usize),
+    /// `y`/`z` 且没有同名系数:对应维度覆写了该坐标就是坐标,否则报未定义.
+    CoordOrUnbound(u8, String),
+    /// 内置常量(优先于变量,与 `evaluate_with_lookup` 的判定顺序一致).
+    Constant(f64),
+    /// 未绑定符号;保留原名以复现 `变量 '{}' 未定义` 文案.
+    Unbound(String),
+}
+
+/// 已把符号解析成槽位的求值树(与 [`Expr`] 同形,但热点路径无名字查找).
+#[derive(Debug)]
+pub(crate) enum BoundExpr {
+    Num(f64),
+    Sym(SymBinding),
+    Neg(Box<BoundExpr>),
+    Binary(BinOp, Box<BoundExpr>, Box<BoundExpr>),
+    /// 一元函数:函数指针在构造期解析(见 `builtins::unary_eval`).
+    Call(builtins::UnaryMathFunction, Box<BoundExpr>),
+    /// 函数未登记(或元数不是 1);求值时按旧文案报错.
+    UnsupportedCall(String),
+    /// 数组表达式不可直接求值.
+    ListNotEvaluable,
+}
+
+/// 预绑定求值上下文:坐标 + 系数,全部按槽位访问.
+#[derive(Debug, Clone)]
+pub(crate) struct EvalContext {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) z: f64,
+    /// 本次求值覆写的坐标个数:1 -> 只有 x;2 -> x,y;3 -> x,y,z.
+    /// 只被 [`SymBinding::CoordOrCoefficient`] / [`SymBinding::CoordOrUnbound`] 读.
+    pub(crate) dim: u8,
+    pub(crate) coefficients: Vec<f64>,
+}
+
+impl EvalContext {
+    fn coordinate(&self, slot: u8) -> f64 {
+        match slot {
+            0 => self.x,
+            1 => self.y,
+            _ => self.z,
+        }
+    }
+}
+
+/// 把已编译表达式绑定成槽位树.
+///
+/// `coefficient_names` 必须与 `EvalContext::coefficients` 一一对应(截断到
+/// 两者的公共长度,与旧实现 `coeff_names.iter().zip(coeff_values.iter())`
+/// 的口径一致).同名系数以**最后一个**为准(旧 `HashMap::insert` 覆盖).
+pub(crate) fn bind_expression(expr: &Expr, coefficient_names: &[String]) -> BoundExpr {
+    match expr {
+        Expr::Num(value) => BoundExpr::Num(*value),
+        Expr::Sym(name) => BoundExpr::Sym(bind_symbol(name, coefficient_names)),
+        Expr::Unary(UnaryOp::Neg, operand) => {
+            BoundExpr::Neg(Box::new(bind_expression(operand, coefficient_names)))
+        }
+        Expr::Binary(op, left, right) => BoundExpr::Binary(
+            *op,
+            Box::new(bind_expression(left, coefficient_names)),
+            Box::new(bind_expression(right, coefficient_names)),
+        ),
+        Expr::Call(name, args) => match args.as_slice() {
+            [arg] => match builtins::unary_eval(name) {
+                Some(function) => {
+                    BoundExpr::Call(function, Box::new(bind_expression(arg, coefficient_names)))
+                }
+                None => BoundExpr::UnsupportedCall(name.clone()),
+            },
+            _ => BoundExpr::UnsupportedCall(name.clone()),
+        },
+        Expr::List(_) => BoundExpr::ListNotEvaluable,
+    }
+}
+
+fn bind_symbol(name: &str, coefficient_names: &[String]) -> SymBinding {
+    // 顺序与 evaluate_with_lookup 一致:内置常量优先于变量.
+    if let Some(value) = builtins::constant_value(name) {
+        return SymBinding::Constant(value);
+    }
+    // rposition:同名系数以最后一个为准(旧 HashMap::insert 覆盖语义).
+    let coefficient = coefficient_names
+        .iter()
+        .rposition(|candidate| candidate == name);
+    match name {
+        "x" => SymBinding::Coord(0),
+        "y" => match coefficient {
+            Some(index) => SymBinding::CoordOrCoefficient(1, index),
+            None => SymBinding::CoordOrUnbound(1, name.to_string()),
+        },
+        "z" => match coefficient {
+            Some(index) => SymBinding::CoordOrCoefficient(2, index),
+            None => SymBinding::CoordOrUnbound(2, name.to_string()),
+        },
+        _ => match coefficient {
+            Some(index) => SymBinding::Coefficient(index),
+            None => SymBinding::Unbound(name.to_string()),
+        },
+    }
+}
+
+/// 对预绑定树求值;语义(含错误文案)与查表版逐点一致.
+pub(crate) fn evaluate_bound(expr: &BoundExpr, ctx: &EvalContext) -> Result<Option<f64>, String> {
+    match expr {
+        BoundExpr::Num(value) => Ok(finite_value(*value)),
+        BoundExpr::Sym(binding) => match binding {
+            SymBinding::Constant(value) => Ok(finite_value(*value)),
+            SymBinding::Coord(slot) => Ok(finite_value(ctx.coordinate(*slot))),
+            SymBinding::Coefficient(index) => Ok(finite_value(ctx.coefficients[*index])),
+            SymBinding::CoordOrCoefficient(slot, index) => {
+                let value = if *slot < ctx.dim {
+                    ctx.coordinate(*slot)
+                } else {
+                    ctx.coefficients[*index]
+                };
+                Ok(finite_value(value))
+            }
+            SymBinding::CoordOrUnbound(slot, name) => {
+                if *slot < ctx.dim {
+                    Ok(finite_value(ctx.coordinate(*slot)))
+                } else {
+                    Err(format!("变量 '{name}' 未定义"))
+                }
+            }
+            SymBinding::Unbound(name) => Err(format!("变量 '{name}' 未定义")),
+        },
+        BoundExpr::Neg(operand) => Ok(evaluate_bound(operand, ctx)?.map(|value| -value)),
+        BoundExpr::Binary(op, left, right) => {
+            let left = evaluate_bound(left, ctx)?;
+            let right = evaluate_bound(right, ctx)?;
+            match (left, right) {
+                (Some(left), Some(right)) => {
+                    let value = match op {
+                        BinOp::Add => left + right,
+                        BinOp::Sub => left - right,
+                        BinOp::Mul => left * right,
+                        BinOp::Div => left / right,
+                        BinOp::Pow => real_pow(left, right),
+                    };
+                    Ok(finite_value(value))
+                }
+                _ => Ok(None),
+            }
+        }
+        BoundExpr::Call(function, arg) => {
+            let Some(value) = evaluate_bound(arg, ctx)? else {
+                return Ok(None);
+            };
+            Ok(finite_value(function(value)))
+        }
+        BoundExpr::UnsupportedCall(name) => {
+            Err(format!("函数 {name} 只接受 1 个参数,当前收到 0 个"))
+        }
+        BoundExpr::ListNotEvaluable => Err("不能直接对数组表达式求值".to_string()),
     }
 }
 
@@ -196,6 +382,10 @@ fn odd_denominator_rational(x: f64) -> Option<(i64, u64)> {
 }
 
 /// 运行时求值错误文案(常量折叠路径见 `simplify::evaluate_constant`).
+///
+/// 只服务于查表版参考实现;生产路径改用预绑定求值,错误文案内联在
+/// [`evaluate_bound`] 里(两者由对拍测试守住一致).
+#[cfg(test)]
 fn runtime_error(error: EvalError) -> String {
     match error {
         EvalError::UnboundSymbol(name) => format!("变量 '{name}' 未定义"),
@@ -206,6 +396,12 @@ fn runtime_error(error: EvalError) -> String {
     }
 }
 
+/// 查表版运行时求值(旧实现),现在只作为预绑定路径的**测试参照物**.
+///
+/// 生产求值统一走 [`bind_expression`] + [`evaluate_bound`];这个函数保留下来
+/// 是为了 `eval_core.rs` 的逐点对拍(旧->新语义等价的唯一证明方式),不再有
+/// 非测试调用方.
+#[cfg(test)]
 pub(crate) fn evaluate_runtime_expr(
     expr: &RuntimeExpr,
     variables: &HashMap<String, f64>,

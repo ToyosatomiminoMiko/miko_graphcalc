@@ -8,7 +8,7 @@
 //! - 布局:二维/三维数组一律行主序(外层 y / 外层 z 中层 y,内层 x);
 //!   含端点整格 (n+1)(m+1) 与单元端 n×m 两种形态见 SampleShape,
 //!   由 integral_method::sample_shape_* 决定,采样侧不自行发明形状;
-//! - 坐标都是世界坐标,系数名与坐标名冲突防护在 eval_core::build_base_context
+//! - 坐标都是世界坐标,系数名与坐标名冲突防护在 eval_core::build_coefficients
 //!   (1D 允许 y/z 作系数,2D 允许 z,因为对应维度不会覆写它们);
 //! - 规模护栏:每个入口先过 config 的上限(MAX_GRID_N / MAX_CURVE_SAMPLES /
 //!   MAX_VECTOR_FIELD_POINTS),在分配前报错.
