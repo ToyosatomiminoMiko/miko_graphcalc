@@ -19,6 +19,7 @@ import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { withStatementSpan } from '../errors';
 import { buildObjectBlueprint } from './objects/build';
+import { createObjectReferenceResolver } from './objects/references';
 import { blueprintHasCoefficients, type ObjectBlueprint } from './objects/types';
 import { assertKnownOptions, findOption, toFiniteNumber } from './options';
 import { cachedDerivativeExpression } from './expression';
@@ -56,6 +57,43 @@ export function objectStatementsByName(ast: AstProgram): Map<string, ObjectState
         map.set(statement.name, statement);
     }
     return map;
+}
+
+/**
+ * 所有"已声明的值名" -> 类型说明(供对象相加的引用解析报错).
+ *
+ * 对象相加的引用解析用它把"引用了一个不是 curve/surface 的已声明名字"
+ * 识别成错误,而不是当成自由参数凭空多出一个滑块(见 objects/references.ts).
+ * 说明文字进报错文案:`sphere 对象` 与 `derivative 产物` 对用户是两种不同的
+ * 误解,分开写才能给出可操作的提示.
+ *
+ * param 不在此列(参数名在引用解析里优先,保持既有语义);
+ * matrix/transform/animation 也不参与函数表达式,同样不计入.
+ */
+function collectDeclaredValueNames(ast: AstProgram): Map<string, string> {
+    const names = new Map<string, string>();
+    for (const statement of ast.statements) {
+        switch (statement.type) {
+            case 'object':
+                names.set(statement.name, `${statement.kind} 对象`);
+                break;
+            case 'derivative':
+                names.set(statement.name, 'derivative 产物');
+                break;
+            case 'analysis':
+                names.set(statement.name, '分析产物');
+                break;
+            case 'integral':
+                names.set(statement.name, '积分产物');
+                break;
+            case 'intersection':
+                names.set(statement.name, '求交产物');
+                break;
+            default:
+                break;
+        }
+    }
+    return names;
 }
 
 /** `derivative` 求导语句允许的选项(与对象外观一致,transform/animation 不继承). */
@@ -413,6 +451,14 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
     // "region" 声明按名引用两条边界 curve(允许引用声明在区域之后的对象),
     // 索引构建复用 objectStatementsByName.
     const statementsByName = objectStatementsByName(ast);
+    // 对象相加(curve/surface 表达式按名引用同类对象)的引用解析器:
+    // 参数名优先于对象名,已声明但不是 curve/surface 的名字报错而不是
+    // 静默变成自由参数(见 objects/references.ts).
+    const references = createObjectReferenceResolver(
+        statementsByName,
+        collectDeclaredValueNames(ast),
+        new Set(params.keys()),
+    );
     for (const statement of ast.statements) {
         if (statement.type !== 'object') continue;
         withStatementSpan(statement.span, () => {
@@ -420,6 +466,7 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
                 statement,
                 nextId,
                 statementsByName,
+                references,
             );
             if (blueprint) {
                 if (objectNames.has(blueprint.name)) {

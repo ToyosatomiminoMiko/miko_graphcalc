@@ -26,6 +26,15 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   显式声明**循环类系数**(球坐标方位角这类圆周量),越界值按区间长度回绕到
   `[min, max)` 而不是夹到端点;不写 `cyclic` 的参数一律按普通参数处理
 - `curve` / `surface` / `vector_field` / `point` / `vector`:基础几何对象
+- 对象相加:`curve`/`surface` 的表达式可以按名引用同类对象,`+` 就是逐点
+  函数相加(`curve c3 = c1 + c2` 即 y = f1(x) + f2(x),`surface s3 = s1 + s2`
+  即 z = f1(x,y) + f2(x,y));加减乘除按普通表达式优先级生效,链式相加
+  (`curve c4 = c3 + c1`)与任意声明顺序都成立,成环报错.引用在归一化**之前**
+  展开成被引用对象自己的表达式与区间:没有显式 `range` 时定义域取被引用
+  对象区间的交集(x 区间 / x-y 矩形,交集为空报错),显式 `range` 优先;
+  curve 只能引用 curve,surface 只能引用 surface,引用体积/点/向量/implicit
+  对象或 `derivative` 等产物会报错而不是悄悄变成自由参数.相加结果照常参与
+  `region` / `integral` / `derivative`;示例 `example/object_addition.scad`
 - `region`:面积图形(两条曲线围成的 x 型带状区域,绘制在 z=0 平面),可
   作为二重积分的积分域;边界曲线只允许不带静态变换/动画的纯函数曲线
 - `matrix` / `transform`:对象场景变换
@@ -161,6 +170,10 @@ XZ/XY/YZ 三个坐标平面,各有独立开关,同一行排列.
   体积域 `integral(S)` 不接受 `range` 选项(域 = 渲染出的世界实体)
 - `region` 边界曲线带静态 `transform` 或 `animation`:编译期报错
 - `region` 区域本体 V1 不支持变换/动画,不接受未知选项
+- 对象相加(按名引用同类对象)的目标必须是**已声明的 `curve`/`surface`
+  对象语句**:`derivative` 产出的曲线/曲面暂不能被引用(它是语句产物而不是
+  对象声明),`intersection`/`integral`/`gradient` 等产物同理,引用会编译期
+  报错并说明是哪种产物
 - `box`/`cone`/`cylinder`/`frustum` 的 `gradient`/`derivative`:隐式函数是
   max 型分段函数,暂未支持(报"暂不支持 ... 体积对象");当前隐式场源只有
   `sphere` 与 `implicit`

@@ -280,6 +280,12 @@ describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(row.classList.contains('is-hidden')).toBe(true);
         expect(row.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
         expect(row.querySelector<StubElement>('.row-visibility-btn')!.textContent).toBe('显示');
+        // 状态芯片挂在名称行里,与对象名同一行;公式仍是名称行的兄弟(另起一行).
+        const head = row.querySelector<StubElement>('.object-head')!;
+        expect(head.querySelector<StubElement>('.object-name')).not.toBeNull();
+        expect(head.querySelector<StubElement>('.row-state')).not.toBeNull();
+        expect(head.querySelector<StubElement>('.object-expr')).toBeNull();
+        expect(head.parent).toBe(row.querySelector<StubElement>('.object-main'));
     });
 
     it('三类求值对象各自绑到对应的切换入口', () => {

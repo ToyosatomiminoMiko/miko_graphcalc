@@ -10,6 +10,13 @@
  * region 的边界曲线又必须与边界 curve 自身同源,故统一对 raw 语句表达式
  * 再做一次归一化后提取系数--normalizeExpression 自带缓存,成本可忽略).
  *
+ * 对象相加(curve/surface 表达式按名引用同类对象,如 `curve c3 = c1 + c2`)
+ * 由同目录 ./references.ts 在归一化**之前**展开:表达式里的对象名必须替换成
+ * 那个对象自己的表达式,否则会被符号引擎当成自由参数.展开后的表达式与
+ * 区间交集照旧填进这里的 blueprint,物化/渲染路径完全无感;region 的边界
+ * 曲线同样经引用解析器取值,保证"边界 curve 的表达式/区间"与边界对象自身
+ * 同源.
+ *
  * region(面积图形)实体:V1 只支持 x 型带状区域,不持有曲线几何拷贝,只按
  * 名引用两条边界 `curve`;后续规划(y 型 / 极坐标 r-θ / 多曲线边界 /
  * region 参与求交 / region 作为曲面底域)见 `ir/types.ts` 的
@@ -37,6 +44,10 @@ import {
     parseArrayStrings,
     type ExpressionArray,
 } from '../expression';
+import type {
+    ObjectReferenceResolver,
+    ResolvedObjectExpression,
+} from './references';
 import type { ObjectBlueprint } from './types';
 
 const RENDER_CONFIG_VOLUME_OPACITY = RENDER_CONFIG.volume.defaultOpacity;
@@ -130,12 +141,41 @@ function parseXRange2(raw: string, context: string): [number, number] {
 }
 
 /** 从 curve 声明语句读 x 区间;缺省取曲线默认 range. */
-function curveRangeFromStatement(statement: ObjectStatement): [number, number] {
+function curveRangeFromStatement(
+    statement: ObjectStatement,
+    references?: ObjectReferenceResolver,
+): [number, number] {
     const raw = findOption(statement.options, 'range');
-    if (raw === undefined) {
-        return [...NUMERIC_CONFIG.curve.defaultRange] as [number, number];
+    if (raw !== undefined) {
+        return parseXRange2(raw, `曲线 ${statement.name}`);
     }
-    return parseXRange2(raw, `曲线 ${statement.name}`);
+    // 没有显式 range 但表达式引用了其它曲线(对象相加)时,定义域是那些
+    // 曲线 x 区间的交集(见 ./references.ts);两者都没有才落到默认区间.
+    const referenced = referencedCurveRange(references?.resolve(statement));
+    if (referenced) return referenced;
+    return [...NUMERIC_CONFIG.curve.defaultRange] as [number, number];
+}
+
+/**
+ * 对象引用给出的 x 区间交集(curve 表达式用);没有引用时 undefined.
+ *
+ * `ResolvedObjectExpression.range` 是 curve x 区间与 surface 矩形的联合类型,
+ * 这里按 curve 语义取前两项,避免在调用处散落类型断言.
+ */
+function referencedCurveRange(
+    resolved: ResolvedObjectExpression | undefined,
+): [number, number] | undefined {
+    if (!resolved || !resolved.range) return undefined;
+    return [resolved.range[0], resolved.range[1]];
+}
+
+/** 对象引用给出的 x-y 矩形交集(surface 表达式用);没有引用时 undefined. */
+function referencedSurfaceRange(
+    resolved: ResolvedObjectExpression | undefined,
+): [number, number, number, number] | undefined {
+    const range = resolved?.range;
+    if (!range || range.length !== 4) return undefined;
+    return [range[0], range[1], range[2], range[3]];
 }
 
 /** 两条边界曲线 x 区间交集;为空时报错(区域无定义带). */
@@ -248,6 +288,7 @@ export function buildObjectBlueprint(
     statement: ObjectStatement,
     id: number,
     statementsByName: ReadonlyMap<string, ObjectStatement> = new Map(),
+    references?: ObjectReferenceResolver,
 ): ObjectBlueprint | null {
     const color = stripQuotes(
         findOption(statement.options, 'color')
@@ -257,11 +298,15 @@ export function buildObjectBlueprint(
     switch (statement.kind) {
         case 'curve': {
             assertKnownOptions(statement.options, CURVE_OPTION_NAMES, `曲线 ${statement.name}`);
-            const expr = normalizeExpression(statement.expr);
+            // 先解析显式 range,再展开对象引用:显式区间优先于"被引用对象区间
+            // 的交集",顺序反了会让引用交集把显式 range 顶掉.
             const rawRange = findOption(statement.options, 'range');
-            const range = rawRange
+            const ownRange = rawRange
                 ? parseXRange2(rawRange, `曲线 ${statement.name}`)
                 : undefined;
+            const resolved = references?.resolve(statement);
+            const expr = resolved?.expr ?? normalizeExpression(statement.expr);
+            const range = ownRange ?? referencedCurveRange(resolved);
             const segments = parseCappedPositiveInteger(
                 findOption(statement.options, 'segments'),
                 `曲线 ${statement.name} 的 segments`,
@@ -281,11 +326,12 @@ export function buildObjectBlueprint(
 
         case 'surface': {
             assertKnownOptions(statement.options, SURFACE_OPTION_NAMES, `曲面 ${statement.name}`);
-            const expr = normalizeExpression(statement.expr);
             const rawRange = findOption(statement.options, 'range');
+            const resolved = references?.resolve(statement);
+            const expr = resolved?.expr ?? normalizeExpression(statement.expr);
             const rangeValues = rawRange
                 ? parseNumberListOfSize(rawRange, 4, `曲面 ${statement.name} 的 range`)
-                : [...NUMERIC_CONFIG.surface.defaultRange];
+                : referencedSurfaceRange(resolved) ?? [...NUMERIC_CONFIG.surface.defaultRange];
             if (rangeValues[0] >= rangeValues[1] || rangeValues[2] >= rangeValues[3]) {
                 throw new Error(`曲面 ${statement.name} 的 range 需要 min < max`);
             }
@@ -523,8 +569,8 @@ export function buildObjectBlueprint(
             const range = rawRange
                 ? parseXRange2(rawRange, `区域 ${statement.name}`)
                 : intersectCurveRanges(
-                    curveRangeFromStatement(curveA),
-                    curveRangeFromStatement(curveB),
+                    curveRangeFromStatement(curveA, references),
+                    curveRangeFromStatement(curveB, references),
                     `区域 ${statement.name}`,
                 );
             const opacity = parseOpacity(
@@ -547,9 +593,13 @@ export function buildObjectBlueprint(
                 range,
                 // 系数从"归一化后的边界表达式"提取,与边界 curve 自身 blueprints
                 // 的 coefficientNames 保持同源(见文件头 202609 review 结论;
-                // 归一化有缓存,重复调用成本可忽略).
+                // 归一化有缓存,重复调用成本可忽略).边界曲线自己也可能由对象
+                // 相加得到,所以表达式与区间都走引用解析器(与 curve 分支同源).
                 coefficientNames: extractCoefficientNames(
-                    [normalizeExpression(curveA.expr), normalizeExpression(curveB.expr)],
+                    [
+                        references?.resolve(curveA).expr ?? normalizeExpression(curveA.expr),
+                        references?.resolve(curveB).expr ?? normalizeExpression(curveB.expr),
+                    ],
                     new Set(['x']),
                 ),
                 color,

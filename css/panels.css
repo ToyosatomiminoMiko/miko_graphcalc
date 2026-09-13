@@ -262,9 +262,10 @@
     opacity: 0.6;
 }
 
-/* 显隐状态文字:透明度之外的第二条线索(色觉/低对比度用户). */
+/* 显隐状态文字:透明度之外的第二条线索(色觉/低对比度用户).
+   芯片与对象名同处 `.object-head` 这一行,按行居中而不是顶对齐. */
 .row-state {
-    align-self: flex-start;
+    align-self: center;
     padding: 1px 6px;
     border-radius: 999px;
     font-size: 10px;
@@ -385,6 +386,15 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
+}
+
+/* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 ObjectListController
+   `_createEntityRow` 的 `.object-head`),公式另起一行--状态不落单占一行. */
+.object-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
 .object-name {

@@ -31,6 +31,7 @@ DSL(`.miko` 语法)源码片段.文件扩展名沿用 `.scad`(项目里没有示
 
 | 文件 | 覆盖功能 |
 | --- | --- |
+| `object_addition.scad` | 对象相加:`curve c3 = c1 + c2` / `surface s3 = s1 + s2` 按名引用同类对象;链式相加,前向引用,区间取交集,显式 `range` 优先,相加结果照常参与 `region` / `derivative` |
 | `intersection_line_curves.scad` | 曲线 ∩ 曲线 -> 离散交点 |
 | `intersection_surfaces.scad` | 曲面 ∩ 曲面(平面)-> 三维交线 |
 | `double_integral_region.scad` | `region` 面积图形作域的二重积分(辛普森法) |

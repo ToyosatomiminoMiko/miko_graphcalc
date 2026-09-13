@@ -313,12 +313,16 @@ export class ObjectListController {
                 'object-expr',
                 sceneObjectExpression(object),
             );
-        main.append(name, expression);
+        // 名称行(`.object-head`):对象名与状态芯片同一行,状态紧跟名字,不落到
+        // 公式下面单独占一行(见 panels.css 的 `.object-head`).
+        const head = createElement('div', 'object-head');
+        head.append(name);
         // 隐藏原来只靠 is-hidden 的透明度:再补一条文字状态,色觉/低对比度
         // 用户也能看出这个对象被排除了.
         if (!object.enabled) {
-            main.append(createElement('span', 'row-state', '已隐藏'));
+            head.append(createElement('span', 'row-state', '已隐藏'));
         }
+        main.append(head, expression);
 
         // 行首显隐按钮:点它切换该实体是否参与渲染与计算.按钮与 main 平级,
         // 不在任何 <summary> 里,不会与列表开合互相干扰.
