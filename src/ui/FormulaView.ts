@@ -81,7 +81,8 @@ function renderLatexInto(latex: string, element: HTMLElement): void {
  *   热区,点它是"展开/收起",不该顺手把 TeX 写进剪贴板.
  *
  * 可复制 = 可聚焦(UI-P3.6):除 `data-tex` 外补 `tabindex="0"` 与 `role`/
- * `aria-label`,复制因此有键盘入口(FormulaCopyController 同时监听 Enter/Space).
+ * `aria-label`,复制因此有键盘入口(FormulaCopyController 把 Enter/Space 规则
+ * 注册进 KeyboardController).
  * 不可复制时这些属性一个都不加:摘要行里的公式处在 `<summary>` 内部,再塞一个
  * 可聚焦控件会造成嵌套交互元素.
  */

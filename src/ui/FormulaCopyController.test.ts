@@ -2,9 +2,11 @@
  * 公式复制控制器单测(UI-P3.6).
  *
  * 复制必须有键盘入口:可复制公式由 FormulaView 加了 `tabindex`/`role`,
- * 本控制器同时处理 click 与 Enter/Space.这里在 node 里走 legacy 剪贴板回退
- * (`window.isSecureContext = false` + `document.execCommand`),覆盖成功/失败
- * 两条回显路径与"非公式目标不响应".
+ * 本控制器提供 `keyboardBinding()` 供 KeyboardController 分发,自己只绑 click.
+ * 这里覆盖:binding 的键名与目标放行规则,click 委托,成功/失败两条回显路径.
+ * `preventDefault` 归 KeyboardController 管,所以断言在 KeyboardController.test.ts.
+ *
+ * 剪贴板走 legacy 回退(`window.isSecureContext = false` + `document.execCommand`).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
@@ -53,49 +55,36 @@ describe('鼠标与键盘两条复制入口(UI-P3.6)', () => {
         controller.dispose();
     });
 
-    it('Enter 激活复制并阻止默认行为', async () => {
-        const { stub, controller, hint, root, formula } = setup();
-        const preventDefault = vi.fn();
+    it('Enter 命中可复制公式时返回处理器并复制', async () => {
+        const { stub, controller, hint, formula } = setup();
 
-        root.dispatch('keydown', {
-            key: 'Enter',
-            target: formula,
-            preventDefault,
-        });
+        // 键盘监听已上收到 KeyboardController;这里只验证本控制器给出的规则.
+        const run = controller.keyboardBinding()
+            .resolve({ target: formula } as unknown as KeyboardEvent);
 
+        expect(run).not.toBeNull();
+        run?.();
         await vi.waitFor(() => {
             expect(stub.execCommand.calls).toEqual(['copy']);
             expect(hint.textContent).toBe('已复制 TeX');
         });
-        expect(preventDefault).toHaveBeenCalledTimes(1);
         controller.dispose();
     });
 
-    it('Space 激活复制(Space 默认会滚页面,必须 preventDefault)', async () => {
-        const { stub, controller, root, formula } = setup();
-        const preventDefault = vi.fn();
+    it('Space 同样命中(默认键名与遗留 Spacebar 都声明)', () => {
+        const { controller } = setup();
 
-        root.dispatch('keydown', {
-            key: ' ',
-            target: formula,
-            preventDefault,
-        });
-
-        await vi.waitFor(() => {
-            expect(stub.execCommand.calls).toEqual(['copy']);
-        });
-        expect(preventDefault).toHaveBeenCalledTimes(1);
+        expect(controller.keyboardBinding().keys).toEqual(['Enter', ' ', 'Spacebar']);
+        expect(controller.keyboardBinding().resolve({ target: null } as unknown as KeyboardEvent))
+            .toBeNull();
         controller.dispose();
     });
 
-    it('其它按键不复制,不拦默认行为', () => {
-        const { stub, controller, root, formula } = setup();
-        const preventDefault = vi.fn();
+    it('目标不是可复制公式时放行(resolve 返回 null)', () => {
+        const { controller, root } = setup();
 
-        root.dispatch('keydown', { key: 'a', target: formula, preventDefault });
-
-        expect(stub.execCommand.calls).toEqual([]);
-        expect(preventDefault).not.toHaveBeenCalled();
+        expect(controller.keyboardBinding()
+            .resolve({ target: root } as unknown as KeyboardEvent)).toBeNull();
         controller.dispose();
     });
 

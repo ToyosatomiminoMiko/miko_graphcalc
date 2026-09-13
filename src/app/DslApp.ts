@@ -122,6 +122,8 @@ export class DslApp {
             onHome: () => this.renderController.resetHome(),
             onRun: () => void this.run(),
         });
+        // 公式复制的 Enter/Space 也注册进唯一的键盘出口,控制器本身不再绑 keydown.
+        this.keyboardController.register(this.formulaCopyController.keyboardBinding());
         this.keyboardController.bind();
 
         window.addEventListener('resize', this.onResize);

@@ -436,6 +436,11 @@ export interface StubDocument {
     createDocumentFragment(): StubElement;
     querySelector<T>(selector: string): T | null;
     querySelectorAll<T>(selector: string): T[];
+    /** document 级键盘监听(KeyboardController 的全局快捷键绑在这里). */
+    addEventListener(type: string, handler: (event: StubEvent) => void): void;
+    removeEventListener(type: string, handler: (event: StubEvent) => void): void;
+    /** 测试用:触发 document 上的监听;真 DOM 的事件目标是当前聚焦元素. */
+    dispatch(type: string, event?: Partial<StubEvent>): void;
 }
 
 /**
@@ -462,6 +467,8 @@ export function installDomStub(): DomStub {
         return found as unknown as T[];
     };
 
+    const documentListeners = new Map<string, Array<(event: StubEvent) => void>>();
+
     const document: StubDocument = {
         documentElement,
         body,
@@ -470,6 +477,30 @@ export function installDomStub(): DomStub {
         createDocumentFragment: () => new StubElement('#fragment'),
         querySelector: <T>(selector: string) => (selectAll<T>(selector)[0] ?? null),
         querySelectorAll: <T>(selector: string) => selectAll<T>(selector),
+        addEventListener: (type, handler) => {
+            const list = documentListeners.get(type) ?? [];
+            list.push(handler);
+            documentListeners.set(type, list);
+        },
+        removeEventListener: (type, handler) => {
+            const list = documentListeners.get(type);
+            const index = list?.indexOf(handler) ?? -1;
+            if (index >= 0) list?.splice(index, 1);
+        },
+        dispatch: (type, event = {}) => {
+            const full: StubEvent = {
+                type,
+                target: body,
+                key: '',
+                ctrlKey: false,
+                metaKey: false,
+                clientX: 0,
+                clientY: 0,
+                preventDefault: () => {},
+                ...event,
+            };
+            for (const handler of [...(documentListeners.get(type) ?? [])]) handler(full);
+        },
     };
 
     const resizeObservers: StubResizeObserver[] = [];

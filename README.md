@@ -1,5 +1,7 @@
 # miko_graphcalc
 
+入口:`https://toyosatomiminomiko.github.io/miko_graphcalc/`
+
 GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 `DslApp` 驱动 `.miko` DSL.
 

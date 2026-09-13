@@ -14,8 +14,13 @@
  * 提示文字淹没.
  *
  * 键盘入口(见 UI-P3.6):可复制公式由 FormulaView 加了 `tabindex="0"` 与
- * `role="button"`,这里同时监听 Enter/Space,复制不再只有鼠标一条路径.
+ * `role="button"`,复制因此有条键盘路径,不再只有鼠标.
+ *
+ * 键盘监听不在这里绑:全应用只有 KeyboardController 对 document 绑一次
+ * keydown,本控制器用 `keyboardBinding()` 把"Enter/Space + 目标是可复制公式"
+ * 这条规则注册进去,由它统一分发.
  */
+import type { KeyboardBinding } from '../service/KeyboardController';
 
 const HINT_RESET_DELAY = 1200;
 
@@ -77,9 +82,24 @@ export class FormulaCopyController {
         this.abortController = new AbortController();
         const options = { signal: this.abortController.signal };
         root.addEventListener('click', this.onClick, options);
-        // 键盘入口与点击走同一个委托根:公式本身可聚焦(见 FormulaView),
-        // 但 KaTeX 内部节点也可能成为事件目标,所以仍然从 target 往上找.
-        root.addEventListener('keydown', this.onKeyDown, options);
+    }
+
+    /**
+     * 键盘激活入口(UI-P3.6):Enter/Space 复制聚焦的公式.
+     *
+     * 只描述"哪些键 + 命中哪个元素 + 命中后做什么",监听与 preventDefault
+     * 交给 KeyboardController,这样键盘事件只有一个出口.
+     */
+    keyboardBinding(): KeyboardBinding {
+        return {
+            keys: ['Enter', ' ', 'Spacebar'],
+            // 公式本身可聚焦(见 FormulaView),但 KaTeX 内部节点也可能成为
+            // 事件目标,所以仍然从 target 往上找.
+            resolve: (event) => {
+                const tex = this._texFrom(event.target);
+                return tex === null ? null : () => void this._copy(tex);
+            },
+        };
     }
 
     dispose(): void {
@@ -96,21 +116,6 @@ export class FormulaCopyController {
     private readonly onClick = (event: MouseEvent): void => {
         const tex = this._texFrom(event.target);
         if (tex === null) return;
-        void this._copy(tex);
-    };
-
-    /**
-     * Enter/Space 激活可复制公式(与原生 button 的键盘行为一致).
-     *
-     * `preventDefault` 是必需的:Space 默认会滚动页面.
-     */
-    private readonly onKeyDown = (event: KeyboardEvent): void => {
-        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') {
-            return;
-        }
-        const tex = this._texFrom(event.target);
-        if (tex === null) return;
-        event.preventDefault();
         void this._copy(tex);
     };
 
