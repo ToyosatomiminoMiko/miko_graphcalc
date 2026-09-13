@@ -254,6 +254,33 @@ SceneIR(纯数据,不含 three.js/DOM)
 - [ComputeFacade.ts](src/math/compute/ComputeFacade.ts):数值计算门面
   (曲线采样/积分);`math/compute/index.ts` 是 compute 层统一入口
 
+### 目录分层(202609 重构后)
+
+按 `prompt/refactor-and-rust-migration.md` 执行完的四批重构(1c IR 切文件与
+3c 统一 client 按建议砍掉):
+
+```text
+src/ir/             零依赖叶子:SceneIR 等纯数据契约(index.ts 统一入口)
+src/config/         零依赖叶子:数值/渲染/UI 默认值(含 SphericalAngleConvention)
+src/compiler/       AST -> IR;矩阵后端 matrixOps.ts
+src/math/
+  adapters/         系数/求交的纯数据转换
+  matrix/           行主序 Mat4 与矩阵运算接口(原 tensor/,无张量)
+  compute/
+    scheduling/     与领域无关的调度原语(ComputeWorkerClient/LatestRequestExecutor)
+    wasm/           WASM 粘合(wasmWorkerRuntime)
+    domain/         curve / surface / vectorField / integral / intersection 编组
+    ComputeFacade   曲线采样 + 积分门面;dispose() 收口 5 个领域 dispose*
+  math_rs/          Rust 数值内核(表达式求值/采样/积分/求交)
+src/render/         只消费 IR;渲染层不再自行解析表达式
+src/ui/ src/app/    控制与编排
+```
+
+数值求值链路(`math_rs::eval_core::CompiledEvaluator`)在构造期把符号解析成
+槽位(`symbolic::eval::SymBinding`),求值期零字符串/零哈希/零分配;旧
+`HashMap<String, f64>` 查表版保留为测试参照物并用逐点对拍守住语义.
+
+
 ## 二/一次"运行"的完整过程
 
 `index.html` 加载 `src/main.ts`,后者只做:
