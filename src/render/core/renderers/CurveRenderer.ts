@@ -1,6 +1,6 @@
 /**
  * 曲线渲染器.
- * 数值采样统一走 MathComputeEngine,渲染层不再自行解析表达式.
+ * 数值采样统一走 ComputeFacade,渲染层不再自行解析表达式.
  *
  * 采样层(`sample_curve`)会在定义域空洞/竖直渐近线处把曲线切成多段,
  * 返回 `{ points, offsets }`.渲染层据此为每段创建一条独立折线(THREE.Line),
@@ -12,12 +12,12 @@ import { NUMERIC_CONFIG } from '../../../config/numericConfig';
 import type { IRenderer } from './IRenderer';
 import type { CurveObject } from '../../../ir';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import { sharedCurveSamplingEngine as curveComputeEngine } from '../../../math/compute/MathComputeEngine';
-import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
 import {
+    sharedComputeFacade as curveComputeEngine,
     LatestRequestExecutor,
+    type CurveSampleResult,
     type RequestClient,
-} from '../../../math/compute/scheduling/LatestRequestExecutor';
+} from '../../../math/compute';
 import { reportSamplingFailure } from '../samplingErrors';
 
 type CurveRendererRequest = {
@@ -29,7 +29,7 @@ type CurveRendererRequest = {
     segments: number;
 };
 
-// CurveRenderer 的请求形状与 MathComputeEngine 直接一致.
+// CurveRenderer 的请求形状与 ComputeFacade 直接一致.
 // 每个曲线 renderer 都有一个 executor,拖动滑块时不会向共享 worker 堆积旧请求.
 const curveRequestClient: RequestClient<CurveRendererRequest, CurveSampleResult> = {
     request(request) {

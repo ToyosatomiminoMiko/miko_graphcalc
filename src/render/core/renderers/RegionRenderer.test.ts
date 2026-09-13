@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { RegionRenderer } from './RegionRenderer';
-import { sharedCurveSamplingEngine } from '../../../math/compute/MathComputeEngine';
+import { sharedComputeFacade } from '../../../math/compute/ComputeFacade';
 import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
 import type { CurveObject, RegionObject } from '../../../ir';
 
@@ -81,7 +81,7 @@ afterEach(() => {
 
 describe('RegionRenderer 边界分段(RND-P3.7)', () => {
     it('采样 offsets 只有一段时,每条边界一条折线', async () => {
-        vi.spyOn(sharedCurveSamplingEngine, 'sampleCurve').mockResolvedValue(sampled());
+        vi.spyOn(sharedComputeFacade, 'sampleCurve').mockResolvedValue(sampled());
         const renderer = createRenderer();
         await drawOnce(renderer);
 
@@ -95,7 +95,7 @@ describe('RegionRenderer 边界分段(RND-P3.7)', () => {
 
     it('offsets 有多段时逐段建线,不画横跨空洞的伪连接线', async () => {
         // 3 + 2 两段
-        vi.spyOn(sharedCurveSamplingEngine, 'sampleCurve')
+        vi.spyOn(sharedComputeFacade, 'sampleCurve')
             .mockResolvedValue(sampled([0, 3, 5]));
         const renderer = createRenderer();
         renderer.draw();
@@ -116,7 +116,7 @@ describe('RegionRenderer 边界分段(RND-P3.7)', () => {
 
 describe('RegionRenderer 材质释放(RND-P2.5)', () => {
     it('重建填充面与边界线时释放上一轮材质', async () => {
-        vi.spyOn(sharedCurveSamplingEngine, 'sampleCurve').mockResolvedValue(sampled());
+        vi.spyOn(sharedComputeFacade, 'sampleCurve').mockResolvedValue(sampled());
         const renderer = createRenderer();
         await drawOnce(renderer);
 
@@ -135,7 +135,7 @@ describe('RegionRenderer 材质释放(RND-P2.5)', () => {
     });
 
     it('dispose 释放最后一轮材质', async () => {
-        vi.spyOn(sharedCurveSamplingEngine, 'sampleCurve').mockResolvedValue(sampled());
+        vi.spyOn(sharedComputeFacade, 'sampleCurve').mockResolvedValue(sampled());
         const renderer = createRenderer();
         await drawOnce(renderer);
 

@@ -16,7 +16,7 @@ import { AnimationPlayer } from '../render/core/AnimationPlayer';
 import { AnalysisRenderer } from '../render/core/renderers/AnalysisRenderer';
 import { IntersectionRenderer } from '../render/core/renderers/IntersectionRenderer';
 import { DslIntegralRenderer } from '../render/visualization/DslIntegralRenderer';
-import { MathComputeEngine } from '../math/compute/MathComputeEngine';
+import { ComputeFacade } from '../math/compute';
 import { CameraToggle } from '../render/controls/CameraToggle';
 import { ViewCubeController } from '../render/controls/ViewCubeController';
 import { RotationLockController } from '../render/controls/RotationLockController';
@@ -34,11 +34,6 @@ import { SceneStore } from './SceneStore';
 import { DiagnosticsController } from '../ui/DiagnosticsController';
 import type { DiagnosticEntry } from '../ui/DiagnosticsController';
 import { ObjectListController } from '../ui/ObjectListController';
-import { disposeCurveComputeClient } from '../math/compute/domain/curve/CurveComputeClient';
-import { disposeSurfaceComputeClient } from '../math/compute/domain/surface/SurfaceComputeClient';
-import { disposeVectorFieldComputeClient } from '../math/compute/domain/vectorField/VectorFieldComputeClient';
-import { disposeIntegralWorker } from '../math/compute/domain/integral/IntegralCompute';
-import { disposeIntersectionComputeClient } from '../math/compute/domain/intersection/IntersectionComputeClient';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;
@@ -48,7 +43,7 @@ export class RenderController {
     private readonly analysisRenderer: AnalysisRenderer;
     private readonly intersectionRenderer: IntersectionRenderer;
     private readonly integralRenderer: DslIntegralRenderer;
-    private readonly computeEngine: MathComputeEngine;
+    private readonly computeEngine: ComputeFacade;
     /** 采样失败上报的退订函数,dispose 时必须调用. */
     private readonly stopSamplingFailureListener: () => void;
 
@@ -89,7 +84,7 @@ export class RenderController {
         this.sceneManager = new SceneManager(viewport);
         this.cameraManager = new CameraManager(viewport);
         this.plotter = new Plotter(this.sceneManager.getScene());
-        this.computeEngine = new MathComputeEngine();
+        this.computeEngine = new ComputeFacade();
         this.integralRenderer = new DslIntegralRenderer(
             this.sceneManager.getScene(),
             this.computeEngine,
@@ -366,16 +361,12 @@ export class RenderController {
         this.analysisRenderer.dispose();
         this.intersectionRenderer.dispose();
         this.plotter.dispose();
-        this.computeEngine.dispose();
         this.sceneManager.dispose();
 
         // 共享 worker 必须最后统一 terminate;前面的 renderer.dispose()
-        // 已经不再拥有销毁这些 client 的权利.
-        disposeCurveComputeClient();
-        disposeSurfaceComputeClient();
-        disposeVectorFieldComputeClient();
-        disposeIntegralWorker();
-        disposeIntersectionComputeClient();
+        // 已经不再拥有销毁这些 client 的权利.门面把 5 个领域 dispose*
+        // 收口成一次调用,这里不再逐个 import.
+        this.computeEngine.dispose();
     }
 
     private _updateAnimations(timestamp: number): void {

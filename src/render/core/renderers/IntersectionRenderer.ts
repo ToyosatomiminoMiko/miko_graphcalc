@@ -18,9 +18,7 @@ import {
     buildIntersectionInput,
     decodeIntersectionOutput,
 } from '../../../math/adapters/IntersectionMath';
-import {
-    requestIntersection,
-} from '../../../math/compute/domain/intersection/IntersectionComputeClient';
+import { requestIntersection } from '../../../math/compute';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 
 export type IntersectionResultCallback = (

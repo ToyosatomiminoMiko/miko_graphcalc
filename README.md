@@ -251,7 +251,8 @@ SceneIR(纯数据,不含 three.js/DOM)
 - [RenderController.ts](src/app/RenderController.ts):场景/相机/异步采样编排
 - [DslApp.ts](src/app/DslApp.ts):装配层 + rAF 主循环 + 参数刷新入口
 - [Plotter.ts](src/render/core/Plotter.ts):对象 id 到渲染器的路由门面
-- [MathComputeEngine.ts](src/math/compute/MathComputeEngine.ts):数值计算门面
+- [ComputeFacade.ts](src/math/compute/ComputeFacade.ts):数值计算门面
+  (曲线采样/积分);`math/compute/index.ts` 是 compute 层统一入口
 
 ## 二/一次"运行"的完整过程
 
@@ -299,7 +300,7 @@ new DslApp().start()
 | 曲线采样 | `CurveRenderer` | `CurveWorker` | `math_rs.sample_curve` | 顶点数组 |
 | 曲面采样 | `SurfaceRenderer` -> `SurfaceMesh` | `SurfaceWorker` | `render_rs.sample_and_process_surface` | 位置/颜色/法线/索引 |
 | 向量场采样 | `VectorFieldRenderer` | `VectorFieldWorker` | `math_rs.sample_vector_field` | 向量数组 |
-| 数值积分 | `DslIntegralRenderer` -> `MathComputeEngine` | `IntegralWorker` | `math_rs.integrate1d/2d`,带域 `integrate_region`(2D 区域)/`integrate_solid`(3D 实体) | 积分值/样本 |
+| 数值积分 | `DslIntegralRenderer` -> `ComputeFacade` | `IntegralWorker` | `math_rs.integrate1d/2d`,带域 `integrate_region`(2D 区域)/`integrate_solid`(3D 实体) | 积分值/样本 |
 | 求交 | `IntersectionRenderer` | `IntersectionWorker` | `math_rs.intersect_pair` | 交点/交线折线 |
 
 这些链路都使用 `LatestRequestExecutor`:同一时间最多一个请求真正在跑,高频拖动滑块时,旧请求会被标记为 `superseded`,只保留最新请求.这是防止 Worker 积压的关键.

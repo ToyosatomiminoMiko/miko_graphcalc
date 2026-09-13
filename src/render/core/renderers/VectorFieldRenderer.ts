@@ -3,9 +3,11 @@ import type { IRenderer } from './IRenderer';
 import type { VectorFieldObject } from '../../../ir';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
 import { VectorFieldMesh } from '../../visualization/VectorFieldMesh';
-import { vectorFieldComputeClient } from '../../../math/compute/domain/vectorField/VectorFieldComputeClient';
-import type { VectorFieldWorkerRequest } from '../../../math/compute/domain/vectorField/VectorFieldWorker';
-import { LatestRequestExecutor } from '../../../math/compute/scheduling/LatestRequestExecutor';
+import {
+    vectorFieldComputeClient,
+    LatestRequestExecutor,
+    type VectorFieldWorkerRequest,
+} from '../../../math/compute';
 import { reportSamplingFailure } from '../samplingErrors';
 
 /**

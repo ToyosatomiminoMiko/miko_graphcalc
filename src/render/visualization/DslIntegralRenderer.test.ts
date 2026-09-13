@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { DslIntegralRenderer } from './DslIntegralRenderer';
-import type { MathComputeEngine } from '../../math/compute/MathComputeEngine';
+import type { ComputeFacade } from '../../math/compute/ComputeFacade';
 import type { IntegralResult } from '../../math/compute/domain/integral/IntegralCompute';
 import type { CurveObject, IntegralTask, SceneObject } from '../../ir';
 
@@ -23,7 +23,7 @@ function deferredEngine() {
 }
 
 function makeRenderer(engine: unknown): DslIntegralRenderer {
-    return new DslIntegralRenderer(new THREE.Scene(), engine as MathComputeEngine);
+    return new DslIntegralRenderer(new THREE.Scene(), engine as ComputeFacade);
 }
 
 function curveObject(id: number): CurveObject {

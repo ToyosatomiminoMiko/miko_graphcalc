@@ -4,18 +4,16 @@ import { splitCoefficients } from '../../math/adapters/coefficientUtils';
 import { RENDER_CONFIG } from '../../config/renderConfig';
 import {
     surfaceComputeClient,
-} from '../../math/compute/domain/surface/SurfaceComputeClient';
-import { LatestRequestExecutor } from '../../math/compute/scheduling/LatestRequestExecutor';
+    LatestRequestExecutor,
+    type SurfaceWorkerRequest,
+    type SurfaceWorkerResponse,
+} from '../../math/compute';
 import { reportSamplingFailure } from '../core/samplingErrors';
 import {
     installSurfaceVertexColor,
     type SurfaceColorHandle,
 } from './surfaceColorMap';
 import type { SurfaceStyle } from '../types';
-import type {
-    SurfaceWorkerRequest,
-    SurfaceWorkerResponse,
-} from '../../math/compute/domain/surface/SurfaceWorker';
 
 // ============================================================
 // SurfaceMesh - 可复用的 3D 曲面网格封装

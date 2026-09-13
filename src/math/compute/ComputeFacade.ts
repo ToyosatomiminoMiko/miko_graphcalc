@@ -1,6 +1,10 @@
 /**
  * 数值计算门面.
- * 当前先把积分计算收口到这里,后续再把曲线/曲面/向量场采样逐步迁入.
+ *
+ * 它是渲染层访问"领域计算编组"的统一入口:曲线采样与积分走这里,其余
+ * (曲面/向量场/求交)由渲染层直连各自 client(见
+ * prompt/refactor-and-rust-migration.md §4 的方案 A′--只做轻量收口,
+ * 不把 `_buildSpec` 那 90 行领域逻辑搬进 render).
  *
  * 积分请求按 task 的显式 `dim`/`domainKind` 组织:
  * - interval(1D 曲线)/ rectangle(2D 曲面矩形):复用原 Rust 一/二维入口;
@@ -26,12 +30,17 @@ import {
     integrate as runIntegral,
     type IntegralResult,
     type IntegralSpec,
+    disposeIntegralWorker,
 } from './domain/integral/IntegralCompute';
 import { describeSide } from '../adapters/IntersectionMath';
 import {
     curveComputeClient,
     type CurveSampleResult,
+    disposeCurveComputeClient,
 } from './domain/curve/CurveComputeClient';
+import { disposeSurfaceComputeClient } from './domain/surface/SurfaceComputeClient';
+import { disposeVectorFieldComputeClient } from './domain/vectorField/VectorFieldComputeClient';
+import { disposeIntersectionComputeClient } from './domain/intersection/IntersectionComputeClient';
 
 export type IntegralSource = Extract<
     SceneObject,
@@ -56,7 +65,7 @@ function findObject(objects: readonly SceneObject[], id: number): SceneObject | 
     return objects.find((object) => object.id === id);
 }
 
-export class MathComputeEngine {
+export class ComputeFacade {
     async sampleCurve(request: CurveSampleRequest): Promise<CurveSampleResult> {
         // 曲线采样与曲面/向量场保持一致:交给 Worker 执行,避免高 segments
         // 或大量曲线时阻塞主线程.失败直接上抛,由渲染层统一上报诊断,
@@ -185,17 +194,28 @@ export class MathComputeEngine {
         };
     }
 
+    /**
+     * 释放本门面名下的全部共享计算 Worker.
+     *
+     * 这些 worker 是模块级单例(不归本实例所有,见各 client 的 @cache 注释),
+     * 所以这里不是"释放对象持有的资源",而是把 5 个领域 `dispose*` 收口成
+     * 一次调用:应用级 dispose 不必再知道计算层的内部划分.调用时机必须是
+     * **所有 renderer.dispose() 之后**(它们可能仍在用这些 client).
+     */
     dispose(): void {
-        // 本类只是计算门面,不拥有任何共享 worker.
-        // worker 生命周期由应用级 dispose 统一处理.
+        disposeCurveComputeClient();
+        disposeSurfaceComputeClient();
+        disposeVectorFieldComputeClient();
+        disposeIntegralWorker();
+        disposeIntersectionComputeClient();
     }
 }
 
 /**
  * 曲线/区域等实体共用的采样门面单例.
  *
- * MathComputeEngine 本身无状态(底层走共享 `curveComputeClient`),真正
+ * ComputeFacade 本身无状态(底层走共享 `curveComputeClient`),真正
  * 的 latest-only 调度在各自 renderer 的 LatestRequestExecutor 上,
  * 因此多个渲染器共享同一实例即可,不必每类渲染器各 new 一个.
  */
-export const sharedCurveSamplingEngine = new MathComputeEngine();
+export const sharedComputeFacade = new ComputeFacade();

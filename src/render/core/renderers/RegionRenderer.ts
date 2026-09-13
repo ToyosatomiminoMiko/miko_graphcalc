@@ -5,7 +5,7 @@
  * - 填充面:相邻两采样站的四边形三角形带(z=0,半透明双面);
  * - 边界描边:两条折线,颜色取各自边界曲线的颜色.
  *
- * 数值采样统一走 MathComputeEngine 的曲线 Worker(与 CurveRenderer 同源),
+ * 数值采样统一走 ComputeFacade 的曲线 Worker(与 CurveRenderer 同源),
  * 渲染层不自行解析表达式;RegionRenderer 每次 draw() 对两条边界各发起一次
  * latest-only 采样,都返回后再重建几何.两曲线在采样站非有限值会被跳过,
  * 填充面在缺口两侧自动断开,避免画出越界的假带.
@@ -16,13 +16,13 @@
 import * as THREE from 'three';
 import type { IRenderer } from '../renderers/IRenderer';
 import type { CurveObject, RegionObject } from '../../../ir';
-import { sharedCurveSamplingEngine as regionComputeEngine } from '../../../math/compute/MathComputeEngine';
-import {
-    LatestRequestExecutor,
-    type RequestClient,
-} from '../../../math/compute/scheduling/LatestRequestExecutor';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
+import {
+    sharedComputeFacade as regionComputeEngine,
+    LatestRequestExecutor,
+    type CurveSampleResult,
+    type RequestClient,
+} from '../../../math/compute';
 import { reportSamplingFailure } from '../samplingErrors';
 
 type RegionSampleRequest = {

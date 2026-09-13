@@ -7,8 +7,7 @@ import type {
 import type { Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { IntegralVisualizer } from './integral/IntegralVisualizer';
 import { makeFn1D, makeFn2D } from './integral/sampleLookup';
-import type { MathComputeEngine } from '../../math/compute/MathComputeEngine';
-import type { IntegralResult } from '../../math/compute/domain/integral/IntegralCompute';
+import type { ComputeFacade, IntegralResult } from '../../math/compute';
 import {
     clampIntegral1DVisualization,
     clampIntegral2DVisualization,
@@ -68,7 +67,7 @@ export class DslIntegralRenderer {
 
     constructor(
         scene: THREE.Scene,
-        private readonly computeEngine: MathComputeEngine,
+        private readonly computeEngine: ComputeFacade,
     ) {
         this.visualizer = new IntegralVisualizer(scene);
     }
