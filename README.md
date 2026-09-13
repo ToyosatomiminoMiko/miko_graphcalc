@@ -320,3 +320,7 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 另外,曲线/曲面/向量场的 Worker 采样失败现在统一经
 `render/core/samplingErrors.ts` 上报,RenderController 转成诊断区错误;
 没有"曲线悄悄走主线程兜底,曲面直接消失"的不一致路径.
+
+## meta
+
+**GraphCalc** 于 2026.09.13.20:15:00 正式立项
