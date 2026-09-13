@@ -15,7 +15,7 @@
  * "重复声明"契约一致.
  */
 import type { AstProgram, IntersectionStatement } from '../ast/types';
-import type { IntersectionTask, SceneObject } from '../ir/types';
+import type { IntersectionTask, SceneObject } from '../../ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { withStatementSpan } from '../errors';
 import {

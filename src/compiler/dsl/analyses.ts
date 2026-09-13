@@ -26,7 +26,7 @@ import type {
     AnalysisShow,
     ParamDeclaration,
     SceneObject,
-} from '../ir/types';
+} from '../../ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import {
     evaluate_curl_point as wasmEvaluateCurlPoint,

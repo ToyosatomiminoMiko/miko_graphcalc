@@ -14,7 +14,7 @@ import type {
     ObjectStatement,
     OptionPair,
 } from '../ast/types';
-import type { AnimationClip, ParamDeclaration } from '../ir/types';
+import type { AnimationClip, ParamDeclaration } from '../../ir';
 import type { MatrixOps } from '../../math/tensor/SceneTransform';
 import { cloneMat4, type Mat4 } from '../../math/tensor/rowMajorMatrix';
 import { withStatementSpan } from '../errors';

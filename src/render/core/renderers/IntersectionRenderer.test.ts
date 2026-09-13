@@ -7,7 +7,7 @@ vi.mock('../../../math/compute/workers/IntersectionComputeClient', () => ({
 
 import { requestIntersection } from '../../../math/compute/workers/IntersectionComputeClient';
 import { IntersectionRenderer } from './IntersectionRenderer';
-import type { IntersectionTask, SceneObject, SphereObject } from '../../../compiler/ir/types';
+import type { IntersectionTask, SceneObject, SphereObject } from '../../../ir';
 
 function sphere(id: number, name: string, x: number): SphereObject {
     return {

@@ -21,7 +21,7 @@ import type {
     SurfaceObject,
     VectorFieldObject,
     VectorObject,
-} from '../../ir/types';
+} from '../../../ir';
 import { evaluateRequiredNumber } from '../expression';
 import { buildParamScope, materializeCoefficient } from '../params';
 import type { ObjectBlueprint } from './types';

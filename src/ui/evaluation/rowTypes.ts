@@ -21,7 +21,7 @@
  * 新增一类求值对象 = 写一个 spec 文件 + 在控制器里挂一个 Section,
  * 不再需要复制那套增删/排序/缓存逻辑.
  */
-import type { SceneObject } from '../../compiler/ir/types';
+import type { SceneObject } from '../../ir';
 import type { KeyedRowHandles } from '../keyedRowList';
 
 /**

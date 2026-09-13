@@ -22,28 +22,13 @@
  * 约定由 `numericConfig.analysis.sphericalAngleConvention` 全局配置.
  */
 
+import type { SphericalAngleConvention } from '../config/numericConfig';
+
 /** 坐标值三元组;`dim = 2` 时只读前两位,第三位恒为 0. */
 export type CoordinateTriple = [number, number, number];
 
 /** 坐标表示的种类. */
 export type CoordinateKind = 'cartesian' | 'spherical';
-
-/**
- * 球坐标角度约定;两个约定都已实现,由全局配置选择默认.
- *
- * - `physics`(物理/ISO,默认):θ 是从 +Z 轴量起的极角 ∈ [0, π],
- *   φ 是 xy 平面内从 +X 轴逆时针量起的方位角 ∈ (-π, π];
- * - `math`(部分教材):θ 是方位角,φ 是极角,即与上一种的 θ/φ 互换.
- *
- * 二维极坐标只有一个角度(方位角),与这个约定无关.
- */
-export type SphericalAngleConvention = 'physics' | 'math';
-
-/** 约定清单(与类型定义同源,供配置校验/遍历使用). */
-export const SPHERICAL_ANGLE_CONVENTIONS: readonly SphericalAngleConvention[] = [
-    'physics',
-    'math',
-];
 
 function clampUnit(value: number): number {
     if (value > 1) return 1;

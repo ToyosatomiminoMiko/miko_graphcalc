@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { AnimationClip } from '../../compiler/ir/types';
+import type { AnimationClip } from '../../ir';
 import {
     cloneMat4,
     type Mat4,

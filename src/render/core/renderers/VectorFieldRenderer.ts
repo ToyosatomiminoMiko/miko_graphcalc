@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { IRenderer } from './IRenderer';
-import type { VectorFieldObject } from '../../../compiler/ir/types';
+import type { VectorFieldObject } from '../../../ir';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
 import { VectorFieldMesh } from '../../visualization/VectorFieldMesh';
 import { vectorFieldComputeClient } from '../../../math/compute/workers/VectorFieldComputeClient';

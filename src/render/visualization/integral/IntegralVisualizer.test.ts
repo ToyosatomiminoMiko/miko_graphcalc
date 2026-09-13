@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { IntegralVisualizer } from './IntegralVisualizer';
-import type { CurveObject } from '../../../compiler/ir/types';
+import type { CurveObject } from '../../../ir';
 
 function curve(): CurveObject {
     return {

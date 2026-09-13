@@ -17,7 +17,7 @@
  * 没有中间步骤可看的(散度,旋度)直接把结果排进摘要.同一列表里两类条目
  * 折叠态的信息量因此不同,这是设计选择而不是漏排.
  */
-import type { AnalysisResult, IntegralTask, SceneObject } from '../ir/types';
+import type { AnalysisResult, IntegralTask, SceneObject } from '../../ir';
 import { latexResultNumber } from '../../math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
 

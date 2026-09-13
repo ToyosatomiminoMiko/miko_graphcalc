@@ -18,7 +18,7 @@ import type {
     BoxObject,
     ConicSolidObject,
     SurfaceObject,
-} from '../../compiler/ir/types';
+} from '../../ir';
 import type { Mat4 } from '../tensor/rowMajorMatrix';
 import { invertMat4 } from '../tensor/rowMajorMatrix';
 import { coefficientsToRecord } from '../adapters/coefficientUtils';

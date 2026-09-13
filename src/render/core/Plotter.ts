@@ -20,7 +20,7 @@ import type {
     SurfaceObject,
     VectorFieldObject,
     VectorObject,
-} from '../../compiler/ir/types';
+} from '../../ir';
 
 /**
  * 扩展的渲染器接口 -- 在 IRenderer 基础上增加可选能力

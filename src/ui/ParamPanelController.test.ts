@@ -12,7 +12,7 @@
  * `dispatch('input'/'change')` 模拟事件.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ParamDeclaration } from '../compiler/ir/types';
+import type { ParamDeclaration } from '../ir';
 import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
 import { ParamPanelController } from './ParamPanelController';
 

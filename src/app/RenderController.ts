@@ -26,7 +26,7 @@ import { AxisLineWidthController } from '../render/controls/AxisLineWidthControl
 import { GridTicksController } from '../render/controls/GridTicksController';
 import { AxisLabelController } from '../render/controls/AxisLabelController';
 import { AxisUpController } from '../render/controls/AxisUpController';
-import type { SceneIR, SceneObject } from '../compiler/ir/types';
+import type { SceneIR, SceneObject } from '../ir';
 import type { GraphCalcEvents } from '../types';
 import { EventBus } from '../service/EventBus';
 import { onSamplingFailure } from '../render/core/samplingErrors';

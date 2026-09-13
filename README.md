@@ -244,7 +244,7 @@ SceneIR(纯数据,不含 three.js/DOM)
 关键边界文件:
 
 - [compiler/ast/types.ts](src/compiler/ast/types.ts):解析结果 `AstProgram`
-- [compiler/ir/types.ts](src/compiler/ir/types.ts):编译结果 `SceneIR`
+- [ir/types.ts](src/ir/types.ts):编译结果 `SceneIR`
 - [DslCompiler.ts](src/compiler/dsl/DslCompiler.ts):AST 到 SceneIR 的编排入口
 - [SceneStore.ts](src/app/SceneStore.ts):当前会话的 AST/显隐/动画起点等状态
 - [CompileController.ts](src/app/CompileController.ts):解析与重新编译的调度

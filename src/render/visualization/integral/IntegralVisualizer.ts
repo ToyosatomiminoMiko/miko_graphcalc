@@ -12,7 +12,7 @@
 // 公开 API(9 个 visualize* + clear/clearAll/dispose + group)供上层调用.
 // ============================================================
 import * as THREE from 'three';
-import type { RiemannSide, SceneObject } from '../../../compiler/ir/types';
+import type { RiemannSide, SceneObject } from '../../../ir';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 import {
     createInstancedBarGroup,

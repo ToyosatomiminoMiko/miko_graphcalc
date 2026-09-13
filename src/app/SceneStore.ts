@@ -13,7 +13,7 @@
  * 把状态从 DslApp 抽出来,是为了让 DslApp 只做装配和事件编排.
  */
 import type { AstProgram } from '../compiler/ast/types';
-import type { SceneIR, SceneObject } from '../compiler/ir/types';
+import type { SceneIR, SceneObject } from '../ir';
 import type { MatrixOps } from '../math/tensor/SceneTransform';
 
 export class SceneStore {

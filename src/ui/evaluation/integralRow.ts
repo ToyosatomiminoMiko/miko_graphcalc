@@ -14,7 +14,7 @@
  * 因为"等式挂在哪,状态行留不留"随数值就绪而变,本类型的行句柄额外记住
  * 积分式本体 `bodyLatex`,异步回填时据此决定走哪条路径.
  */
-import type { IntegralTask, SceneObject } from '../../compiler/ir/types';
+import type { IntegralTask, SceneObject } from '../../ir';
 import {
     integralLatexDetails,
     integralLatexSummary,

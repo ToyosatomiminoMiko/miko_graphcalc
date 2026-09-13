@@ -12,7 +12,7 @@
  * 源码仍然是唯一真相源:
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
-import type { SceneIR } from '../compiler/ir/types';
+import type { SceneIR } from '../ir';
 import { EventBus } from '../service/EventBus';
 import { KeyboardController } from '../service/KeyboardController';
 import type { GraphCalcEvents } from '../types';

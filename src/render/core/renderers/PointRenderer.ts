@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { IRenderer } from './IRenderer';
-import type { PointObject } from '../../../compiler/ir/types';
+import type { PointObject } from '../../../ir';
 
 /** 点对象的全局渲染样式,由右侧"点"面板控制. */
 export interface PointStyle {

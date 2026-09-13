@@ -20,12 +20,12 @@
  * - integrand 变量一律为世界坐标.
  *
  * 后续规划(roadmap):区域 y 型 / 极坐标 r-θ / 多曲线边界 / region 参与求交 /
- * region 作为曲面底域等,见 `compiler/ir/types.ts` RegionObject 注释.
+ * region 作为曲面底域等,见 `ir/types.ts` RegionObject 注释.
  */
 import type { IntegralStatement } from '../ast/types';
 import {
     INTEGRAL_METHOD_NAMES,
-} from '../ir/types';
+} from '../../ir';
 import type {
     Coefficient,
     IntegralDomainKind,
@@ -33,7 +33,7 @@ import type {
     IntegralTask,
     ParamDeclaration,
     SceneObject,
-} from '../ir/types';
+} from '../../ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { normalizeExpression, extractSymbolNames } from './expression';
 import { buildParamScope, requireDeclaredCoefficient } from './params';

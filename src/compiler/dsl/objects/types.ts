@@ -6,7 +6,7 @@
  * 把 blueprint 求值成 ir/types.ts 的 SceneObject.静态场景/构建/物化三处
  * 都只经由这里共享类型与 type guard.
  */
-import type { DerivativeOrigin } from '../../ir/types';
+import type { DerivativeOrigin } from '../../../ir';
 
 export type CurveBlueprint = {
     name: string;

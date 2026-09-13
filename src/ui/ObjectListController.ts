@@ -28,7 +28,7 @@ import type {
     IntersectionTask,
     SceneIR,
     SceneObject,
-} from '../compiler/ir/types';
+} from '../ir';
 import { createFormulaElement } from './FormulaView';
 import { EvaluationSection } from './evaluation/EvaluationSection';
 import {

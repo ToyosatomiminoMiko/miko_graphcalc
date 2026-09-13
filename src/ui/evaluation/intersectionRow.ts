@@ -10,7 +10,7 @@
 import type {
     IntersectionOutput,
     IntersectionTask,
-} from '../../compiler/ir/types';
+} from '../../ir';
 import {
     intersectionLatexDetails,
     intersectionLatexSummary,

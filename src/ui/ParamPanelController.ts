@@ -16,7 +16,7 @@
  *   用户既清不掉内容,也再打不出小数点;
  * - 归一化(夹取/回绕)后的文本写回只发生在 `change`(失焦/回车)时.
  */
-import type { ParamDeclaration } from '../compiler/ir/types';
+import type { ParamDeclaration } from '../ir';
 import { normalizeParamValue } from '../math/paramValue';
 
 export type ParamChangeHandler = (name: string, value: number) => void;

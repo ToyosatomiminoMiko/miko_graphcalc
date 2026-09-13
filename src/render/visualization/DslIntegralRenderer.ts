@@ -3,7 +3,7 @@ import type {
     IntegralTask,
     RiemannSide,
     SceneObject,
-} from '../../compiler/ir/types';
+} from '../../ir';
 import type { Mat4 } from '../../math/tensor/rowMajorMatrix';
 import { IntegralVisualizer } from './integral/IntegralVisualizer';
 import { makeFn1D, makeFn2D } from './integral/sampleLookup';

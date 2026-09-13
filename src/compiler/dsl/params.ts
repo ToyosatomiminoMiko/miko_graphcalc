@@ -9,7 +9,7 @@
  * (`buildParamScope`)--保证三者永远给出同一个值.
  */
 import type { AstProgram } from '../ast/types';
-import type { Coefficient, ParamDeclaration } from '../ir/types';
+import type { Coefficient, ParamDeclaration } from '../../ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { normalizeParamValue } from '../../math/paramValue';
 import { withStatementSpan } from '../errors';

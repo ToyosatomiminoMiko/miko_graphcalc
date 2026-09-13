@@ -3,7 +3,7 @@ import type {
     IntegralTask,
     SceneIR,
     SceneObject,
-} from '../ir/types';
+} from '../../ir';
 import type { MatrixOps } from '../../math/tensor/SceneTransform';
 import { withStatementSpan } from '../errors';
 import { materializeObject } from './objects/materialize';
@@ -26,8 +26,8 @@ import {
  * 具体职责已经拆到:
  * - options.ts     选项与列表解析
  * - params.ts      参数收集/覆盖/求值 scope
- * - objects/        对象子系统:types.ts(blueprint 类型)/build.ts(语句→blueprint;
- *                    region 面积图形 V1 语义见该文件头)/materialize.ts(blueprint→数值 IR)
+ * - objects/        对象子系统:types.ts(blueprint 类型)/build.ts(语句->blueprint;
+ *                    region 面积图形 V1 语义见该文件头)/materialize.ts(blueprint->数值 IR)
  * - expression.ts  Rust 符号归一化/求导与数值求值
  * - transforms.ts  矩阵/变换求值(统一因子语法见该文件头注释)
  * - integrals.ts   积分任务编译(dim/domainKind/integrand 语义)
@@ -40,7 +40,7 @@ import {
  *    抛出;隐藏只产出 enabled:false 的占位(列表保留,不调度数值计算).
  * 2. 语句名唯一:param/object/animation/analysis/integral/intersection 各自
  *    查重("重复声明").求值语句(analysis/integral/intersection)此前漏了
- *    查重,integralFormulas 这类 Record<名字,…> 会被同名语句静默覆盖.
+ *    查重,integralFormulas 这类 Record<名字,...> 会被同名语句静默覆盖.
  * 3. 表达式归一化收口:curve/surface 单表达式与 vector_field 三分量在
  *    blueprint 阶段统一归一化;region 边界系数也按"归一化后的边界表达式"
  *    提取,保证符号求导/LaTeX/系数集合与对象自身同源(objects/build.ts 文件头).

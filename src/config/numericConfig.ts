@@ -2,8 +2,29 @@
  * 数值计算与 DSL 编译默认值.
  *
  * 这里只放"默认策略",不应包含类/DOM 或渲染逻辑.
+ *
+ * 本模块是**零依赖叶子**:不 import `math/`,`compiler/` 或 `render/`.
+ * 球坐标角度约定虽然也被 `math/CoordinateSystem.ts` 使用,但它的本质是
+ * "数值口径的全局配置",所以定义在这里,由 math 反向 import 类型
+ * (见 prompt/refactor-and-rust-migration.md §1.4).
  */
-import type { SphericalAngleConvention } from '../math/CoordinateSystem';
+
+/**
+ * 球坐标角度约定;两个约定都已实现,由全局配置选择默认.
+ *
+ * - `physics`(物理/ISO,默认):θ 是从 +Z 轴量起的极角 ∈ [0, π],
+ *   φ 是 xy 平面内从 +X 轴逆时针量起的方位角 ∈ (-π, π];
+ * - `math`(部分教材):θ 是方位角,φ 是极角,即与上一种的 θ/φ 互换.
+ *
+ * 二维极坐标只有一个角度(方位角),与这个约定无关.
+ */
+export type SphericalAngleConvention = 'physics' | 'math';
+
+/** 约定清单(与类型定义同源,供配置校验/遍历使用). */
+export const SPHERICAL_ANGLE_CONVENTIONS: readonly SphericalAngleConvention[] = [
+    'physics',
+    'math',
+];
 
 export const NUMERIC_CONFIG = {
     param: {

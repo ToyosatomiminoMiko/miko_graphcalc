@@ -11,7 +11,7 @@ import type {
     AnalysisResult,
     IntegralTask,
     SceneObject,
-} from '../ir/types';
+} from '../../ir';
 
 /**
  * 表达式 -> LaTeX 由 Rust 符号引擎负责(真机上是 wasm),展示层测试只需要

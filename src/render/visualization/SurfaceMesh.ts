@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Coefficient } from '../../compiler/ir/types';
+import type { Coefficient } from '../../ir';
 import { splitCoefficients } from '../../math/adapters/coefficientUtils';
 import { RENDER_CONFIG } from '../../config/renderConfig';
 import {

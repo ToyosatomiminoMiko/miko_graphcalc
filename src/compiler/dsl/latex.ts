@@ -7,7 +7,7 @@
  * d/dx(源函数)=导函数 或 ∂/∂y(源函数)=导函数,region 是不等式带,
  * 积分是 ∫/∬/∭...).
  */
-import type { DerivativeOrigin, IntegralTask, SceneObject } from '../ir/types';
+import type { DerivativeOrigin, IntegralTask, SceneObject } from '../../ir';
 import { cachedLatexExpression } from './expression';
 
 function latexNumber(value: number): string {

@@ -16,7 +16,7 @@
  * 不看排版.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AnalysisResult, SceneIR, SceneObject } from '../compiler/ir/types';
+import type { AnalysisResult, SceneIR, SceneObject } from '../ir';
 import { installDomStub, StubElement } from '../test/domStub';
 
 vi.mock('katex', () => ({

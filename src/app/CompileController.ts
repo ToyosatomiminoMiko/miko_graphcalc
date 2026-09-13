@@ -15,7 +15,7 @@
 import { compileScene } from '../compiler/dsl/DslCompiler';
 import { parseMiko } from '../compiler/parser';
 import { createWasmMatrixOps } from '../compiler/matrixOps';
-import type { SceneIR } from '../compiler/ir/types';
+import type { SceneIR } from '../ir';
 import { CompileError, formatLocatedError } from '../compiler/errors';
 import { SceneStore } from './SceneStore';
 

@@ -10,7 +10,7 @@
  * 本类不再自建任何点几何体(旧的独立 SphereGeometry 已移除).
  */
 import * as THREE from 'three';
-import type { AnalysisResult, PointObject } from '../../../compiler/ir/types';
+import type { AnalysisResult, PointObject } from '../../../ir';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 import { PointRenderer, type PointStyle } from './PointRenderer';
 

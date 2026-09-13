@@ -13,7 +13,7 @@ import type {
     IntersectionTask,
     SceneObject,
     Vec3,
-} from '../../compiler/ir/types';
+} from '../../ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { splitCoefficients } from './coefficientUtils';
 import {

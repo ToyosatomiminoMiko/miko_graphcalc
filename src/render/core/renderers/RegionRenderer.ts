@@ -11,11 +11,11 @@
  * 填充面在缺口两侧自动断开,避免画出越界的假带.
  *
  * 后续规划(roadmap):y 型区域 / 极坐标 r-θ 区域 / 三条以上曲线边界 /
- * 区域参与求交,见 compiler/ir/types.ts RegionObject 注释.
+ * 区域参与求交,见 ir/types.ts RegionObject 注释.
  */
 import * as THREE from 'three';
 import type { IRenderer } from '../renderers/IRenderer';
-import type { CurveObject, RegionObject } from '../../../compiler/ir/types';
+import type { CurveObject, RegionObject } from '../../../ir';
 import { sharedCurveSamplingEngine as regionComputeEngine } from '../../../math/compute/MathComputeEngine';
 import {
     LatestRequestExecutor,

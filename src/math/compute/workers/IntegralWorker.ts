@@ -13,7 +13,7 @@ import init, {
     integrate_region,
     integrate_solid,
 } from "../../../wasm/math_rs/math_rs";
-import type { IntegralDomainKind, IntegralMethod } from '../../../compiler/ir/types';
+import type { IntegralDomainKind, IntegralMethod } from '../../../ir';
 import { recordToCoefficientArgs } from '../../adapters/coefficientUtils';
 import { createWasmWorker } from './wasmWorkerRuntime';
 

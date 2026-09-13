@@ -4,7 +4,7 @@ import type {
     BoxObject,
     ConicSolidObject,
     SphereObject,
-} from '../../../compiler/ir/types';
+} from '../../../ir';
 import {
     buildBoxGeometry,
     buildConicGeometry,
