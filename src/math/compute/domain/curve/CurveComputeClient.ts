@@ -2,7 +2,7 @@
  * 曲线采样 Worker 的主线程客户端.
  * 曲线采样原先直接在主线程调用 WASM,这里改为与其他计算一致的 Worker 路径.
  */
-import { createComputeWorkerClient } from './ComputeWorkerClient';
+import { createComputeWorkerClient } from '../../scheduling/ComputeWorkerClient';
 import type {
     CurveWorkerRequest,
     CurveWorkerResponse,

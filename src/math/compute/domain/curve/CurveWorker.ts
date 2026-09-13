@@ -1,5 +1,5 @@
-import init, { sample_curve } from '../../../wasm/math_rs/math_rs';
-import { createWasmWorker } from './wasmWorkerRuntime';
+import init, { sample_curve } from '../../../../wasm/math_rs/math_rs';
+import { createWasmWorker } from '../../wasm/wasmWorkerRuntime';
 
 export type CurveWorkerRequest = {
     id: number;

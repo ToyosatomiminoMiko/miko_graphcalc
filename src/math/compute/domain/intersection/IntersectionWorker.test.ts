@@ -9,7 +9,7 @@
  * WASM 用桩替代,只观察 handler 拼出来的 JSON;不创建 Worker/WASM.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IntersectionComputeSide } from '../../adapters/IntersectionMath';
+import type { IntersectionComputeSide } from '../../../adapters/IntersectionMath';
 import type {
     IntersectionWorkerRequest,
     IntersectionWorkerResponse,
@@ -19,7 +19,7 @@ const wasm = vi.hoisted(() => ({
     intersectPair: vi.fn(),
 }));
 
-vi.mock('../../../wasm/math_rs/math_rs', () => ({
+vi.mock('../../../../wasm/math_rs/math_rs', () => ({
     default: vi.fn(() => Promise.resolve()),
     intersect_pair: wasm.intersectPair,
 }));

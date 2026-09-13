@@ -13,11 +13,11 @@ import type { IRenderer } from './IRenderer';
 import type { CurveObject } from '../../../ir';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
 import { sharedCurveSamplingEngine as curveComputeEngine } from '../../../math/compute/MathComputeEngine';
-import type { CurveSampleResult } from '../../../math/compute/workers/CurveComputeClient';
+import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
 import {
     LatestRequestExecutor,
     type RequestClient,
-} from '../../../math/compute/workers/LatestRequestExecutor';
+} from '../../../math/compute/scheduling/LatestRequestExecutor';
 import { reportSamplingFailure } from '../samplingErrors';
 
 type CurveRendererRequest = {

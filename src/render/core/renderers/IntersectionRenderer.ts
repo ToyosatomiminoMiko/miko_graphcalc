@@ -20,7 +20,7 @@ import {
 } from '../../../math/adapters/IntersectionMath';
 import {
     requestIntersection,
-} from '../../../math/compute/workers/IntersectionComputeClient';
+} from '../../../math/compute/domain/intersection/IntersectionComputeClient';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 
 export type IntersectionResultCallback = (

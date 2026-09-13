@@ -23,7 +23,7 @@ const wasm = vi.hoisted(() => ({
     integrateSolid: vi.fn(),
 }));
 
-vi.mock('../../../wasm/math_rs/math_rs', () => ({
+vi.mock('../../../../wasm/math_rs/math_rs', () => ({
     default: vi.fn(() => Promise.resolve()),
     integrate1d: wasm.integrate1d,
     integrate2d: wasm.integrate2d,

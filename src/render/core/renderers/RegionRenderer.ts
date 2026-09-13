@@ -20,9 +20,9 @@ import { sharedCurveSamplingEngine as regionComputeEngine } from '../../../math/
 import {
     LatestRequestExecutor,
     type RequestClient,
-} from '../../../math/compute/workers/LatestRequestExecutor';
+} from '../../../math/compute/scheduling/LatestRequestExecutor';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import type { CurveSampleResult } from '../../../math/compute/workers/CurveComputeClient';
+import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
 import { reportSamplingFailure } from '../samplingErrors';
 
 type RegionSampleRequest = {

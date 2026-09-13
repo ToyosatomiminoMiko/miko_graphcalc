@@ -34,11 +34,11 @@ import { SceneStore } from './SceneStore';
 import { DiagnosticsController } from '../ui/DiagnosticsController';
 import type { DiagnosticEntry } from '../ui/DiagnosticsController';
 import { ObjectListController } from '../ui/ObjectListController';
-import { disposeCurveComputeClient } from '../math/compute/workers/CurveComputeClient';
-import { disposeSurfaceComputeClient } from '../math/compute/workers/SurfaceComputeClient';
-import { disposeVectorFieldComputeClient } from '../math/compute/workers/VectorFieldComputeClient';
-import { disposeIntegralWorker } from '../math/compute/workers/IntegralCompute';
-import { disposeIntersectionComputeClient } from '../math/compute/workers/IntersectionComputeClient';
+import { disposeCurveComputeClient } from '../math/compute/domain/curve/CurveComputeClient';
+import { disposeSurfaceComputeClient } from '../math/compute/domain/surface/SurfaceComputeClient';
+import { disposeVectorFieldComputeClient } from '../math/compute/domain/vectorField/VectorFieldComputeClient';
+import { disposeIntegralWorker } from '../math/compute/domain/integral/IntegralCompute';
+import { disposeIntersectionComputeClient } from '../math/compute/domain/intersection/IntersectionComputeClient';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;

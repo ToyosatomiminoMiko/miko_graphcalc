@@ -1,5 +1,5 @@
-import init, { sample_and_process_surface } from '../../../wasm/render_rs/render_rs';
-import { createWasmWorker } from './wasmWorkerRuntime';
+import init, { sample_and_process_surface } from '../../../../wasm/render_rs/render_rs';
+import { createWasmWorker } from '../../wasm/wasmWorkerRuntime';
 
 // ================================================================
 // SurfaceWorker - 曲面采样 Worker

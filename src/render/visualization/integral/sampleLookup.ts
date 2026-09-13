@@ -5,7 +5,7 @@
  * 这里从 DslIntegralRenderer 抽成纯函数,便于对"单元定位"这类边界情形补单测
  * (见 RND-P2.1).
  */
-import type { IntegralResult } from '../../../math/compute/workers/IntegralCompute';
+import type { IntegralResult } from '../../../math/compute/domain/integral/IntegralCompute';
 
 /**
  * 单元定位容差.

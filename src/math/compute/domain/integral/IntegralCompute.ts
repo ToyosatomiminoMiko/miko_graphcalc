@@ -9,10 +9,10 @@
  *   采样所需的外接范围由 Rust 核回传(xa/xb/ya/yb/za/zb);
  * - 调度(Worker 复用,latest-only,dispose)保持原样.
  */
-import type { IntegralDomainKind, IntegralMethod } from '../../../ir';
-import { NUMERIC_CONFIG } from '../../../config/numericConfig';
-import { ComputeWorkerClient } from './ComputeWorkerClient';
-import { LatestRequestExecutor } from './LatestRequestExecutor';
+import type { IntegralDomainKind, IntegralMethod } from '../../../../ir';
+import { NUMERIC_CONFIG } from '../../../../config/numericConfig';
+import { ComputeWorkerClient } from '../../scheduling/ComputeWorkerClient';
+import { LatestRequestExecutor } from '../../scheduling/LatestRequestExecutor';
 import type {
     IntegralWorkerRequest,
     IntegralWorkerResponse,

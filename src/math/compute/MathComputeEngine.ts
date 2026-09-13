@@ -26,12 +26,12 @@ import {
     integrate as runIntegral,
     type IntegralResult,
     type IntegralSpec,
-} from './workers/IntegralCompute';
+} from './domain/integral/IntegralCompute';
 import { describeSide } from '../adapters/IntersectionMath';
 import {
     curveComputeClient,
     type CurveSampleResult,
-} from './workers/CurveComputeClient';
+} from './domain/curve/CurveComputeClient';
 
 export type IntegralSource = Extract<
     SceneObject,

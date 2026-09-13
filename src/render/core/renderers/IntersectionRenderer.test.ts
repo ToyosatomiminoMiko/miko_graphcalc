@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntersectionComputeInput } from '../../../math/adapters/IntersectionMath';
 
-vi.mock('../../../math/compute/workers/IntersectionComputeClient', () => ({
+vi.mock('../../../math/compute/domain/intersection/IntersectionComputeClient', () => ({
     requestIntersection: vi.fn(),
 }));
 
-import { requestIntersection } from '../../../math/compute/workers/IntersectionComputeClient';
+import { requestIntersection } from '../../../math/compute/domain/intersection/IntersectionComputeClient';
 import { IntersectionRenderer } from './IntersectionRenderer';
 import type { IntersectionTask, SceneObject, SphereObject } from '../../../ir';
 

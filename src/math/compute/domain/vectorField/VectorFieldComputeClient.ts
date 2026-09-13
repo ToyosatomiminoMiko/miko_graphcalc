@@ -2,7 +2,7 @@
  * 向量场采样 Worker 的主线程客户端.
  * 复用通用 ComputeWorkerClient,避免重复 pending/error/dispose 逻辑.
  */
-import { createComputeWorkerClient } from './ComputeWorkerClient';
+import { createComputeWorkerClient } from '../../scheduling/ComputeWorkerClient';
 import type {
     VectorFieldWorkerRequest,
     VectorFieldWorkerResponse,

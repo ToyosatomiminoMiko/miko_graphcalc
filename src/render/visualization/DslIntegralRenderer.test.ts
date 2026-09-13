@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { DslIntegralRenderer } from './DslIntegralRenderer';
 import type { MathComputeEngine } from '../../math/compute/MathComputeEngine';
-import type { IntegralResult } from '../../math/compute/workers/IntegralCompute';
+import type { IntegralResult } from '../../math/compute/domain/integral/IntegralCompute';
 import type { CurveObject, IntegralTask, SceneObject } from '../../ir';
 
 type Deferred = { resolve: (r: IntegralResult) => void; reject: (e: Error) => void };

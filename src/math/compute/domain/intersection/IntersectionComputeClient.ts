@@ -4,9 +4,9 @@
  * 与曲线/曲面/积分采样一致:共享一个 Worker + latest-only 调度器,
  * 高频拖动滑块时旧求交请求会被替换,不积压任务.
  */
-import type { IntersectionComputeInput } from '../../adapters/IntersectionMath';
-import { ComputeWorkerClient } from './ComputeWorkerClient';
-import { LatestRequestExecutor } from './LatestRequestExecutor';
+import type { IntersectionComputeInput } from '../../../adapters/IntersectionMath';
+import { ComputeWorkerClient } from '../../scheduling/ComputeWorkerClient';
+import { LatestRequestExecutor } from '../../scheduling/LatestRequestExecutor';
 import type {
     IntersectionWorkerRequest,
     IntersectionWorkerResponse,

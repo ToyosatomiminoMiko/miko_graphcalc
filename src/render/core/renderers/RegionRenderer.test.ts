@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { RegionRenderer } from './RegionRenderer';
 import { sharedCurveSamplingEngine } from '../../../math/compute/MathComputeEngine';
-import type { CurveSampleResult } from '../../../math/compute/workers/CurveComputeClient';
+import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
 import type { CurveObject, RegionObject } from '../../../ir';
 
 function boundary(id: number, name: string): CurveObject {
