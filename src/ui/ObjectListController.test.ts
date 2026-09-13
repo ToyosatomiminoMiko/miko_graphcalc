@@ -4,9 +4,9 @@
  * 锁的是几条来自实际反馈的约束:
  * 1. 行里**没有自建的开合按钮**:开合交给 <details>/<summary> 原生行为
  *    (摘要行就是 <summary>,点它由浏览器开合);
- * 2. 行首有**显隐按钮**(`.row-visibility-btn`):它是业务动作(隐藏 =
- *    不渲染 + 不参与计算),回调给应用层;按钮挂在行上,不在 <summary> 内,
- *    点它不会开合细节;
+ * 2. 行末有**显隐按钮**(`.row-visibility-btn`):它是业务动作(隐藏 =
+ *    不渲染 + 不参与计算),回调给应用层;按钮与主内容包装 `.row-main` 平级,
+ *    在行末靠右,不在 <summary> 内,点它不会开合细节;
  * 3. 折叠态只有一行 KaTeX 公式;
  * 4. 展开细节逐行分块(.eval-details 下每行一个 .eval-detail-line),不是
  *    一堆 inline 公式挤成一行;结果行在 <details> 内,跟着一起开合.
@@ -157,7 +157,7 @@ describe('求值条目的折叠结构', () => {
         const summary = analysisList.querySelector<StubElement>('.eval-summary')!;
         // 开合交给 <details>/<summary> 原生行为:摘要行就是 <summary>.
         expect(analysisList.querySelectorAll('summary')).toHaveLength(1);
-        // 行里唯一一个按钮是行首显隐按钮,且它**不在** summary 内:
+        // 行里唯一一个按钮是行末显隐按钮,且它**不在** summary 内:
         // 点 summary 只开合,点按钮只切换显隐,两者不互相触发.
         const buttons = analysisList.querySelectorAll<StubElement>('button');
         expect(buttons).toHaveLength(1);
@@ -256,7 +256,7 @@ describe('求值条目的折叠结构', () => {
     });
 });
 
-describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
+describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
     it('实体按钮把 toggleEntity(id) 回调出去,文案是动作', () => {
         const { entityList, calls, controller } = createController();
         controller.renderScene(scene);
@@ -285,8 +285,10 @@ describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(head.querySelector<StubElement>('.object-name')).not.toBeNull();
         expect(head.querySelector<StubElement>('.row-state')).not.toBeNull();
         expect(head.querySelector<StubElement>('.object-expr')).toBeNull();
-        // 行里没有中间包装层:名称行直接挂在行上.
-        expect(head.parent).toBe(row);
+        // 名称行与公式同处主内容包装 `.row-main`(见 rowDom.createObjectRow).
+        const main = row.querySelector<StubElement>('.row-main')!;
+        expect(head.parent).toBe(main);
+        expect(row.querySelector<StubElement>('.object-expr')!.parent).toBe(main);
     });
 
     it('三类求值对象各自绑到对应的切换入口', () => {
@@ -308,17 +310,23 @@ describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(calls.intersection).toEqual(['X']);
     });
 
-    it('按钮是行的直接子节点,不在 <summary> 内,点它不开合细节', () => {
+    it('按钮是行末的直接子节点,不在 <summary> 内,点它不开合细节', () => {
         const { integralList, controller } = createController();
         controller.renderScene(scene);
 
         const row = integralList.querySelector<StubElement>('.evaluation-row')!;
+        const main = row.querySelector<StubElement>('.row-main')!;
         const summary = row.querySelector<StubElement>('.eval-summary')!;
         const button = row.querySelector<StubElement>('.row-visibility-btn')!;
         expect(summary.tagName).toBe('summary');
         expect(summary.querySelectorAll<StubElement>('.row-visibility-btn')).toHaveLength(0);
-        // 按钮是行的直接子节点(与摘要/折叠区同级),不是 summary 的子节点.
+        // 行的直接子节点只有"主内容 + 按钮":摘要/折叠区在主内容里,按钮在
+        // 末位,靠 .row-main 的 flex:1 贴右(见 rowDom.createObjectRow).
+        expect(row.children).toHaveLength(2);
+        expect(row.children[0]).toBe(main);
+        expect(row.children[1]).toBe(button);
         expect(button.parent).toBe(row);
+        expect(main.querySelector<StubElement>('.eval-details')).not.toBeNull();
         // 行里没有监听 click 的自建开合按钮:开合只认 <summary> 原生行为.
         expect(summary.listeners.get('click')).toBeUndefined();
     });

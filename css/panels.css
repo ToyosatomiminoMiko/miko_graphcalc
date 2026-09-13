@@ -262,38 +262,48 @@
     opacity: 0.6;
 }
 
-/* 实体行是两行式(见 entity/EntityItem):第一行"显隐 + 徽章 + 颜色 + 名称行",
-   第二行公式整行独占. */
-.entity-row {
+/* 行主内容:`.object-row` 里除显隐按钮外的全部内容都收在这一层(见
+   ui/rowDom.ts 的 createObjectRow).flex:1 吃掉除按钮外的全部宽度,按钮
+   因此始终贴右;内部的"可换行横排"沿用原来的行内布局--实体行的公式,
+   求值行无细节时的结果行都用 flex-basis 100% 独占第二行. */
+.row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
     flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* 实体行是两行式(见 entity/EntityItem):第一行"徽章 + 颜色 + 名称行",
+   第二行公式整行独占. */
+.entity-row > .row-main {
     row-gap: 5px;
 }
 
 /* 公式自己占一整行:flex-basis 100% 把它挤到第二行,并横向铺满.
    这条只作用于实体行;`.object-expr` 也用在求值摘要的纯文本回退里(在
    `.eval-summary` 内部),那里不能被拉成整行. */
-.entity-row > .object-expr {
+.entity-row > .row-main > .object-expr {
     flex: 1 0 100%;
 }
 
-/* 求值行(见 evaluation/evaluationDom.ts)没有中间包装层,所以行的直接子节点
-   自己声明占位:
+/* 求值行(见 evaluation/evaluationDom.ts):主内容里
    - 折叠区 `<details>`(或没有细节时的摘要 `<summary>`)占第一行剩余宽度;
-   - 结果行只在"没有细节可展开"时是行的直接子节点,那时给它整行宽度.
-   允许换行是为了后者;`.evaluation-row > .eval-result` 用子选择器限定,
-   免得影响细节块内部(纵向 flex)里的结果行. */
-.evaluation-row {
-    flex-wrap: wrap;
+   - 结果行只在"没有细节可展开"时是主内容的直接子节点,那时给它整行宽度.
+   允许换行是为了后者;`.eval-result` 用子选择器限定,免得影响细节块内部
+   (纵向 flex)里的结果行. */
+.evaluation-row > .row-main {
     row-gap: 3px;
 }
 
-.evaluation-row > .eval-details,
-.evaluation-row > .eval-summary {
+.evaluation-row > .row-main > .eval-details,
+.evaluation-row > .row-main > .eval-summary {
     flex: 1 1 auto;
     min-width: 0;
 }
 
-.evaluation-row > .eval-result {
+.evaluation-row > .row-main > .eval-result {
     flex: 1 0 100%;
 }
 
@@ -312,10 +322,13 @@
     border-color: rgba(255, 90, 110, 0.35);
 }
 
-/* 行首显隐按钮:业务动作(隐藏 = Three.js 里不渲染且不参与计算),
-   与 <details> 的开合无关--它挂在行上,不在 <summary> 里,点它不会开合细节. */
+/* 行末显隐按钮:业务动作(隐藏 = Three.js 里不渲染且不参与计算),
+   与 <details> 的开合无关--它挂在行末(见 createObjectRow),不在
+   <summary> 里,点它不会开合细节.主内容 `.row-main` 是 flex:1,所以按钮
+   自然贴右;`align-self` 与行的 align-items 一致,内容变高时仍停在顶部. */
 .row-visibility-btn {
     flex: 0 0 auto;
+    align-self: flex-start;
     padding: 3px 7px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
@@ -446,7 +459,8 @@
 
 /* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 entity/EntityItem 的
    `.object-head`),公式另起一行--状态不落单占一行.
-   它是实体行第一行的内容块,占满第一行剩余宽度(行里没有中间包装层). */
+   它是 `.row-main` 第一行的内容块,与徽章/颜色同为直接子节点,占满第一行
+   剩余宽度. */
 .object-head {
     display: flex;
     align-items: center;
@@ -507,13 +521,13 @@
 /* ==========================================================================
  * 求值条目的折叠细节(分析/积分/求交)
  *
- * 条目 = 行首显隐按钮 + 摘要行(<summary>:彩色类型标签 + 变量名 + 一行
- * KaTeX)+ 折叠细节(<details>,默认收起:展开后每行一段 KaTeX,结果行在最后).
+ * 条目 = 主内容(.row-main:摘要行 + 折叠细节)+ 行末显隐按钮.
+ * 摘要行是 (<summary>:彩色类型标签 + 变量名 + 一行 KaTeX);折叠细节是
+ * <details>(默认收起:展开后每行一段 KaTeX,结果行在最后).
  * 开合完全是 <details>/<summary> 的原生行为(点摘要行即开合),没有自建开合
  * 按钮,因此这里也不隐藏 ::marker,让浏览器自带的三角作为唯一标识.
- * 行首的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
- * 行首的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
- * 它是行内容块的同级兄弟而不是 <summary> 的子节点,点它不会开合细节.
+ * 行末的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
+ * 它与 .row-main 同级而不是 <summary> 的子节点,点它不会开合细节.
  * 复制只在展开细节行上生效:摘要公式不带 data-tex,点它只开合.
  * 细节里的公式一行排不下时不换行(KaTeX 换行会破坏公式语义),由横向滚动承接.
  * ========================================================================== */

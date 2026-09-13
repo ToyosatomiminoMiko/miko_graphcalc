@@ -95,7 +95,7 @@ export class IntersectionItem extends EvaluationItem<
             () => context.toggleHidden(task.name),
         );
 
-        const row = createEvaluationRow(summary, detail, result, toggle);
+        const { row } = createEvaluationRow(summary, detail, result, toggle);
         row.classList.toggle('is-hidden', !task.enabled);
         super(task, row);
         this.result = result;

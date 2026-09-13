@@ -22,7 +22,7 @@ import { carryDetailsOpen } from '../rowDom';
  *
  * - `objects`:域对象解析(积分条目要把 `objectId` 还原成对象名)之类的跨条目
  *   依赖走这里,不往 item 里塞全局状态;
- * - `toggleHidden`:行首显隐按钮的回调,由 `EvaluationList` 按子列表绑到对应的
+ * - `toggleHidden`:行末显隐按钮的回调,由 `EvaluationList` 按子列表绑到对应的
  *   `toggleAnalysis/toggleIntegral/toggleIntersection`.item 只负责把按钮建出来
  *   并接上它,不关心"隐藏后要重新编译"的流程.
  */

@@ -68,6 +68,14 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
     /** 积分式本体(不含 `=`);null 表示排不出公式,数值只能落在状态行. */
     private readonly bodyLatex: string | null;
 
+    /**
+     * 主内容包装(`.row-main`):公式块不存在时,状态行要挂回这里.
+     *
+     * 不能退回 `this.row`--那会让状态行变成显隐按钮的第三个兄弟,掉到
+     * `.row-main` 之外(见 createEvaluationRow).
+     */
+    private readonly main: HTMLElement;
+
     /** 状态行;就绪后为 null(等式由细节行唯一承载). */
     private result: HTMLElement | null;
 
@@ -156,11 +164,12 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             () => context.toggleHidden(task.name),
         );
 
-        const row = createEvaluationRow(summary, details, status, toggle);
+        const { row, main } = createEvaluationRow(summary, details, status, toggle);
         row.classList.toggle('is-hidden', !task.enabled);
 
         super(task, row);
         this.bodyLatex = bodyLatex;
+        this.main = main;
         this.result = status;
         // 已有数值时把数值排好(行重建但键一致时走这条路径).
         if (value !== null) this.renderValue(value);
@@ -235,14 +244,15 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      * 状态行(计算中 / 已隐藏 / 错误文本)的唯一落点.
      *
      * 就绪后状态行会被摘掉(等式在细节行上),出错时再按需挂回公式块末尾;
-     * 公式块不存在(积分式排不出来)时退回行本身--`.evaluation-row` 换行,
-     * 直接子节点里的结果行独占一行,仍然看得见.
+     * 公式块不存在(积分式排不出来)时退回**主内容包装** `.row-main`,由它
+     * 的换行布局把结果行放到第二行.不退回行本身:行里只有"主内容 + 按钮"
+     * 两个直接子节点,挂到行上会让按钮被挤走(见 createObjectRow).
      */
     private ensureStatusRow(): HTMLElement {
         if (this.result !== null) return this.result;
         const result = createElement('code', 'eval-result is-error', '');
         const container = this.row.querySelector<HTMLElement>('.eval-detail-body')
-            ?? this.row;
+            ?? this.main;
         container.append(result);
         this.result = result;
         return result;

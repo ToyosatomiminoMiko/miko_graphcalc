@@ -11,7 +11,7 @@ import { KeyedRowList } from '../keyedRowList';
 import { EntityItem } from './EntityItem';
 
 /**
- * 行首显隐按钮的回调:请求方只报"用户点了哪一条",隐藏的语义(不渲染)以及
+ * 行末显隐按钮的回调:请求方只报"用户点了哪一条",隐藏的语义(不渲染)以及
  * 是否要重新编译由应用层决定(实体显隐不重新编译,直接改渲染可见性).
  */
 export interface EntityListHandlers {

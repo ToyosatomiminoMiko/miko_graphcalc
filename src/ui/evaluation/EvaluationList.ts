@@ -31,7 +31,7 @@ export interface EvaluationListContainers {
 }
 
 /**
- * 行首显隐按钮的回调:请求方只报"用户点了哪一条",隐藏的语义
+ * 行末显隐按钮的回调:请求方只报"用户点了哪一条",隐藏的语义
  * (不渲染 + 不参与计算)由应用层实现(切隐藏集合后按当前参数重新编译).
  */
 export interface EvaluationListHandlers {

@@ -6,23 +6,28 @@
  *
  * ```text
  * <article class="object-row evaluation-row" role="listitem">
- *   <button class="row-visibility-btn">隐藏/显示</button>  ← 显隐(不在 summary 里)
- *   <details class="eval-details" open=false>          ← 无展开细节时 summary 直接在行上
- *     <summary class="eval-summary">...badge + 变量名 + 一行公式...</summary>
- *     <div class="eval-detail-body">        ← 公式块:数学内容 + 结果行
- *       <span class="eval-detail-line">...</span>
- *     </div>
- *     <div class="eval-detail-meta-block"> ← 纯文本元信息块(公式块之外)
- *       <div class="eval-detail-meta">域: ... · 方法: ...</div>
- *     </div>
- *   </details>
+ *   <div class="row-main">                              ← 除按钮外的全部内容
+ *     <details class="eval-details" open=false>          ← 无展开细节时 summary 直接在行上
+ *       <summary class="eval-summary">...badge + 变量名 + 一行公式...</summary>
+ *       <div class="eval-detail-body">        ← 公式块:数学内容 + 结果行
+ *         <span class="eval-detail-line">...</span>
+ *       </div>
+ *       <div class="eval-detail-meta-block"> ← 纯文本元信息块(公式块之外)
+ *         <div class="eval-detail-meta">域: ... · 方法: ...</div>
+ *       </div>
+ *     </details>
+ *   </div>
+ *   <button class="row-visibility-btn">隐藏/显示</button>  ← 行末,靠右,与 summary 无嵌套关系
  * </article>
  * ```
  *
- * 行里没有 `.object-main` 这类中间包装:摘要与两个细节块都是**行/`<details>` 的
- * 直接子节点**,宽度直接由行给出(见 panels.css 的 `.evaluation-row`).
- * `<details>` 本身保留是刻意的:`<summary>` 必须与它同处一个 `<details>` 才能有
+ * `<details>` 保留是刻意的:`<summary>` 必须与它同处一个 `<details>` 才能有
  * 原生开合,细节块搬出去就没有折叠了.
+ *
+ * `.row-main` 这层包装由 {@link createObjectRow} 生成:它把"摘要 + 折叠区 +
+ * 结果行"收成一个 `flex: 1` 的内容块,于是行的直接子节点只剩"主内容 + 显隐
+ * 按钮"两个,按钮才能既贴右,又与全部内容平级.除按钮外的节点宽度都由
+ * `.row-main` 给出(见 panels.css 的 `.evaluation-row > .row-main`).
  *
  * 行类型由 `EvaluationDetailLine` 判别:`latex` -> 公式行(可点击复制),
  * `text` -> 元信息行.哪些行走公式,哪些行走元信息完全由各类型的细节
@@ -32,7 +37,7 @@
  * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素与
  * 显隐按钮这类两栏通用件在 `ui/rowDom.ts`.
  */
-import { createElement } from '../rowDom';
+import { createElement, createObjectRow } from '../rowDom';
 import { createFormulaElement } from '../FormulaView';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
 
@@ -144,15 +149,17 @@ export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
 /**
  * 行外壳:把摘要/细节/结果行装配成 `<article class="evaluation-row">`.
  *
- * - 没有展开细节(`detail === null`,如被隐藏的条目):summary 直接在行上,
- *   结果行跟在后面(行内换行,结果行独占第二行,见 panels.css);
+ * - 没有展开细节(`detail === null`,如被隐藏的条目):summary 进 `.row-main`,
+ *   结果行跟在后面(主内容内换行,结果行独占第二行,见 panels.css);
  * - 有细节:建 `<details open=false>`,结果行**进公式块**并排在公式行之后
  *   (`result` 为 null 就不挂状态行,以免与细节里的等式重复);积分式排不
  *   出来时公式块为 null,此时为结果行单独建块,保证它不会掉出折叠区.
  *
- * 返回的就是传进来的 `result` 节点(可能已被搬进公式块);调用方(各 item
- * 子类)自己持有引用,以便后续异步回填.开合完全交给 `<details>/<summary>`
- * 原生行为;`toggle` 是行首的显隐按钮(可为 null),它是内容块的**同级兄弟**,
+ * `result` 节点本身可能已被搬进公式块(仍由调用方持有引用做异步回填);返回
+ * `{ row, main }` 是因为积分条目在公式块不存在时要把状态行挂回主内容包装,
+ * 而不是挂到行上变成按钮的第三个兄弟(见 IntegralItem.ensureStatusRow).
+ * 开合完全交给 `<details>/<summary>` 原生行为;`toggle` 是行末的显隐按钮
+ * (可为 null),它与 `.row-main` 同级,在行末(见 {@link createObjectRow}),
  * 不在 `<summary>` 内,所以点它只切换显隐,不开合细节.
  */
 export function createEvaluationRow(
@@ -160,15 +167,13 @@ export function createEvaluationRow(
     detail: EvaluationDetailSections | null,
     result: HTMLElement | null,
     toggle: HTMLElement | null = null,
-): HTMLElement {
-    const row = createElement('article', 'object-row evaluation-row');
-    row.setAttribute('role', 'listitem');
-    if (toggle !== null) row.append(toggle);
+): { readonly row: HTMLElement; readonly main: HTMLElement } {
+    const { row, main } = createObjectRow('evaluation-row', toggle);
 
     if (detail === null) {
-        row.append(summary);
-        if (result !== null) row.append(result);
-        return row;
+        main.append(summary);
+        if (result !== null) main.append(result);
+        return { row, main };
     }
 
     // 结果行进公式块内部(末尾);积分式排不出来时公式块为 null,此时为结果
@@ -187,6 +192,6 @@ export function createEvaluationRow(
     details.append(summary);
     if (detail.formulas !== null) details.append(detail.formulas);
     if (detail.metadata !== null) details.append(detail.metadata);
-    row.append(details);
-    return row;
+    main.append(details);
+    return { row, main };
 }

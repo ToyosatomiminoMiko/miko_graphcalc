@@ -5,7 +5,7 @@
  * 不变量,因为实体行结构已经从控制器搬进了 `EntityItem`/`EntityList`:
  * 1. 内容键不变 -> **整行复用**(同一个 DOM 节点:KaTeX 不重排,文本选择不丢);
  * 2. 内容键变了 -> 重建行,同名旧行不残留;
- * 3. 行首显隐按钮把 `toggleEntity(id)` 回调出去;
+ * 3. 行末显隐按钮把 `toggleEntity(id)` 回调出去;
  * 4. 消失的对象连行一起删除.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -97,20 +97,29 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
         expect(container.children).toHaveLength(0);
     });
 
-    it('公式与名称行都是行的直接子节点(没有中间包装层)', () => {
+    it('内容都在 .row-main 里,显隐按钮是行末的直接子节点', () => {
         const { container, list } = createList();
         list.render([curve], { 1: 'y=1' });
 
         const row = container.querySelector<StubElement>('.entity-row')!;
+        const main = row.querySelector<StubElement>('.row-main')!;
         const head = row.querySelector<StubElement>('.object-head')!;
         const expr = row.querySelector<StubElement>('.object-expr')!;
+        const toggle = row.querySelector<StubElement>('.row-visibility-btn')!;
 
-        // 名称行与公式各占一行(靠 .entity-row 换行 + 公式 flex-basis 100%,
-        // 见 panels.css),两者都直接挂在行上.
-        expect(head.parent).toBe(row);
-        expect(expr.parent).toBe(row);
+        // 名称行与公式都在主内容包装里;公式独占第二行靠
+        // `.entity-row > .row-main > .object-expr { flex-basis: 100% }`
+        // (见 panels.css).
+        expect(head.parent).toBe(main);
+        expect(expr.parent).toBe(main);
         expect(head.querySelector<StubElement>('.object-expr')).toBeNull();
-        expect(row.querySelector<StubElement>('.object-main')).toBeNull();
+
+        // 行的直接子节点只有"主内容 + 按钮":按钮在末位,主内容 flex:1 把它
+        // 推到右端(见 rowDom.createObjectRow).
+        expect(row.children).toHaveLength(2);
+        expect(row.children[0]).toBe(main);
+        expect(row.children[1]).toBe(toggle);
+        expect(toggle.parent).toBe(row);
     });
 
     it('颜色定义是"色块 + 明文值",紧跟在类型徽章后面(同一行)', () => {
@@ -118,13 +127,14 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
         list.render([{ ...curve, color: '#ff0000' }], { 1: 'y=1' });
 
         const row = container.querySelector<StubElement>('.entity-row')!;
+        const main = row.querySelector<StubElement>('.row-main')!;
         const badge = row.querySelector<StubElement>('.kind-badge')!;
         const color = row.querySelector<StubElement>('.object-color')!;
 
-        // 与徽章同为行的直接子节点(不在名称行里),且紧跟徽章之后.
-        expect(badge.parent).toBe(row);
-        expect(color.parent).toBe(row);
-        expect(row.children.indexOf(color)).toBe(row.children.indexOf(badge) + 1);
+        // 与徽章同为主内容的直接子节点(不在名称行里),且紧跟徽章之后.
+        expect(badge.parent).toBe(main);
+        expect(color.parent).toBe(main);
+        expect(main.children.indexOf(color)).toBe(main.children.indexOf(badge) + 1);
 
         // 明文值 + 色块各给一条线索:颜色不是只靠颜色表达.
         expect(color.querySelector<StubElement>('.object-color-code')!.textContent)

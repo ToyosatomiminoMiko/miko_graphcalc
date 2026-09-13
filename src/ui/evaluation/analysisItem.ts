@@ -84,7 +84,7 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
                 text: '已隐藏,不参与计算',
             });
 
-        const row = createEvaluationRow(summary, detail, status, toggle);
+        const { row } = createEvaluationRow(summary, detail, status, toggle);
         row.classList.toggle('is-hidden', !analysis.enabled);
         super(analysis, row);
     }

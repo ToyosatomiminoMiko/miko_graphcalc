@@ -10,10 +10,10 @@
  * 控制器对外的面孔保持不变(渲染层只认 `renderScene` 与四个异步回填入口),
  * 于是"列表怎么分,行怎么建"的改动不外溢到 `RenderController`/`DslApp`.
  *
- * 行内**没有自建的开合按钮**:开合交给 `<details>/<summary>` 原生行为.行首的
+ * 行内**没有自建的开合按钮**:开合交给 `<details>/<summary>` 原生行为.行末的
  * **显隐按钮**是另一回事:它是业务动作(不渲染 + 不参与计算),点它走
- * {@link ObjectListHandlers} 回调,由 DslApp 决定的编译/渲染流程处理;按钮是
- * 行内容块的同级兄弟,不在 `<summary>` 里,所以不会连带开合细节.
+ * {@link ObjectListHandlers} 回调,由 DslApp 决定的编译/渲染流程处理;按钮在
+ * 行末,与主内容包装同级,不在 `<summary>` 里,所以不会连带开合细节.
  */
 import type {
     IntersectionOutput,
@@ -36,7 +36,7 @@ export interface ObjectListContainers {
 }
 
 /**
- * 行首显隐按钮的回调:控制器只负责"用户点了哪一条",隐藏的语义
+ * 行末显隐按钮的回调:控制器只负责"用户点了哪一条",隐藏的语义
  * (不渲染 + 不参与计算)由应用层实现.
  *
  * - 实体:直接切换场景对象的可见性,不重新编译;
