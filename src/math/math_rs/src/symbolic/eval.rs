@@ -29,6 +29,76 @@ fn finite_value(value: f64) -> Option<f64> {
     }
 }
 
+/// 符号求值错误(202609 审查 P3-2 去重后的单一错误类型).
+///
+/// 常量折叠(`simplify::evaluate_constant`)与运行时求值(`evaluate_runtime_expr`)
+/// 共用同一个求值内核,两者对错误的**文案**不同(一个说"矩阵条目包含...",
+/// 一个说"变量 '{}' 未定义"),所以内核返回结构化的错误,由各自入口映射成文案.
+pub(crate) enum EvalError {
+    /// 名字既不是内置常量也没有被绑定.
+    UnboundSymbol(String),
+    /// 函数名/元数不受支持.
+    UnsupportedCall(String),
+    /// 冒号/数组形态不能求值.
+    ListNotEvaluable,
+}
+
+/// 求值内核:常量折叠与运行时求值共用(只差"符号怎么解析").
+///
+/// `lookup` 负责把非内置常量的 `Sym` 解析成数值;返回 `None` 表示该名字未绑定.
+/// 只构造一次 `args` 数组之外不做任何分配(单参函数不建 `Vec`).
+pub(crate) fn evaluate_with_lookup(
+    expr: &Expr,
+    lookup: &dyn Fn(&str) -> Option<f64>,
+) -> Result<Option<f64>, EvalError> {
+    match expr {
+        Expr::Num(value) => Ok(finite_value(*value)),
+        Expr::Sym(name) => {
+            // 数值常量名单收口在 builtins;其余名字按调用方的绑定解析.
+            let value = match builtins::constant_value(name) {
+                Some(value) => value,
+                None => lookup(name).ok_or_else(|| EvalError::UnboundSymbol(name.clone()))?,
+            };
+            Ok(finite_value(value))
+        }
+        Expr::Unary(UnaryOp::Neg, operand) => {
+            Ok(evaluate_with_lookup(operand, lookup)?.map(|value| -value))
+        }
+        Expr::Binary(op, left, right) => {
+            let left = evaluate_with_lookup(left, lookup)?;
+            let right = evaluate_with_lookup(right, lookup)?;
+            match (left, right) {
+                (Some(left), Some(right)) => {
+                    let value = match op {
+                        BinOp::Add => left + right,
+                        BinOp::Sub => left - right,
+                        BinOp::Mul => left * right,
+                        BinOp::Div => left / right,
+                        BinOp::Pow => real_pow(left, right),
+                    };
+                    Ok(finite_value(value))
+                }
+                _ => Ok(None),
+            }
+        }
+        Expr::Call(name, args) => {
+            // 元数由 `compile_runtime_expr -> validate_supported` 保证为 1
+            // (单事实来源,202609 审查 SYM-P2.1);但常量折叠路径可能拿到未走
+            // 校验的树,所以这里仍按"恰好一个参数"校验而不是直接索引.
+            let [arg] = args.as_slice() else {
+                return Err(EvalError::UnsupportedCall(name.clone()));
+            };
+            let Some(value) = evaluate_with_lookup(arg, lookup)? else {
+                return Ok(None);
+            };
+            builtins::apply_unary(name, value)
+                .map(finite_value)
+                .map_err(|_| EvalError::UnsupportedCall(name.clone()))
+        }
+        Expr::List(_) => Err(EvalError::ListNotEvaluable),
+    }
+}
+
 /// 实数幂语义:负底数的非整数次幂只在指数是"约分后分母为奇数"的有理数
 /// m/n 时有实值((−x)^(m/n) = (−1)^m·|x|^(m/n));否则返回 NaN.
 /// 避免 `(-8)^(1/3)` 之类数学上可定义的实值运算被 `powf` 一律给 NaN
@@ -125,61 +195,14 @@ fn odd_denominator_rational(x: f64) -> Option<(i64, u64)> {
     scan(SIMPLE_ODD_DEN).or_else(|| scan(MAX_ODD_DEN))
 }
 
-fn evaluate_expr_inner(
-    expr: &Expr,
-    variables: &HashMap<String, f64>,
-) -> Result<Option<f64>, String> {
-    match expr {
-        Expr::Num(value) => Ok(finite_value(*value)),
-        Expr::Sym(name) => {
-            // 数值常量名单收口在 builtins;其余名字按变量解析.
-            let value = match builtins::constant_value(name) {
-                Some(value) => value,
-                None => variables
-                    .get(name)
-                    .copied()
-                    .ok_or_else(|| format!("变量 '{}' 未定义", name))?,
-            };
-            Ok(finite_value(value))
+/// 运行时求值错误文案(常量折叠路径见 `simplify::evaluate_constant`).
+fn runtime_error(error: EvalError) -> String {
+    match error {
+        EvalError::UnboundSymbol(name) => format!("变量 '{name}' 未定义"),
+        EvalError::UnsupportedCall(name) => {
+            format!("函数 {name} 只接受 1 个参数,当前收到 0 个")
         }
-        Expr::Unary(UnaryOp::Neg, operand) => {
-            Ok(evaluate_expr_inner(operand, variables)?.map(|value| -value))
-        }
-        Expr::Binary(op, left, right) => {
-            let left = evaluate_expr_inner(left, variables)?;
-            let right = evaluate_expr_inner(right, variables)?;
-            match (left, right) {
-                (Some(left), Some(right)) => {
-                    let value = match op {
-                        BinOp::Add => left + right,
-                        BinOp::Sub => left - right,
-                        BinOp::Mul => left * right,
-                        BinOp::Div => left / right,
-                        BinOp::Pow => real_pow(left, right),
-                    };
-                    Ok(finite_value(value))
-                }
-                _ => Ok(None),
-            }
-        }
-        Expr::Call(name, args) => {
-            let mut values = Vec::with_capacity(args.len());
-            for arg in args {
-                let Some(value) = evaluate_expr_inner(arg, variables)? else {
-                    return Ok(None);
-                };
-                values.push(value);
-            }
-            // 元数由 `compile_runtime_expr -> validate_supported` 保证为 1
-            // (单事实来源,202609 审查 SYM-P2.1);取值仍用 `first()` 而不是索引,
-            // 保证任何构造路径下解释器都不会越界 panic(编码规范第 5 条).
-            let Some(value) = values.first().copied() else {
-                return Err(format!("函数 {name} 只接受 1 个参数,当前收到 0 个"));
-            };
-            let value = builtins::apply_unary(name, value)?;
-            Ok(finite_value(value))
-        }
-        Expr::List(_) => Err("不能直接对数组表达式求值".to_string()),
+        EvalError::ListNotEvaluable => "不能直接对数组表达式求值".to_string(),
     }
 }
 
@@ -187,7 +210,7 @@ pub(crate) fn evaluate_runtime_expr(
     expr: &RuntimeExpr,
     variables: &HashMap<String, f64>,
 ) -> Result<Option<f64>, String> {
-    evaluate_expr_inner(expr, variables)
+    evaluate_with_lookup(expr, &|name| variables.get(name).copied()).map_err(runtime_error)
 }
 
 // ============================================================

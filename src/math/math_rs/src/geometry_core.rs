@@ -24,7 +24,7 @@
 //! 但不能作为体域(见 FieldEval::new / SolidProbe::new 的校验).
 
 use crate::eval_core::CompiledEvaluator;
-use crate::transform_core::{apply_to_point, Mat4};
+use crate::transform_core::{apply_to_point, identity4, multiply4x4, Mat4};
 
 type V3 = [f64; 3];
 
@@ -102,6 +102,43 @@ fn parse_optional_matrix(raw: &[f64], label: &str) -> Result<Option<Mat4>, Strin
     Ok(Some(matrix))
 }
 
+/// 校验静态变换的 `matrix` 与 `inverse` 确实互为逆矩阵(相对容差).
+///
+/// 两者由调用方成对给出;若不一致,`to_local` 会把世界坐标当成局部坐标,
+/// 求交/积分会静默给出错误结果,因此这里直接报错而不是将就.
+fn validate_matrix_inverse(matrix: &Mat4, inverse: &Mat4) -> Result<(), String> {
+    let product = multiply4x4(*matrix, *inverse);
+    let identity = identity4();
+    let matrix_scale = matrix.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+    let inverse_scale = inverse.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+    // 乘积元素量级 ~ |matrix| · |inverse|,用相对容差比较单位阵.
+    let tolerance = 1e-9 * 1.0f64.max(matrix_scale * inverse_scale);
+    for (value, unit) in product.iter().zip(identity.iter()) {
+        if (value - unit).abs() > tolerance {
+            return Err("变换矩阵与逆矩阵不一致:matrix * inverse 不等于单位阵".to_string());
+        }
+    }
+    Ok(())
+}
+
+/// 旋转体参数的统一校验(求交面片侧与体积积分域侧共用).
+///
+/// `top_radius == 0` 表示圆锥,合法;负半径没有几何意义,会让 AABB/面片
+/// 静默失界,这里直接报错.
+pub(crate) fn check_conic_params(
+    base_radius: f64,
+    top_radius: f64,
+    height: f64,
+) -> Result<(), String> {
+    if !(base_radius > 0.0 && height > 0.0) {
+        return Err("旋转体 base/height 必须大于 0".to_string());
+    }
+    if top_radius < 0.0 {
+        return Err("旋转体 top_radius 不能为负".to_string());
+    }
+    Ok(())
+}
+
 pub fn parse_object_descriptor(
     kind: &str,
     expr: &str,
@@ -138,6 +175,15 @@ pub fn parse_object_descriptor(
 
     let matrix = parse_optional_matrix(&matrix_values, "变换矩阵")?;
     let inverse = parse_optional_matrix(&inverse_values, "逆矩阵")?;
+    match (&matrix, &inverse) {
+        (Some(matrix), Some(inverse)) => validate_matrix_inverse(matrix, inverse)?,
+        (None, None) => {}
+        _ => {
+            return Err(
+                "变换矩阵与逆矩阵必须同时提供(缺 inverse 会把世界坐标当局部坐标)".to_string(),
+            );
+        }
+    }
 
     Ok(ObjectDescriptor {
         kind,
@@ -333,16 +379,22 @@ impl FieldEval {
                     descriptor.params[5] * 0.5,
                 ],
             },
-            ObjectKind::Conic => FieldKind::Conic {
-                center: [
-                    descriptor.params[0],
-                    descriptor.params[1],
-                    descriptor.params[2],
-                ],
-                base_radius: descriptor.params[3],
-                top_radius: descriptor.params[4],
-                height: descriptor.params[5],
-            },
+            ObjectKind::Conic => {
+                let base_radius = descriptor.params[3];
+                let top_radius = descriptor.params[4];
+                let height = descriptor.params[5];
+                check_conic_params(base_radius, top_radius, height)?;
+                FieldKind::Conic {
+                    center: [
+                        descriptor.params[0],
+                        descriptor.params[1],
+                        descriptor.params[2],
+                    ],
+                    base_radius,
+                    top_radius,
+                    height,
+                }
+            }
             ObjectKind::Curve => return Err("曲线不能作为隐式场".to_string()),
         };
         Ok(Self {
@@ -364,10 +416,21 @@ impl FieldEval {
             }
             FieldKind::Sphere { center, radius } => Ok(Some(dist(local, *center) - *radius)),
             FieldKind::Box { center, half } => {
-                let dx = (local[0] - center[0]).abs() - half[0];
-                let dy = (local[1] - center[1]).abs() - half[1];
-                let dz = (local[2] - center[2]).abs() - half[2];
-                Ok(Some(dx.max(dy).max(dz)))
+                // 盒的精确带符号距离:盒外为到盒面的欧氏距离(严格为正),
+                // 盒内/盒面上为 ≤ 0.三个"半空间距离"的 max 在盒外虽也
+                // >0,但只是轴向超出量的最大值,不是真正的离面距离;这里
+                // 显式合成 outside(正部)与 inside(负部),保证
+                // "≤ 0 当且仅当在盒内(含边界)"且盒外任一轴超出即严格为正.
+                let qx = (local[0] - center[0]).abs() - half[0];
+                let qy = (local[1] - center[1]).abs() - half[1];
+                let qz = (local[2] - center[2]).abs() - half[2];
+                let outside_x = qx.max(0.0);
+                let outside_y = qy.max(0.0);
+                let outside_z = qz.max(0.0);
+                let outside =
+                    (outside_x * outside_x + outside_y * outside_y + outside_z * outside_z).sqrt();
+                let inside = qx.max(qy).max(qz).min(0.0);
+                Ok(Some(outside + inside))
             }
             FieldKind::Conic {
                 center,
@@ -387,5 +450,131 @@ impl FieldEval {
                 ))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transform_core::translate4;
+
+    fn descriptor(
+        kind: &str,
+        params: Vec<f64>,
+        matrix: Vec<f64>,
+        inverse: Vec<f64>,
+    ) -> Result<ObjectDescriptor, String> {
+        parse_object_descriptor(kind, "", vec![], vec![], params, matrix, inverse)
+    }
+
+    fn sphere() -> ObjectDescriptor {
+        descriptor("sphere", vec![0.0, 0.0, 0.0, 1.0], vec![], vec![]).unwrap()
+    }
+
+    /// 回归:matrix / inverse 必须成对给出,缺一会把世界坐标当局部坐标用.
+    #[test]
+    fn matrix_without_inverse_is_rejected() {
+        let error = descriptor(
+            "sphere",
+            vec![0.0, 0.0, 0.0, 1.0],
+            translate4(0.0, 1.0, 0.0).to_vec(),
+            vec![],
+        )
+        .unwrap_err();
+        assert!(error.contains("逆矩阵"), "错误应点名逆矩阵: {error}");
+        let error = descriptor(
+            "sphere",
+            vec![0.0, 0.0, 0.0, 1.0],
+            vec![],
+            translate4(0.0, 1.0, 0.0).to_vec(),
+        )
+        .unwrap_err();
+        assert!(error.contains("逆矩阵"), "错误应点名逆矩阵: {error}");
+    }
+
+    /// 回归:matrix * inverse 必须(相对容差内)等于单位阵.
+    #[test]
+    fn inconsistent_matrix_inverse_is_rejected() {
+        let matrix = translate4(0.0, 1.0, 0.0).to_vec();
+        // translate(1) 的逆是 translate(-1);此处把 translate(1) 当逆用,
+        // 乘积是 translate(2).
+        let error =
+            descriptor("sphere", vec![0.0, 0.0, 0.0, 1.0], matrix.clone(), matrix).unwrap_err();
+        assert!(error.contains("单位阵"), "错误应点名单位阵: {error}");
+    }
+
+    #[test]
+    fn consistent_matrix_inverse_is_accepted() {
+        let descriptor = descriptor(
+            "sphere",
+            vec![0.0, 0.0, 0.0, 1.0],
+            translate4(0.0, 1.0, 0.0).to_vec(),
+            translate4(0.0, -1.0, 0.0).to_vec(),
+        );
+        assert!(descriptor.is_ok(), "{descriptor:?}");
+    }
+
+    /// 回归:盒隐式场是精确带符号距离 -- 盒外严格为正,盒面上为 0,
+    /// 盒内为负;且"≤0 当且仅当在盒内(含边界)".
+    #[test]
+    fn box_field_is_exact_signed_distance() {
+        let descriptor =
+            descriptor("box", vec![0.0, 0.0, 0.0, 2.0, 2.0, 2.0], vec![], vec![]).unwrap();
+        let mut field = FieldEval::new(&descriptor).unwrap();
+
+        let inside = field.eval([0.5, 0.5, 0.5]).unwrap().unwrap();
+        assert!(inside < 0.0, "盒内应为负: {inside}");
+        let face = field.eval([1.0, 0.5, 0.5]).unwrap().unwrap();
+        assert_eq!(face, 0.0, "盒面上应为 0");
+        let edge = field.eval([1.0, 1.0, 0.5]).unwrap().unwrap();
+        assert_eq!(edge, 0.0, "盒棱上应为 0");
+        // 盒外:任一轴超出即严格为正.
+        for point in [[1.5, 0.0, 0.0], [2.0, 1.0, 1.0], [0.0, -3.0, 0.0]] {
+            let value = field.eval(point).unwrap().unwrap();
+            assert!(value > 0.0, "{point:?} 盒外应为正: {value}");
+        }
+        // 角外:欧氏距离应为 sqrt(3),而不是轴向超出量的 max(1).
+        let corner = field.eval([2.0, 2.0, 2.0]).unwrap().unwrap();
+        assert!(
+            (corner - 3.0f64.sqrt()).abs() < 1e-12,
+            "角外应为欧氏距离: {corner}"
+        );
+    }
+
+    #[test]
+    fn box_solid_probe_inside_matches_closed_box() {
+        let descriptor =
+            descriptor("box", vec![0.0, 0.0, 0.0, 2.0, 2.0, 2.0], vec![], vec![]).unwrap();
+        let mut probe = SolidProbe::new(&descriptor).unwrap();
+        assert!(probe.inside([0.0, 0.0, 0.0]).unwrap());
+        assert!(probe.inside([1.0, 1.0, 1.0]).unwrap(), "边界计为体内");
+        assert!(!probe.inside([1.000_001, 0.0, 0.0]).unwrap());
+        assert!(!probe.inside([0.0, 0.0, 1.000_001]).unwrap());
+    }
+
+    /// 回归:负 top_radius 必须在隐式场入口报错(而不是让 AABB 静默失界).
+    #[test]
+    fn conic_negative_top_radius_is_rejected() {
+        let negative =
+            descriptor("conic", vec![0.0, 0.0, 0.0, 2.0, -1.0, 3.0], vec![], vec![]).unwrap();
+        let error = match FieldEval::new(&negative) {
+            Err(error) => error,
+            Ok(_) => panic!("负 top_radius 应报错"),
+        };
+        assert!(
+            error.contains("top_radius"),
+            "错误应点名 top_radius: {error}"
+        );
+
+        let cone = descriptor("conic", vec![0.0, 0.0, 0.0, 2.0, 0.0, 3.0], vec![], vec![]).unwrap();
+        assert!(FieldEval::new(&cone).is_ok(), "top_radius = 0(圆锥)仍合法");
+    }
+
+    #[test]
+    fn sphere_field_probe_unchanged() {
+        let mut probe = SolidProbe::new(&sphere()).unwrap();
+        assert!(probe.inside([0.0, 0.0, 0.0]).unwrap());
+        assert!(probe.inside([1.0, 0.0, 0.0]).unwrap());
+        assert!(!probe.inside([1.0 + 1e-3, 0.0, 0.0]).unwrap());
     }
 }

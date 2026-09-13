@@ -18,6 +18,15 @@ fn is_const_except(expr: &Expr, variable: &str) -> bool {
     }
 }
 
+/// 是否为数值字面量零.
+///
+/// `d/dx (0 / f) = 0` 用得上:分子是字面量零时商在 f 有定义处恒为 0,
+/// 可以直接返回 0,不必让商法则产出 `-0 * f' / f^2` 这类碎片(202609 审查
+/// P1-3 的 `d/dx 0/x` 就是这条路径).
+fn is_zero(expr: &Expr) -> bool {
+    matches!(expr, Expr::Num(value) if *value == 0.0)
+}
+
 pub(crate) fn derivative(expr: &Expr, variable: &str) -> Result<Expr, String> {
     let expr = rewrite_aliases(expr)?;
     validate_supported(&expr)?;
@@ -100,6 +109,11 @@ fn derivative_binary(op: BinOp, left: &Expr, right: &Expr, variable: &str) -> Re
                     Box::new(derivative_inner(left, variable)?),
                     Box::new(right.clone()),
                 ));
+            }
+            // `d/dx (0 / f) = 0`:分子是字面量零时商在 f 有定义处恒为 0,
+            // 直接返回 0,不让商法则产出 `-0 * f' / f^2` 这类碎片.
+            if is_zero(left) {
+                return Ok(Expr::Num(0.0));
             }
             if is_const_except(left, variable) {
                 return Ok(Expr::Binary(

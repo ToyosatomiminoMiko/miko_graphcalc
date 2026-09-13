@@ -50,6 +50,16 @@ export function normalizeParamValue(value: number, param: ParamRange): number {
     // 声明校验已保证 min < max;span 非正只可能来自未走校验的手工声明,
     // 此时没有可回绕的周期,原样返回比产生 NaN 更可诊断.
     if (!(span > 0)) return value;
-    const offset = ((value - param.min) % span + span) % span;
+    // 回绕公式对"区间跨度或偏移量本身溢出"的输入会产出 NaN:`min`/`max` 取到
+    // `±1e308` 时 `max - min` 溢出为 `Infinity`,`value - min` 同样可能溢出,
+    // 而 `Infinity % span` 是 NaN.这类输入没有有意义的回绕结果,保持调用方
+    // 传入的原值,与上面 `span <= 0` 的退化分支同一口径--宁可不回绕,不要
+    // 静默产出一个 NaN 参数(202609 审查 P1-8).
+    const offsetBase = value - param.min;
+    if (!Number.isFinite(span) || !Number.isFinite(offsetBase)) {
+        return value;
+    }
+    const offset = ((offsetBase % span) + span) % span;
+    if (!Number.isFinite(offset)) return value;
     return param.min + offset;
 }

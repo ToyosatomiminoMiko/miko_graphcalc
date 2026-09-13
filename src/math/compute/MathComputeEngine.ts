@@ -92,13 +92,16 @@ export class MathComputeEngine {
         // "region"/"solid" 域的被积表达式里出现的额外参数(见 integrals.ts),
         // 它们是任务自身携带的系数,不挂在域对象上.
         const integrandCoeffs = coefficientsToRecord(task.integrandCoefficients);
+        // latest-only 调度的身份:只有同一任务的新请求才顶掉旧请求
+        // (见 IntegralCompute 的 per-task executor 注释).
+        const taskKey = task.name;
 
         // curve 源:被积函数是曲线自身,积分区间是 task.range;系数在对象上.
         if (task.domainKind === 'interval') {
             const curve = source as CurveObject;
             return {
+                taskKey,
                 method: task.method,
-                dim: 1,
                 domainKind: 'interval',
                 integrand: task.integrand,
                 integrandCoeffs: coefficientsToRecord(curve.coefficients),
@@ -111,8 +114,8 @@ export class MathComputeEngine {
         if (task.domainKind === 'rectangle') {
             const surface = source as SurfaceObject;
             return {
+                taskKey,
                 method: task.method,
-                dim: 2,
                 domainKind: 'rectangle',
                 integrand: task.integrand,
                 integrandCoeffs: coefficientsToRecord(surface.coefficients),
@@ -131,8 +134,8 @@ export class MathComputeEngine {
             }
             const [xa, xb] = task.range as [number, number];
             return {
+                taskKey,
                 method: task.method,
-                dim: 2,
                 domainKind: 'region',
                 integrand: task.integrand,
                 integrandCoeffs,
@@ -159,8 +162,8 @@ export class MathComputeEngine {
         }
         const side = describeSide(source, matrix, inverse);
         return {
+            taskKey,
             method: task.method,
-            dim: 3,
             domainKind: 'solid',
             integrand: task.integrand,
             integrandCoeffs,

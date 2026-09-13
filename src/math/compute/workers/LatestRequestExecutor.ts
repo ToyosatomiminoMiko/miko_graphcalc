@@ -37,6 +37,11 @@ export class LatestRequestExecutor<
      * 提交一个 latest-only 请求;执行中的旧请求会被后续请求取代.
      */
     request(request: Omit<TRequest, 'id'>): Promise<TResponse> {
+        // dispose 后不得再向已销毁的 client 派发:直接拒绝,不走 _run.
+        if (this._disposed) {
+            return Promise.reject(new Error('disposed'));
+        }
+
         const id = ++this._latestId;
         if (this._inFlight) {
             this._pending?.reject(new Error('superseded'));

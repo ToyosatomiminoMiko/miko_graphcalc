@@ -27,7 +27,11 @@
 //! - `SYM-P1.3`:树深预算封住所有递归遍历;
 //! - `SYM-P2.1`:元数校验单点收口.
 
-use super::{BinOp, Expr, UnaryOp};
+use super::{
+    BinOp, Expr, UnaryOp, PREC_ADDITIVE, PREC_ADDITIVE_RIGHT, PREC_IMPLICIT_MUL,
+    PREC_IMPLICIT_MUL_RIGHT, PREC_MULTIPLICATIVE, PREC_MULTIPLICATIVE_RIGHT, PREC_POWER,
+    PREC_POWER_RIGHT, PREC_UNARY,
+};
 use crate::builtins;
 
 /// 表达式**语法嵌套**深度上限(括号/函数参数/一元与幂链),防止递归下降
@@ -220,6 +224,13 @@ impl Lexer {
 
         let text: String = self.chars[start..self.pos].iter().collect();
         let value: f64 = text.parse().map_err(|_| format!("无法解析数字: {text}"))?;
+        // 溢出字面量必须报错,不能让它变成 inf:
+        // `f64::from_str` 对 "1e999" 返回 Ok(inf),而 inf 既不能作为可执行串
+        // 回读(归一化会打印成 "inf",回读报"变量 inf 未定义"),又可能被当作
+        // 合法的系数名静默求值(见 202609 审查 SYM-P1.4).
+        if !value.is_finite() {
+            return Err(format!("数字字面量超出可表示范围: {text}"));
+        }
         Ok(Token::Num(value))
     }
 
@@ -326,20 +337,30 @@ impl Parser {
         let mut lhs = self.parse_prefix()?;
 
         loop {
+            // 优先级数字全部来自 `super` 的常量(唯一事实来源,P3-1):
+            // 左结合运算符的右操作数用 `_RIGHT` 变体绑紧一级.
             let (op, left_prec, right_prec) = if matches!(self.peek(), Token::Plus) {
-                (Some(BinOp::Add), 20, 21)
+                (Some(BinOp::Add), PREC_ADDITIVE, PREC_ADDITIVE_RIGHT)
             } else if matches!(self.peek(), Token::Minus) {
-                (Some(BinOp::Sub), 20, 21)
+                (Some(BinOp::Sub), PREC_ADDITIVE, PREC_ADDITIVE_RIGHT)
             } else if matches!(self.peek(), Token::Star) {
-                (Some(BinOp::Mul), 40, 41)
+                (
+                    Some(BinOp::Mul),
+                    PREC_MULTIPLICATIVE,
+                    PREC_MULTIPLICATIVE_RIGHT,
+                )
             } else if matches!(self.peek(), Token::Slash) {
-                (Some(BinOp::Div), 40, 41)
+                (
+                    Some(BinOp::Div),
+                    PREC_MULTIPLICATIVE,
+                    PREC_MULTIPLICATIVE_RIGHT,
+                )
             } else if matches!(self.peek(), Token::Caret) {
-                // 幂运算右结合.
-                (Some(BinOp::Pow), 70, 70)
+                // 幂运算右结合:左右同优先级.
+                (Some(BinOp::Pow), PREC_POWER, PREC_POWER_RIGHT)
             } else if self.is_atom() {
                 // 2x/2 sin(x)/(x+1)(x-1) 等隐式乘法.
-                (Some(BinOp::Mul), 50, 51)
+                (Some(BinOp::Mul), PREC_IMPLICIT_MUL, PREC_IMPLICIT_MUL_RIGHT)
             } else {
                 (None, 0, 0)
             };
@@ -372,11 +393,11 @@ impl Parser {
     fn parse_prefix(&mut self) -> Result<Expr, String> {
         if matches!(self.peek(), Token::Plus) {
             self.bump();
-            return self.parse_expr(60);
+            return self.parse_expr(PREC_UNARY);
         }
         if matches!(self.peek(), Token::Minus) {
             self.bump();
-            let operand = self.parse_expr(60)?;
+            let operand = self.parse_expr(PREC_UNARY)?;
             let node = Expr::Unary(UnaryOp::Neg, Box::new(operand));
             self.check_tree_depth(&node)?;
             return Ok(node);

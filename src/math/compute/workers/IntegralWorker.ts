@@ -2,10 +2,10 @@
  * 积分计算 Worker.
  * 采样/求值与积分值计算全部由 Rust/WASM 完成,不再使用外部 JS 数学库.
  *
- * 维度语义:请求带显式 `dim`('1d'|'2d'|'3d')与 `domainKind`
- * (interval/rectangle/region/solid),按域路由到 Rust 的
- * integrate1d/integrate2d/integrate_region/integrate_solid 入口;
- * 不再用 range 长度推断维度.
+ * 域语义:请求只带显式 `domainKind`(interval/rectangle/region/solid),
+ * 按域路由到 Rust 的 integrate1d/integrate2d/integrate_region/
+ * integrate_solid 入口;不再用 range 长度推断维度,也不在请求里重复携带
+ * `dim`(compute 从不读它,路由只看 domainKind).
  */
 import init, {
     integrate1d,
@@ -33,10 +33,9 @@ export type IntegralWorkerRequest = {
     id: number;
     /**
      * 语义方法名,与 IR `IntegralMethod` 及 Rust parse 名单保持一致;
-     * 维度/域由 `dim` 与 `domainKind` 显式给出.
+     * 域由 `domainKind` 显式给出.
      */
     method: IntegralMethod;
-    dim: '1d' | '2d' | '3d';
     domainKind: IntegralDomainKind;
     /** 被积函数(世界坐标变量). */
     integrandExpr: string;
@@ -96,6 +95,19 @@ export type IntegralWorkerResponse = {
  * 生命周期:随 Worker 实例存活.
  */
 const wasmInit = init();
+
+/**
+ * Float64Array -> 普通 number[],专供 JSON.stringify 前的载荷拼装.
+ *
+ * 为什么必须显式转数组:JSON.stringify 对 TypedArray 走的是"可枚举下标
+ * 属性"路径,`JSON.stringify(new Float64Array([1,2]))` 得到的是
+ * `{"0":1,"1":2}`(对象),不是 `[1,2]`(数组);Rust serde 按 `Vec<f64>`
+ * 反序列化会直接失败.所以这里不能像普通数组那样直接传引用,必须用一次
+ * `Array.from` 物化成真数组.
+ */
+function toJsonNumberArray(values: Float64Array): number[] {
+    return Array.from(values);
+}
 
 type IntegralComputed = {
     value: number;
@@ -162,7 +174,7 @@ function compute(
         const payload = JSON.stringify({
             expr: req.integrandExpr,
             coeff_names: integrandNames,
-            coeff_values: [...integrandValues],
+            coeff_values: toJsonNumberArray(integrandValues),
             a: req.a!,
             b: req.b!,
             n: sampleN,
@@ -187,7 +199,7 @@ function compute(
         const payload = JSON.stringify({
             expr: req.integrandExpr,
             coeff_names: integrandNames,
-            coeff_values: [...integrandValues],
+            coeff_values: toJsonNumberArray(integrandValues),
             xa: req.xa!,
             xb: req.xb!,
             ya: req.ya!,
@@ -224,13 +236,13 @@ function compute(
             method: req.method,
             integrand_expr: req.integrandExpr,
             integrand_names: integrandNames,
-            integrand_values: [...integrandValues],
+            integrand_values: toJsonNumberArray(integrandValues),
             boundary_a_expr: req.boundaryA!.expr,
             boundary_a_names: a.names,
-            boundary_a_values: [...a.values],
+            boundary_a_values: toJsonNumberArray(a.values),
             boundary_b_expr: req.boundaryB!.expr,
             boundary_b_names: b.names,
-            boundary_b_values: [...b.values],
+            boundary_b_values: toJsonNumberArray(b.values),
             xa: req.xa!,
             xb: req.xb!,
             n,
@@ -257,12 +269,14 @@ function compute(
     const payload = JSON.stringify({
         method: req.method,
         kind: solid.kind,
-        params: [...solid.params],
-        matrix_values: [...solid.matrix],
-        inverse_values: [...solid.inverse],
+        // params/matrix/inverse 在类型契约上本来就是普通 number[],
+        // JSON.stringify 可直接序列化,无需再拷贝一份.
+        params: solid.params,
+        matrix_values: solid.matrix,
+        inverse_values: solid.inverse,
         integrand_expr: req.integrandExpr,
         integrand_names: integrandNames,
-        integrand_values: [...integrandValues],
+        integrand_values: toJsonNumberArray(integrandValues),
         n,
         layers,
     });

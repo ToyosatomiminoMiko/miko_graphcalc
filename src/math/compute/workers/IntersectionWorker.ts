@@ -31,16 +31,24 @@ export type IntersectionWorkerResponse = {
  */
 const wasmInit = init();
 
-/** 把一侧对象描述符展开成 Rust `IntersectPairPayload` 的 JSON 键(前缀区分两侧). */
+/**
+ * 把一侧对象描述符展开成 Rust `IntersectPairPayload` 的 JSON 键(前缀区分两侧).
+ *
+ * `IntersectionComputeSide` 的六个字段在类型契约上就是普通数组
+ * (`describeSide` 里分别来自 `splitCoefficients` / `flattenOptionalMat4` /
+ * 各 `*Params`),JSON.stringify 直接序列化成数组字面量,不需要再 `[...]`
+ * 拷贝一份.这里依赖该契约:若哪天某个字段变成 Float64Array,序列化会变成
+ * `{"0":..}`,必须改回显式 `Array.from`.
+ */
 function sidePayload(prefix: 'a' | 'b', side: IntersectionComputeSide): Record<string, unknown> {
     return {
         [`kind_${prefix}`]: side.kind,
         [`expr_${prefix}`]: side.expr,
         [`coeff_names_${prefix}`]: side.coefficientNames,
-        [`coeff_values_${prefix}`]: [...side.coefficientValues],
-        [`params_${prefix}`]: [...side.params],
-        [`matrix_${prefix}`]: [...side.matrix],
-        [`inverse_${prefix}`]: [...side.inverse],
+        [`coeff_values_${prefix}`]: side.coefficientValues,
+        [`params_${prefix}`]: side.params,
+        [`matrix_${prefix}`]: side.matrix,
+        [`inverse_${prefix}`]: side.inverse,
     };
 }
 

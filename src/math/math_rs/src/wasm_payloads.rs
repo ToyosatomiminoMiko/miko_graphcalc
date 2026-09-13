@@ -12,11 +12,16 @@
 //!
 //! 字段名沿用旧参数名(下划线命名),JSON 键与之完全一致;数字数组即 JSON
 //! number 数组(TS 侧需把 Float64Array 展开成普通数组再 stringify).
+//!
+//! 每个结构体都带 `#[serde(deny_unknown_fields)]`:TS 侧字段改名/手误多写字段时
+//! 直接报 "unknown field" 而不是静默忽略(缺字段本来就会报 missing field,但多写
+//! 字段在默认 serde 下会被丢弃--那正是"契约悄悄漂移"的入口).
 
 use serde::{Deserialize, Serialize};
 
 /// `integrate1d`:一维曲线域积分请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Integrate1dPayload {
     pub expr: String,
     pub coeff_names: Vec<String>,
@@ -30,6 +35,7 @@ pub struct Integrate1dPayload {
 
 /// `integrate2d`:二维矩形域积分请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Integrate2dPayload {
     pub expr: String,
     pub coeff_names: Vec<String>,
@@ -46,6 +52,7 @@ pub struct Integrate2dPayload {
 
 /// `integrate_region`:region(面积图形)域积分请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrateRegionPayload {
     pub method: String,
     pub integrand_expr: String,
@@ -65,6 +72,7 @@ pub struct IntegrateRegionPayload {
 
 /// `integrate_solid`:3D 实体域积分请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct IntegrateSolidPayload {
     pub method: String,
     pub kind: String,
@@ -80,6 +88,7 @@ pub struct IntegrateSolidPayload {
 
 /// `sample_vector_field`:三维向量场采样请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SampleVectorFieldPayload {
     pub p_expr: String,
     pub q_expr: String,
@@ -99,6 +108,7 @@ pub struct SampleVectorFieldPayload {
 
 /// `intersect_pair`:两个对象求交请求(与旧参数一一对应).
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct IntersectPairPayload {
     pub kind_a: String,
     pub expr_a: String,
@@ -119,6 +129,7 @@ pub struct IntersectPairPayload {
 
 /// `evaluate_gradient_point`:梯度数值求值请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvaluateGradientPointPayload {
     pub surface_expr: String,
     pub fx_expr: String,
@@ -131,6 +142,7 @@ pub struct EvaluateGradientPointPayload {
 
 /// `evaluate_divergence_point`:散度数值求值请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvaluateDivergencePointPayload {
     pub dpx_expr: String,
     pub dqy_expr: String,
@@ -144,6 +156,7 @@ pub struct EvaluateDivergencePointPayload {
 
 /// `evaluate_curl_point`:旋度数值求值请求.
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvaluateCurlPointPayload {
     pub dr_dy_expr: String,
     pub dq_dz_expr: String,

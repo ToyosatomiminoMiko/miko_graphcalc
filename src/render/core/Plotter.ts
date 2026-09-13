@@ -30,6 +30,10 @@ interface UpdatableRenderer extends IRenderer {
     updateRef?(data: SceneObject): void;
 }
 
+// ---- Plotter.applyTransform 的模块级暂存(见方法注释,勿跨调用持有) ----
+const applyTransformScratch = new Array<number>(16);
+const applyTransformMatrix = new THREE.Matrix4();
+
 /**
  * 绘图门面 -- 将数学对象路由到对应的专属渲染器
  *
@@ -125,6 +129,10 @@ export class Plotter {
     /**
      * 对某个对象的渲染 group 应用 4x4 行主序场景变换.
      * 传入 null 时恢复单位变换.
+     *
+     * 暂存复用:`_updateAnimations` 每帧对每个带动画对象调用一次,原来每次都
+     * new 一个 16 元素数组 + 一个 `THREE.Matrix4`.这里改用模块级暂存;调用是
+     * 同步的,`copy` 之后 group 持有自己的矩阵副本,不存在别名问题.
      */
     applyTransform(id: number, matrix: number[][] | null): void {
         const renderer = this.rendererMap.get(id);
@@ -136,16 +144,15 @@ export class Plotter {
             return;
         }
 
-        const columnMajor = [
-            matrix[0][0], matrix[1][0], matrix[2][0], matrix[3][0],
-            matrix[0][1], matrix[1][1], matrix[2][1], matrix[3][1],
-            matrix[0][2], matrix[1][2], matrix[2][2], matrix[3][2],
-            matrix[0][3], matrix[1][3], matrix[2][3], matrix[3][3],
-        ];
-        const transform = new THREE.Matrix4();
-        transform.fromArray(columnMajor);
+        // 行主序 -> THREE 列主序,写进复用数组.
+        for (let row = 0; row < 4; row += 1) {
+            for (let col = 0; col < 4; col += 1) {
+                applyTransformScratch[col * 4 + row] = matrix[row][col];
+            }
+        }
+        applyTransformMatrix.fromArray(applyTransformScratch);
         renderer.group.matrixAutoUpdate = false;
-        renderer.group.matrix.copy(transform);
+        renderer.group.matrix.copy(applyTransformMatrix);
     }
 
     /** 更新所有点对象的全局样式(尺寸/可见性) */

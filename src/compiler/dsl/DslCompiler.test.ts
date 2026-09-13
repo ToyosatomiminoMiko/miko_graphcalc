@@ -795,6 +795,44 @@ describe('compileScene', () => {
         expect(multiple.params[0].value).toBeCloseTo(0, 9);
     });
 
+    it('normalizes a cyclic initial value sitting exactly on max (半开区间)', () => {
+        // 回归(202609 审查 P1-9):循环参数的主值区间是半开的 [min, max),
+        // 初值恰为 max 时必须当场回绕成 min.旧实现用闭区间 `>` 判定,面板保留
+        // max(滑块最右)而求值 scope 归一化成 min(最左),同一个参数在两条路径
+        // 上给出不同的值.
+        const ast: AstProgram = {
+            statements: [
+                {
+                    type: 'param',
+                    name: 'phi',
+                    value: '3.141592653589793',
+                    ui: {
+                        min: '-3.141592653589793',
+                        max: '3.141592653589793',
+                        step: '0.01',
+                    },
+                    cyclic: true,
+                    span: { start: 0, end: 0 },
+                },
+                {
+                    type: 'object',
+                    kind: 'curve',
+                    name: 'c',
+                    expr: 'sin(x * phi)',
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+            ],
+        };
+
+        const scene = compileScene(ast);
+        // 面板值与求值系数必须是同一个数,且落在 min 一侧.
+        expect(scene.params[0].value).toBeCloseTo(-Math.PI, 9);
+        const curve = scene.objects[0];
+        if (curve.kind !== 'curve') throw new Error('期望 curve 对象');
+        expect(curve.coefficients[0].value).toBeCloseTo(scene.params[0].value, 12);
+    });
+
     it('still clamps ordinary coefficients at the declared bounds', () => {
         // 同一区间,不写 cyclic 时必须保持夹取:是否循环只能靠显式声明.
         const ordinaryAst: AstProgram = {

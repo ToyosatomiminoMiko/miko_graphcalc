@@ -43,6 +43,14 @@ describe('normalizeParamValue', () => {
         expect(() => normalizeParamValue(NaN, cyclic)).toThrow(/有限数/);
         expect(() => normalizeParamValue(Infinity, ordinary)).toThrow(/有限数/);
     });
+
+    it('区间跨度溢出不产出 NaN:回绕不可行时保持原值', () => {
+        // max - min 溢出为 Infinity(1e308 - (-1e308)),取模会得到 NaN.
+        const huge = { name: 'p', min: -1e308, max: 1e308, cyclic: true };
+        const value = normalizeParamValue(1e308, huge);
+        expect(Number.isNaN(value)).toBe(false);
+        expect(value).toBe(1e308);
+    });
 });
 
 describe('latexResultNumber', () => {

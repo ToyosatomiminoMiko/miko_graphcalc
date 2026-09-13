@@ -34,26 +34,40 @@ function interpolateMat4(start: Mat4, end: Mat4, t: number): Mat4 {
     if (t <= 0) return cloneMat4(start);
     if (t >= 1) return cloneMat4(end);
 
-    const startMatrix = new THREE.Matrix4().fromArray(rowMajorToColumnMajor(start));
-    const endMatrix = new THREE.Matrix4().fromArray(rowMajorToColumnMajor(end));
-    const startPosition = new THREE.Vector3();
-    const startQuaternion = new THREE.Quaternion();
-    const startScale = new THREE.Vector3();
-    const endPosition = new THREE.Vector3();
-    const endQuaternion = new THREE.Quaternion();
-    const endScale = new THREE.Vector3();
+    // 复用的分解暂存对象:`interpolateMat4` 在动画播放期间**每帧每个对象**
+    // 调用一次,原来每次都 new 两个 Matrix4 + 三个 Vector3 + 一个 Quaternion
+    // (共 8 个临时对象),是主线程 GC 的主要来源之一.这里改走模块级暂存,
+    // 调用是同步的,decompose/lerp/slerp 的结果当场被下面的 threeToRowMajor
+    // 拷成返回值,不存在跨调用别名问题.
+    const startMatrix = scratchStartMatrix.fromArray(rowMajorToColumnMajor(start));
+    const endMatrix = scratchEndMatrix.fromArray(rowMajorToColumnMajor(end));
 
-    startMatrix.decompose(startPosition, startQuaternion, startScale);
-    endMatrix.decompose(endPosition, endQuaternion, endScale);
+    startMatrix.decompose(scratchStartPosition, scratchStartQuaternion, scratchStartScale);
+    endMatrix.decompose(scratchEndPosition, scratchEndQuaternion, scratchEndScale);
 
-    startPosition.lerp(endPosition, t);
-    startQuaternion.slerp(endQuaternion, t);
-    startScale.lerp(endScale, t);
+    scratchStartPosition.lerp(scratchEndPosition, t);
+    scratchStartQuaternion.slerp(scratchEndQuaternion, t);
+    scratchStartScale.lerp(scratchEndScale, t);
 
     return threeToRowMajor(
-        new THREE.Matrix4().compose(startPosition, startQuaternion, startScale),
+        scratchResultMatrix.compose(
+            scratchStartPosition,
+            scratchStartQuaternion,
+            scratchStartScale,
+        ),
     );
 }
+
+// ---- interpolateMat4 的模块级暂存(见函数注释,勿跨调用持有) ----
+const scratchStartMatrix = new THREE.Matrix4();
+const scratchEndMatrix = new THREE.Matrix4();
+const scratchResultMatrix = new THREE.Matrix4();
+const scratchStartPosition = new THREE.Vector3();
+const scratchStartQuaternion = new THREE.Quaternion();
+const scratchStartScale = new THREE.Vector3();
+const scratchEndPosition = new THREE.Vector3();
+const scratchEndQuaternion = new THREE.Quaternion();
+const scratchEndScale = new THREE.Vector3();
 
 /**
  * 按时间轴计算对象动画矩阵.

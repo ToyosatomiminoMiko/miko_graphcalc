@@ -75,13 +75,16 @@ fn latex_join_args(arg_texts: &[String]) -> String {
     arg_texts.join(",\\ ")
 }
 
-/// 幂运算底数:只有原子/函数调用可以直接跟随上标,其余需要括号.
+/// 幂运算底数:是否加括号走 `printing` 的共享判定(与 Text 模式同源).
+///
+/// 覆盖:负数字面量/前缀负号(`(-2)^{x}`),加减乘除形态(`(a + b)^{2}`),
+/// 底数本身是幂(`(x^{2})^{3}`,`(e^{x})^{2}`,避免 LaTeX 双上标报错).
 pub(crate) fn latex_pow_base(expr: &Expr) -> String {
     let text = to_latex(expr, 0);
-    match expr {
-        Expr::Num(_) | Expr::Sym(_) | Expr::Call(_, _) | Expr::List(_) => text,
-        _ => parenthesize(&text, true),
-    }
+    parenthesize(
+        &text,
+        crate::symbolic::printing::power_base_needs_parentheses(expr, PrintMode::Latex),
+    )
 }
 
 /// `name(...)` 的 LaTeX 兜底:元数不对(缺参/多参)时退化成
@@ -212,14 +215,18 @@ fn to_latex(expr: &Expr, parent_prec: u8) -> String {
 /// 表达式 -> LaTeX(UI 公式展示).
 ///
 /// 行为契约:
-/// - 元数/未知函数与数值路径同源:先走 `rewrite_aliases`(别名展开)再走
-///   `validate_supported`(函数名 + 元数,见审查 SYM-P2.1),因此
-///   `latex_expression("sin(x, y)")` 报错而不是静默丢 `y`;
+/// - 元数/未知函数的校验仍走 `rewrite_aliases` + `validate_supported`
+///   (别名展开后的树才是"可求值形态",元数不符在这里报错,见 SYM-P2.1);
+/// - **排版用解析出的原树**:别名(`pow`/`deg`/`log`)保留符号形式,
+///   `latex_call` 才能按 `AliasLatexKind` 排出 `a^{b}` / `x^{\circ}` / `\ln`.
+///   202609 修复前直接用展开后的树排版,`deg(180)` 退化成
+///   `180 \cdot 0.017453292519943`,`AliasLatexKind` 三个分支全部不可达;
 /// - 错误是 `Err(String)`,不 panic(SYM-P1.2);
 /// - `pi` / `e` 不折叠成小数:展示层保留符号形式,数值语义由 Text 路径负责.
 pub fn latex_expression(expr: &str) -> Result<String, String> {
     let parsed = parse_expr(expr)?;
+    // 校验用展开后的树(元数是"求值形态"的属性),排版用原树(保留别名写法).
     let rewritten = rewrite_aliases(&parsed)?;
     validate_supported(&rewritten)?;
-    Ok(to_latex(&rewritten, 0))
+    Ok(to_latex(&parsed, 0))
 }

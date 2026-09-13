@@ -27,26 +27,47 @@ export class ComputeWorkerClient<
     private _worker: Worker | null = null;
     private readonly _pending = new Map<number, PendingRequest<TResponse>>();
     private _nextId = 0;
+    /**
+     * 终态标志.没有它时,dispose 只置空 `_worker`,下一次 request 会由
+     * `_getWorker()` 再 fork 一个不受任何引用跟踪的 Worker(调用方以为
+     * 已经释放,实际泄漏一个线程 + WASM 实例).
+     */
+    private _disposed = false;
 
     constructor(private readonly workerFactory: () => Worker) {}
 
     /**
      * @cache_access
      * 通过复用 Worker 发送请求,并登记到 pending 缓存.
+     *
+     * dispose 后进入终态:直接 reject,既不建 Worker 也不登记 pending.
      */
     request(request: Omit<TRequest, 'id'>): Promise<TResponse> {
+        if (this._disposed) {
+            return Promise.reject(new Error('Compute worker disposed'));
+        }
+
         const id = ++this._nextId;
         return new Promise<TResponse>((resolve, reject) => {
             this._pending.set(id, { resolve, reject });
-            this._getWorker().postMessage({ ...request, id });
+            try {
+                this._getWorker().postMessage({ ...request, id });
+            } catch (error) {
+                // postMessage 是结构化克隆,DataCloneError 等同步异常不会触发
+                // Worker.onerror;若不在这里兜底,_pending 里这条会永久残留,
+                // 请求既不 resolve 也不 reject.
+                this._pending.delete(id);
+                reject(error instanceof Error ? error : new Error(String(error)));
+            }
         });
     }
 
     /**
      * @cache_access
-     * 终止 Worker 并拒绝所有 pending 请求.
+     * 终止 Worker 并拒绝所有 pending 请求;此后 request 一律 reject.
      */
     dispose(): void {
+        this._disposed = true;
         this._worker?.terminate();
         this._worker = null;
 

@@ -58,27 +58,20 @@ export type SurfaceWorkerResponse = {
  * 缓存目的:Worker 内只初始化一次 render_rs WASM 实例,后续请求复用.
  * 键/失效策略:模块级 Promise;永不失效.
  * 生命周期:随 Worker 实例存活.
+ *
+ * 另注:这里曾有一个用 `sessionStorage.getItem('surfaceTiming')` 的性能观测
+ * 开关.本文件是 module Worker 入口,`sessionStorage` 是 window 专有 API,在
+ * Worker 全局里未定义,读取恒抛 ReferenceError 并被 catch 吞成 false--也
+ * 就是说 `if (profile)` 那条分支从来没有执行过,是死代码.现在直接测量
+ * `computeMs`(响应字段保留,仅用于性能观测),不再有任何开关分支与控制台
+ * 输出,Worker 也不再触碰 window 专有 API.
  */
 const wasmReady = init();
-
-/**
- * 性能观测开关:在控制台执行 `sessionStorage.setItem('surfaceTiming','1')`
- * 后,每次采样请求会把整段 Rust/WASM 耗时打到 worker console.
- * 默认关闭,零额外输出(仅多两次 performance.now,可忽略).
- */
-function surfaceTimingEnabled(): boolean {
-    try {
-        return sessionStorage.getItem('surfaceTiming') === '1';
-    } catch {
-        return false;
-    }
-}
 
 createWasmWorker<SurfaceWorkerRequest, SurfaceWorkerResponse>(
     wasmReady,
     (req, post) => {
-        const profile = surfaceTimingEnabled();
-        const t0 = profile ? performance.now() : 0;
+        const t0 = performance.now();
 
         // Worker 收到的普通数组先转成 WASM 期望的 Float64Array
         const coeffValues = new Float64Array(req.coeffValues);
@@ -98,12 +91,8 @@ createWasmWorker<SurfaceWorkerRequest, SurfaceWorkerResponse>(
             req.rows,
         );
 
-        const computeMs = profile ? performance.now() - t0 : 0;
-        if (profile) {
-            console.info(
-                `[surfaceTiming] ${req.cols}x${req.rows} "${req.expr}" = ${computeMs.toFixed(2)} ms`,
-            );
-        }
+        // 整段 Rust/WASM 调用耗时;仅作为响应里的观测字段回传,不参与渲染.
+        const computeMs = performance.now() - t0;
 
         // 拆包:头部元数据 + 零拷贝 subarray 视图.三个视图共享同一块
         // ArrayBuffer,后续整体 transfer 这一块 buffer,零额外拷贝.

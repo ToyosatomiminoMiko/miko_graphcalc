@@ -667,6 +667,43 @@ mod glue_tests {
         serde_json::to_string(request).expect("请求可序列化")
     }
 
+    /// 契约硬化回归(202609 审查 P3):未知 JSON 字段必须报错而不是被静默忽略.
+    ///
+    /// 缺字段本来就会报 missing field,但**多写/写错**字段在默认 serde 下会被
+    /// 丢弃,正是"TS 侧改字段名后契约悄悄漂移"的入口.所有请求结构体都带
+    /// `#[serde(deny_unknown_fields)]`.
+    ///
+    /// 注意这里**直接测 serde 反序列化**而不是调 wasm 导出:错误路径要构造
+    /// `JsValue`,而 wasm-bindgen 的 `JsValue::from_str` 在 native 宿主上会
+    /// abort(见本模块头注释),所以 glue_tests 只走成功路径.
+    #[test]
+    fn unknown_payload_fields_are_rejected() {
+        let (names, values) = no_coeffs();
+        let request = Integrate1dPayload {
+            expr: "x".to_string(),
+            coeff_names: names,
+            coeff_values: values,
+            a: 0.0,
+            b: 1.0,
+            n: 8,
+            layers: 8,
+            method: "trapezoid".to_string(),
+        };
+        let mut value: serde_json::Value = serde_json::from_str(&payload_of(&request)).unwrap();
+        // 没有多余字段时可正常反序列化.
+        assert!(serde_json::from_str::<Integrate1dPayload>(&value.to_string()).is_ok());
+
+        // 塞一个 TS 侧旧版本的 routing 字段(历史上 `dim` 曾经从这里走过),
+        // 必须报错而不是静默忽略.
+        value["dim"] = serde_json::json!("1d");
+        let error = serde_json::from_str::<Integrate1dPayload>(&value.to_string())
+            .expect_err("未知字段必须被拒绝");
+        assert!(
+            error.to_string().contains("unknown field"),
+            "错误应点名未知字段: {error}"
+        );
+    }
+
     #[test]
     fn integrate1d_trapezoid_simpson_riemann_known_values() {
         let (names, values) = no_coeffs();

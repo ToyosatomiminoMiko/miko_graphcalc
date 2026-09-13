@@ -115,7 +115,15 @@ export function collectParams(ast: AstProgram): Map<string, ParamDeclaration> {
             if (declaration.step <= 0) {
                 throw new Error(`参数 ${statement.name} 的 step 必须大于 0`);
             }
-            if (declaration.value < declaration.min || declaration.value > declaration.max) {
+            // 循环参数的主值区间是**半开的** `[min, max)`(min 与 max 在圆周上
+            // 是同一点,见 `normalizeParamValue`),所以初值恰为 `max` 时必须
+            // 当场回绕成 `min`;否则面板保留 `max`(滑块最右)而求值 scope 归一化
+            // 成 `min`(最左),同一个参数在 UI 与数值两条路径上给出不同值
+            // (202609 审查 P1-9).普通参数仍是闭区间 `[min, max]`,用 `>`.
+            const outOfRange = declaration.cyclic
+                ? declaration.value < declaration.min || declaration.value >= declaration.max
+                : declaration.value < declaration.min || declaration.value > declaration.max;
+            if (outOfRange) {
                 // 循环参数的初始值允许落在域外(它会被回绕到 [min, max)),
                 // 普通参数仍要求初始值在区间内.
                 if (declaration.cyclic) {

@@ -52,8 +52,12 @@ export type IntegralSolidDomain = {
 
 /** 一次积分请求的完整描述. */
 export type IntegralSpec = {
+    /**
+     * 任务身份(latest-only 调度用):只有同一个 taskKey 的新请求才会顶掉旧请求.
+     * 取任务名(场景内唯一),不要用物体 id(一个物体可有多个积分).
+     */
+    taskKey: string;
     method: IntegralMethod;
-    dim: 1 | 2 | 3;
     domainKind: IntegralDomainKind;
     /** 被积函数(归一化字符串);region/solid 缺省 "1",变量为世界坐标. */
     integrand: string;
@@ -79,7 +83,7 @@ export type IntegralSpec = {
 // ---------- Worker 管理 ----------
 /**
  * @cache
- * 缓存目的:积分计算复用同一个 Worker client 和 latest-only 调度器.
+ * 缓存目的:积分计算复用同一个 Worker client.
  * 键/失效策略:模块级单例;应用销毁时由 disposeIntegralWorker 显式释放.
  * 生命周期:模块级,随页面存活.
  */
@@ -88,24 +92,38 @@ const integralClient = new ComputeWorkerClient<IntegralWorkerRequest, IntegralWo
     { type: 'module' },
 ));
 
-// 积分请求也走 latest-only.滑块高频刷新时,旧请求不会再无意义地堆积;
-// 每个时刻最多只有一个积分请求真正交给 Worker.
 /**
  * @cache
- * 缓存目的:保证积分请求 latest-only,避免高频刷新堆积旧任务.
- * 键/失效策略:单飞队列;新请求取代 pending 请求.
- * 生命周期:模块级,随页面存活.
+ * 缓存目的:每个积分任务一个 latest-only 调度器,而不是全场景共用一个.
+ * 键/失效策略:taskKey(见 `IntegralSpec.taskKey`)-> executor;参数刷新只会
+ *              顶掉**同一个任务**的旧请求.
+ * 生命周期:模块级,随页面存活;disposeIntegralWorker 逐个释放.
+ *
+ * 为什么不能共用一个(202609 审查 P0-4,已用探针复现):
+ * `DslIntegralRenderer.sync` 是 `for (task of tasks) await integrate(task)` 的
+ * 串行循环,而共用 executor 的 superseded 是**全局按请求号**判定的.任务 A 在飞
+ * 时,第二次刷新只把 A 标脏:`sync([A])` 先顶掉在飞的 A,再把新 A 排进 pending;
+ * 旧 A 结算时新 A 的请求号已经过期,于是**两次 A 都以 superseded 结算**,被渲染
+ * 层 `continue` 咽掉--A 永远拿不到结果,对象列表保留旧参数的积分值(静默错值).
+ * 每任务一个 executor 后,superseded 只在同一任务内部发生,跨任务互不干扰.
  */
-const integralExecutor = new LatestRequestExecutor<IntegralWorkerRequest, IntegralWorkerResponse>(
-    integralClient,
-);
+const integralExecutors = new Map<string, LatestRequestExecutor<IntegralWorkerRequest, IntegralWorkerResponse>>();
+
+function executorFor(taskKey: string): LatestRequestExecutor<IntegralWorkerRequest, IntegralWorkerResponse> {
+    let executor = integralExecutors.get(taskKey);
+    if (!executor) {
+        executor = new LatestRequestExecutor<IntegralWorkerRequest, IntegralWorkerResponse>(integralClient);
+        integralExecutors.set(taskKey, executor);
+    }
+    return executor;
+}
 
 /**
  * @cache_access
- * 通过 latest-only executor 调用积分 Worker.
+ * 通过该任务自己的 latest-only executor 调用积分 Worker.
  */
 export function integrate(spec: IntegralSpec): Promise<IntegralResult> {
-    return integralExecutor
+    return executorFor(spec.taskKey)
         .request(buildRequest(spec))
         .then((response) => ({
             value: response.value!,
@@ -125,7 +143,6 @@ export function integrate(spec: IntegralSpec): Promise<IntegralResult> {
 function buildRequest(spec: IntegralSpec): Omit<IntegralWorkerRequest, 'id'> {
     const base = {
         method: spec.method,
-        dim: spec.dim === 1 ? ('1d' as const) : spec.dim === 2 ? ('2d' as const) : ('3d' as const),
         domainKind: spec.domainKind,
         integrandExpr: spec.integrand,
         integrandCoeffs: spec.integrandCoeffs,
@@ -196,13 +213,16 @@ function buildRequest(spec: IntegralSpec): Omit<IntegralWorkerRequest, 'id'> {
 
 /**
  * 应用级释放积分计算资源.
- * 先停掉 LatestRequestExecutor 的逻辑调度,再 terminate 共享 Worker.
+ * 先停掉每个任务的 LatestRequestExecutor 逻辑调度,再 terminate 共享 Worker.
  */
 /**
  * @cache_access
- * 释放积分 latest-only 调度器和共享 Worker.
+ * 释放所有任务的 latest-only 调度器和共享 Worker.
  */
 export function disposeIntegralWorker(): void {
-    integralExecutor.dispose();
+    for (const executor of integralExecutors.values()) {
+        executor.dispose();
+    }
+    integralExecutors.clear();
     integralClient.dispose();
 }

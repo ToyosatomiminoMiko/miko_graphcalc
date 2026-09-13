@@ -59,6 +59,33 @@ pub(crate) enum Expr {
 /// 类型保持 crate 内部可见:外部仍通过表达式字符串与 WASM 入口交互.
 pub(crate) type RuntimeExpr = Expr;
 
+// ---- 运算符优先级:全模块唯一事实来源(202609 审查 P3-1) ----
+//
+// 这些数字**同时**被三处消费:解析器(parser.rs 的优先级爬升),打印器
+// (printing.rs 的加括号判定),以及 `BinOp::prec()`.历史上 parser 里还硬编码
+// 了一套自己的字面量,改 `BinOp::prec()` 不会编译报错但会静默改变语义.
+// 现在所有数字都从这里取;解析器需要区分"左/右结合"时用 `_RIGHT` 后缀的
+// 相邻值(右绑紧一级,实现左结合).
+/// 加减:`a + b - c`.
+pub(crate) const PREC_ADDITIVE: u8 = 20;
+/// 隐式乘法 `2x`:优先级高于 `/`,低于 `^`(既有约定,见 parser 文件头).
+pub(crate) const PREC_IMPLICIT_MUL: u8 = 50;
+/// 乘除:`a * b / c`.
+pub(crate) const PREC_MULTIPLICATIVE: u8 = 40;
+/// 乘方:`a ^ b`,右结合.
+pub(crate) const PREC_POWER: u8 = 70;
+/// 前缀正负号:`-x ^ 2` 读作 `-(x ^ 2)`,所以前缀负号优先级低于幂.
+pub(crate) const PREC_UNARY: u8 = 60;
+
+/// 左结合运算符的右操作数绑紧一级:`a - (b ...)`.
+pub(crate) const PREC_ADDITIVE_RIGHT: u8 = PREC_ADDITIVE + 1;
+/// 见 [`PREC_ADDITIVE_RIGHT`].
+pub(crate) const PREC_MULTIPLICATIVE_RIGHT: u8 = PREC_MULTIPLICATIVE + 1;
+/// 见 [`PREC_ADDITIVE_RIGHT`].
+pub(crate) const PREC_IMPLICIT_MUL_RIGHT: u8 = PREC_IMPLICIT_MUL + 1;
+/// 幂右结合:左右同优先级(`2 ^ 2 ^ 3` 读作 `2 ^ (2 ^ 3)`).
+pub(crate) const PREC_POWER_RIGHT: u8 = PREC_POWER;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnaryOp {
     Neg,
@@ -76,9 +103,9 @@ pub(crate) enum BinOp {
 impl BinOp {
     fn prec(self) -> u8 {
         match self {
-            Self::Add | Self::Sub => 20,
-            Self::Mul | Self::Div => 40,
-            Self::Pow => 70,
+            Self::Add | Self::Sub => PREC_ADDITIVE,
+            Self::Mul | Self::Div => PREC_MULTIPLICATIVE,
+            Self::Pow => PREC_POWER,
         }
     }
 
@@ -259,14 +286,15 @@ pub fn matrix4_from_expr(expr: &str) -> Result<Vec<f64>, String> {
                     // "非有限 = 掩码"的语义.`1/0` / `0/0` 这类条目过去会静默
                     // 产出 inf/NaN 并污染整条变换链,这里按编码规范
                     // "非有限输入要有明确语义"直接报错并带上行列下标.
-                    if !value.is_finite() {
+                    // `evaluate_constant` 用 `None` 表示非有限结果.
+                    if !matches!(value, Some(v) if v.is_finite()) {
                         return Err(format!(
                             "矩阵第 {} 行第 {} 列不是有限数值: {item}",
                             row_index + 1,
                             column_index + 1
                         ));
                     }
-                    out.push(value);
+                    out.push(value.expect("已确认有限"));
                 }
             }
             _ => return Err("矩阵每一行必须为 4 个元素".to_string()),
@@ -718,5 +746,157 @@ mod tests {
         let deep = format!("{}x{}", "(".repeat(600), ")".repeat(600));
         let error = normalize_expression(&deep).unwrap_err();
         assert!(error.contains("嵌套"), "护栏报错应可读: {error}");
+    }
+
+    /// 202609 审查 P0-1 回归:负数字面量作幂底数必须保留括号.
+    ///
+    /// `simplify` 会把 `Unary(Neg, Num(2))` 折成 `Num(-2)`,打印器若只看优先级
+    /// 就输出 `-2 ^ x`,回读成 `-(2 ^ x)`--x 为偶数时数值静默变号.求导结果
+    /// 会经 `cachedDerivativeExpression` 回读进梯度/散度/旋度/隐式场求值,
+    /// 所以这条不是显示问题,是数值错误.
+    #[test]
+    fn negative_literal_power_base_keeps_parentheses() {
+        // 求导路径:y 的偏导就是 (-2)^x 本身,输出必须是可回读的 (-2) ^ x.
+        assert_eq!(symbolic_derivative("(-2)^x * y", "y").unwrap(), "(-2) ^ x");
+        assert_eq!(
+            symbolic_derivative("(-0.5)^x * y", "y").unwrap(),
+            "(-0.5) ^ x"
+        );
+        // 回读语义:x=2 时 (-2)^2 = 4,而不是 -(2^2) = -4.
+        let derived = symbolic_derivative("(-2)^x * y", "y").unwrap();
+        let node = compile_runtime_expr(&derived).unwrap();
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("x".to_string(), 2.0);
+        assert_eq!(evaluate_runtime_expr(&node, &ctx).unwrap(), Some(4.0));
+
+        // 归一化串同样要守住括号.
+        assert_eq!(normalize_expression("(-2)^x").unwrap(), "(-2) ^ x");
+        // 前缀负号作底数也要括号:(-x)^2 少括号会变成 -(x^2).
+        assert_eq!(normalize_expression("(-x)^2").unwrap(), "(-x) ^ 2");
+        assert_eq!(normalize_expression("-(x^2)").unwrap(), "-(x ^ 2)");
+        // 非幂底数位置的负号不补括号(前缀负号优先级高于二元运算符).
+        assert_eq!(normalize_expression("-2 * x").unwrap(), "-2 * x");
+        assert_eq!(normalize_expression("a - (-b)").unwrap(), "a - -b");
+    }
+
+    /// 202609 审查 P0-2 回归:`normalize_expression` 不得重结合 Add/Mul.
+    ///
+    /// 浮点加减乘不满足结合律,`a * (b * c)` 与 `(a * b) * c` 可以差出 1 ulp
+    /// 甚至有限/非有限.归一化串会回读求值,必须保结构.
+    #[test]
+    fn normalize_preserves_additive_and_multiplicative_association() {
+        assert_eq!(normalize_expression("a * (b * c)").unwrap(), "a * (b * c)");
+        assert_eq!(normalize_expression("a + (b + c)").unwrap(), "a + (b + c)");
+        assert_eq!(normalize_expression("a + (b - c)").unwrap(), "a + (b - c)");
+        // 左结合的形态不该被无谓地加括号.
+        assert_eq!(normalize_expression("a * b * c").unwrap(), "a * b * c");
+        assert_eq!(normalize_expression("a + b + c").unwrap(), "a + b + c");
+        assert_eq!(normalize_expression("a + b - c").unwrap(), "a + b - c");
+
+        // 用真实数值守住"结构不被改变":a=1e16,b=-1e16,c=1 时
+        // a + (b + c) = 1,而 (a + b) + c = 1,但 a + c + b = 0--归一化不得
+        // 把带括号的形态改成无括号的重结合形态.
+        fn evaluate_bindings(source: &str) -> Option<f64> {
+            let node = compile_runtime_expr(source).unwrap();
+            let mut ctx = std::collections::HashMap::new();
+            ctx.insert("a".to_string(), 1e16);
+            ctx.insert("b".to_string(), -1e16);
+            ctx.insert("c".to_string(), 1.0);
+            evaluate_runtime_expr(&node, &ctx).unwrap()
+        }
+        let normalized = normalize_expression("a + (b + c)").unwrap();
+        assert_eq!(
+            evaluate_bindings(&normalized),
+            evaluate_bindings("a + (b + c)")
+        );
+    }
+
+    /// 202609 审查 P1-1..P1-3 回归:化简规则不得静默扩大定义域.
+    ///
+    /// 三条规则各自的前提:
+    /// - `(x^a)^b -> x^(a*b)` 要求**内层指数是常数**(只要求外层整数不够:
+    ///   `((-8)^0.5)^2 = NaN`,而 `(-8)^(0.5*2) = -8`);
+    /// - `x^m * x^n -> x^(m+n)` 只在底数可证为正或指数同号时成立
+    ///   (`0^0.5 * 0^-0.5 = NaN`,合并后成 `0^0 = 1`);
+    /// - `0 * f -> 0` / `0 / f -> 0` 只在另一侧可证有限/非零常数时成立.
+    #[test]
+    fn simplification_does_not_widen_the_domain() {
+        // 内层符号指数不折叠:结果保留 ((x^a)^2) 形态而不是 x^(2a).
+        assert_eq!(
+            symbolic_derivative("(x^a)^2 * t", "t").unwrap(),
+            "(x ^ a) ^ 2"
+        );
+        // 异号指数不合并(0 处 0*inf 的静默修复);`^ -0.5` 读作 `^(-0.5)`,
+        // 与乘除链里的 `x ^ -0.5` 是同一棵树,不因写法不同而改变合并判定.
+        assert_eq!(
+            symbolic_derivative("(x^0.5 * x^-0.5) * t", "t").unwrap(),
+            "x ^ 0.5 * x ^ -0.5"
+        );
+        // 同号指数照旧合并(x=0 两侧都无定义,合并保值).
+        // 用求导路径观察 simplify 的结果(normalize_expression 只做归一化,
+        // 不跑化简,所以这里必须经 `d/dt[... * t]`).
+        assert_eq!(
+            symbolic_derivative("(x^3 * x^4) * t", "t").unwrap(),
+            "x ^ 7"
+        );
+        assert_eq!(
+            symbolic_derivative("(x^3 / x^8) * t", "t").unwrap(),
+            "1 / x ^ 5"
+        );
+        // 0 的折叠只在另一侧可证有限/非零时发生.
+        assert_eq!(normalize_expression("0 / 2").unwrap(), "0 / 2");
+        assert_eq!(symbolic_derivative("(0/0) * t", "t").unwrap(), "0 / 0");
+        assert_eq!(symbolic_derivative("0 / x", "x").unwrap(), "0");
+        assert_eq!(symbolic_derivative("0 / (x - x)", "t").unwrap(), "0");
+        // 求值侧语义:0/0 与 0/x(在 x=0)都必须保持"无定义"而不是 0.
+        let node = compile_runtime_expr("0 / 0").unwrap();
+        assert_eq!(
+            evaluate_runtime_expr(&node, &std::collections::HashMap::new()).unwrap(),
+            None
+        );
+        let node = compile_runtime_expr("0 / x").unwrap();
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("x".to_string(), 0.0);
+        assert_eq!(evaluate_runtime_expr(&node, &ctx).unwrap(), None);
+        ctx.insert("x".to_string(), 2.0);
+        assert_eq!(evaluate_runtime_expr(&node, &ctx).unwrap(), Some(0.0));
+    }
+
+    /// 202609 审查 P1-4 回归:溢出字面量必须报错,不能变成 `inf`.
+    ///
+    /// `f64::from_str("1e999")` 返回 `Ok(inf)`;归一化把它打印成 `"inf"` 后
+    /// 既不可回读(报"变量 inf 未定义"),又可能被当成合法系数名静默求值.
+    #[test]
+    fn out_of_range_numeric_literals_are_rejected() {
+        for literal in ["1e999", "-1e999", "1e309"] {
+            let error = normalize_expression(literal).unwrap_err();
+            assert!(error.contains("超出可表示范围"), "{literal}: {error}");
+        }
+        // 边界内的极值仍可正常往返.
+        for literal in ["1e308", "1e-320", "-1e-320"] {
+            assert!(normalize_expression(literal).is_ok(), "{literal} 应可解析");
+        }
+    }
+
+    /// 202609 审查 P1-5/P1-6 回归:别名排版必须在展开前处理.
+    ///
+    /// - `exp(x)^2` 排版成 `(e^{x})^{2}`,否则 `e^{x}^{2}` 是 LaTeX 的
+    ///   Double superscript 语法错误;
+    /// - `deg(180)` 排版成 `180^{\circ}`,而不是展开后的 `180 \cdot 0.017...`.
+    #[test]
+    fn latex_renders_aliases_before_expansion() {
+        assert_eq!(latex_expression("exp(x)^2").unwrap(), "(e^{x})^{2}");
+        assert_eq!(
+            latex_expression("exp(x)^exp(x)").unwrap(),
+            "(e^{x})^{e^{x}}"
+        );
+        assert_eq!(latex_expression("pow(x,2)").unwrap(), "x^{2}");
+        assert_eq!(latex_expression("pow(x,2)^3").unwrap(), "(x^{2})^{3}");
+        assert_eq!(latex_expression("deg(180)").unwrap(), "180^{\\circ}");
+        assert_eq!(latex_expression("deg(x)").unwrap(), "x^{\\circ}");
+        assert_eq!(latex_expression("log(x)").unwrap(), "\\ln\\left(x\\right)");
+        // 元数校验仍走展开后的树:`sin(x, y)` 必须报错而不是静默丢参数.
+        assert!(latex_expression("sin(x, y)").is_err());
+        assert!(latex_expression("deg(x, y)").is_err());
     }
 }

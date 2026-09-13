@@ -29,14 +29,18 @@ use std::collections::HashMap;
 
 use crate::config::MAX_INTERSECTION_SEGMENTS;
 use crate::eval_core::CompiledEvaluator;
-use crate::geometry_core::FieldEval;
+use crate::geometry_core::{check_conic_params, FieldEval};
 use crate::sampling_core::uniform_nodes;
 use crate::transform_core::{apply_to_point, Mat4};
 
 const TAU: f64 = std::f64::consts::TAU;
 
-/// 去重半径的基础系数(世界坐标).实际去重按点/根的量级缩放,
-/// 见 `dedupe_point_tolerance` / `dedupe_root_tolerance`.
+/// 旋转体端盖存在性判定:半径小于"旋转体自身尺度"的该比例时视为退化,
+/// 不生成端盖.相对容差随几何缩放,不再用硬编码绝对 1e-9.
+const CONIC_CAP_RELATIVE_EPSILON: f64 = 1e-9;
+
+/// 去重半径的基础系数.实际去重按"点集直径 / 根集跨度"等几何自身尺度缩放,
+/// 见 `dedupe_point_tolerance` / `dedupe_root_tolerance`(坐标绝对值不参与).
 const POINT_DEDUP_TOLERANCE: f64 = 1e-5;
 /// 顶点池坐标量化的相对精度:key = round(坐标 · VERTEX_QUANTUM / 该点量级),
 /// 等价于"相对 1e-6 精度"量化(旧实现与 TS 的 toFixed(6) 是绝对 1e-6,
@@ -90,10 +94,6 @@ fn clamp(value: f64, lo: f64, hi: f64) -> f64 {
 
 fn finite(value: f64) -> bool {
     value.is_finite()
-}
-
-fn finite_opt(value: Option<f64>) -> bool {
-    matches!(value, Some(value) if value.is_finite())
 }
 
 fn to_world(matrix: Option<Mat4>, local: V3) -> V3 {
@@ -257,8 +257,6 @@ enum PatchShape {
         direction: V3,
         axis_a: V3,
         axis_b: V3,
-        ar: f64,
-        br: f64,
         hd: f64,
         matrix: Option<Mat4>,
     },
@@ -314,8 +312,6 @@ impl PatchEval {
                 direction,
                 axis_a,
                 axis_b,
-                ar,
-                br,
                 hd,
                 matrix,
             } => {
@@ -323,7 +319,6 @@ impl PatchEval {
                 for i in 0..3 {
                     local[i] = center[i] + direction[i] * hd + axis_a[i] * u + axis_b[i] * v;
                 }
-                let _ = (ar, br);
                 (Some(to_world(*matrix, local)), true)
             }
             PatchShape::ConicSide {
@@ -487,8 +482,6 @@ fn build_box_patches(descriptor: &ObjectDescriptor) -> Result<Vec<PatchEval>, St
                 direction: *direction,
                 axis_a: *axis_a,
                 axis_b: *axis_b,
-                ar: *ar,
-                br: *br,
                 hd: *hd,
                 matrix: descriptor.matrix,
             },
@@ -505,9 +498,8 @@ fn build_conic_patches(descriptor: &ObjectDescriptor) -> Result<Vec<PatchEval>, 
     let base_radius = descriptor.params[3];
     let top_radius = descriptor.params[4];
     let height = descriptor.params[5];
-    if !(base_radius > 0.0 && height > 0.0) {
-        return Err("旋转体 base/height 必须大于 0".to_string());
-    }
+    check_conic_params(base_radius, top_radius, height)?;
+    let cap_scale = base_radius.max(top_radius).max(height);
 
     let mut patches = vec![PatchEval {
         u0: 0.0,
@@ -523,7 +515,7 @@ fn build_conic_patches(descriptor: &ObjectDescriptor) -> Result<Vec<PatchEval>, 
         },
     }];
 
-    if base_radius > 1e-9 {
+    if base_radius > CONIC_CAP_RELATIVE_EPSILON * cap_scale {
         patches.push(PatchEval {
             u0: 0.0,
             u1: TAU,
@@ -537,7 +529,7 @@ fn build_conic_patches(descriptor: &ObjectDescriptor) -> Result<Vec<PatchEval>, 
             },
         });
     }
-    if top_radius > 1e-9 {
+    if top_radius > CONIC_CAP_RELATIVE_EPSILON * cap_scale {
         patches.push(PatchEval {
             u0: 0.0,
             u1: TAU,
@@ -568,130 +560,300 @@ fn build_patches(descriptor: &ObjectDescriptor, segments: usize) -> Result<Vec<P
 // 一维求根
 // ================================================================
 
-/// 采样 + 符号变化二分 + 相切采样点,返回参数位置.
+/// 采样点被判为"在表面上"(符号 0)的容差系数:与相邻采样步长量级
+/// `max|f_i - f_{i±1}|`(≈|f'|·h)成比例,与整段区间的函数最大值无关.
+const TANGENT_STEP_RATIO: f64 = 1.0;
+/// 相切根残差复核系数:细化后的 |f| 必须不超过邻域函数量级的该倍数,
+/// 否则判为"接近但未到达 0",丢弃.穿越型根由符号变化本身证明,不走此判据.
+const CONTACT_RESIDUAL_RATIO: f64 = 1e-7;
+/// 二分收敛的残差系数(相对二分区间端点的函数量级).
+const BISECTION_RESIDUAL_RATIO: f64 = 1e-12;
+/// 接触点三分细化迭代次数.
+const CONTACT_REFINE_ITERATIONS: usize = 120;
+
+/// 采样 + 跨号二分 + 接触段细化,返回参数位置.
 ///
-/// 容差全部取"相对尺度"而非硬编码绝对量:
-/// - 残差收敛 |f| ≤ 1e-12·f_scale(f_scale = 采样值量级):坐标/函数整体
-///   缩放到 1e-6 量级时,判据随量级收缩,不会把区间中点过早当根;
-/// - 相切判定 |f| ≤ 1e-7·f_scale,与残差判据同尺度;
-/// - 区间宽度收敛 1e-11·(1+|x|) 已是相对形式.
+/// 容差一律与**采样步长/局部函数尺度**挂钩,不用"整段区间的函数最大值":
+/// - 采样点按局部量级 `max|f_i - f_{i±1}|`(≈|f'|·h)分类,落在容差内的
+///   点视作"在表面上"(符号 0),相切/擦边因此不会被拆成成片假根;
+/// - 严格跨号的相邻采样点用二分收敛;
+/// - 相邻"在表面上"的采样点合并成接触段:段两侧异号(真实穿越)时二分;
+///   两侧同号(相切)时取段内 |f| 最小的采样点做三分细化,再用"残差相对
+///   邻域函数量级足够小"复核,复核不过则丢弃(避免大动态范围下的假根).
 fn find_1d_roots<F>(f: &mut F, lo: f64, hi: f64, steps: usize) -> Result<Vec<f64>, String>
 where
     F: FnMut(f64) -> Result<Option<f64>, String>,
 {
     let mut xs = Vec::with_capacity(steps + 1);
-    let mut values = Vec::with_capacity(steps + 1);
-    let mut f_scale = 0.0f64;
+    let mut values: Vec<Option<f64>> = Vec::with_capacity(steps + 1);
     for x in uniform_nodes(lo, hi, steps) {
         xs.push(x);
-        let value = f(x)?;
-        if let Some(v) = value.filter(|value| value.is_finite()) {
-            f_scale = f_scale.max(v.abs());
-        }
-        values.push(value);
+        values.push(f(x)?.filter(|value| value.is_finite()));
     }
-    // 量级下限只用于避免除零/判据恒真;真实函数整体缩小时判据跟着缩小.
-    let f_scale = f_scale.max(f64::MIN_POSITIVE);
+
+    // 局部步长量级:|f_i - f_{i±1}| ≈ |f'|·h(端点只有唯一邻居).
+    let step_scale = |i: usize| -> f64 {
+        let Some(fi) = values[i] else {
+            return 0.0;
+        };
+        let mut scale = 0.0f64;
+        if i > 0 {
+            if let Some(left) = values[i - 1] {
+                scale = scale.max((fi - left).abs());
+            }
+        }
+        if i + 1 < values.len() {
+            if let Some(right) = values[i + 1] {
+                scale = scale.max((fi - right).abs());
+            }
+        }
+        scale
+    };
+
+    // 三值符号:+1 / 0(局部容差内视作在表面上)/ -1.
+    let signs: Vec<i8> = (0..=steps)
+        .map(|i| match values[i] {
+            None => 0,
+            Some(value) => {
+                let tolerance = TANGENT_STEP_RATIO * step_scale(i);
+                if value > tolerance {
+                    1
+                } else if value < -tolerance {
+                    -1
+                } else {
+                    0
+                }
+            }
+        })
+        .collect();
 
     let mut roots = Vec::new();
-    for i in 0..steps {
-        let f0 = values[i];
-        let f1 = values[i + 1];
-        if !finite_opt(f0) || !finite_opt(f1) {
-            continue;
-        }
-        let f0 = f0.unwrap();
-        let f1 = f1.unwrap();
-        if f0 == 0.0 {
-            roots.push(xs[i]);
-            continue;
-        }
-        if f1 == 0.0 {
-            roots.push(xs[i + 1]);
-            continue;
-        }
-        if (f0 < 0.0) == (f1 < 0.0) {
-            continue;
-        }
 
-        let mut lo_x = xs[i];
-        let mut hi_x = xs[i + 1];
-        let mut f_lo = f0;
-        let mut f_hi = f1;
-        let mut converged = false;
-        for _ in 0..100 {
-            let mid = (lo_x + hi_x) * 0.5;
-            let fm = f(mid)?;
-            let Some(fm) = fm.filter(|value| value.is_finite()) else {
-                break;
-            };
-            if fm == 0.0 || fm.abs() < 1e-12 * f_scale {
-                roots.push(mid);
-                converged = true;
-                break;
-            }
-            if (fm < 0.0) == (f_lo < 0.0) {
-                lo_x = mid;
-                f_lo = fm;
-            } else {
-                hi_x = mid;
-                f_hi = fm;
-            }
-            if hi_x - lo_x < 1e-11 * (1.0 + lo_x.abs()) {
-                roots.push((lo_x + hi_x) * 0.5);
-                converged = true;
-                break;
-            }
+    // 1) 严格跨号区间:二分.
+    for i in 0..steps {
+        if signs[i] == 0 || signs[i + 1] == 0 || signs[i] == signs[i + 1] {
+            continue;
         }
-        if !converged && (f_lo < 0.0) != (f_hi < 0.0) {
-            roots.push((lo_x + hi_x) * 0.5);
+        if let Some(root) = bisect_sign_change(f, xs[i], xs[i + 1], values[i], values[i + 1])? {
+            roots.push(root);
         }
     }
 
-    // 相切:采样点本身就在边界上但没有符号变化(阈值随函数量级缩放).
-    for (i, value) in values.iter().enumerate() {
-        let value = value.filter(|value| value.is_finite()).unwrap_or(f64::NAN);
-        if value.abs() <= 1e-7 * f_scale {
-            roots.push(xs[i]);
+    // 2) "在表面上"的连续采样段:段内细化 + 残差复核.
+    let mut i = 0usize;
+    while i <= steps {
+        if signs[i] != 0 || values[i].is_none() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i <= steps && signs[i] == 0 && values[i].is_some() {
+            i += 1;
+        }
+        let end = i - 1;
+
+        // 接触段两侧若为异号,段内必有一次真实穿越:用两侧端点二分.
+        // 符号变化本身就是根存在的证明,残差只受浮点分辨率限制.
+        let crossing = start > 0
+            && end < steps
+            && signs[start - 1] != 0
+            && signs[end + 1] != 0
+            && signs[start - 1] != signs[end + 1];
+        if crossing {
+            if let Some(root) = bisect_sign_change(
+                f,
+                xs[start - 1],
+                xs[end + 1],
+                values[start - 1],
+                values[end + 1],
+            )? {
+                roots.push(root);
+            }
+            continue;
+        }
+
+        // 相切(两侧同号):段内取 |f| 最小的采样点做三分细化,再用
+        // "细化残差相对邻域函数量级足够小"复核;接近但未到达 0 则丢弃.
+        //
+        // 已知分辨率限制(不修,记录在此):若两个真实交点落在**同一个**接触段
+        // 内,且相距小于采样步长,这里只能给出一个解.曾尝试按 |f| 局部极大把
+        // 接触段拆成多个邻域,但解决不了这种情形(段内 |f| 可能先降后升,没有
+        // 可切的峰),反而在"曲线正好落在面上,采样点精确取 0"时把一连串零值
+        // 点各自报成根.要真正分开需要提高采样分辨率或引入导数信息,属于新的
+        // 数值能力,不在本轮范围内.
+        let mut best_index = start;
+        let mut best_abs = f64::INFINITY;
+        for (j, value) in values.iter().enumerate().take(end + 1).skip(start) {
+            if let Some(value) = value {
+                if value.abs() < best_abs {
+                    best_abs = value.abs();
+                    best_index = j;
+                }
+            }
+        }
+
+        let left = if best_index == 0 {
+            xs[0]
+        } else {
+            xs[best_index - 1]
+        };
+        let right = if best_index == steps {
+            xs[steps]
+        } else {
+            xs[best_index + 1]
+        };
+        let refined = refine_contact(f, left, right)?;
+
+        let mut local = 0.0f64;
+        for value in values
+            .iter()
+            .take((end + 1).min(steps) + 1)
+            .skip(start.saturating_sub(1))
+            .flatten()
+        {
+            local = local.max(value.abs());
+        }
+        if let Some(residual) = f(refined)?.filter(|value| value.is_finite()).map(f64::abs) {
+            if residual == 0.0 || residual <= CONTACT_RESIDUAL_RATIO * local {
+                roots.push(refined);
+            }
         }
     }
 
     Ok(roots)
 }
 
-/// 世界坐标点集的去重半径:随坐标量级缩放,而不是固定绝对半径.
-/// 场景整体缩放到 1e-6 量级时,若仍用绝对 1e-5 会把不同交点全并掉.
-fn dedupe_point_tolerance(points: &[V3]) -> f64 {
-    let scale = points
-        .iter()
-        .map(|point| point.iter().map(|c| c.abs()).fold(0.0f64, f64::max))
-        .fold(0.0f64, f64::max)
-        .max(1e-6);
+/// 对已知跨号区间做二分;残差相对区间端点的函数量级校验.
+fn bisect_sign_change<F>(
+    f: &mut F,
+    lo: f64,
+    hi: f64,
+    f_lo: Option<f64>,
+    f_hi: Option<f64>,
+) -> Result<Option<f64>, String>
+where
+    F: FnMut(f64) -> Result<Option<f64>, String>,
+{
+    let (Some(mut f_lo), Some(mut f_hi)) = (f_lo, f_hi) else {
+        return Ok(None);
+    };
+    if (f_lo < 0.0) == (f_hi < 0.0) {
+        return Ok(None);
+    }
+    let scale = f_lo.abs().max(f_hi.abs()).max(f64::MIN_POSITIVE);
+    let mut lo_x = lo;
+    let mut hi_x = hi;
+    for _ in 0..200 {
+        let mid = (lo_x + hi_x) * 0.5;
+        let Some(value) = f(mid)?.filter(|value| value.is_finite()) else {
+            break;
+        };
+        if value == 0.0 || value.abs() <= BISECTION_RESIDUAL_RATIO * scale {
+            return Ok(Some(mid));
+        }
+        if (value < 0.0) == (f_lo < 0.0) {
+            lo_x = mid;
+            f_lo = value;
+        } else {
+            hi_x = mid;
+            f_hi = value;
+        }
+        if hi_x - lo_x <= 1e-11 * (1.0 + lo_x.abs()) {
+            return Ok(Some((lo_x + hi_x) * 0.5));
+        }
+    }
+    if (f_lo < 0.0) != (f_hi < 0.0) {
+        Ok(Some((lo_x + hi_x) * 0.5))
+    } else {
+        Ok(None)
+    }
+}
+
+/// 在 [lo, hi] 上对 |f| 做三分搜索(该邻域内 |f| 近似单峰),返回极小点.
+fn refine_contact<F>(f: &mut F, lo: f64, hi: f64) -> Result<f64, String>
+where
+    F: FnMut(f64) -> Result<Option<f64>, String>,
+{
+    let mut a = lo;
+    let mut b = hi;
+    for _ in 0..CONTACT_REFINE_ITERATIONS {
+        let m1 = a + (b - a) / 3.0;
+        let m2 = b - (b - a) / 3.0;
+        let f1 = f(m1)?
+            .filter(|value| value.is_finite())
+            .map_or(f64::INFINITY, f64::abs);
+        let f2 = f(m2)?
+            .filter(|value| value.is_finite())
+            .map_or(f64::INFINITY, f64::abs);
+        if f1 <= f2 {
+            b = m2;
+        } else {
+            a = m1;
+        }
+        if b - a <= f64::EPSILON * (1.0 + a.abs()) {
+            break;
+        }
+    }
+    Ok((a + b) * 0.5)
+}
+
+/// 去重半径 = 基础系数 × 几何自身尺度(点集直径 / 采样外接盒等),
+/// 与坐标绝对值无关,因此整体平移不改变去重结果.
+fn dedupe_tolerance_for_scale(scale: f64) -> f64 {
     POINT_DEDUP_TOLERANCE * scale
+}
+
+/// 点集的"直径"(外接盒对角线),作为几何自身尺度.
+fn point_set_diameter(points: &[V3]) -> f64 {
+    if points.is_empty() {
+        return 0.0;
+    }
+    let mut mins = [f64::INFINITY; 3];
+    let mut maxs = [f64::NEG_INFINITY; 3];
+    for point in points {
+        for axis in 0..3 {
+            mins[axis] = mins[axis].min(point[axis]);
+            maxs[axis] = maxs[axis].max(point[axis]);
+        }
+    }
+    dist(mins, maxs)
+}
+
+/// 点集去重半径:按点集直径缩放.退化为单点/重合点集时半径为 0,
+/// 仍靠"完全相等"合并重复点.
+fn dedupe_point_tolerance(points: &[V3]) -> f64 {
+    dedupe_tolerance_for_scale(point_set_diameter(points))
+}
+
+/// 按给定半径把一个点并入去重结果(与 [`dedupe_points`] 同一比较口径).
+/// 半径由调用方按"该场景的几何尺度"给出,便于空间曲线路径增量去重.
+fn push_deduped_point(result: &mut Vec<V3>, point: V3, tolerance: f64) {
+    if !result
+        .iter()
+        .any(|existing| dist(*existing, point) <= tolerance)
+    {
+        result.push(point);
+    }
 }
 
 fn dedupe_points(points: Vec<V3>) -> Vec<V3> {
     let tolerance = dedupe_point_tolerance(&points);
     let mut result: Vec<V3> = Vec::with_capacity(points.len());
     for point in points {
-        if !result
-            .iter()
-            .any(|existing| dist(*existing, point) < tolerance)
-        {
-            result.push(point);
-        }
+        push_deduped_point(&mut result, point, tolerance);
     }
     result
 }
 
-/// 一维根坐标的去重半径:按坐标量级缩放(1D 根来自参数区间 [lo,hi]).
+/// 一维根坐标的去重半径:按根集的参数跨度(几何自身尺度)缩放,
+/// 同样是平移不变的;单根时半径为 0,仅合并完全相等的重复根.
 fn dedupe_root_tolerance(roots: &[f64]) -> f64 {
-    let scale = roots
-        .iter()
-        .map(|root| root.abs())
-        .fold(0.0f64, f64::max)
-        .max(1e-6);
-    POINT_DEDUP_TOLERANCE * scale
+    if roots.is_empty() {
+        return 0.0;
+    }
+    let min = roots.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = roots.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    POINT_DEDUP_TOLERANCE * (max - min)
 }
 
 fn dedupe_roots(roots: Vec<f64>) -> Vec<f64> {
@@ -700,7 +862,7 @@ fn dedupe_roots(roots: Vec<f64>) -> Vec<f64> {
     for root in roots {
         if !result
             .iter()
-            .any(|existing| (*existing - root).abs() < tolerance)
+            .any(|existing| (*existing - root).abs() <= tolerance)
         {
             result.push(root);
         }
@@ -902,6 +1064,20 @@ fn space_curve_intersections(
     }
     let seed_tolerance = max_step.max(1e-6) * 2.0;
 
+    // 去重半径取"两条曲线采样点的世界外接盒对角线"(几何自身尺度),
+    // 与坐标绝对值无关;这样同一场景整体平移后交点个数不变.
+    let mut bbox_mins = [f64::INFINITY; 3];
+    let mut bbox_maxs = [f64::NEG_INFINITY; 3];
+    for (_, point) in samples_a.iter().chain(samples_b.iter()) {
+        for axis in 0..3 {
+            bbox_mins[axis] = bbox_mins[axis].min(point[axis]);
+            bbox_maxs[axis] = bbox_maxs[axis].max(point[axis]);
+        }
+    }
+    let tolerance = dedupe_tolerance_for_scale(dist(bbox_mins, bbox_maxs).max(max_step));
+
+    // 增量去重(与 dedupe_points 同口径):重合曲线会产生 O(steps²) 个候选,
+    // 必须边细化边合并,避免先堆积再二次去重.
     let mut results: Vec<V3> = Vec::new();
     for pair_a in samples_a.windows(2) {
         for pair_b in samples_b.windows(2) {
@@ -913,12 +1089,7 @@ fn space_curve_intersections(
             let t = pair_a[0].0 + (pair_a[1].0 - pair_a[0].0) * t_local;
             let s = pair_b[0].0 + (pair_b[1].0 - pair_b[0].0) * s_local;
             if let Some(point) = refine_space_curve_pair(a, b, &mut curve_a, &mut curve_b, t, s)? {
-                if !results
-                    .iter()
-                    .any(|existing| dist(*existing, point) < POINT_DEDUP_TOLERANCE)
-                {
-                    results.push(point);
-                }
+                push_deduped_point(&mut results, point, tolerance);
             }
         }
     }
@@ -1367,6 +1538,12 @@ mod tests {
             .collect()
     }
 
+    fn conic_descriptor(base: f64, top: f64, height: f64) -> ObjectDescriptor {
+        let params = [0.0, 0.0, 0.0, base, top, height];
+        parse_object_descriptor("conic", "", vec![], vec![], params.to_vec(), vec![], vec![])
+            .unwrap()
+    }
+
     #[test]
     fn planar_curves_cross_at_expected_x() {
         let a = curve_descriptor("x", [-2.0, 2.0]);
@@ -1456,6 +1633,188 @@ mod tests {
         assert_eq!(first.curve_points, second.curve_points);
     }
 
+    /// 回归 #1:曲线贴着盒面(振幅仅 1e-6)时,旧实现返回 201 个**假**交点.
+    ///
+    /// 真正的缺陷是盒隐式场在"盒外但落在另两轴跨度内"时返回恰好 0,于是
+    /// `y > 1` 的那半个振荡周期也被当成在盒面上.改成精确带符号距离后,
+    /// `y > 1` 的点严格为正,不允许上报;`y ≤ 1` 的点才可能落在盒顶面上.
+    /// 这条守住"没有盒外假交点",与下面那条"交点数量有界"互为补充
+    /// (当前实现最终返回 1 个点;数量断言见
+    /// [`grazing_curve_on_box_face_reports_at_most_two_intersections`]).
+    #[test]
+    fn grazing_curve_on_box_face_has_no_false_intersections() {
+        let curve = curve_descriptor("1 + 1e-6 * sin(200 * pi * x)", [0.0, 1.0]);
+        let box_obj = box_descriptor([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let output = compute_pair(&curve, &box_obj, 400).unwrap();
+        let points = points_of(&output);
+        assert!(!points.is_empty(), "贴面接触不应全部丢失");
+        for point in &points {
+            assert!(
+                point[1] <= 1.0 + 1e-12,
+                "盒外的 y={} 被当成盒面交点: {point:?}",
+                point[1]
+            );
+        }
+
+        // 反例对照:把整条曲线抬到盒外(最小值仍在面上方)后必须**一个交点都没有**,
+        // 这正是旧实现会返回成片假交点的情形.
+        let above = curve_descriptor(
+            "1.000001 + 0.5 * 1e-6 * (1 + sin(200 * pi * x))",
+            [0.0, 1.0],
+        );
+        let output = compute_pair(&above, &box_obj, 400).unwrap();
+        let points = points_of(&output);
+        assert!(
+            points.is_empty(),
+            "整条曲线在盒外,不应有交点,实际 {} 个: {points:?}",
+            points.len()
+        );
+    }
+
+    /// 回归 #1(任务验收口径):贴面振荡曲线不得把每个采样点都当成独立交点.
+    /// 修复前为 201 个,修复后应 ≤ 2.
+    #[test]
+    fn grazing_curve_on_box_face_reports_at_most_two_intersections() {
+        let curve = curve_descriptor("1 + 1e-6 * sin(200 * pi * x)", [0.0, 1.0]);
+        let box_obj = box_descriptor([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let output = compute_pair(&curve, &box_obj, 400).unwrap();
+        let points = points_of(&output);
+        assert!(
+            points.len() <= 2,
+            "贴面曲线产生了 {} 个交点(任务要求 ≤ 2): {points:?}",
+            points.len()
+        );
+    }
+
+    /// 空间曲线路径(带静态变换)同样按几何自身尺度去重:
+    /// 两条交叉直线只应得到 1 个交点(众多候选对都收敛到同一点).
+    #[test]
+    fn space_curve_intersections_dedupe_to_single_point() {
+        let identity: Vec<f64> = vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let a = parse_object_descriptor(
+            "curve",
+            "x",
+            vec![],
+            vec![],
+            vec![-2.0, 2.0],
+            identity.clone(),
+            identity.clone(),
+        )
+        .unwrap();
+        let b = parse_object_descriptor(
+            "curve",
+            "-x + 2",
+            vec![],
+            vec![],
+            vec![-2.0, 2.0],
+            identity.clone(),
+            identity,
+        )
+        .unwrap();
+        let output = compute_pair(&a, &b, 64).unwrap();
+        let points = points_of(&output);
+        assert_eq!(points.len(), 1, "{points:?}");
+        assert!((points[0][0] - 1.0).abs() < 1e-3, "{points:?}");
+    }
+
+    /// 回归 #2:极大值很大,零点附近平坦时,旧的 `|f| ≤ 1e-7·全局max`
+    /// 判据把平坦段的采样点全当相切根.局部尺度判定 + 残差复核后应无根.
+    #[test]
+    fn tangential_scan_uses_local_scale_not_global_max() {
+        // 函数量级 1e6,但在 x≈0 附近平坦且最小值 1e-2 > 0(全程无根).
+        let mut near_touch = |x: f64| Ok(Some(1e-2 + 1e6 * x * x));
+        let roots = find_1d_roots(&mut near_touch, -1.0, 1.0, 128).unwrap();
+        assert!(roots.is_empty(), "平坦近切段不应产生根: {roots:?}");
+    }
+
+    /// 对照:真正的相切(双重根)仍必须被找到并细化.
+    #[test]
+    fn tangential_scan_still_finds_true_tangency() {
+        let mut tangent = |x: f64| Ok(Some(1e6 * (x - 0.5) * (x - 0.5)));
+        let roots = find_1d_roots(&mut tangent, 0.0, 1.0, 128).unwrap();
+        assert_eq!(roots.len(), 1, "{roots:?}");
+        assert!(
+            (roots[0] - 0.5).abs() < 1e-6,
+            "相切点应被细化: {}",
+            roots[0]
+        );
+    }
+
+    /// 回归 #3:去重容差必须取几何自身尺度(根集跨度),不是坐标绝对值,
+    /// 否则平移到 1e5 量级会把相距 3e-6 的真实根并掉.
+    #[test]
+    fn dedupe_roots_scale_is_geometric_not_absolute() {
+        assert_eq!(dedupe_roots(vec![0.0, 3e-6]).len(), 2);
+        assert_eq!(
+            dedupe_roots(vec![1e5, 1e5 + 3e-6]).len(),
+            2,
+            "平移后相距 3e-6 的真实根被错误合并"
+        );
+        assert_eq!(
+            dedupe_roots(vec![7.0, 7.0]).len(),
+            1,
+            "完全重合的根仍应合并"
+        );
+    }
+
+    /// 回归 #3:点集去重同口径(按外接盒对角线,平移不变).
+    #[test]
+    fn dedupe_points_scale_is_geometric_not_absolute() {
+        assert_eq!(
+            dedupe_points(vec![[0.0, 0.0, 0.0], [3e-6, 0.0, 0.0]]).len(),
+            2
+        );
+        assert_eq!(
+            dedupe_points(vec![[1e5, 0.0, 0.0], [1e5 + 3e-6, 0.0, 0.0]]).len(),
+            2,
+            "平移后相距 3e-6 的真实交点被错误合并"
+        );
+        assert_eq!(
+            dedupe_points(vec![[1e5, 0.0, 0.0], [1e5, 0.0, 0.0]]).len(),
+            1,
+            "完全重合的点仍应合并"
+        );
+    }
+
+    /// 回归 #3(端到端):同一几何放在原点与放在 1e5 处,真实交点个数一致.
+    #[test]
+    fn close_intersections_survive_large_translation() {
+        let origin = curve_descriptor("x * (x - 3e-6)", [-1e-5, 1e-5]);
+        let origin_base = curve_descriptor("0", [-1e-5, 1e-5]);
+        assert_eq!(
+            points_of(&compute_pair(&origin, &origin_base, 256).unwrap()).len(),
+            2
+        );
+
+        let a = 1.0e5;
+        let shifted = curve_descriptor("(x - 1e5) * (x - 1e5 - 3e-6)", [a - 1e-5, a + 1e-5]);
+        let shifted_base = curve_descriptor("0", [a - 1e-5, a + 1e-5]);
+        assert_eq!(
+            points_of(&compute_pair(&shifted, &shifted_base, 256).unwrap()).len(),
+            2,
+            "平移到 1e5 后相近真实交点被并掉"
+        );
+    }
+
+    /// 回归 #5:负 top_radius 必须在求交内核入口报错(隐式场侧与面片侧).
+    #[test]
+    fn conic_negative_top_radius_is_rejected_at_core_entry() {
+        let bad = conic_descriptor(2.0, -1.0, 3.0);
+        let curve = curve_descriptor("x", [-3.0, 3.0]);
+        let error = compute_pair(&curve, &bad, 32).unwrap_err();
+        assert!(error.contains("top_radius"), "{error}");
+
+        let surface = surface_descriptor("0", [-3.0, 3.0, -3.0, 3.0]);
+        let error = compute_pair(&surface, &bad, 32).unwrap_err();
+        assert!(error.contains("top_radius"), "{error}");
+
+        // top_radius == 0(圆锥)仍然合法.
+        let cone = conic_descriptor(2.0, 0.0, 3.0);
+        assert!(compute_pair(&surface, &cone, 32).is_ok());
+    }
+
     #[test]
     fn transform_translates_curve_intersection() {
         let mut matrix = [0.0; 16];
@@ -1465,6 +1824,10 @@ mod tests {
         matrix[15] = 1.0;
         matrix[3] = 0.0;
         matrix[7] = 1.0;
+        // 与 matrix 成对的真逆(translate(0,1) 的逆是 translate(0,-1));
+        // 曲线侧只用 matrix,逆矩阵不参与该场景的求值.
+        let mut inverse = matrix;
+        inverse[7] = -1.0;
         let curve = parse_object_descriptor(
             "curve",
             "x",
@@ -1472,7 +1835,7 @@ mod tests {
             vec![],
             vec![-2.0, 2.0],
             matrix.to_vec(),
-            matrix.to_vec(),
+            inverse.to_vec(),
         )
         .unwrap();
         let surface = surface_descriptor("y", [-2.0, 2.0, -2.0, 2.0]);

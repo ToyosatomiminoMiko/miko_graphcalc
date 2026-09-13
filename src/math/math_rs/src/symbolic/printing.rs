@@ -16,7 +16,7 @@
 use std::f64::consts::PI;
 
 use super::latex::{latex_call, latex_number, latex_pow_base, latex_product, latex_symbol};
-use super::{BinOp, Expr, UnaryOp};
+use super::{BinOp, Expr, UnaryOp, PREC_UNARY};
 
 fn is_atomic(expr: &Expr) -> bool {
     matches!(expr, Expr::Num(_) | Expr::Sym(_))
@@ -105,22 +105,104 @@ fn expr_prec(expr: &Expr) -> u8 {
     }
 }
 
+/// 该节点在 Text/LaTeX 输出里是否以 `-` 开头(负数字面量或前缀负号).
+///
+/// 幂底数位置最危险:`-2 ^ x` 会重读成 `-(2 ^ x)`(x 为偶数时数值静默变号).
+fn starts_with_minus(expr: &Expr) -> bool {
+    match expr {
+        Expr::Num(value) => value.is_sign_negative() && *value != 0.0,
+        Expr::Unary(UnaryOp::Neg, _) => true,
+        _ => false,
+    }
+}
+
+/// 子节点在父运算符下是否需要括号.
+///
+/// 判定顺序与依据:
+/// 1. 优先级更低必须括号;
+/// 2. 优先级更高时只在**幂底数位置**且以 `-` 开头才括号(`(-2) ^ x`,
+///    `(-x) ^ y`).`^` 右结合且优先级高于前缀负号,少这层括号会重读成
+///    `-(2 ^ x)`;其他位置的 `-` 无歧义,不补括号(`-56 / x ^ 9`,`a + -b`);
+/// 3. 同优先级看结合性:`-`/`/` 左结合只有右侧同级子节点需要括号;
+///    `^` 右结合**底数(左侧)同级也要括号**(`(x ^ 2) ^ 3` 少写括号会重读成
+///    `x ^ (2 ^ 3)`,x^6 变成 x^8);
+/// 4. **同优先级的 `+`/`*` 右子节点也要括号**:浮点加减乘不满足结合律,
+///    `1e16 + (-1e16 + 1)` 与 `(1e16 - 1e16) + 1` 相差 1,`1e-300 * (1e300 *
+///    1e300)` 与 `(1e-300 * 1e300) * 1e300` 相差有限/非有限.归一化串会回读
+///    求值,必须保结构而不是保最少括号.
+fn child_needs_parentheses(expr: &Expr, op: BinOp, is_right: bool) -> bool {
+    if expr_prec(expr) < op.prec() {
+        return true;
+    }
+    if expr_prec(expr) > op.prec() {
+        return op == BinOp::Pow && !is_right && starts_with_minus(expr);
+    }
+    match op {
+        BinOp::Sub | BinOp::Div => is_right,
+        BinOp::Pow => true,
+        BinOp::Add | BinOp::Mul => is_right,
+    }
+}
+
 fn binary_child(expr: &Expr, mode: PrintMode, op: BinOp, is_right: bool) -> String {
-    let child_prec = expr_prec(expr);
-    // 同优先级子节点是否要括号取决于结合性:
-    // - `-` / `/` 左结合,只有右侧同级子节点需要(a - (b - c),a / (b / c));
-    // - `^` 右结合,**底数(左侧)同级也要括号**:`(x ^ 2) ^ 3` 少写括号会
-    //   重读成 `x ^ (2 ^ 3)`(= x^8,值从 x^6 变成 x^8).202609 修复前
-    //   Text 模式漏了这个括号,`7 / x ^ 4` 求导得到的分母被打印成
-    //   `x ^ 4 ^ 2`,回读后从 x^8 变成 x^16.
-    let needs_parentheses = child_prec < op.prec()
-        || (child_prec == op.prec()
-            && match op {
-                BinOp::Sub | BinOp::Div => is_right,
-                BinOp::Pow => true,
-                _ => false,
-            });
-    parenthesize(&format_expr(expr, mode, 0), needs_parentheses)
+    parenthesize(
+        &format_expr(expr, mode, 0),
+        child_needs_parentheses(expr, op, is_right),
+    )
+}
+
+/// 幂底数是否需要括号(Text/LaTeX 共用同一判定,排版差异交给 `format_expr`).
+///
+/// - 以 `-` 开头(`-2 ^ x` -> `(-2) ^ x`);
+/// - 非原子的加减乘除形态(`(a + b) ^ 2`);
+/// - **底数本身就是幂**(`(x ^ 2) ^ 3`):`^` 右结合,少一层括号会重读成
+///   `x ^ (2 ^ 3)`(x^6 变成 x^8);
+/// - **LaTeX 下自带上标模板的调用**(`exp`,`pow`/`deg` 别名):`e^{x}` 再跟随
+///   上标会产出 `e^{x}^{2}`,是 LaTeX/MathJax 的 Double superscript 错误.
+pub(crate) fn power_base_needs_parentheses(expr: &Expr, mode: PrintMode) -> bool {
+    starts_with_minus(expr)
+        || matches!(
+            expr,
+            Expr::Binary(
+                BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Pow,
+                _,
+                _
+            )
+        )
+        || (matches!(mode, PrintMode::Latex) && expr_renders_with_superscript(expr))
+}
+
+/// LaTeX 下自身就带 `^{...}` 的节点形态.
+///
+/// 两类来源:`LatexStyle::Exp`(`e^{...}`)与别名排版 `AliasLatexKind` 的
+/// 上标分支(`pow(a,b) -> a^{b}`,`deg(x) -> x^{\circ}`).这类节点不能再直接
+/// 跟随一个上标.
+fn expr_renders_with_superscript(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call(name, _) => {
+            matches!(
+                crate::builtins::latex_style(name),
+                Some(crate::builtins::LatexStyle::Exp)
+            ) || matches!(
+                crate::builtins::alias_latex_kind(name),
+                Some(crate::builtins::AliasLatexKind::SuperscriptPower)
+                    | Some(crate::builtins::AliasLatexKind::Degree)
+            )
+        }
+        _ => false,
+    }
+}
+
+/// Text 模式的幂:底数按 [`power_base_needs_parentheses`] 加括号.
+fn text_power(left: &Expr, right: &Expr) -> String {
+    format!(
+        "{} ^ {}",
+        parenthesize(
+            &format_expr(left, PrintMode::Text, 0),
+            power_base_needs_parentheses(left, PrintMode::Text),
+        ),
+        binary_child(right, PrintMode::Text, BinOp::Pow, true),
+    )
 }
 
 /// 唯一树打印入口.
@@ -150,6 +232,9 @@ pub(crate) fn format_expr(expr: &Expr, mode: PrintMode, parent_prec: u8) -> Stri
             format!("[{body}]")
         }
         Expr::Unary(UnaryOp::Neg, operand) => {
+            // 操作数自身的括号规则由 `format_expr` 内部处理(负号操作数,
+            // 加减形态);与父运算符的交互(例如 `a - (-b)`)统一交给
+            // `child_needs_parentheses`,这里不再自行包一层,避免 `((-a))`.
             let body = format_expr(operand, mode, 0);
             let text = match mode {
                 PrintMode::Text => {
@@ -175,7 +260,7 @@ pub(crate) fn format_expr(expr: &Expr, mode: PrintMode, parent_prec: u8) -> Stri
                     }
                 }
             };
-            parenthesize(&text, 60 < parent_prec)
+            parenthesize(&text, PREC_UNARY < parent_prec)
         }
         Expr::Call(name, args) => {
             let separator = match mode {
@@ -199,12 +284,15 @@ pub(crate) fn format_expr(expr: &Expr, mode: PrintMode, parent_prec: u8) -> Stri
                     binary_child(right, mode, *op, true),
                 ),
                 BinOp::Mul | BinOp::Div | BinOp::Pow => match mode {
-                    PrintMode::Text => format!(
-                        "{} {} {}",
-                        binary_child(left, mode, *op, false),
-                        op.text(),
-                        binary_child(right, mode, *op, true),
-                    ),
+                    PrintMode::Text => match op {
+                        BinOp::Pow => text_power(left, right),
+                        _ => format!(
+                            "{} {} {}",
+                            binary_child(left, mode, *op, false),
+                            op.text(),
+                            binary_child(right, mode, *op, true),
+                        ),
+                    },
                     PrintMode::Latex => match op {
                         BinOp::Mul => latex_product(expr),
                         BinOp::Div => format!(

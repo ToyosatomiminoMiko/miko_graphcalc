@@ -32,7 +32,7 @@ export function normalizeExpression(raw: string): string {
     if (cached !== undefined) return cached;
     try {
         const normalized = wasmNormalizeExpression(raw);
-        rustExpressionCache.set(raw, normalized);
+        setBounded(rustExpressionCache, raw, normalized, EXPRESSION_CACHE_LIMIT);
         return normalized;
     } catch (error) {
         throwExpressionError(raw, error);
@@ -159,15 +159,47 @@ export function evaluateMatrixExpr(raw: string): number[] {
 }
 
 /**
+ * 三个模块级表达式缓存的容量上限.
+ *
+ * 为什么必须有界:表达式来自用户可编辑源码,每敲一个字符都可能产生新的
+ * 表达式字符串,而这些 Map 是模块级,跟随页面存活.注释里"键集通常有限"
+ * 只在静态场景成立,长会话持续编辑源码就是只增不回收的内存泄漏.
+ * 512 远大于单屏公式数(几十条),热点表达式反复命中不会被淘汰,只是给
+ * 无限增长的键集加一道硬上限.
+ */
+const EXPRESSION_CACHE_LIMIT = 512;
+
+/**
+ * 单个表达式的求导变量缓存上限:同一表达式一般只对 x/y/z 等少数变量
+ * 求导,内层 Map 同样按插入序淘汰最旧变量,避免外层有界而内层无界.
+ */
+const DERIVATIVE_VARIABLE_CACHE_LIMIT = 8;
+
+/**
+ * 写入有界缓存:满员时先淘汰最旧(插入序)的一条.
+ *
+ * 已存在的键不淘汰:否则当它恰好是最旧条目时,会把刚命中的条目删掉,
+ * 缓存反而永远存不住热点键.
+ */
+function setBounded<K, V>(cache: Map<K, V>, key: K, value: V, limit: number): void {
+    if (!cache.has(key) && cache.size >= limit) {
+        const oldest = cache.keys().next().value;
+        if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(key, value);
+}
+
+/**
  * 归一化表达式缓存:原表达式字符串 -> 归一化结果.
- * 键集通常有限,不做失效策略;模块级生命周期,跟随页面存活.
+ * 有界(EXPRESSION_CACHE_LIMIT,淘汰最旧);模块级生命周期,跟随页面存活.
  */
 const rustExpressionCache = new Map<string, string>();
 
 /**
  * @cache
  * 缓存目的:避免对象列表每次重绘都对同一表达式调用 Rust/WASM 生成 LaTeX.
- * 键/失效策略:原表达式字符串 -> LaTeX 字符串;无失效机制,表达式集合通常有限.
+ * 键/失效策略:原表达式字符串 -> LaTeX 字符串;有界
+ *              (EXPRESSION_CACHE_LIMIT,淘汰最旧).
  * 生命周期:模块级,跟随页面存活.
  */
 const latexExpressionCache = new Map<string, string>();
@@ -175,7 +207,9 @@ const latexExpressionCache = new Map<string, string>();
 /**
  * @cache
  * 缓存目的:缓存符号求导结果,避免参数刷新时重复计算偏导数.
- * 键/失效策略:原表达式 -> (变量 -> 导数表达式);无失效机制.
+ * 键/失效策略:原表达式 -> (变量 -> 导数表达式);外层/内层都有界
+ *              (EXPRESSION_CACHE_LIMIT / DERIVATIVE_VARIABLE_CACHE_LIMIT),
+ *              各自淘汰最旧条目.
  * 生命周期:模块级,跟随页面存活.
  */
 const derivativeExpressionCache = new Map<string, Map<string, string>>();
@@ -188,7 +222,7 @@ export function cachedLatexExpression(expr: string): string {
     let cached = latexExpressionCache.get(expr);
     if (!cached) {
         cached = latexExpression(expr);
-        latexExpressionCache.set(expr, cached);
+        setBounded(latexExpressionCache, expr, cached, EXPRESSION_CACHE_LIMIT);
     }
     return cached;
 }
@@ -201,13 +235,13 @@ export function cachedDerivativeExpression(expr: string, variable: string): stri
     let byVariable = derivativeExpressionCache.get(expr);
     if (!byVariable) {
         byVariable = new Map<string, string>();
-        derivativeExpressionCache.set(expr, byVariable);
+        setBounded(derivativeExpressionCache, expr, byVariable, EXPRESSION_CACHE_LIMIT);
     }
 
     let cached = byVariable.get(variable);
     if (!cached) {
         cached = symbolicDerivative(expr, variable);
-        byVariable.set(variable, cached);
+        setBounded(byVariable, variable, cached, DERIVATIVE_VARIABLE_CACHE_LIMIT);
     }
     return cached;
 }

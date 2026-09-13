@@ -6,15 +6,19 @@
 //!   `(x - 1 - (x + 1)) / (x - 1) ^ 2`--值正确,只是不好看.
 //!   这是**能力边界而不是 bug**:求导链式法则的输出保持可读的最小化简,
 //!   真正的多项式正规化需要新的数据结构,不要在这里零敲碎打地加特例;
-//! - 化简结果对实数语义**不等价变换要谨慎**:只在 `is_finite()` 时才折叠
-//!   常量(`1/0`,`0/0` 保持原样,交给消费方按掩码/报错语义处理);
+//! - **化简不得改变定义域/取值**(202609 审查 P1-1..P1-3):每条形状规则都带
+//!   前提,不满足就保持原样.常量折叠只在 `is_finite()` 时发生(`1/0`,`0/0`
+//!   保持原样);`0 * f`/`0 / f` 只在另一侧可证有限/非零时折叠;
 //! - 在"最小化简"之上另有四条**形状**规则,只为把求导链式法则的产物收成
 //!   人能读的一行(202609 新增,`d/dx (x^3 + 7/x^4 - 2/x)` 需要它):
-//!   1) `(x^a)^b -> x^(a*b)`,仅当外层指数 b 是整数(实数语义下唯一安全的);
+//!   1) `(x^a)^b -> x^(a*b)`,要求**外层指数是整数且内层指数是常数**
+//!      (只要求外层整数不够:`((-8)^0.5)^2 = NaN` 而 `(-8)^1 = -8`);
 //!   2) 同底数幂相除/相乘 `x^m / x^n -> x^(m-n)`,`x^m * x^n -> x^(m+n)`,
-//!      指数必须是常数;
+//!      要求**指数是常数**(`Unary(Neg, Num)` 先归一成 `Num`)且
+//!      **底数可证为正或所有指数同号**(异号会在 `x = 0` 处把 `0 * inf = NaN`
+//!      静默变成 `x^0 = 1`);
 //!   3) 数值系数并进分数分子 `c * (u / v) -> (c*u) / v`(单个分数因子);
-//!   4) `A + (-c)X -> A - cX`,`A - (-c)X -> A + cX`.
+//!   4) `A + (-c)X -> A - cX`,`A - (-c)X -> A + cX`,以及 `A - A -> 0`.
 //!
 //!   这四条仍然不是多项式正规化:没有同类项合并,也没有通分/因式分解.
 //!
@@ -22,42 +26,26 @@
 //! - `pi`/`e` 等符号常量在表达式归一化阶段(rewrite_aliases)已被折叠成 Num,
 //!   因此 evaluate_constant 里不再内联一份常量表(202609 审查去掉重复);
 //!   残留的 Sym 一律视为未绑定变量并报错;
-//! - 乘积化简的数字因子在任意位置都合并成单一系数,结果不随书写顺序漂移.
+//! - 乘积化简的数字因子在任意位置都合并成单一系数,结果不随书写顺序漂移;
+//! - 求值内核与 `eval.rs` 共用(`evaluate_with_lookup`),两条路径只差
+//!   "符号怎么解析"与错误文案(202609 审查 P3-2 去重).
 
-use super::eval::real_pow;
+use super::eval::{evaluate_with_lookup, real_pow, EvalError};
 use super::{BinOp, Expr, UnaryOp};
-use crate::builtins;
 
-pub(crate) fn evaluate_constant(expr: &Expr) -> Result<f64, String> {
-    match expr {
-        Expr::Num(value) => Ok(*value),
+/// 常量求值(矩阵条目等"结构参数"路径).
+///
+/// 返回 `Ok(None)` 表示结果是**非有限数值**(`1/0`,`0/0`);调用方(矩阵解析)
+/// 按"结构参数不允许 inf/NaN"报带行列下标的错,所以这里既不能折成 0,也不该
+/// 统一成错误文案.未绑定变量/不支持函数仍是明确的 `Err`.
+pub(crate) fn evaluate_constant(expr: &Expr) -> Result<Option<f64>, String> {
+    match evaluate_with_lookup(expr, &|_name| None) {
+        Ok(value) => Ok(value),
         // pi/e 等常量在 rewrite_aliases 阶段已折叠为 Num,这里不重复登记;
         // 任何残留 Sym 都是未绑定变量(或调用方忘了先归一化).
-        Expr::Sym(name) => Err(format!("矩阵条目包含未绑定变量 {name}")),
-        Expr::Unary(UnaryOp::Neg, operand) => Ok(-evaluate_constant(operand)?),
-        Expr::Binary(op, left, right) => {
-            let lhs = evaluate_constant(left)?;
-            let rhs = evaluate_constant(right)?;
-            match op {
-                BinOp::Add => Ok(lhs + rhs),
-                BinOp::Sub => Ok(lhs - rhs),
-                BinOp::Mul => Ok(lhs * rhs),
-                BinOp::Div => Ok(lhs / rhs),
-                BinOp::Pow => Ok(real_pow(lhs, rhs)),
-            }
-        }
-        Expr::Call(name, args) => {
-            let values = args
-                .iter()
-                .map(evaluate_constant)
-                .collect::<Result<Vec<_>, _>>()?;
-            if values.len() != 1 {
-                return Err(format!("矩阵条目包含不支持的函数 {name}"));
-            }
-            builtins::apply_unary(name, values[0])
-                .map_err(|_| format!("矩阵条目包含不支持的函数 {name}"))
-        }
-        Expr::List(_) => Err("矩阵条目中不能包含嵌套数组".to_string()),
+        Err(EvalError::UnboundSymbol(name)) => Err(format!("矩阵条目包含未绑定变量 {name}")),
+        Err(EvalError::UnsupportedCall(name)) => Err(format!("矩阵条目包含不支持的函数 {name}")),
+        Err(EvalError::ListNotEvaluable) => Err("矩阵条目中不能包含嵌套数组".to_string()),
     }
 }
 
@@ -123,13 +111,25 @@ fn simplify_binary(op: BinOp, left: Expr, right: Expr) -> Expr {
             if is_zero(&left) {
                 return Expr::Unary(UnaryOp::Neg, Box::new(right));
             }
+            // `A - A -> 0`:结构相同即数学相同,对任意定义域都成立(含 A 为
+            // 未定义时两侧同为 NaN,掩码语义下都算"不贡献测度").这条同时
+            // 让 `0 / (x - x)` 收敛成 `0 / 0`(保持无定义)而不是在求导后
+            // 变成 `0 / x - 0 / x` 之类的碎片.
+            if left == right {
+                return Expr::Num(0.0);
+            }
             // `A - (-c)X -> A + cX`,避免 `... - -2 / x^2`.
             if let Some(positive) = positive_lead(&right) {
                 return Expr::Binary(BinOp::Add, Box::new(left), Box::new(positive));
             }
         }
         BinOp::Mul => {
-            if is_zero(&left) || is_zero(&right) {
+            // `0 * f -> 0` 只在 f 可证为有限数值时成立:实数语义下
+            // `0 * inf = NaN`,`0 * NaN = NaN`,无条件折叠会把"该点无定义"
+            // 静默变成 0.数值互乘已在函数开头按 Num/Num 折叠.
+            if (is_zero(&left) && is_finite_constant(&right))
+                || (is_zero(&right) && is_finite_constant(&left))
+            {
                 return Expr::Num(0.0);
             }
             if is_one(&left) {
@@ -141,7 +141,9 @@ fn simplify_binary(op: BinOp, left: Expr, right: Expr) -> Expr {
             return merge_coefficient_into_quotient(simplify_mul(left, right));
         }
         BinOp::Div => {
-            if is_zero(&left) {
+            // `0 / c -> 0` 只在 c 是非零有限常数时成立:`0 / 0` 与 `0 / inf`
+            // 都不是 0,分母含变量时还可能是 0(见 SYM 审查 P1-3).
+            if is_zero(&left) && is_nonzero_constant(&right) {
                 return Expr::Num(0.0);
             }
             if is_one(&right) {
@@ -167,12 +169,12 @@ fn simplify_binary(op: BinOp, left: Expr, right: Expr) -> Expr {
     Expr::Binary(op, Box::new(left), Box::new(right))
 }
 
-/// `(x^a)^b -> x^(a*b)`,仅当外层指数 b 是整数.
+/// `(x^a)^b -> x^(a*b)`,仅当**外层指数是整数且内层指数是常数**.
 ///
-/// 实数语义下 `(x^a)^b = x^(a*b)` 只在 b 为整数时普遍成立
-/// (`((-1)^2)^(1/2) = 1`,而 `(-1)^(2*1/2) = -1`),非整数外层指数保持原样.
-/// 这条规则同时也是"打平嵌套幂"的兜底:打印器虽然已给 `(x ^ a) ^ b` 补括号,
-/// 但能用指数直接算出来的就不要再留一层括号.
+/// 实数语义下 `(x^a)^b = x^(a*b)` 需要前提:只要求 b 为整数是不够的
+/// (`((-8)^0.5)^2 = NaN`,而 `(-8)^(0.5*2) = -8`,定义域被静默扩大).
+/// 内层指数是常数时 `a*b` 本身可算,规则才落在"整数次幂可结合"的成立区间;
+/// 内层是符号(如 `(x^a)^2`)时保持原样,不做定义域扩张.
 fn fold_integer_power_of_power(left: &Expr, right: &Expr) -> Option<Expr> {
     let Expr::Num(outer) = right else {
         return None;
@@ -183,12 +185,77 @@ fn fold_integer_power_of_power(left: &Expr, right: &Expr) -> Option<Expr> {
     let Expr::Binary(BinOp::Pow, base, inner) = left else {
         return None;
     };
+    let Expr::Num(_) = inner.as_ref() else {
+        return None;
+    };
     let exponent = simplify(Expr::Binary(
         BinOp::Mul,
         inner.clone(),
         Box::new(Expr::Num(*outer)),
     ));
     Some(simplify_binary(BinOp::Pow, base.as_ref().clone(), exponent))
+}
+
+/// 指数是否为"可安全合并"的常数.
+///
+/// 只有 `Num` 形态可合并:`x^m * x^n = x^(m+n)` 在 `x <= 0` 或 `x = 0` 时
+/// 不成立(`0^0.5 * 0^-0.5 = 0 * inf = NaN`,合并后成 `0^0 = 1`),所以合并
+/// 的前提是底数可证为正.`Unary(Neg, Num)`(如 `x^-1` 的指数)先归一成
+/// `Num(-1)` 再参与判定.
+fn constant_exponent(exponent: &Expr) -> Option<f64> {
+    match exponent {
+        Expr::Num(value) => Some(*value),
+        Expr::Unary(UnaryOp::Neg, inner) => match inner.as_ref() {
+            Expr::Num(value) => Some(-*value),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// 底数是否可证为正(合并同底数幂的前提之一).
+///
+/// 只认能一眼判定的形态:正数值常量,正数内置常量(`pi`/`e`),`exp(...)`,
+/// `sqrt(...)`,以及指数为数值常数的幂(如 `e^2`).
+fn base_is_provably_positive(base: &Expr) -> bool {
+    match base {
+        Expr::Num(value) => *value > 0.0,
+        Expr::Sym(name) => matches!(
+            crate::builtins::constant_value(name),
+            Some(value) if value > 0.0
+        ),
+        Expr::Call(name, _) => matches!(
+            crate::builtins::latex_style(name),
+            Some(crate::builtins::LatexStyle::Exp) | Some(crate::builtins::LatexStyle::Sqrt)
+        ),
+        Expr::Binary(BinOp::Pow, _, exponent) => constant_exponent(exponent).is_some(),
+        _ => false,
+    }
+}
+
+/// 合并同底数幂是否安全:除了底数可证为正,还允许"所有指数同号".
+///
+/// 危险只在指数之和**跨过 0** 时出现:此时 `x^m * x^n` 在 `x = 0` 处是
+/// `0 * inf` 或 `inf * 0`(NaN/无定义),而 `x^(m+n)` 变成 `x^0 = 1`(有定义)
+/// 或 `x^正数 = 0`--静默把"无定义"变成"有值".
+///
+/// 指数同号时合并是保值的:`x^3 * x^4 = x^7`(`0` 对 `0`),
+/// `x^3 / x^8 = x^-5`(`inf` 对 `inf`,两侧在 `x=0` 都无定义).指数必须在
+/// 数值上可比较,所以符号指数一律不合并.
+fn power_merge_is_safe(base: &Expr, exponents: &[f64]) -> bool {
+    if base_is_provably_positive(base) {
+        return true;
+    }
+    let mut has_positive = false;
+    let mut has_negative = false;
+    for exponent in exponents {
+        if *exponent > 0.0 {
+            has_positive = true;
+        } else if *exponent < 0.0 {
+            has_negative = true;
+        }
+    }
+    !(has_positive && has_negative)
 }
 
 /// 同底数幂相除:`x^3 / x^8 -> 1 / x^5`,`x^8 / x^3 -> x^5`,`x^3 / x^3 -> 1`.
@@ -200,20 +267,16 @@ fn combine_power_quotient(left: &Expr, right: &Expr) -> Option<Expr> {
     let Expr::Binary(BinOp::Pow, right_base, right_exponent) = right else {
         return None;
     };
-    let Expr::Num(right_exponent) = right_exponent.as_ref() else {
-        return None;
-    };
+    let right_exponent = constant_exponent(right_exponent)?;
     let (coefficient, core) = split_number_coefficient(left);
     let Expr::Binary(BinOp::Pow, left_base, left_exponent) = &core else {
         return None;
     };
-    let Expr::Num(left_exponent) = left_exponent.as_ref() else {
-        return None;
-    };
-    if left_base != right_base {
+    let left_exponent = constant_exponent(left_exponent)?;
+    if left_base != right_base || !power_merge_is_safe(left_base, &[left_exponent, right_exponent])
+    {
         return None;
     }
-
     let exponent = left_exponent - right_exponent;
     let combined = if exponent == 0.0 {
         Expr::Num(1.0)
@@ -322,10 +385,8 @@ fn positive_lead(expr: &Expr) -> Option<Expr> {
 
 fn simplify_call(name: &str, args: Vec<Expr>) -> Expr {
     if args.iter().all(|arg| matches!(arg, Expr::Num(_))) {
-        if let Ok(value) = evaluate_constant(&Expr::Call(name.to_string(), args.clone())) {
-            if value.is_finite() {
-                return Expr::Num(value);
-            }
+        if let Ok(Some(value)) = evaluate_constant(&Expr::Call(name.to_string(), args.clone())) {
+            return Expr::Num(value);
         }
     }
     Expr::Call(name.to_string(), args)
@@ -333,6 +394,53 @@ fn simplify_call(name: &str, args: Vec<Expr>) -> Expr {
 
 fn is_zero(expr: &Expr) -> bool {
     matches!(expr, Expr::Num(value) if *value == 0.0)
+}
+
+/// 该节点是否为"可证有限"的数值常量.
+///
+/// 内置常量在求值时优先于变量,`pi`/`e` 都是有限值;变量与表达式一律不算
+/// (它们可能是 inf/NaN).
+fn is_finite_constant(expr: &Expr) -> bool {
+    match expr {
+        Expr::Num(value) => value.is_finite(),
+        Expr::Sym(name) => {
+            matches!(crate::builtins::constant_value(name), Some(v) if v.is_finite())
+        }
+        _ => false,
+    }
+}
+
+/// 该节点是否"可证有限"(用来判断 `0 * f` 能否安全折成 0).
+///
+/// `1/x`/`sqrt(x)`/`ln(x)` 这类含变量或定义域受限的形态一律**不算**:
+/// 它们在部分定义域上是 inf/NaN,`0 * f` 必须保持 NaN 而不是 0.
+/// 只有数值常量与常量指数幂等显然有限的形态才算.
+fn is_finite_expression(expr: &Expr) -> bool {
+    match expr {
+        Expr::Num(value) => value.is_finite(),
+        Expr::Sym(name) => {
+            matches!(crate::builtins::constant_value(name), Some(v) if v.is_finite())
+        }
+        Expr::Binary(BinOp::Pow, base, exponent) => {
+            is_finite_expression(base) && is_finite_expression(exponent)
+        }
+        Expr::Binary(BinOp::Add | BinOp::Sub | BinOp::Mul, left, right) => {
+            is_finite_expression(left) && is_finite_expression(right)
+        }
+        // 除法/函数/变量/列表一律保守判为"不保证有限".
+        _ => false,
+    }
+}
+
+/// 该节点是否为"可证非零有限"的数值常量(`0 / c -> 0` 的前提).
+fn is_nonzero_constant(expr: &Expr) -> bool {
+    match expr {
+        Expr::Num(value) => value.is_finite() && *value != 0.0,
+        Expr::Sym(name) => {
+            matches!(crate::builtins::constant_value(name), Some(v) if v.is_finite() && v != 0.0)
+        }
+        _ => false,
+    }
 }
 
 fn is_one(expr: &Expr) -> bool {
@@ -369,7 +477,14 @@ fn simplify_mul(left: Expr, right: Expr) -> Expr {
         }
     }
     if coefficient == 0.0 {
-        return Expr::Num(0.0);
+        // 乘积的数值系数为 0 时也**不能无条件折成 0**:`0 * f` 在 f 非有限
+        // (未定义/无穷)处是 NaN,折成 0 会把无定义静默变成有值
+        // (`0 * ln(x-1)` 在 x≤1 处本该无定义).只有剩余因子全部可证有限时才折.
+        if terms.iter().all(is_finite_expression) {
+            return Expr::Num(0.0);
+        }
+        // 否则保留 0 因子,交给求值层按实数语义算 NaN.
+        terms.insert(0, Expr::Num(0.0));
     }
     let mut terms = merge_power_factors(terms);
 
@@ -388,12 +503,12 @@ fn simplify_mul(left: Expr, right: Expr) -> Expr {
     product
 }
 
-/// 同底数幂相乘:`x^m * x^n -> x^(m+n)`,指数必须是常数.
+/// 同底数幂相乘:`x^m * x^n -> x^(m+n)`,要求指数是常数**且底数可证为正**.
 ///
 /// 与同底数幂相除(`combine_power_quotient`)成对:两者把幂法则/商法则留下的
-/// `x^3 * x^4` 与 `x^3 / x^8` 收成一个幂,所以 `d/dx 7/(x^4)^2` 得到
-/// `-56 / x^9` 而不是 `-56 * x^3 * x^4 / x^16`.符号指数不动:
-/// `x^m * x^n = x^(m+n)` 只在 x > 0 时无条件成立.
+/// `e^3 * e^4` 收成一个幂.负数/零底数不合并:`x^m * x^n = x^(m+n)` 只在
+/// x > 0 时无条件成立(`0^0.5 * 0^-0.5 = NaN` 而 `0^0 = 1`;`(-8)^0.5 *
+/// (-8)^0.5 = NaN` 而 `(-8)^1 = -8`),静默扩大定义域比留下层幂更危险.
 fn merge_power_factors(terms: Vec<Expr>) -> Vec<Expr> {
     let mut merged: Vec<Expr> = Vec::new();
     for term in terms {
@@ -401,7 +516,7 @@ fn merge_power_factors(terms: Vec<Expr>) -> Vec<Expr> {
             merged.push(term);
             continue;
         };
-        let Expr::Num(exponent) = exponent.as_ref() else {
+        let Some(exponent) = constant_exponent(exponent) else {
             merged.push(term);
             continue;
         };
@@ -412,8 +527,8 @@ fn merge_power_factors(terms: Vec<Expr>) -> Vec<Expr> {
                 Expr::Binary(BinOp::Pow, existing_base, existing_exponent)
                     if existing_base == base =>
                 {
-                    match existing_exponent.as_ref() {
-                        Expr::Num(value) => {
+                    match constant_exponent(existing_exponent) {
+                        Some(value) if power_merge_is_safe(base, &[value, exponent]) => {
                             let total = value + exponent;
                             if total == 1.0 {
                                 Some(base.as_ref().clone())
