@@ -262,6 +262,41 @@
     opacity: 0.6;
 }
 
+/* 实体行是两行式(见 entity/EntityItem):第一行"显隐 + 徽章 + 颜色 + 名称行",
+   第二行公式整行独占. */
+.entity-row {
+    flex-wrap: wrap;
+    row-gap: 5px;
+}
+
+/* 公式自己占一整行:flex-basis 100% 把它挤到第二行,并横向铺满.
+   这条只作用于实体行;`.object-expr` 也用在求值摘要的纯文本回退里(在
+   `.eval-summary` 内部),那里不能被拉成整行. */
+.entity-row > .object-expr {
+    flex: 1 0 100%;
+}
+
+/* 求值行(见 evaluation/evaluationDom.ts)没有中间包装层,所以行的直接子节点
+   自己声明占位:
+   - 折叠区 `<details>`(或没有细节时的摘要 `<summary>`)占第一行剩余宽度;
+   - 结果行只在"没有细节可展开"时是行的直接子节点,那时给它整行宽度.
+   允许换行是为了后者;`.evaluation-row > .eval-result` 用子选择器限定,
+   免得影响细节块内部(纵向 flex)里的结果行. */
+.evaluation-row {
+    flex-wrap: wrap;
+    row-gap: 3px;
+}
+
+.evaluation-row > .eval-details,
+.evaluation-row > .eval-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.evaluation-row > .eval-result {
+    flex: 1 0 100%;
+}
+
 /* 显隐状态文字:透明度之外的第二条线索(色觉/低对比度用户).
    芯片与对象名同处 `.object-head` 这一行,按行居中而不是顶对齐. */
 .row-state {
@@ -311,6 +346,35 @@
     text-align: center;
     color: #0d1120;
     background: #7b8bb8;
+}
+
+/* 实体颜色定义:紧跟在 .kind-badge 后面,同一行的"色块 + 明文值"
+   (见 entity/EntityItem).上下各留 2px,与徽章的盒高对齐;明文值让颜色不只是
+   颜色(色觉/低对比度用户也能读到定义). */
+.object-color {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #8e9fc7;
+}
+
+.object-color-swatch {
+    width: 10px;
+    height: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 3px;
+    /* 值由 EntityItem 用内联 CSS 变量写入,渲染层不改写颜色字符串. */
+    background: var(--object-color, transparent);
+}
+
+.object-color-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: inherit;
 }
 
 .kind-curve {
@@ -380,25 +444,19 @@
     background: #ffd93d;
 }
 
-.object-main {
-    min-width: 0;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-/* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 ObjectListController
-   `_createEntityRow` 的 `.object-head`),公式另起一行--状态不落单占一行. */
+/* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 entity/EntityItem 的
+   `.object-head`),公式另起一行--状态不落单占一行.
+   它是实体行第一行的内容块,占满第一行剩余宽度(行里没有中间包装层). */
 .object-head {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
 .object-name {
-    font-size: 12px;
+    font-size: 16px;
     color: #dbe4ff;
 }
 
@@ -454,7 +512,8 @@
  * 开合完全是 <details>/<summary> 的原生行为(点摘要行即开合),没有自建开合
  * 按钮,因此这里也不隐藏 ::marker,让浏览器自带的三角作为唯一标识.
  * 行首的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
- * 它是 .object-main 的兄弟而不是 <summary> 的子节点,点它不会开合细节.
+ * 行首的显隐按钮是业务动作(隐藏 = 不渲染 + 不参与计算),见 .row-visibility-btn;
+ * 它是行内容块的同级兄弟而不是 <summary> 的子节点,点它不会开合细节.
  * 复制只在展开细节行上生效:摘要公式不带 data-tex,点它只开合.
  * 细节里的公式一行排不下时不换行(KaTeX 换行会破坏公式语义),由横向滚动承接.
  * ========================================================================== */

@@ -5,8 +5,9 @@
  * 点/键盘激活任意一个带 `data-tex` 的公式,就把它的原始 TeX 写进剪贴板.
  *
  * 为什么用委托而不是逐个绑定:
- * 公式 DOM 由 ObjectListController 在每次 sync 时整体重建
- * (createFormulaElement 返回的是模板 clone),逐个绑定会在重建后失效.
+ * 公式 DOM 由两个列表在每次 sync 时整体重建(`entity/EntityItem` 与
+ * `evaluation/*Item`,内部走 createFormulaElement 的模板 clone),
+ * 逐个绑定会在重建后失效.
  *
  * 为什么提示只有一处:
  * "可复制"的文案只在底部"实体对象"标题旁出现,复制成功/失败也改那一处回显;

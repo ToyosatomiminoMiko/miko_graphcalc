@@ -1,87 +1,68 @@
 /**
  * 求值条目的 DOM 外壳(与具体类型无关).
  *
- * 三类求值对象(分析/积分/求交)共用同一副骨架,差异由各类型 spec 的
- * `build` 决定往里面放什么:
+ * 三类求值对象(分析/积分/求交)共用同一副骨架,差异由各 item 子类的构造函数
+ * 决定往里面放什么:
  *
  * ```text
  * <article class="object-row evaluation-row" role="listitem">
  *   <button class="row-visibility-btn">隐藏/显示</button>  ← 显隐(不在 summary 里)
- *   <div class="object-main">
+ *   <details class="eval-details" open=false>          ← 无展开细节时 summary 直接在行上
  *     <summary class="eval-summary">...badge + 变量名 + 一行公式...</summary>
- *     │  (无展开细节时 summary 直接放在 main 里)
- *     或
- *     <details class="eval-details" open=false>
- *       <summary class="eval-summary">...</summary>
- *       <div class="eval-detail-body">        ← 公式块:数学内容 + 结果行
- *         <span class="eval-detail-line">...</span>
- *       </div>
- *       <div class="eval-detail-meta-block"> ← 纯文本元信息块(公式块之外)
- *         <div class="eval-detail-meta">域: ... · 方法: ...</div>
- *       </div>
- *     </details>
- *   </div>
+ *     <div class="eval-detail-body">        ← 公式块:数学内容 + 结果行
+ *       <span class="eval-detail-line">...</span>
+ *     </div>
+ *     <div class="eval-detail-meta-block"> ← 纯文本元信息块(公式块之外)
+ *       <div class="eval-detail-meta">域: ... · 方法: ...</div>
+ *     </div>
+ *   </details>
  * </article>
  * ```
+ *
+ * 行里没有 `.object-main` 这类中间包装:摘要与两个细节块都是**行/`<details>` 的
+ * 直接子节点**,宽度直接由行给出(见 panels.css 的 `.evaluation-row`).
+ * `<details>` 本身保留是刻意的:`<summary>` 必须与它同处一个 `<details>` 才能有
+ * 原生开合,细节块搬出去就没有折叠了.
  *
  * 行类型由 `EvaluationDetailLine` 判别:`latex` -> 公式行(可点击复制),
  * `text` -> 元信息行.哪些行走公式,哪些行走元信息完全由各类型的细节
  * 生成函数决定(`dsl/evaluationLatex.ts`).
  *
- * 两类按钮分工明确,不要混在一起:
- * - **开合**由 `<details>/<summary>` 原生行为承担,行里没有自建开合按钮;
- * - **显隐切换**是业务动作(不渲染 + 不参与计算),由 {@link createVisibilityButton}
- *   生成的按钮承担,并且挂在行(`<article>`)上,是 `.object-main` 的兄弟,
- *   **不在 `<summary>` 里**--点它不会连带开合细节,也不需要 stopPropagation.
+ * 本文件是求值 item 子类共用的组装件:谁长什么样由各子类的构造函数决定
+ * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素与
+ * 显隐按钮这类两栏通用件在 `ui/rowDom.ts`.
  */
+import { createElement } from '../rowDom';
 import { createFormulaElement } from '../FormulaView';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
-import type {
-    EvaluationResultSpec,
-    EvaluationSummarySpec,
-} from './rowTypes';
-
-/** 轻量建元素:属性只有 class 与文本,避免每处三行样板. */
-export function createElement(
-    tag: string,
-    className?: string,
-    text?: string,
-): HTMLElement {
-    const element = document.createElement(tag);
-    if (className) element.className = className;
-    if (text !== undefined) element.textContent = text;
-    return element;
-}
 
 /**
- * 行首显隐按钮:切换该对象"是否参与三维渲染与数值计算".
+ * 折叠态摘要:彩色类型标签 + 变量名 + 一行公式.
  *
- * 这不是折叠按钮(开合交给 `<summary>`),点它的语义是业务动作:
- * - 文案给**下一步动作**(可见时"隐藏",已隐藏时"显示"),状态本身由行上的
- *   `is-hidden` 与"已隐藏"文字承担;
- * - `aria-label` 带上对象名,读屏不必靠上下文猜操作的是哪一条;
- * - 挂在行(`<article>`)上,与 `.object-main` 平级,不在 `<summary>` 里,
- *   因此点按钮只切换显隐,不会顺手开合细节.
+ * 公式排不出来时 `latex` 为 null,由 `text` 回退成纯文本(积分源对象被
+ * 删除时就是这条路径),避免给半个公式.
  */
-export function createVisibilityButton(
-    enabled: boolean,
-    label: string,
-    onToggle: () => void,
-): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'row-visibility-btn';
-    button.textContent = enabled ? '隐藏' : '显示';
-    button.setAttribute('aria-label', `${enabled ? '隐藏' : '显示'} ${label}`);
-    button.addEventListener('click', onToggle);
-    return button;
+export interface EvaluationSummarySpec {
+    /** 完整 class,如 `kind-analysis kind-analysis-gradient`. */
+    badgeClass: string;
+    badgeLabel: string;
+    /** KaTeX 公式;null 时用 `text`. */
+    latex: string | null;
+    /** `latex === null` 时的纯文本回退. */
+    text?: string;
+}
+
+/** 结果/状态行初态:`className` 决定 `计算中...`/`已隐藏`/`错误` 的配色. */
+export interface EvaluationResultSpec {
+    className: string;
+    text: string;
 }
 
 /**
  * 展开细节里的两组行:公式块与纯文本元信息块.
  *
- * `createEvaluationRow` 按 `summary -> 公式块(内含结果行) -> 元信息块` 的
- * 顺序插进 `<details>`:
+ * 各 item 子类按 `summary -> 公式块(内含结果行) -> 元信息块` 的顺序插进
+ * `<details>`:
  * - `formulas`(`.eval-detail-body`):KaTeX 公式行(带 `data-tex`,可点击复制)
  *   与结果行 `.eval-result`,共用左侧高亮竖线与底色--它们都是数学内容;
  * - `metadata`(`.eval-detail-meta` 若干行):域/方法/分段/分层这类键值对,
@@ -129,8 +110,8 @@ export function createDetailSections(
  * - 公式:该条目的算子形式,`copyable = false`--摘要行是 `<details>` 的原生
  *   开合热区,点它只开合,不复制 TeX(复制只在展开细节行上生效).
  *
- * "公式排不出来就回退纯文本"(积分源对象被删除)这条规则收在这里:各类型
- * 只声明自己要放什么({@link EvaluationSummarySpec}),不必各自重复回退判断.
+ * "公式排不出来就回退纯文本"(积分源对象被删除)这条规则收在这里:各 item
+ * 子类只声明自己要放什么({@link EvaluationSummarySpec}),不必各自重复回退判断.
  */
 export function createEvaluationSummary(
     spec: EvaluationSummarySpec,
@@ -163,15 +144,15 @@ export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
 /**
  * 行外壳:把摘要/细节/结果行装配成 `<article class="evaluation-row">`.
  *
- * - 没有展开细节(`detail === null`,如被隐藏的条目):summary 直接放
- *   `.object-main`,结果行跟在后面;
+ * - 没有展开细节(`detail === null`,如被隐藏的条目):summary 直接在行上,
+ *   结果行跟在后面(行内换行,结果行独占第二行,见 panels.css);
  * - 有细节:建 `<details open=false>`,结果行**进公式块**并排在公式行之后
  *   (`result` 为 null 就不挂状态行,以免与细节里的等式重复);积分式排不
  *   出来时公式块为 null,此时为结果行单独建块,保证它不会掉出折叠区.
  *
- * 返回的就是传进来的 `result` 节点(可能已被搬进公式块);调用方自己持有
- * 引用,以便后续异步回填.开合完全交给 `<details>/<summary>` 原生行为;
- * `toggle` 是行首的显隐按钮(可为 null),它是 `.object-main` 的**兄弟**,
+ * 返回的就是传进来的 `result` 节点(可能已被搬进公式块);调用方(各 item
+ * 子类)自己持有引用,以便后续异步回填.开合完全交给 `<details>/<summary>`
+ * 原生行为;`toggle` 是行首的显隐按钮(可为 null),它是内容块的**同级兄弟**,
  * 不在 `<summary>` 内,所以点它只切换显隐,不开合细节.
  */
 export function createEvaluationRow(
@@ -183,12 +164,10 @@ export function createEvaluationRow(
     const row = createElement('article', 'object-row evaluation-row');
     row.setAttribute('role', 'listitem');
     if (toggle !== null) row.append(toggle);
-    const main = createElement('div', 'object-main');
 
     if (detail === null) {
-        main.append(summary);
-        if (result !== null) main.append(result);
-        row.append(main);
+        row.append(summary);
+        if (result !== null) row.append(result);
         return row;
     }
 
@@ -208,20 +187,6 @@ export function createEvaluationRow(
     details.append(summary);
     if (detail.formulas !== null) details.append(detail.formulas);
     if (detail.metadata !== null) details.append(detail.metadata);
-    main.append(details);
-    row.append(main);
+    row.append(details);
     return row;
-}
-
-/**
- * 行被替换时把 `<details>` 的展开态带到新行上.
- *
- * 数值变化必然重建行(内容真的变了),但"用户把它展开了"这件事与内容无关,
- * 不该在拖动滑块时被每帧重置.
- */
-export function carryDetailsOpen(from: HTMLElement, to: HTMLElement): void {
-    const before = from.querySelector<HTMLDetailsElement>('details');
-    if (before === null) return;
-    const after = to.querySelector<HTMLDetailsElement>('details');
-    if (after !== null) after.open = before.open;
 }

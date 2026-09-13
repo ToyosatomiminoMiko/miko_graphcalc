@@ -285,7 +285,8 @@ describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(head.querySelector<StubElement>('.object-name')).not.toBeNull();
         expect(head.querySelector<StubElement>('.row-state')).not.toBeNull();
         expect(head.querySelector<StubElement>('.object-expr')).toBeNull();
-        expect(head.parent).toBe(row.querySelector<StubElement>('.object-main'));
+        // 行里没有中间包装层:名称行直接挂在行上.
+        expect(head.parent).toBe(row);
     });
 
     it('三类求值对象各自绑到对应的切换入口', () => {
@@ -316,7 +317,7 @@ describe('行首显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         const button = row.querySelector<StubElement>('.row-visibility-btn')!;
         expect(summary.tagName).toBe('summary');
         expect(summary.querySelectorAll<StubElement>('.row-visibility-btn')).toHaveLength(0);
-        // 按钮是行的直接子节点(与 .object-main 平级),不是 summary 的子节点.
+        // 按钮是行的直接子节点(与摘要/折叠区同级),不是 summary 的子节点.
         expect(button.parent).toBe(row);
         // 行里没有监听 click 的自建开合按钮:开合只认 <summary> 原生行为.
         expect(summary.listeners.get('click')).toBeUndefined();

@@ -8,7 +8,7 @@
  *   逐分量结果,方法的完整积分式...).
  *
  * 纯函数,只消费 IR,不碰 DOM:这样摘要/细节两套公式能单测,渲染层
- * (ui/ObjectListController)只负责把字符串交给 KaTeX.细节行按"一行一条"
+ * (ui/evaluation/*Item.ts)只负责把字符串交给 KaTeX.细节行按"一行一条"
  * 返回,列表里一行排不下时由 CSS 横向滚动承接(KaTeX 不换行,这是屏上
  * 唯一不破坏公式语义的溢出处理).
  *
@@ -178,7 +178,7 @@ export interface IntersectionTaskLike {
  * 求交结果摘要:默认可见的一行.
  *
  * 求交是异步任务,首次渲染时还没有交点/交线数量,所以摘要只给"谁与谁求交";
- * 数量摘要沿用既有纯文本(见 ui/evaluation/intersectionRow.ts 的
+ * 数量摘要沿用既有纯文本(见 ui/evaluation/intersectionItem.ts 的
  * `intersectionSummary`),细节行给出两个源对象,采样分段与输出形态.
  */
 export function intersectionLatexSummary(task: IntersectionTaskLike): LatexLine {

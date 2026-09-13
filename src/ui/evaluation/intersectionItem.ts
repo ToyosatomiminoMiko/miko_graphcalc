@@ -1,5 +1,5 @@
 /**
- * 求交条目的 HTML 结构(类型专属定义).
+ * 求交 item:一个求交条目就是一行 DOM(`IntersectionItem`).
  *
  * 结构特征:**只有一条纯文本结果行**,细节是"源对象 + 采样分段"这类元信息.
  * 数值(交点/交线数量)由 Worker 异步回填,首次渲染只有占位.
@@ -15,17 +15,14 @@ import {
     intersectionLatexDetails,
     intersectionLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
+import { createVisibilityButton } from '../rowDom';
+import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,
     createEvaluationRow,
     createEvaluationSummary,
     createResultRow,
-    createVisibilityButton,
-} from './rowDom';
-import type {
-    EvaluationKindSpec,
-    EvaluationRowHandles,
-} from './rowTypes';
+} from './evaluationDom';
 
 /**
  * 求交结果摘要(纯文本,排在结果行里).
@@ -47,34 +44,28 @@ function intersectionSummary(
     return `${source} · ${parts.length > 0 ? parts.join(' · ') : '无交'}`;
 }
 
-/** 求交条目句柄:结果行一定存在(纯文本统计),没有可落空的公式. */
-export interface IntersectionRowHandles extends EvaluationRowHandles {
-    result: HTMLElement;
-}
-
-/**
- * 求交条目 key:摘要/细节公式与启用态.
- *
- * `color` 只影响三维渲染,不影响列表内容,不进键--否则改个颜色就会把
- * 用户展开的细节收起来.
- */
-function intersectionRowKey(task: IntersectionTask): string {
-    return JSON.stringify([
-        intersectionLatexSummary(task),
-        task.enabled,
-        task.enabled ? intersectionLatexDetails(task) : null,
-    ]);
-}
-
-export const intersectionRowSpec: EvaluationKindSpec<
+export class IntersectionItem extends EvaluationItem<
     IntersectionTask,
-    IntersectionOutput,
-    IntersectionRowHandles
-> = {
-    kind: 'intersection',
-    name: (task) => task.name,
-    cacheKey: (task) => intersectionRowKey(task),
-    build(task, context) {
+    IntersectionOutput
+> {
+    /**
+     * 求交条目的内容键:摘要/细节公式与启用态.
+     *
+     * `color` 只影响三维渲染,不影响列表内容,不进键--否则改个颜色就会把
+     * 用户展开的细节收起来.
+     */
+    static cacheKey(task: IntersectionTask): string {
+        return JSON.stringify([
+            intersectionLatexSummary(task),
+            task.enabled,
+            task.enabled ? intersectionLatexDetails(task) : null,
+        ]);
+    }
+
+    /** 结果行一定存在(纯文本统计),没有可落空的公式. */
+    private readonly result: HTMLElement;
+
+    constructor(task: IntersectionTask, context: EvaluationContext) {
         const summary = createEvaluationSummary(
             {
                 badgeClass: 'kind-intersection',
@@ -106,16 +97,19 @@ export const intersectionRowSpec: EvaluationKindSpec<
 
         const row = createEvaluationRow(summary, detail, result, toggle);
         row.classList.toggle('is-hidden', !task.enabled);
-        return { row, result };
-    },
-    resolve(handles, task, output) {
-        handles.result.textContent = intersectionSummary(task, output);
-        handles.result.className = 'eval-result is-ready';
-        handles.row.classList.remove('has-error');
-    },
-    reject(handles, _task, message) {
-        handles.result.textContent = message;
-        handles.result.className = 'eval-result is-error';
-        handles.row.classList.add('has-error');
-    },
-};
+        super(task, row);
+        this.result = result;
+    }
+
+    renderValue(output: IntersectionOutput): void {
+        this.result.textContent = intersectionSummary(this.task, output);
+        this.result.className = 'eval-result is-ready';
+        this.row.classList.remove('has-error');
+    }
+
+    renderError(message: string): void {
+        this.result.textContent = message;
+        this.result.className = 'eval-result is-error';
+        this.row.classList.add('has-error');
+    }
+}

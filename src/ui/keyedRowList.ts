@@ -7,13 +7,19 @@
  * 2. 首次出现或内容键变了 -> 交给 `build` 重建,同名旧行先摘除;
  * 3. 消失的条目连行一起删除,其余行按输入数组顺序摆放(见 `appendInOrder`).
  *
- * 为什么抽出来:`ObjectListController._renderEntities` 与
- * `evaluation/EvaluationSection.render` 曾是同一套增删/排序/缓存循环的两份拷贝
- * (见 UI-P3.8),后续任何顺序/缓存策略调整都要改两处.类型差异(有没有展开细节,
- * 结果行,异步数值缓存)留在各自的 `build` 与调用方里.
+ * 为什么抽出来:`entity/EntityList.render` 与 `evaluation/EvaluationSection.render`
+ * 曾是同一套增删/排序/缓存循环的两份拷贝(见 UI-P3.8),后续任何顺序/缓存策略
+ * 调整都要改两处.类型差异(有没有展开细节,结果行,异步数值缓存)留在各自的
+ * `build`(即 item 类的构造函数)里.
  */
 
-/** 行句柄的下限:任何行至少有一个根元素. */
+/**
+ * 行句柄的下限:任何行至少有一个根元素.
+ *
+ * 句柄通常就是**行对象本身**(如 `entity/EntityItem`,`evaluation/IntegralItem`):
+ * 列表引擎只认这个 `row`,行内结构,异步回填都由对象自己的方法承担,不需要
+ * 另建一份与行为分离的数据袋.
+ */
 export interface KeyedRowHandles {
     readonly row: HTMLElement;
 }
@@ -30,8 +36,9 @@ export interface KeyedRowHooks<TItem, THandles extends KeyedRowHandles> {
      */
     key(item: TItem): string;
     /**
-     * 构建整行,`previous` 是同名旧行的句柄(首次出现或已删除时为 null),
-     * `key` 是本次同步算出的内容键(调用方据此判断缓存数值是否还有效).
+     * 构建整行(通常是 `new 行对象(...)`),`previous` 是同名旧行对象
+     * (首次出现或已删除时为 null),`key` 是本次同步算出的内容键(调用方据此
+     * 判断缓存数值是否还有效).
      */
     build(item: TItem, previous: THandles | null, key: string): THandles;
     /** 条目从列表消失时回调;调用方据此清自己的数值缓存. */
@@ -84,7 +91,10 @@ export class KeyedRowList<TItem, THandles extends KeyedRowHandles> {
         appendInOrder(this.container, ordered);
     }
 
-    /** 取当前同名条目的句柄/键/条目(异步回填用). */
+    /**
+     * 取当前同名条目的行对象/键/条目(异步回填用):`handles` 就是行对象,
+     * 回填直接调它的方法(见 `EvaluationSection.resolve`).
+     */
     entry(name: string): KeyedRowEntry<TItem, THandles> | undefined {
         return this.rows.get(name);
     }
