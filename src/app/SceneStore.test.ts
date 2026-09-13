@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { AstProgram } from '../compiler/ast/types';
-import type { MatrixOps } from '../math/tensor/SceneTransform';
+import type { MatrixOps } from '../math/matrix/MatrixOps';
 import { SceneStore } from './SceneStore';
 
 // commitSource 只保存引用,不解释 AST/矩阵后端,桩对象足够.

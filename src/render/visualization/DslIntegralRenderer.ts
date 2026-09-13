@@ -4,7 +4,7 @@ import type {
     RiemannSide,
     SceneObject,
 } from '../../ir';
-import type { Mat4 } from '../../math/tensor/rowMajorMatrix';
+import type { Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { IntegralVisualizer } from './integral/IntegralVisualizer';
 import { makeFn1D, makeFn2D } from './integral/sampleLookup';
 import type { MathComputeEngine } from '../../math/compute/MathComputeEngine';

@@ -20,7 +20,7 @@ import {
     flattenOptionalMat4,
     invertMat4,
     type Mat4,
-} from '../tensor/rowMajorMatrix';
+} from '../matrix/rowMajorMatrix';
 
 const SUPPORTED_INTERSECTION_KINDS = new Set<SceneObject['kind']>([
     'curve',

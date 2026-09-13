@@ -14,7 +14,7 @@
  */
 import type { AstProgram } from '../compiler/ast/types';
 import type { SceneIR, SceneObject } from '../ir';
-import type { MatrixOps } from '../math/tensor/SceneTransform';
+import type { MatrixOps } from '../math/matrix/MatrixOps';
 
 export class SceneStore {
     private _currentAst: AstProgram | null = null;

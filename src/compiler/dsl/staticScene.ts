@@ -15,8 +15,8 @@ import type {
     OptionPair,
 } from '../ast/types';
 import type { AnimationClip, ParamDeclaration } from '../../ir';
-import type { MatrixOps } from '../../math/tensor/SceneTransform';
-import { cloneMat4, type Mat4 } from '../../math/tensor/rowMajorMatrix';
+import type { MatrixOps } from '../../math/matrix/MatrixOps';
+import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { withStatementSpan } from '../errors';
 import { buildObjectBlueprint } from './objects/build';
 import { blueprintHasCoefficients, type ObjectBlueprint } from './objects/types';

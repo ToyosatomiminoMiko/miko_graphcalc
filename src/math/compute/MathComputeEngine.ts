@@ -19,8 +19,8 @@ import type {
     ConicSolidObject,
     SurfaceObject,
 } from '../../ir';
-import type { Mat4 } from '../tensor/rowMajorMatrix';
-import { invertMat4 } from '../tensor/rowMajorMatrix';
+import type { Mat4 } from '../matrix/rowMajorMatrix';
+import { invertMat4 } from '../matrix/rowMajorMatrix';
 import { coefficientsToRecord } from '../adapters/coefficientUtils';
 import {
     integrate as runIntegral,

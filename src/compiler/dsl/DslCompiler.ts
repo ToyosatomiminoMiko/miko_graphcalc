@@ -4,7 +4,7 @@ import type {
     SceneIR,
     SceneObject,
 } from '../../ir';
-import type { MatrixOps } from '../../math/tensor/SceneTransform';
+import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { withStatementSpan } from '../errors';
 import { materializeObject } from './objects/materialize';
 import { applyParamOverrides } from './params';

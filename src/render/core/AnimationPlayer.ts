@@ -3,8 +3,8 @@ import type { AnimationClip } from '../../ir';
 import {
     cloneMat4,
     type Mat4,
-} from '../../math/tensor/rowMajorMatrix';
-import type { MatrixOps } from '../../math/tensor/SceneTransform';
+} from '../../math/matrix/rowMajorMatrix';
+import type { MatrixOps } from '../../math/matrix/MatrixOps';
 
 interface ObjectAnimationTimeline {
     base: Mat4 | null;

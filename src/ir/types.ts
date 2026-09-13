@@ -476,7 +476,7 @@ export interface IntersectionOutput {
 export interface AnimationClip {
     name: string;
     duration: number;
-    /** 行主序 4x4 矩阵,布局见 `math/tensor/rowMajorMatrix.ts`. */
+    /** 行主序 4x4 矩阵,布局见 `math/matrix/rowMajorMatrix.ts`. */
     matrix: number[][];
 }
 
@@ -501,7 +501,7 @@ export interface SceneIR {
      */
     integralFormulas: Record<string, string | null>;
     /**
-     * 对象 id -> 行主序 4x4 矩阵,布局见 `math/tensor/rowMajorMatrix.ts`.
+     * 对象 id -> 行主序 4x4 矩阵,布局见 `math/matrix/rowMajorMatrix.ts`.
      *
      * 使用 Record 而不是 Map,是为了让 IR 保持可序列化,
      * 便于未来跨线程 / 跨进程 / 桌面端消费.

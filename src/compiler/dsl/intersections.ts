@@ -24,7 +24,7 @@ import {
     parseCappedPositiveInteger,
     stripQuotes,
 } from './options';
-import { invertMat4, type Mat4 } from '../../math/tensor/rowMajorMatrix';
+import { invertMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 
 const INTERSECTION_OPTION_NAMES = ['color', 'segments'] as const;
 const SUPPORTED_KINDS = new Set<SceneObject['kind']>([

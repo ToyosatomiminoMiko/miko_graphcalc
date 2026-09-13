@@ -27,12 +27,12 @@
  *
  * 这样同一份引用解析不存在第二个实现,语境差异只剩"能否组合/能否用函数".
  */
-import type { MatrixOps } from '../../math/tensor/SceneTransform';
+import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import {
     cloneMat4,
     mat4FromFlat,
     type Mat4,
-} from '../../math/tensor/rowMajorMatrix';
+} from '../../math/matrix/rowMajorMatrix';
 import { evaluateMatrixExpr, evaluateNumber } from './expression';
 import { splitTopLevel } from '../text';
 

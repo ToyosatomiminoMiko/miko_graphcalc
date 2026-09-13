@@ -5,7 +5,7 @@
  * 本文件不再被 DslCompiler/AnimationPlayer 作为默认后端引用.
  */
 import { assertMat4, type Mat4 } from './rowMajorMatrix';
-import type { MatrixOps } from './SceneTransform';
+import type { MatrixOps } from './MatrixOps';
 
 /** 单位 4x4 矩阵. */
 export function identity4(): Mat4 {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compileScene as compileSceneWithOps } from './DslCompiler';
 import type { CompileSceneOptions } from './DslCompiler';
-import { jsMatrixOps } from '../../math/tensor/testMatrixOps';
+import { jsMatrixOps } from '../../math/matrix/testBackend';
 import type { AstProgram, ObjectStatement } from '../ast/types';
 import { buildIntersectionInput } from '../../math/adapters/IntersectionMath';
 

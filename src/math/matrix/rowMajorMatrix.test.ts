@@ -5,7 +5,7 @@ import {
     invertMat4,
     mat4FromFlat,
 } from './rowMajorMatrix';
-import { translate4 } from './testMatrixOps';
+import { translate4 } from './testBackend';
 
 describe('rowMajorMatrix', () => {
     it('round-trips between nested and flat row-major layouts', () => {

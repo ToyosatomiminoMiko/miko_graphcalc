@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMatrixOps } from './SceneTransform';
+import type { MatrixOps } from './MatrixOps';
 import {
     identity4,
     jsMatrixOps,
@@ -7,9 +7,9 @@ import {
     rotate4,
     scale4,
     translate4,
-} from './testMatrixOps';
+} from './testBackend';
 
-describe('SceneTransform', () => {
+describe('MatrixOps', () => {
     it('keeps translation in the fourth column of a row-major matrix', () => {
         expect(translate4([2, 3, 4])).toEqual([
             [1, 0, 0, 2],
@@ -45,19 +45,12 @@ describe('SceneTransform', () => {
         expect(matrix[3]).toEqual([0, 0, 0, 1]);
     });
 
-    it('creates explicit matrix ops without module-level mutable state', () => {
-        const backend = {
-            identity: () => identity4(),
-            translate: () => translate4([9, 8, 7]),
-            scale: () => scale4([2, 2, 2]),
-            rotate: () => rotate4([0, 0, 0]),
-            multiply: (a: number[][], b: number[][]) => multiply4x4(a, b),
-            apply: (_matrix: number[][], point: number[]) => [point[0] + 1, point[1], point[2]],
-        };
+    it('exposes the injected ops as the plain MatrixOps contract', () => {
+        // 曾经的 createMatrixOps 只是 `(args) => backend.method(args)` 的零逻辑
+        // 包装,已删除:实现对象本身就是 MatrixOps,这里守住这个契约形状.
+        const ops: MatrixOps = jsMatrixOps;
 
-        const ops = createMatrixOps(backend);
-
-        expect(ops.translate([0, 0, 0])).toEqual(translate4([9, 8, 7]));
-        expect(ops.apply(identity4(), [1, 2, 3])).toEqual([2, 2, 3]);
+        expect(ops.translate([9, 8, 7])).toEqual(translate4([9, 8, 7]));
+        expect(ops.apply(identity4(), [1, 2, 3])).toEqual([1, 2, 3]);
     });
 });

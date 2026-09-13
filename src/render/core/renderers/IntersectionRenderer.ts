@@ -13,7 +13,7 @@ import type {
     IntersectionTask,
     SceneObject,
 } from '../../../ir';
-import type { Mat4 } from '../../../math/tensor/rowMajorMatrix';
+import type { Mat4 } from '../../../math/matrix/rowMajorMatrix';
 import {
     buildIntersectionInput,
     decodeIntersectionOutput,
