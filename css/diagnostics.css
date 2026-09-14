@@ -8,9 +8,9 @@
     flex-direction: column;
     gap: 4px;
     overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--color-border-panel);
     border-radius: 8px;
-    background: #0d1120;
+    background: var(--color-bg-sunken);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 20px;
 }
@@ -25,11 +25,11 @@
 }
 
 .diagnostic-warning {
-    color: #ffd38f;
-    background: rgba(255, 190, 70, 0.12);
+    color: var(--color-warning);
+    background: var(--color-diagnostic-warning-bg);
 }
 
 .diagnostic-error {
-    color: #ff9aa8;
-    background: rgba(255, 70, 90, 0.14);
+    color: var(--color-error);
+    background: var(--color-diagnostic-error-bg);
 }

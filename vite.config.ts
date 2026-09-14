@@ -7,9 +7,22 @@ import { VitePWA } from 'vite-plugin-pwa';
  *
  * `base` 是这里唯一的路径开关. 改仓库名时只改这一处即可: Vite 会自动把
  * 它补到 HTML 里的绝对资源路径(`/apple-touch-icon.png` 会变成带前缀的
- * 形式)、worker 与 wasm 产物 URL 上; VitePWA 也会据此生成 manifest 的
+ * 形式),worker 与 wasm 产物 URL 上; VitePWA 也会据此生成 manifest 的
  * scope/start_url 与 Service Worker 的相对预缓存清单.
  */
+/**
+ * PWA 的浏览器外框色(manifest 的 theme_color 与 background_color 共用).
+ *
+ * 单一来源:这两个字段以前各写一遍 `#0d0d0d`,改一处漏一处不会报错,只会让
+ * 安装后的启动画面与状态栏颜色分叉.
+ *
+ * 注意 `index.html` 的 `<meta name="theme-color">` 是同一族配色的第三份副本:
+ * 静态 HTML 读不到这个常量,只能人工保持一致(当前两者相同).
+ * 它不等于色板里的 `--color-bg-app`(#0e101a),那是页面底色;这里刻意更深,
+ * 让独立窗口的状态栏与页面内容有分界.
+ */
+const PWA_CHROME_COLOR = '#0d0d0d';
+
 export default defineConfig({
     base: '/miko_graphcalc/',
     optimizeDeps: {
@@ -38,8 +51,8 @@ export default defineConfig({
                 short_name: 'GraphCalc',
                 description: 'GraphCalc DSL',
                 lang: 'zh-CN',
-                theme_color: '#0d0d0d',
-                background_color: '#0d0d0d',
+                theme_color: PWA_CHROME_COLOR,
+                background_color: PWA_CHROME_COLOR,
                 display: 'standalone',
                 orientation: 'any',
                 icons: [

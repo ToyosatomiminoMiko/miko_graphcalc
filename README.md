@@ -5,7 +5,7 @@
 GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 `DslApp` 驱动 `.miko` DSL.
 
-这是符号计算引擎(Symbolic Computation Engine),
+这是符号计算引擎(Symbolic Computation Engine)和Plotter,
 作为计算机代数系统(Computer Algebra System, CAS)是不完全的.
 
 ## 数据流
@@ -325,7 +325,6 @@ src/ui/ src/app/    控制与编排
 数值求值链路(`math_rs::eval_core::CompiledEvaluator`)在构造期把符号解析成
 槽位(`symbolic::eval::SymBinding`),求值期零字符串/零哈希/零分配;旧
 `HashMap<String, f64>` 查表版保留为测试参照物并用逐点对拍守住语义.
-
 
 ## 二/一次"运行"的完整过程
 

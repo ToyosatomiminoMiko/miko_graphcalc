@@ -44,8 +44,8 @@
     height: 100%;
     min-height: 0;
     overflow: hidden;
-    background: #0d1120;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-bg-sunken);
+    border: 1px solid var(--color-border-panel);
     border-radius: 8px;
 }
 
@@ -91,22 +91,23 @@
     line-height: var(--code-line-height);
     tab-size: var(--code-tab-size, 4);
     white-space: pre;
-    color: #dbe4ff;
+    color: var(--color-text-strong);
 }
 
 /* --------------------------------------------------------------------------
  * 高亮配色(只作用于高亮层,textarea 的文字是透明的).
  *
- * 取色沿用深蓝底:青色 #6dd5ff 是场景里的主色,继续用来标"选项名";
- * 注释刻意用行号同色 #55618c--它在源码里密度最高,必须最不抢眼.
+ * 取色沿用深蓝底:青色(--color-syntax-property,与主色同值)是场景里的主色,
+ * 继续用来标"选项名";注释刻意用行号同色(--color-syntax-comment),
+ * 它在源码里密度最高,必须最不抢眼.色值全部来自 base.css 的色板,这里不再写字面量.
  * -------------------------------------------------------------------------- */
-#dsl-editor-highlight-code .dsl-comment { color: #55618c; }
-#dsl-editor-highlight-code .dsl-string { color: #9ad48a; }
-#dsl-editor-highlight-code .dsl-number { color: #e0a56b; }
-#dsl-editor-highlight-code .dsl-keyword { color: #c678dd; }
-#dsl-editor-highlight-code .dsl-property { color: #6dd5ff; }
-#dsl-editor-highlight-code .dsl-operator { color: #9aa7d4; }
-#dsl-editor-highlight-code .dsl-bracket { color: #7f8bbd; }
+#dsl-editor-highlight-code .dsl-comment { color: var(--color-syntax-comment); }
+#dsl-editor-highlight-code .dsl-string { color: var(--color-syntax-string); }
+#dsl-editor-highlight-code .dsl-number { color: var(--color-syntax-number); }
+#dsl-editor-highlight-code .dsl-keyword { color: var(--color-syntax-keyword); }
+#dsl-editor-highlight-code .dsl-property { color: var(--color-syntax-property); }
+#dsl-editor-highlight-code .dsl-operator { color: var(--color-syntax-operator); }
+#dsl-editor-highlight-code .dsl-bracket { color: var(--color-syntax-bracket); }
 
 /* 行号槽:宽度随字体与行数变化,内容超出时裁剪,靠 translate 跟随滚动 */
 #dsl-editor-gutter {
@@ -117,9 +118,9 @@
     width: var(--code-gutter-width);
     padding: 11px 0 11px 8px; /* 顶部 11px = 外框 border 1px + 编辑区 padding 10px */
     overflow: hidden;
-    background: #0a0e1c;
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    color: #55618c;
+    background: var(--color-bg-gutter);
+    border-right: 1px solid var(--color-border-divider);
+    color: var(--color-text-faint);
     user-select: none;
     -webkit-user-select: none;
 }
@@ -161,11 +162,11 @@
 /* 高亮层就位:文字让位(只留光标色),着色完全由背景层显示 */
 #dsl-editor.is-highlighted {
     color: transparent;
-    caret-color: #dbe4ff;
+    caret-color: var(--color-text-strong);
 }
 
 /* 透明文字下的选区要自己给底色:默认选区色偏淡,不给的话选中一段时
    会与高亮层的文字糊在一起 */
 #dsl-editor::selection {
-    background: rgba(109, 213, 255, 0.28);
+    background: var(--color-accent-selection);
 }
