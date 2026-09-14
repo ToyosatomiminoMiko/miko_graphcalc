@@ -52,7 +52,7 @@ export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'intersection_surfaces.scad', title: '曲面 ∩ 曲面', group: '其他主题' },
     { file: 'double_integral_region.scad', title: 'region 域二重积分', group: '其他主题' },
     { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: '其他主题' },
-    { file: 'Zemlya.scad', title: '地球球体与卫星点', group: '其他主题' },
+    { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: '其他主题' },
 ];
 
 /**

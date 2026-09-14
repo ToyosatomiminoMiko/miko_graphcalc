@@ -43,4 +43,4 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名沿用 `.scad`,文件名按
 | `intersection_surfaces.scad` | 曲面 ∩ 曲面(平面)-> 三维交线 |
 | `double_integral_region.scad` | `region` 面积图形作域的二重积分(辛普森法) |
 | `animation_box_rotations.scad` | 动画片段 `rotate` 列表按顺序播放 |
-| `Zemlya.scad` | 最小球体场景:一个 `point` 标记 + 一个半透明球体(点样式与球体渲染的手动试验台) |
+| `Zemlya.scad` | 地球与三星覆盖:3 颗同轨道面均布(相隔 120°)的卫星,各自一道切于地表的"覆盖波束"圆锥(底沿即覆盖圈);`param h` 拖动轨道高度,可看覆盖圈扩大,两极极冠缩小但**永不消失**--文件头给出"3 颗卫星不可能覆盖全球"的证明与各级高度的覆盖纬度表 |
