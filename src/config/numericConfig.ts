@@ -5,8 +5,7 @@
  *
  * 本模块是**零依赖叶子**:不 import `math/`,`compiler/` 或 `render/`.
  * 球坐标角度约定虽然也被 `math/CoordinateSystem.ts` 使用,但它的本质是
- * "数值口径的全局配置",所以定义在这里,由 math 反向 import 类型
- * (见 prompt/refactor-and-rust-migration.md §1.4).
+ * "数值口径的全局配置",所以定义在这里,由 math 反向 import 类型.
  */
 
 /**

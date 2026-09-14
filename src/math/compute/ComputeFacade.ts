@@ -2,9 +2,8 @@
  * 数值计算门面.
  *
  * 它是渲染层访问"领域计算编组"的统一入口:曲线采样与积分走这里,其余
- * (曲面/向量场/求交)由渲染层直连各自 client(见
- * prompt/refactor-and-rust-migration.md §4 的方案 A′--只做轻量收口,
- * 不把 `_buildSpec` 那 90 行领域逻辑搬进 render).
+ * (曲面/向量场/求交)由渲染层直连各自 client.门面只做轻量收口,
+ * 不把 `_buildSpec` 那 90 行领域逻辑搬进 render(202609 重构选定的方案).
  *
  * 积分请求按 task 的显式 `dim`/`domainKind` 组织:
  * - interval(1D 曲线)/ rectangle(2D 曲面矩形):复用原 Rust 一/二维入口;

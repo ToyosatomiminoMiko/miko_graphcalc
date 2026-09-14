@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AnimationPlayer } from './AnimationPlayer';
-import { jsMatrixOps } from '../../math/matrix/testBackend';
+import { testMatrixOps } from '../../test/matrixOps';
 
 const identity = [
     [1, 0, 0, 0],
@@ -11,7 +11,7 @@ const identity = [
 
 describe('AnimationPlayer', () => {
     it('returns the base transform before any clip starts', () => {
-        const player = new AnimationPlayer(jsMatrixOps);
+        const player = new AnimationPlayer(testMatrixOps);
         player.setScene(
             { 1: identity },
             [],
@@ -22,7 +22,7 @@ describe('AnimationPlayer', () => {
     });
 
     it('interpolates a single translation clip over its duration', () => {
-        const player = new AnimationPlayer(jsMatrixOps);
+        const player = new AnimationPlayer(testMatrixOps);
         player.setScene(
             {},
             [{
@@ -48,7 +48,7 @@ describe('AnimationPlayer', () => {
     });
 
     it('chains clips from the matrix left by the previous clip', () => {
-        const player = new AnimationPlayer(jsMatrixOps);
+        const player = new AnimationPlayer(testMatrixOps);
         player.setScene(
             {},
             [

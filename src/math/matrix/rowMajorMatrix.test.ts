@@ -4,12 +4,25 @@ import {
     flattenMat4,
     invertMat4,
     mat4FromFlat,
+    type Mat4,
 } from './rowMajorMatrix';
-import { translate4 } from './testBackend';
+
+/**
+ * 测试夹具:行主序平移矩阵(平移量在第四列).
+ *
+ * 本文件测的是表示层(嵌套 <-> 扁平,求逆,克隆),不该依赖任何矩阵后端,
+ * 所以自带字面量,而不是 import WASM 后端或另造一份 JS 参考实现.
+ */
+const translated = (x: number, y: number, z: number): Mat4 => [
+    [1, 0, 0, x],
+    [0, 1, 0, y],
+    [0, 0, 1, z],
+    [0, 0, 0, 1],
+];
 
 describe('rowMajorMatrix', () => {
     it('round-trips between nested and flat row-major layouts', () => {
-        const matrix = translate4([2, -3, 5]);
+        const matrix = translated(2, -3, 5);
         expect(mat4FromFlat(flattenMat4(matrix))).toEqual(matrix);
     });
 
@@ -18,7 +31,7 @@ describe('rowMajorMatrix', () => {
     });
 
     it('inverts a translation so applying both keeps the point', () => {
-        const matrix = translate4([1, 2, 3]);
+        const matrix = translated(1, 2, 3);
         const inverse = invertMat4(matrix)!;
         expect(inverse).not.toBeNull();
 
@@ -35,7 +48,7 @@ describe('rowMajorMatrix', () => {
     });
 
     it('clone does not share rows with the source', () => {
-        const matrix = translate4([1, 0, 0]);
+        const matrix = translated(1, 0, 0);
         const clone = cloneMat4(matrix);
         clone[0][3] = 99;
         expect(matrix[0][3]).toBe(1);

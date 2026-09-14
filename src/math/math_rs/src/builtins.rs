@@ -337,8 +337,7 @@ pub(crate) fn apply_unary(name: &str, value: f64) -> Result<f64, String> {
 /// 返回一元内置函数的求值函数指针;名字未登记时返回 `None`.
 ///
 /// 供预绑定求值路径(`eval::bind_expression`)在**编译期**把 17 项线性扫
-/// (`apply_unary`)解析成函数指针,热点循环里不再按名字查找;见
-/// prompt/refactor-and-rust-migration.md §9.5.
+/// (`apply_unary`)解析成函数指针,热点循环里不再按名字查找.
 pub(crate) fn unary_eval(name: &str) -> Option<UnaryMathFunction> {
     MATH_FUNCTIONS
         .iter()

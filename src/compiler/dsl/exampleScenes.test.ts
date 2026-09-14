@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile, readdir } from 'node:fs/promises';
 import { parseMiko } from '../parser';
 import { compileScene } from './DslCompiler';
-import { jsMatrixOps } from '../../math/matrix/testBackend';
+import { testMatrixOps } from '../../test/matrixOps';
 
 describe('仓库自带 DSL 源码', () => {
     it('example/ 下每个示例都能编译出 SceneIR', async () => {
@@ -26,7 +26,7 @@ describe('仓库自带 DSL 源码', () => {
         for (const file of files) {
             const source = await readFile(new URL(file, dir), 'utf8');
             try {
-                compileScene(await parseMiko(source), {}, jsMatrixOps);
+                compileScene(await parseMiko(source), {}, testMatrixOps);
             } catch (error) {
                 failures.push(
                     `${file}: ${error instanceof Error ? error.message : String(error)}`,
@@ -41,7 +41,7 @@ describe('仓库自带 DSL 源码', () => {
         const match = html.match(/<textarea id="dsl-editor"[^>]*>([\s\S]*?)<\/textarea>/);
         expect(match).not.toBeNull();
 
-        const scene = compileScene(await parseMiko(match![1]), {}, jsMatrixOps);
+        const scene = compileScene(await parseMiko(match![1]), {}, testMatrixOps);
         expect(scene.objects.length).toBeGreaterThan(0);
     });
 });

@@ -302,8 +302,8 @@ SceneIR(纯数据,不含 three.js/DOM)
 
 ### 目录分层(202609 重构后)
 
-按 `prompt/refactor-and-rust-migration.md` 执行完的四批重构(1c IR 切文件与
-3c 统一 client 按建议砍掉):
+202609 架构重构完成的四批改动(另有两项可选项--IR 再切 5 个文件,统一 client
+形状--当时按建议砍掉):
 
 ```text
 src/ir/             零依赖叶子:SceneIR 等纯数据契约(index.ts 统一入口)

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compileScene as compileSceneWithOps } from './DslCompiler';
 import type { CompileSceneOptions } from './DslCompiler';
-import { jsMatrixOps } from '../../math/matrix/testBackend';
+import { testMatrixOps } from '../../test/matrixOps';
 import {
     evaluate_curl_point,
     evaluate_divergence_point,
@@ -13,121 +13,134 @@ import type { AstProgram } from '../ast/types';
 import { normalizeExpression } from './expression';
 import { CompileError, formatLocatedError } from '../errors';
 
-vi.mock('../../wasm/math_rs/math_rs', () => ({
-    evaluate_gradient_point: vi.fn(() => ({ f0: 0, fx: 0, fy: 0 })),
-    evaluate_divergence_point: vi.fn(() => 0),
-    evaluate_curl_point: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
-    normalize_expression: vi.fn((expr: string) => {
-        switch (expr) {
-            case 'sin(x*a)':
-                return 'sin(x * a)';
-            case 'sin(x)*cos(y)':
-                return 'sin(x) * cos(y)';
-            case 'log(x)':
-                return 'ln(x)';
-            default:
-                return expr;
-        }
-    }),
-    latex_expression: vi.fn((expr: string) => expr),
-    symbolic_derivative: vi.fn((expr: string, variable: string) => {
-        switch (expr) {
-            case 'sin(x * a)':
-                return variable === 'x' ? 'a * cos(x * a)' : '0';
-            case 'sin(x) * cos(y)':
-                // 曲面是 f(x,y):对 z 求偏导恒为 0(真实 Rust 引擎同样返回 0).
-                if (variable === 'x') return 'cos(y) * cos(x)';
-                if (variable === 'y') return '-(sin(x) * sin(y))';
-                return '0';
-            case '-x':
-                return variable === 'x' ? '-1' : '0';
-            case 'y':
-                return variable === 'y' ? '1' : '0';
-            case '0':
-                return '0';
-            // 隐式场测试用表达式:只登记测试真正用到的偏导,保持 mock 简单.
-            case 'x^2 + y^2 - 1':
-                return variable === 'x' ? '2 * x' : variable === 'y' ? '2 * y' : '0';
-            case 'x^2 + y^2 + z^2 - 4':
-                return variable === 'x'
-                    ? '2 * x'
-                    : variable === 'y'
-                        ? '2 * y'
-                        : '2 * z';
-            default:
-                return '1';
-        }
-    }),
-    symbolic_variables: vi.fn((expr: string, exclude: string[]) => {
-        const excluded = new Set(exclude);
-        return expr
-            .split(/[^A-Za-z_]/)
-            .filter((name) => name && !excluded.has(name) && !['sin', 'cos'].includes(name));
-    }),
-    parse_array_strings: vi.fn((expr: string) => {
-        switch (expr) {
-            case '[y, -x, 0]':
-                return '["y", "-x", "0"]';
-            case '[sin(x*a), 0, 0]':
-                return '["sin(x*a)", "0", "0"]';
-            case '[a, 1, 0]':
-                return '["a", "1", "0"]';
-            case '[[1, 2, 3], [a, 0, 1]]':
-                return '[["1", "2", "3"], ["a", "0", "1"]]';
-            case '[0, a, 0]':
-                return '["0", "a", "0"]';
-            case '[0, 1, 0]':
-                return '["0", "1", "0"]';
-            case '[1, 2, 3]':
-                return '["1", "2", "3"]';
-            case '[0, 0, 0]':
-                return '["0", "0", "0"]';
-            case '[0, 0, 1]':
-                return '["0", "0", "1"]';
-            case '[0, 0, -1]':
-                return '["0", "0", "-1"]';
-            case '[2, 1, 1]':
-                return '["2", "1", "1"]';
-            case '[1, 1, 1]':
-                return '["1", "1", "1"]';
-            // 隐式场求导生成的 ∇f 分量(球体走解析式,implicit 走符号求导).
-            case '[2 * x, 2 * y, 2 * z]':
-                return '["2 * x", "2 * y", "2 * z"]';
-            case '[2 * x, 2 * y, 0]':
-                return '["2 * x", "2 * y", "0"]';
-            case '[2 * (x - (0)), 2 * (y - (0)), 2 * (z - (0))]':
-                return '["2 * (x - (0))", "2 * (y - (0))", "2 * (z - (0))"]';
-            default:
-                return '[]';
-        }
-    }),
-    matrix4_from_expr: vi.fn(() => [1, 0, 0, 2, 0, 1, 0, 3, 0, 0, 1, 4, 0, 0, 0, 1]),
-    evaluate_scalar: vi.fn((
-        expr: string,
-        names: string[],
-        values: Float64Array,
-        x: number,
-        y: number,
-        z: number,
-    ) => {
-        // 坐标参与隐式场 f/∇f 的求值,必须真的绑定 x/y/z;参数/选项求值时
-        // 调用方传 NaN,表达式不引用坐标,结果不变.
-        const scope: Record<string, number> = { x, y, z };
-        names.forEach((name, index) => {
-            scope[name] = values[index];
-        });
-        scope.pi = Math.PI;
-        scope.e = Math.E;
-        // DSL 的幂是 `^`(Rust 符号引擎语义),JS 的 `^` 是按位异或;mock 里
-        // 先换成 `**`,否则隐式场的 x^2 会算成 x XOR 2.
-        const jsExpr = expr.replace(/\^/g, '**');
-        const fn = new Function(
-            ...Object.keys(scope),
-            `return (${jsExpr});`,
-        );
-        return fn(...Object.values(scope));
-    }),
-}));
+vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
+    // 本文件只 mock 符号求值/打印相关函数;矩阵运算保留真实 Rust 实现,因为
+    // 注入的 MatrixOps 就是生产 WASM 后端(test/matrixOps.ts).若把 mat4_* 也
+    // mock 掉,测试就会依赖另一份 JS 公式,正是本次清理要消掉的东西.
+    const actual = await importOriginal<typeof import('../../wasm/math_rs/math_rs')>();
+
+    return {
+        mat4_identity: actual.mat4_identity,
+        mat4_translate: actual.mat4_translate,
+        mat4_scale: actual.mat4_scale,
+        mat4_rotate: actual.mat4_rotate,
+        mat4_multiply: actual.mat4_multiply,
+        mat4_apply_point: actual.mat4_apply_point,
+        evaluate_gradient_point: vi.fn(() => ({ f0: 0, fx: 0, fy: 0 })),
+        evaluate_divergence_point: vi.fn(() => 0),
+        evaluate_curl_point: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+        normalize_expression: vi.fn((expr: string) => {
+            switch (expr) {
+                case 'sin(x*a)':
+                    return 'sin(x * a)';
+                case 'sin(x)*cos(y)':
+                    return 'sin(x) * cos(y)';
+                case 'log(x)':
+                    return 'ln(x)';
+                default:
+                    return expr;
+            }
+        }),
+        latex_expression: vi.fn((expr: string) => expr),
+        symbolic_derivative: vi.fn((expr: string, variable: string) => {
+            switch (expr) {
+                case 'sin(x * a)':
+                    return variable === 'x' ? 'a * cos(x * a)' : '0';
+                case 'sin(x) * cos(y)':
+                    // 曲面是 f(x,y):对 z 求偏导恒为 0(真实 Rust 引擎同样返回 0).
+                    if (variable === 'x') return 'cos(y) * cos(x)';
+                    if (variable === 'y') return '-(sin(x) * sin(y))';
+                    return '0';
+                case '-x':
+                    return variable === 'x' ? '-1' : '0';
+                case 'y':
+                    return variable === 'y' ? '1' : '0';
+                case '0':
+                    return '0';
+                // 隐式场测试用表达式:只登记测试真正用到的偏导,保持 mock 简单.
+                case 'x^2 + y^2 - 1':
+                    return variable === 'x' ? '2 * x' : variable === 'y' ? '2 * y' : '0';
+                case 'x^2 + y^2 + z^2 - 4':
+                    return variable === 'x'
+                        ? '2 * x'
+                        : variable === 'y'
+                            ? '2 * y'
+                            : '2 * z';
+                default:
+                    return '1';
+            }
+        }),
+        symbolic_variables: vi.fn((expr: string, exclude: string[]) => {
+            const excluded = new Set(exclude);
+            return expr
+                .split(/[^A-Za-z_]/)
+                .filter((name) => name && !excluded.has(name) && !['sin', 'cos'].includes(name));
+        }),
+        parse_array_strings: vi.fn((expr: string) => {
+            switch (expr) {
+                case '[y, -x, 0]':
+                    return '["y", "-x", "0"]';
+                case '[sin(x*a), 0, 0]':
+                    return '["sin(x*a)", "0", "0"]';
+                case '[a, 1, 0]':
+                    return '["a", "1", "0"]';
+                case '[[1, 2, 3], [a, 0, 1]]':
+                    return '[["1", "2", "3"], ["a", "0", "1"]]';
+                case '[0, a, 0]':
+                    return '["0", "a", "0"]';
+                case '[0, 1, 0]':
+                    return '["0", "1", "0"]';
+                case '[1, 2, 3]':
+                    return '["1", "2", "3"]';
+                case '[0, 0, 0]':
+                    return '["0", "0", "0"]';
+                case '[0, 0, 1]':
+                    return '["0", "0", "1"]';
+                case '[0, 0, -1]':
+                    return '["0", "0", "-1"]';
+                case '[2, 1, 1]':
+                    return '["2", "1", "1"]';
+                case '[1, 1, 1]':
+                    return '["1", "1", "1"]';
+                // 隐式场求导生成的 ∇f 分量(球体走解析式,implicit 走符号求导).
+                case '[2 * x, 2 * y, 2 * z]':
+                    return '["2 * x", "2 * y", "2 * z"]';
+                case '[2 * x, 2 * y, 0]':
+                    return '["2 * x", "2 * y", "0"]';
+                case '[2 * (x - (0)), 2 * (y - (0)), 2 * (z - (0))]':
+                    return '["2 * (x - (0))", "2 * (y - (0))", "2 * (z - (0))"]';
+                default:
+                    return '[]';
+            }
+        }),
+        matrix4_from_expr: vi.fn(() => [1, 0, 0, 2, 0, 1, 0, 3, 0, 0, 1, 4, 0, 0, 0, 1]),
+        evaluate_scalar: vi.fn((
+            expr: string,
+            names: string[],
+            values: Float64Array,
+            x: number,
+            y: number,
+            z: number,
+        ) => {
+            // 坐标参与隐式场 f/∇f 的求值,必须真的绑定 x/y/z;参数/选项求值时
+            // 调用方传 NaN,表达式不引用坐标,结果不变.
+            const scope: Record<string, number> = { x, y, z };
+            names.forEach((name, index) => {
+                scope[name] = values[index];
+            });
+            scope.pi = Math.PI;
+            scope.e = Math.E;
+            // DSL 的幂是 `^`(Rust 符号引擎语义),JS 的 `^` 是按位异或;mock 里
+            // 先换成 `**`,否则隐式场的 x^2 会算成 x XOR 2.
+            const jsExpr = expr.replace(/\^/g, '**');
+            const fn = new Function(
+                ...Object.keys(scope),
+                `return (${jsExpr});`,
+            );
+            return fn(...Object.values(scope));
+        }),
+    };
+});
 
 const ast: AstProgram = {
     statements: [
@@ -201,7 +214,7 @@ function compileScene(
     paramOverrides: Record<string, number> = {},
     options: CompileSceneOptions = {},
 ) {
-    return compileSceneWithOps(programAst, paramOverrides, jsMatrixOps, options);
+    return compileSceneWithOps(programAst, paramOverrides, testMatrixOps, options);
 }
 
 it('normalizes log() to the Rust ln() symbol', () => {
@@ -1798,7 +1811,7 @@ describe('语句级错误定位', () => {
 
         let caught: unknown;
         try {
-            compileSceneWithOps(ast, {}, jsMatrixOps);
+            compileSceneWithOps(ast, {}, testMatrixOps);
         } catch (error) {
             caught = error;
         }

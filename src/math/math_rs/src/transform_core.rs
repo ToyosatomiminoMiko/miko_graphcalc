@@ -141,6 +141,64 @@ mod tests {
     }
 
     #[test]
+    fn translate_keeps_offset_in_fourth_column() {
+        // 行主序:平移量落在每行的第 4 个元素(m03/m13/m23).
+        assert_eq!(
+            translate4(2.0, -3.0, 5.0),
+            [
+                1.0, 0.0, 0.0, 2.0, //
+                0.0, 1.0, 0.0, -3.0, //
+                0.0, 0.0, 1.0, 5.0, //
+                0.0, 0.0, 0.0, 1.0,
+            ]
+        );
+    }
+
+    #[test]
+    fn identity_is_neutral_for_multiply() {
+        let matrix = translate4(1.0, 2.0, 3.0);
+        assert_eq!(multiply4x4(identity4(), matrix), matrix);
+        assert_eq!(multiply4x4(matrix, identity4()), matrix);
+    }
+
+    #[test]
+    fn multiply_applies_right_hand_matrix_first() {
+        // a * b 的语义是"先 b 后 a":对 (1,1,1) 先平移 (1,0,0),再放大 2 倍.
+        // 这是 compileScene/AnimationPlayer 逐级累乘所依赖的顺序约定.
+        let matrix = multiply4x4(scale4(2.0, 2.0, 2.0), translate4(1.0, 0.0, 0.0));
+        let point = apply_to_point(matrix, 1.0, 1.0, 1.0);
+
+        assert!((point[0] - 4.0).abs() < 1e-12, "先平移后缩放应得 x=4");
+        assert!((point[1] - 2.0).abs() < 1e-12);
+        assert!((point[2] - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rotate_composes_as_rz_ry_rx_and_stays_affine() {
+        // 单轴 90 度:绕 z 轴把 (1,0,0) 转到 (0,1,0).
+        let quarter = rotate4(0.0, 0.0, std::f64::consts::FRAC_PI_2);
+        let point = apply_to_point(quarter, 1.0, 0.0, 0.0);
+
+        assert!(point[0].abs() < 1e-12);
+        assert!((point[1] - 1.0).abs() < 1e-12);
+        assert!(point[2].abs() < 1e-12);
+
+        // 旋转是仿射变换:最后一行恒为 [0, 0, 0, 1].
+        let matrix = rotate4(0.3, -0.2, 0.7);
+        assert_eq!(&matrix[12..16], &[0.0, 0.0, 0.0, 1.0][..]);
+    }
+
+    #[test]
+    fn from_flat_rejects_wrong_length_and_round_trips() {
+        // WASM 边界收到的扁平数组长度必须正好 16,否则上游是坏数据.
+        assert!(from_flat(vec![0.0; 15]).is_err());
+        assert!(from_flat(vec![0.0; 17]).is_err());
+
+        let matrix = translate4(1.0, 2.0, 3.0);
+        assert_eq!(from_flat(matrix.to_vec()), Ok(matrix));
+    }
+
+    #[test]
     fn affine_volume_scale_matches_expected_determinants() {
         assert!((affine_volume_scale(None) - 1.0).abs() < 1e-12);
         assert!((affine_volume_scale(Some(translate4(1.0, 2.0, 3.0))) - 1.0).abs() < 1e-12);

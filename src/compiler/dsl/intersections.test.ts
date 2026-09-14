@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compileScene as compileSceneWithOps } from './DslCompiler';
 import type { CompileSceneOptions } from './DslCompiler';
-import { jsMatrixOps } from '../../math/matrix/testBackend';
+import { testMatrixOps } from '../../test/matrixOps';
 import type { AstProgram, ObjectStatement } from '../ast/types';
 import { buildIntersectionInput } from '../../math/adapters/IntersectionMath';
 
-vi.mock('../../wasm/math_rs/math_rs', () => {
+vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
+    // 只替掉符号求值相关函数:矩阵运算用真实 Rust `math_rs::transform_core`.
+    // 测试注入的 MatrixOps 就是生产 WASM 后端(test/matrixOps.ts),这里若把
+    // mat4_* 一并 mock,等于又造了一份 JS 公式,正是本次清理要消掉的东西.
+    const actual = await importOriginal<typeof import('../../wasm/math_rs/math_rs')>();
+
     function evaluate(
         expr: string,
         names: string[],
@@ -28,6 +33,12 @@ vi.mock('../../wasm/math_rs/math_rs', () => {
     }
 
     return {
+        mat4_identity: actual.mat4_identity,
+        mat4_translate: actual.mat4_translate,
+        mat4_scale: actual.mat4_scale,
+        mat4_rotate: actual.mat4_rotate,
+        mat4_multiply: actual.mat4_multiply,
+        mat4_apply_point: actual.mat4_apply_point,
         evaluate_scalar: vi.fn((
             expr: string,
             names: string[],
@@ -119,7 +130,7 @@ function compileScene(
     paramOverrides: Record<string, number> = {},
     options: CompileSceneOptions = {},
 ) {
-    return compileSceneWithOps(programAst, paramOverrides, jsMatrixOps, options);
+    return compileSceneWithOps(programAst, paramOverrides, testMatrixOps, options);
 }
 
 describe('compileIntersections', () => {
@@ -158,7 +169,7 @@ describe('compileIntersections', () => {
                 intersection('I', 'a', 'b'),
             ),
             {},
-            jsMatrixOps,
+            testMatrixOps,
             { hiddenIntersectionNames: new Set(['I']) },
         );
 

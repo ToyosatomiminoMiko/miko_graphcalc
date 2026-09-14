@@ -2,8 +2,8 @@
  * compute 层统一入口.
  *
  * 目的:渲染层/应用层只需要记住一条 import 路径 `math/compute`,不必知道
- * 调度原语,WASM 粘合与领域编组在内部怎么分目录(见
- * prompt/refactor-and-rust-migration.md §3).
+ * 调度原语,WASM 粘合与领域编组在内部怎么分目录
+ * (`scheduling/` 调度原语,`wasm/` 粘合,`domain/` 领域编组).
  *
  * 注意:**从 barrel 导入不会提前创建 Worker**.各领域 client 的
  * `new Worker(...)` 都在 `() => ...` 工厂闭包里,只有第一次 `request` 才

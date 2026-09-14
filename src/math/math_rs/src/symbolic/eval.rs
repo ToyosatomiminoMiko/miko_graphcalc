@@ -108,7 +108,7 @@ pub(crate) fn evaluate_with_lookup(
 // 背景:`evaluate_with_lookup` 每个点都要按**名字**查一次上下文,而
 // `CompiledEvaluator` 旧实现更是每点 `ctx.insert(name.to_string(), value)`
 // --一次堆分配 + 一次字符串哈希.实测 context 记账占求值成本的 94-99%
-// (见 prompt/refactor-and-rust-migration.md §7.3).
+// (微基准表见 docs/wasm-boundary-cost.md §三).
 //
 // 这里在**构造期**把符号解析成槽位([`SymBinding`]),求值期只剩数组下标与
 // 一次匹配:零字符串,零哈希,零分配.语义必须与查表版逐点一致,

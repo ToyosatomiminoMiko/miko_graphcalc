@@ -8,10 +8,10 @@
  *   `compileScene(ast, params, matrixOps)` 显式注入本模块产物,
  *   生产 WASM 实现必须与编译需求方同侧,调用方为 `app/CompileController.ts`.
  * - 与 DSL 解析无关,独立成模块:避免 `parser` 包同时承担解析与矩阵后端职责.
- * - 分层约定:纯接口 `MatrixOps` 在 `math/matrix/MatrixOps.ts`,
- *   纯 JS 参考实现只保留在 `math/matrix/testBackend.ts`(供单测,避免 JS/Rust
- *   两套公式同时成为运行真相),生产 WASM 后端即本文件.放 `math/matrix/` 会令
- *   纯矩阵层反向依赖 `wasm/math_rs` 绑定,放 `parser/` 又混入解析之外职责.
+ * - 分层约定:纯接口 `MatrixOps` 在 `math/matrix/MatrixOps.ts`,实现只有本文件
+ *   的 WASM 后端一份(测试注入的也是它,见 `test/matrixOps.ts`).放
+ *   `math/matrix/` 会令纯矩阵层反向依赖 `wasm/math_rs` 绑定,放 `parser/`
+ *   又混入解析之外职责.
  *
  * 注意:matrixOps 并非编译期专属--SceneStore 保存后 `render/core/AnimationPlayer.ts`
  * 每帧动画累乘也调用同一实例,属跨编译/渲染共享的注入对象.本目录归属以"编译期
