@@ -35,10 +35,10 @@
  *
  * 本文件是求值 item 子类共用的组装件:谁长什么样由各子类的构造函数决定
  * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素与
- * 显隐按钮这类两栏通用件在 `ui/rowDom.ts`.
+ * 显隐按钮这类两栏通用件在 `ui/shared/rowDom.ts`.
  */
-import { createElement, createObjectRow } from '../rowDom';
-import { createFormulaElement } from '../FormulaView';
+import { createElement, createObjectRow } from '../shared/rowDom';
+import { createFormulaElement } from '../formula/FormulaView';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
 
 /**

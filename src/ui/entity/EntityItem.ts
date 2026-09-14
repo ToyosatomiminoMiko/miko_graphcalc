@@ -36,8 +36,8 @@
  * 还是重建--颜色已经画在行上,所以它必须进键,否则改颜色不会刷新.
  */
 import type { SceneObject } from '../../ir';
-import { createFormulaElement } from '../FormulaView';
-import { createElement, createObjectRow, createVisibilityButton } from '../rowDom';
+import { createFormulaElement } from '../formula/FormulaView';
+import { createElement, createObjectRow, createVisibilityButton } from '../shared/rowDom';
 import { sceneObjectExpression, sceneObjectKindLabel } from './entityText';
 
 export class EntityItem {

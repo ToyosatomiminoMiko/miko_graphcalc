@@ -10,7 +10,7 @@
  * KaTeX 用写回 textContent 的假实现,断言只看结构与属性,不看排版.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub } from '../test/domStub';
+import { installDomStub } from '../../test/domStub';
 
 vi.mock('katex', () => ({
     default: {

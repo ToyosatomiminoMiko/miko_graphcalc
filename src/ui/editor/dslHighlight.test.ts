@@ -144,7 +144,7 @@ function ruleLiterals(pest: string, rule: string): string[] {
 describe('关键字表与 miko.pest 同步', () => {
     it('四个枚举规则里的字面量都在 DSL_KEYWORDS 里', async () => {
         const pest = await readFile(
-            new URL('../compiler/compiler_rs/src/miko.pest', import.meta.url),
+            new URL('../../compiler/compiler_rs/src/miko.pest', import.meta.url),
             'utf8',
         );
         const keywords = new Set(DSL_KEYWORDS);
@@ -159,7 +159,7 @@ describe('关键字表与 miko.pest 同步', () => {
 
     it('DSL_KEYWORDS 每一条都能在语法文件里找到', async () => {
         const pest = await readFile(
-            new URL('../compiler/compiler_rs/src/miko.pest', import.meta.url),
+            new URL('../../compiler/compiler_rs/src/miko.pest', import.meta.url),
             'utf8',
         );
         for (const keyword of DSL_KEYWORDS) {

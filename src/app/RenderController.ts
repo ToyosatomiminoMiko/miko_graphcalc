@@ -31,9 +31,9 @@ import type { GraphCalcEvents } from '../types';
 import { EventBus } from '../service/EventBus';
 import { onSamplingFailure } from '../render/core/samplingErrors';
 import { SceneStore } from './SceneStore';
-import { DiagnosticsController } from '../ui/DiagnosticsController';
-import type { DiagnosticEntry } from '../ui/DiagnosticsController';
-import { ObjectListController } from '../ui/ObjectListController';
+import { DiagnosticsController } from '../ui/panels/DiagnosticsController';
+import type { DiagnosticEntry } from '../ui/panels/DiagnosticsController';
+import { ObjectListController } from '../ui/objects/ObjectListController';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;

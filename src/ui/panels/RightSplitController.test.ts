@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
+import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
 import {
     computeSplitRatio,
     RightSplitController,
@@ -216,14 +216,14 @@ describe('样式契约', () => {
      * (与 applyUiConfig.test.ts 锁 base.css 兜底的思路一致).
      */
     it('base.css 的兜底比例与 SPLIT_DEFAULT_RATIO 一致', () => {
-        const css = readFileSync(new URL('../../css/base.css', import.meta.url), 'utf8');
+        const css = readFileSync(new URL('../../../css/base.css', import.meta.url), 'utf8');
         const match = /--right-split-basis:\s*([^;]+);/.exec(css);
 
         expect(match?.[1].trim()).toBe(`${SPLIT_DEFAULT_RATIO * 100}%`);
     });
 
     it('分隔条样式存在,并声明了纵向拖动的光标与触摸行为', () => {
-        const css = readFileSync(new URL('../../css/panels.css', import.meta.url), 'utf8');
+        const css = readFileSync(new URL('../../../css/panels.css', import.meta.url), 'utf8');
         const rule = /\.right-splitter\s*\{([\s\S]*?)\}/.exec(css);
 
         expect(rule?.[1]).toMatch(/cursor:\s*ns-resize/);

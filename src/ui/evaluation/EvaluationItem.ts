@@ -15,7 +15,7 @@
  * 字段取,不再要求每个 kind 各写一遍同样的函数.
  */
 import type { SceneObject } from '../../ir';
-import { carryDetailsOpen } from '../rowDom';
+import { carryDetailsOpen } from '../shared/rowDom';
 
 /**
  * 渲染求值 item 时的场景上下文.

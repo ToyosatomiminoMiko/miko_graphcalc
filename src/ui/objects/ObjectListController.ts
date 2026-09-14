@@ -18,9 +18,9 @@
 import type {
     IntersectionOutput,
     SceneIR,
-} from '../ir';
-import { EntityList } from './entity/EntityList';
-import { EvaluationList } from './evaluation/EvaluationList';
+} from '../../ir';
+import { EntityList } from '../entity/EntityList';
+import { EvaluationList } from '../evaluation/EvaluationList';
 
 /**
  * footer 四个列表容器.

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../config/uiConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 import { applyUiConfig, uiConfigCssVariables } from './applyUiConfig';
 
 /**
@@ -132,7 +132,7 @@ describe('applyUiConfig', () => {
 describe('base.css 的 :root 兜底(UI-P3.14)', () => {
     it('每个变量的兜底值都与 UI_CONFIG 映射出的值逐字一致', () => {
         const css = readFileSync(
-            new URL('../../css/base.css', import.meta.url),
+            new URL('../../../css/base.css', import.meta.url),
             'utf8',
         );
         const fallbacks = readRootCssVariables(css);
@@ -144,7 +144,7 @@ describe('base.css 的 :root 兜底(UI-P3.14)', () => {
 
     it('派生变量只引用 :root 数字,不重复写一遍同样的数', () => {
         const css = readFileSync(
-            new URL('../../css/base.css', import.meta.url),
+            new URL('../../../css/base.css', import.meta.url),
             'utf8',
         );
         const appBlock = /#app\s*\{([\s\S]*?)\}/.exec(css)?.[1] ?? '';

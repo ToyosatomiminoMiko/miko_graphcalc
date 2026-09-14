@@ -299,7 +299,7 @@
 }
 
 /* 行主内容:`.object-row` 里除显隐按钮外的全部内容都收在这一层(见
-   ui/rowDom.ts 的 createObjectRow).flex:1 吃掉除按钮外的全部宽度,按钮
+   ui/shared/rowDom.ts 的 createObjectRow).flex:1 吃掉除按钮外的全部宽度,按钮
    因此始终贴右;内部的"可换行横排"沿用原来的行内布局--实体行的公式,
    求值行无细节时的结果行都用 flex-basis 100% 独占第二行. */
 .row-main {

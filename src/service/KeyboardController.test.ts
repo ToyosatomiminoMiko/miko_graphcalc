@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
-import { FormulaCopyController } from '../ui/FormulaCopyController';
+import { FormulaCopyController } from '../ui/formula/FormulaCopyController';
 import { KeyboardController, type KeyboardBinding } from './KeyboardController';
 
 interface Harness {

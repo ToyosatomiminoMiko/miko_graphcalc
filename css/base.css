@@ -19,13 +19,13 @@
  *
  * 1. **界面配色**(`--color-*` / `--kind-*`,块首"主题色板"一节):
  *    真相源就在本文件,消费者全是 CSS,没有任何 TS 读取方.
- *    规则见那节注释,由 src/ui/cssPalette.test.ts 断言.
+ *    规则见那节注释,由 src/ui/theme/cssPalette.test.ts 断言.
  *
  * 2. **代码字体 / KaTeX 字号 / 面板几何**:
- *    真相源是 src/config/uiConfig.ts,启动时由 src/ui/applyUiConfig.ts
+ *    真相源是 src/config/uiConfig.ts,启动时由 src/ui/theme/applyUiConfig.ts
  *    写到 :root 上并覆盖这里的值.下面这些只是"脚本执行前"的兜底,
  *    必须与 UI_CONFIG 保持一致,否则首帧会闪一下旧样式--这条约定由
- *    src/ui/applyUiConfig.test.ts 逐字断言,漏改会先失败在测试上.
+ *    src/ui/theme/applyUiConfig.test.ts 逐字断言,漏改会先失败在测试上.
  *
  *    --code-gutter-width 是例外:它由 EditorLineNumbers 按实际字体与行数
  *    动态写入,这里只给一个保守初值.
@@ -37,7 +37,7 @@
     /* ----------------------------------------------------------------------
      * 主题色板:**界面配色的唯一真相源**.
      *
-     * 规则只有两条,由 src/ui/cssPalette.test.ts 逐条断言:
+     * 规则只有两条,由 src/ui/theme/cssPalette.test.ts 逐条断言:
      * 1. 每个颜色字面量只在这里出现一次;其余 css 文件一律 `var(--...)`,
      *    同一个值不允许有第二处定义(改色只开这一个文件);
      * 2. 值与上面某个 token 相同,只是换了语境的,写成下面的"别名"

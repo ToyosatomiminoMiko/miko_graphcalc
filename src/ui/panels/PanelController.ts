@@ -1,4 +1,4 @@
-import { UI_CONFIG } from '../config/uiConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 
 type PanelId = 'left-panel' | 'right-panel' | 'bottom-panel';
 

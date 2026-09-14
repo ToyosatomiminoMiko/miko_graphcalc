@@ -21,10 +21,10 @@ import {
     integralLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
 import { latexResultNumber } from '../../math/latexNumber';
-import { formatNumber } from '../numberText';
-import { createFormulaElement } from '../FormulaView';
+import { formatNumber } from '../shared/numberText';
+import { createFormulaElement } from '../formula/FormulaView';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
-import { createElement, createVisibilityButton } from '../rowDom';
+import { createElement, createVisibilityButton } from '../shared/rowDom';
 import {
     createDetailSections,
     createEvaluationRow,

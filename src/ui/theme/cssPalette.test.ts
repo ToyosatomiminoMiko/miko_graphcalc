@@ -30,7 +30,7 @@ const CSS_FILES = [
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g;
 
 function read(name: string): string {
-    return readFileSync(new URL(`../../css/${name}`, import.meta.url), 'utf8');
+    return readFileSync(new URL(`../../../css/${name}`, import.meta.url), 'utf8');
 }
 
 function stripComments(css: string): string {

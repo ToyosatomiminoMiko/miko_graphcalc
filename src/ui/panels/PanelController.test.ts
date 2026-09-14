@@ -10,8 +10,8 @@
  * 拖拽尺寸路径需要 `getComputedStyle` 与 window 指针事件,不在本文件覆盖.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../config/uiConfig';
-import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
+import { UI_CONFIG } from '../../config/uiConfig';
+import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
 import { PanelController } from './PanelController';
 
 interface FakePanel {

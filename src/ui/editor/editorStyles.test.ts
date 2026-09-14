@@ -15,9 +15,9 @@ function read(relative: string): string {
 }
 
 describe('编辑区样式归属', () => {
-    const editorCss = read('../../css/editor.css');
-    const panelsCss = read('../../css/panels.css');
-    const html = read('../../index.html');
+    const editorCss = read('../../../css/editor.css');
+    const panelsCss = read('../../../css/panels.css');
+    const html = read('../../../index.html');
 
     it('编辑器的结构选择器都在 editor.css', () => {
         for (const selector of [

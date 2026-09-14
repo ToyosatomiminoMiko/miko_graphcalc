@@ -15,7 +15,7 @@ import {
     intersectionLatexDetails,
     intersectionLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
-import { createVisibilityButton } from '../rowDom';
+import { createVisibilityButton } from '../shared/rowDom';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

@@ -7,7 +7,7 @@
  * 因此"顺序/缓存"策略只有一处.
  */
 import type { SceneObject } from '../../ir';
-import { KeyedRowList } from '../keyedRowList';
+import { KeyedRowList } from '../shared/keyedRowList';
 import { EntityItem } from './EntityItem';
 
 /**

@@ -155,7 +155,7 @@ export function integralLatex(
 /**
  * 积分式本体(``∫_a^b f dx`` 这类),供两处复用:
  * - 实体列表的积分条目公式(本文件 `integralLatex`);
- * - 求值对象的列表条目(ui/ObjectListController 展开细节里的完整公式).
+ * - 求值对象的列表条目(ui/objects/ObjectListController 展开细节里的完整公式).
  *
  * 两处必须同源,否则展开前后会给出两个不同版本的积分式.
  */

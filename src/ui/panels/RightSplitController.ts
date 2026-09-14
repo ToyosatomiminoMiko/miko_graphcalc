@@ -18,7 +18,7 @@
  * 回到默认比例(见 README 的"代码区字体与 KaTeX 字号"一节).
  */
 
-import { UI_CONFIG } from '../config/uiConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 
 /** 分隔条 DOM 契约. */
 export interface RightSplitBinding {

@@ -42,7 +42,7 @@
 | 切线与切平面 | `src/render/core/renderers/AnalysisRenderer.ts` | 一阶导的几何意义直接可见 |
 | 隐式场梯度 | `example/sphere_gradient.scad` | 梯度垂直于等值面,难得的直观演示 |
 | 参数实时联动 | `src/compiler/dsl/params.ts` | 滑块驱动,适合课堂逐步演示 |
-| 公式 KaTeX + 点击复制 | `src/ui/FormulaView.ts` | 可做"结论对答案"环节 |
+| 公式 KaTeX + 点击复制 | `src/ui/formula/FormulaView.ts` | 可做"结论对答案"环节 |
 | 54 项自动化测试 | 354 (TS) + 129 (Rust) | 改坏的立刻知道,教学改造的安全网 |
 
 ## 1.2 数学表达力缺口
@@ -72,7 +72,7 @@
 | D2 | **默认场景是杂物间** | `index.html` 的 textarea 混了 `param/point/vector/matrix/curve×2/integral/intersection`,还留着注释"临时示例,后续统一加入文档" | 首次打开认知过载,不知道从哪里开始 |
 | D3 | **无练习模式** | 无题面/答案/判定机制 | 只能演示,不能练 |
 | D4 | **无进度与引导** | 无课程入口,无步骤状态 | 学生不知道"下一步学什么" |
-| D5 | **诊断只报错不解释** | `src/ui/DiagnosticsController.ts` 显示编译器错误 | 新手看到"引用不存在的对象"仍不知道改哪 |
+| D5 | **诊断只报错不解释** | `src/ui/panels/DiagnosticsController.ts` 显示编译器错误 | 新手看到"引用不存在的对象"仍不知道改哪 |
 
 ---
 
@@ -195,7 +195,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | **D5**:错误只说"不合法",不说"怎么改" |
-| 改动 | 在 `src/ui/DiagnosticsController.ts` 展示层增"常见原因 + 修法"映射表(纯数据模块),针对高频错误:引用不存在的对象,选项名拼错,`range` 参数个数与维度不符,`at` 坐标个数不对,`in cyclic` 写成 `in [..] cyclic`,`derivative` 引用了产物而非对象声明. |
+| 改动 | 在 `src/ui/panels/DiagnosticsController.ts` 展示层增"常见原因 + 修法"映射表(纯数据模块),针对高频错误:引用不存在的对象,选项名拼错,`range` 参数个数与维度不符,`at` 坐标个数不对,`in cyclic` 写成 `in [..] cyclic`,`derivative` 引用了产物而非对象声明. |
 | 依赖 | 无(可与 T2 并行) |
 | 工作量 | `1–2d` |
 | 验收 | 上述 6 类错误都能在诊断区看到修法提示;映射表有单测(输入错误消息 -> 期望提示) |
@@ -237,7 +237,7 @@
 | --- | --- |
 | 问题 | **G1,本项目从"可视化器"升级为"教具"的唯一关键项**.当前 `symbolic_derivative` 只给最终化简结果,求导法则(链式/积/商/幂)的应用过程被 `simplify` 吃掉了 |
 | 现状证据 | `src/math/math_rs/src/symbolic/derivative.rs`,`simplify.rs`,`builtins.rs`(已实现完整的规则表:`derivative_sin/cos/tan/asin/...`,`derivative_log_base`,`expand_sec/csc/cot`,`expand_deg` 等),但 `pub(crate)` 级别,公开面只有字符串进出口 |
-| 改动(四步,建议分 PR) | ①**Rust 侧新增产物类型** `DeriveStep { rule: &'static str, before: Expr, after: Expr }`,让求导递归在每一步记录所用法则;②**新增序列化**:把步骤链打印成 `Vec<String>`,每条形如 `d/dx[sin(u)] = cos(u)·du/dx (链式法则)`;③**新增 WASM 入口** `symbolic_derivative_steps(expr, var) -> Vec<String>`(独立函数,不改 `symbolic_derivative` 的签名,保住既有 116 个 Rust 测试);④**前端展示**:在 `src/ui/FormulaView.ts` 附近新增步骤行,复用 KaTeX 渲染(LaTeX 能力 `symbolic/latex.rs` 已有) |
+| 改动(四步,建议分 PR) | ①**Rust 侧新增产物类型** `DeriveStep { rule: &'static str, before: Expr, after: Expr }`,让求导递归在每一步记录所用法则;②**新增序列化**:把步骤链打印成 `Vec<String>`,每条形如 `d/dx[sin(u)] = cos(u)·du/dx (链式法则)`;③**新增 WASM 入口** `symbolic_derivative_steps(expr, var) -> Vec<String>`(独立函数,不改 `symbolic_derivative` 的签名,保住既有 116 个 Rust 测试);④**前端展示**:在 `src/ui/formula/FormulaView.ts` 附近新增步骤行,复用 KaTeX 渲染(LaTeX 能力 `symbolic/latex.rs` 已有) |
 | 依赖 | T8(用于交叉验证数值正确性) |
 | 工作量 | `1w+`,建议拆成 ①+②(内核,3–5d),③(边界,0.5d),④(UI,2–3d) |
 | 验收 | 对 `sin(a*x)`,`x^2*exp(x)`,`ln(cos(x))`,`1/x` 至少四个案例,步骤链**每一步的首尾相接**(上一步的 `after` 等于下一步的 `before`),且最后一步等于现有 `symbolic_derivative` 的输出;Rust 侧新增逐案例断言测试 |

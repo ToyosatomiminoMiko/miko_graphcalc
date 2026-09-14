@@ -6,8 +6,8 @@
  *   - 透明的 textarea 与其背后高亮层的严格重叠
  *   - 高亮层里各词法类别的配色
  *
- * 与 src/ui/EditorLineNumbers.ts(行号)/ src/ui/EditorHighlight.ts(滚动同步)/
- * src/ui/dslHighlight.ts(分词)配套:那三个模块负责内容与行为,这里只负责
+ * 与 src/ui/editor/EditorLineNumbers.ts(行号)/ src/ui/editor/EditorHighlight.ts(滚动同步)/
+ * src/ui/editor/dslHighlight.ts(分词)配套:那三个模块负责内容与行为,这里只负责
  * 它们依赖的几何与颜色,改动任何一处都要三边对齐.
  *
  * 字体/字号/行高/制表位来自 base.css 的 --code-* 变量(唯一真相源是
@@ -24,7 +24,7 @@
 /* --------------------------------------------------------------------------
  * 编辑区布局:gutter + (高亮层 + textarea) 叠放.
  *
- * 对齐的三条铁律(与 src/ui/EditorLineNumbers.ts / EditorHighlight.ts 配套):
+ * 对齐的三条铁律(与 src/ui/editor/EditorLineNumbers.ts / EditorHighlight.ts 配套):
  * 1. textarea 关闭软换行(white-space: pre),"源码行 == 视觉行",
  *    行号只需按 \n 计数即可逐行对应;
  * 2. gutter 与 textarea 使用完全相同的字体/字号/行高,并且起始位置一致

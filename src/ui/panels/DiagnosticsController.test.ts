@@ -5,7 +5,7 @@
  * **零 DOM 操作**;变了才替换,并尽量复用同键节点.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type StubElement } from '../test/domStub';
+import { installDomStub, type StubElement } from '../../test/domStub';
 import { DiagnosticsController } from './DiagnosticsController';
 
 function setup(): { controller: DiagnosticsController; container: StubElement } {

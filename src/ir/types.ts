@@ -495,7 +495,7 @@ export interface SceneIR {
      * 积分任务展示公式:任务名 -> LaTeX 字符串(积分式本体,不含方法名).
      *
      * 找不到被积对象时值为 null.它是 IR 的展示元数据,供任意消费者读取;
-     * 求值对象列表(ui/ObjectListController)现在直接调用
+     * 求值对象列表(ui/objects/ObjectListController)现在直接调用
      * `dsl/evaluationLatex.ts` 的 `integralLatexSummary` 生成同样的公式
      * (两处同源于 `latex.ts` 的 `integralBodyLatex`),不再依赖本字段.
      */

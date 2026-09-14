@@ -2,7 +2,7 @@
  * 界面样式默认值.
  *
  * 与 `numericConfig` / `renderConfig` 同一约定:这里只放纯数据,不含 DOM
- * 或渲染逻辑.真正落到页面的是 `src/ui/applyUiConfig.ts`,它把这些值写成
+ * 或渲染逻辑.真正落到页面的是 `src/ui/theme/applyUiConfig.ts`,它把这些值写成
  * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
  * 生效方式:改这里 -> 刷新页面(vite 开发态自动重建).
@@ -15,7 +15,7 @@ export const UI_CONFIG = {
      *
      * `#dsl-editor` 与 `#dsl-editor-lines` 必须共用同一组
      * fontFamily/fontSize/lineHeight,否则行号与文本会错行
-     * (见 `src/ui/EditorLineNumbers.ts` 的行号对齐说明).
+     * (见 `src/ui/editor/EditorLineNumbers.ts` 的行号对齐说明).
      */
     editor: {
         /**

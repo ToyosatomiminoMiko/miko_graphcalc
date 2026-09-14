@@ -27,7 +27,7 @@
  * 为什么对外要暴露 `refresh()`:`input` 事件只覆盖用户键入;若将来有代码
  * 程序化写 `editor.value`(载入示例/撤销到某版本),行号不会自己更新.
  */
-import { UI_CONFIG } from '../config/uiConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 
 /** gutter 里除数字本身之外的固定宽度:左 padding 8 + 行号右 padding 6 + 边框 1,与 editor.css 对应. */
 const GUTTER_CHROME_PX = 15;

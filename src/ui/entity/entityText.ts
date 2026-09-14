@@ -5,7 +5,7 @@
  * (`numberText`):实体行结构在 `EntityItem`,这里只管"这一条显示成什么字".
  */
 import type { SceneObject } from '../../ir';
-import { formatNumber, formatVector } from '../numberText';
+import { formatNumber, formatVector } from '../shared/numberText';
 
 const ENTITY_KIND_LABELS: Record<SceneObject['kind'], string> = {
     curve: '曲线',

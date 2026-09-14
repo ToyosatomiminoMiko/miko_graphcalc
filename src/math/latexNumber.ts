@@ -15,7 +15,7 @@ export function latexResultNumber(value: number): string {
     if (!Number.isFinite(value)) return String(value);
     if (value === 0) return '0';
 
-    // 与 ui/numberText.ts 的 formatNumber 同一档位:常规大小用定点,
+    // 与 ui/shared/numberText.ts 的 formatNumber 同一档位:常规大小用定点,
     // 超出 ±[1e-4, 1e6) 才用科学计数法,避免把 0.0001 写成 1e-4.
     const magnitude = Math.abs(value);
     if (magnitude < 1e-4 || magnitude >= 1e6) {

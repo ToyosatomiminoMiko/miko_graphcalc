@@ -9,7 +9,7 @@
  *   `document.execCommand` 的,若实现缓存了加载期的引用,下面每条断言都会失败.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, type DomStub } from '../test/domStub';
+import { installDomStub, type DomStub } from '../../test/domStub';
 import { runLegacyEditorCommand } from './legacyEditorCommand';
 
 let stub: DomStub;

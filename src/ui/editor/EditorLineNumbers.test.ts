@@ -5,8 +5,8 @@
  * 缺结构时构造即报错(依赖不再藏在"父节点里按 id 查"的实现里).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../config/uiConfig';
-import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
+import { UI_CONFIG } from '../../config/uiConfig';
+import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
 import { EditorLineNumbers } from './EditorLineNumbers';
 
 interface Harness {

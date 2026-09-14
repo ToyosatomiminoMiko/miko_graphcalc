@@ -101,7 +101,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 ## 界面样式配置
 
 代码区字体,KaTeX 字号与面板几何**不做运行时设置界面**,也不落 localStorage:
-唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/applyUiConfig.ts`
+唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/theme/applyUiConfig.ts`
 写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
 `css/panels.css`(面板与对象列表),`css/controls.css` 与 `css/base.css`
 的 `var()` 消费.
@@ -131,7 +131,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 写在内容元素的 `transform` 上(`EditorHighlight.sync`),不让高亮层自己滚动:
 textarea 的滚动条要占位而高亮层不占,两者的最大滚动偏移差一个滚动条厚度,
 抄 `scrollTop` 会在靠近底部/右端时被浏览器夹住,高亮最多滞后约 0.8 行.
-分词与配色见 `src/ui/dslHighlight.ts` 与 `css/editor.css`;关键字表由
+分词与配色见 `src/ui/editor/dslHighlight.ts` 与 `css/editor.css`;关键字表由
 `dslHighlight.test.ts` 直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,
 语法文件新增枚举值不会漏.
 
@@ -319,7 +319,17 @@ src/math/
     ComputeFacade   曲线采样 + 积分门面;dispose() 收口 5 个领域 dispose*
   math_rs/          Rust 数值内核(表达式求值/采样/积分/求交)
 src/render/         只消费 IR;渲染层不再自行解析表达式
-src/ui/ src/app/    控制与编排
+src/ui/
+  editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
+  panels/           面板几何,参数滑块,诊断提示
+  formula/          KaTeX 排版与点击复制
+  objects/          对象列表装配(左实体栏 + 右求值栏)
+  shared/           两栏共用的行 DOM/行缓存/数值文本
+  theme/            UI_CONFIG -> CSS 变量与配色契约
+  entity/           实体列表(左栏)
+  evaluation/       求值列表(右栏:分析/积分/求交)
+  examples/         示例目录与载入
+src/app/            控制与编排
 ```
 
 数值求值链路(`math_rs::eval_core::CompiledEvaluator`)在构造期把符号解析成

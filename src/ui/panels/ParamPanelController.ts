@@ -22,8 +22,8 @@
  * 点击.置灰判据里同时比较数字框文本,这样用户把输入框清空或写成 `1.` 之后
  * (值没变而文本变了)仍然能用它把文本恢复成声明值.
  */
-import type { ParamDeclaration } from '../ir';
-import { normalizeParamValue } from '../math/paramValue';
+import type { ParamDeclaration } from '../../ir';
+import { normalizeParamValue } from '../../math/paramValue';
 
 export type ParamChangeHandler = (name: string, value: number) => void;
 
