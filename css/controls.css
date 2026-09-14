@@ -9,8 +9,15 @@
  * 相机切换与旋转锁定共用 .switch/.slider 开关样式.
  * ========================================================================== */
 
-/* 视图控制区域整体布局 */
+/* 视图控制区域整体布局.
+   高度由分隔条分配(参数区拿 `--right-split-basis`,剩下的全归这里,见
+   panels.css 的 #params-panel):所以这里不再自己设 max-height,只保留下限
+   --内容比分配到的空间多时在自己内部滚动(折叠项都在这一块里),而不是向上
+   把参数区挤没. */
 #view-controls {
+    flex: 1 1 auto;
+    min-height: var(--view-controls-min-height, 120px);
+    overflow-y: auto;
     padding: 8px;
     display: flex;
     flex-direction: column;

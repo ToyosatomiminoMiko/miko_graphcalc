@@ -3,7 +3,7 @@
  *
  * 界面样式(代码字体/KaTeX 字号)不做运行时设置界面,也不落 localStorage:
  * 唯一真相源是 `src/config/uiConfig.ts`,这里只负责把配置翻译成 CSS 变量,
- * 其余交给 `css/panels.css` 的 `var()`.
+ * 其余交给 `css/editor.css` 与 `css/panels.css` 的 `var()`.
  *
  * 调用时机:`src/main.ts` 在 `new DslApp()` **之前**调用.原因是
  * `EditorLineNumbers` 构造时会按最终字体度量行号宽度,晚一步就会量到兜底字体.

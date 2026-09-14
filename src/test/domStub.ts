@@ -131,6 +131,16 @@ export class StubElement {
     checked = false;
     /** `<details>` 的开合状态;普通元素上无意义. */
     open = false;
+    /**
+     * 排版尺寸:桩不做布局,由测试自己按用例赋值(分隔条的比例换算要用).
+     * `clientHeight` / `getBoundingClientRect` 都从这两个数派生,保证同一元素
+     * 的"量高度"与"量矩形"读到的是一份数据.
+     */
+    offsetTop = 0;
+    offsetWidth = 0;
+    offsetHeight = 0;
+    /** 指针捕获状态:分隔条拖动时会 set/release,桩按真 DOM 语义记下来. */
+    readonly capturedPointers = new Set<number>();
     /** 父元素;append/prepend/replaceChildren 时维护,replaceWith 需要它. */
     parent: StubElement | null = null;
     readonly style = new StubStyle();
@@ -329,6 +339,7 @@ export class StubElement {
             metaKey: false,
             clientX: 0,
             clientY: 0,
+            pointerId: 0,
             preventDefault: () => {},
             ...event,
         };
@@ -345,6 +356,52 @@ export class StubElement {
 
     removeAttribute(name: string): void {
         this.attributes.delete(name);
+    }
+
+    /** 与 offsetHeight 同源:桩里不做边框/内边距区分. */
+    get clientHeight(): number {
+        return this.offsetHeight;
+    }
+
+    get clientWidth(): number {
+        return this.offsetWidth;
+    }
+
+    /**
+     * 由 offset* 派生的矩形:测试设定 offsetTop/offsetHeight 后,
+     * "量高度"与"量矩形"两条路径读到的必然是同一份数据.
+     */
+    getBoundingClientRect(): {
+        top: number;
+        left: number;
+        right: number;
+        bottom: number;
+        width: number;
+        height: number;
+    } {
+        const width = this.offsetWidth;
+        const height = this.offsetHeight;
+        return {
+            top: this.offsetTop,
+            left: 0,
+            right: width,
+            bottom: this.offsetTop + height,
+            width,
+            height,
+        };
+    }
+
+    /** 指针捕获:真 DOM 里 pointerup 只在捕获元素上触发,桩按同一语义记录. */
+    setPointerCapture(pointerId: number): void {
+        this.capturedPointers.add(pointerId);
+    }
+
+    hasPointerCapture(pointerId: number): boolean {
+        return this.capturedPointers.has(pointerId);
+    }
+
+    releasePointerCapture(pointerId: number): void {
+        this.capturedPointers.delete(pointerId);
     }
 
     /** 离屏度量用的 2D 上下文桩:按字符数给一个稳定的宽度. */
@@ -406,6 +463,8 @@ export interface StubEvent {
     metaKey: boolean;
     clientX: number;
     clientY: number;
+    /** 指针事件用:分隔条拖动靠它做 setPointerCapture/release. */
+    pointerId: number;
     preventDefault(): void;
 }
 
@@ -449,8 +508,14 @@ export interface DomStub {
 
 export interface StubWindow {
     isSecureContext: boolean;
-    addEventListener(type: string, handler: unknown, options?: unknown): void;
-    removeEventListener(type: string, handler: unknown): void;
+    addEventListener(
+        type: string,
+        handler: (event: StubEvent) => void,
+        options?: { signal?: AbortSignal },
+    ): void;
+    removeEventListener(type: string, handler: (event: StubEvent) => void): void;
+    /** 测试用:触发 window 上的监听(分隔条的拖动/收尾绑在这里). */
+    dispatch(type: string, event?: Partial<StubEvent>): void;
     setTimeout(handler: () => void, delay?: number): number;
     clearTimeout(id: number): void;
 }
@@ -523,6 +588,7 @@ export function installDomStub(): DomStub {
                 metaKey: false,
                 clientX: 0,
                 clientY: 0,
+                pointerId: 0,
                 preventDefault: () => {},
                 ...event,
             };
@@ -539,10 +605,41 @@ export function installDomStub(): DomStub {
         rootVariables.set(name, value);
     };
 
+    const windowListeners = new Map<string, Array<(event: StubEvent) => void>>();
     const window: StubWindow = {
         isSecureContext: false,
-        addEventListener: () => {},
-        removeEventListener: () => {},
+        addEventListener: (type, handler, options) => {
+            const signal = options?.signal;
+            if (signal?.aborted) return;
+            const list = windowListeners.get(type) ?? [];
+            list.push(handler);
+            windowListeners.set(type, list);
+            signal?.addEventListener('abort', () => {
+                const current = windowListeners.get(type);
+                const index = current?.indexOf(handler) ?? -1;
+                if (index >= 0) current?.splice(index, 1);
+            });
+        },
+        removeEventListener: (type, handler) => {
+            const list = windowListeners.get(type);
+            const index = list?.indexOf(handler) ?? -1;
+            if (index >= 0) list?.splice(index, 1);
+        },
+        dispatch: (type, event = {}) => {
+            const full: StubEvent = {
+                type,
+                target: window,
+                key: '',
+                ctrlKey: false,
+                metaKey: false,
+                clientX: 0,
+                clientY: 0,
+                pointerId: 0,
+                preventDefault: () => {},
+                ...event,
+            };
+            for (const handler of [...(windowListeners.get(type) ?? [])]) handler(full);
+        },
         setTimeout: (handler: () => void, delay?: number) =>
             setTimeout(handler, delay) as unknown as number,
         clearTimeout: (id: number) => clearTimeout(id),

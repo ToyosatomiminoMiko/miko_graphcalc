@@ -14,6 +14,7 @@
     <link href="css/base.css" rel="stylesheet" type="text/css">
     <link href="css/layout.css" rel="stylesheet" type="text/css">
     <link href="css/panels.css" rel="stylesheet" type="text/css">
+    <link href="css/editor.css" rel="stylesheet" type="text/css">
     <link href="css/controls.css" rel="stylesheet" type="text/css">
     <link href="css/diagnostics.css" rel="stylesheet" type="text/css">
 </head>
@@ -227,6 +228,14 @@ intersection X = intersection(s1, s2) {
             </header>
             <section id="params-panel"></section>
             <section id="diagnostics" aria-live="polite"></section>
+
+            <!-- 参数区/视图区的分隔条:上下拖动改变两块各占多少高度
+                 (见 RightSplitController).焦点在它上面时,上下方向键同样
+                 可以调整,所以它是可聚焦的 separator 而不是纯装饰.
+                 视觉与状态由 css/panels.css 的 .right-splitter 负责. -->
+            <div id="right-splitter" class="right-splitter" role="separator"
+                aria-orientation="horizontal" aria-label="调整参数区与视图区的高度" tabindex="0"
+                title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
 
             <header class="panel-header">视图</header>
             <section id="view-controls">

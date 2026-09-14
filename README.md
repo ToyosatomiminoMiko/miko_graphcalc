@@ -100,7 +100,8 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 代码区字体与 KaTeX 字号**不做运行时设置界面**,也不落 localStorage:
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/applyUiConfig.ts`
-写成 `:root` 上的 CSS 变量,再由 `css/panels.css` 的 `var()` 消费.
+写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区)与
+`css/panels.css`(面板与对象列表)的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
@@ -114,9 +115,13 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 源码高亮不引入编辑器组件:着色后的源码渲染在 textarea 背后的
 `#dsl-editor-highlight` 层里,textarea 只把文字设为透明(光标/选区/撤销/IME
 仍由原生 textarea 负责).透明与显示由 `EditorHighlight` 在首次渲染成功后加上的
-`is-highlighted` 类同时开关,脚本没跑时它就是一个普通输入框.分词与配色见
-`src/ui/dslHighlight.ts` 与 `css/panels.css`;关键字表由 `dslHighlight.test.ts`
-直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,语法文件新增枚举值不会漏.
+`is-highlighted` 类同时开关,脚本没跑时它就是一个普通输入框.高亮层的滚动偏移
+写在内容元素的 `transform` 上(`EditorHighlight.sync`),不让高亮层自己滚动:
+textarea 的滚动条要占位而高亮层不占,两者的最大滚动偏移差一个滚动条厚度,
+抄 `scrollTop` 会在靠近底部/右端时被浏览器夹住,高亮最多滞后约 0.8 行.
+分词与配色见 `src/ui/dslHighlight.ts` 与 `css/editor.css`;关键字表由
+`dslHighlight.test.ts` 直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,
+语法文件新增枚举值不会漏.
 
 ## 求交
 

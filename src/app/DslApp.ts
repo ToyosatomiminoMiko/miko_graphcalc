@@ -26,6 +26,7 @@ import { EditorHighlight } from '../ui/EditorHighlight';
 import { FormulaCopyController } from '../ui/FormulaCopyController';
 import { ObjectListController } from '../ui/ObjectListController';
 import { PanelController } from '../ui/PanelController';
+import { RightSplitController } from '../ui/RightSplitController';
 import { ExampleLoaderController } from '../ui/examples/ExampleLoaderController';
 import { exampleSource, type ExampleEntry } from '../ui/examples/exampleCatalog';
 import { replaceTextareaSource } from '../ui/examples/replaceEditorSource';
@@ -46,6 +47,7 @@ export class DslApp {
     private readonly lineNumbers: EditorLineNumbers;
     private readonly editorHighlight: EditorHighlight;
     private panelController: PanelController | null = null;
+    private rightSplitController: RightSplitController | null = null;
 
     private animationFrameId: number | null = null;
     private refreshFrame: number | null = null;
@@ -135,6 +137,10 @@ export class DslApp {
 
         this.panelController = new PanelController();
         this.panelController.bind(document.getElementById('app')!);
+        // 右面板内部"参数区 / 视图区"的分隔高度:与面板宽度/底部高度一样,
+        // 属于布局态,由控制器写到 #app 的 CSS 变量上.
+        this.rightSplitController = new RightSplitController();
+        this.rightSplitController.bind(document.getElementById('app')!);
         this.formulaCopyController.bind(document.getElementById('app')!);
         // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听
         // (键盘那条路仍然只走 KeyboardController).
@@ -171,6 +177,7 @@ export class DslApp {
         window.removeEventListener('resize', this.onResize);
 
         this.panelController?.dispose();
+        this.rightSplitController?.dispose();
         this.lineNumbers.dispose();
         this.editorHighlight.dispose();
         this.renderController.dispose();

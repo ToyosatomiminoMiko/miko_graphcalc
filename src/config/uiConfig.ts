@@ -3,7 +3,7 @@
  *
  * 与 `numericConfig` / `renderConfig` 同一约定:这里只放纯数据,不含 DOM
  * 或渲染逻辑.真正落到页面的是 `src/ui/applyUiConfig.ts`,它把这些值写成
- * `:root` 上的 CSS 变量,再由 `css/panels.css` 里的 `var()` 消费.
+ * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
  * 生效方式:改这里 -> 刷新页面(vite 开发态自动重建).
  * `css/base.css` 的 `:root` 里有同名变量的兜底值,必须与本文件保持一致:

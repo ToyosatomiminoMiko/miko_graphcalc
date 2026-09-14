@@ -31,6 +31,18 @@
     --code-tab-size: 4;
     --katex-font-size: 1.5em;
     --code-gutter-width: 32px;
+
+    /* 右侧面板上下两块内容的最小可视高度(消费者是 panels.css 的
+       #params-panel 与 controls.css 的 #view-controls).
+       右面板是通高的:两块的"舒适高度"之和超过它时,先压到各自的下限,
+       再各自出现内部滚动条,谁都不会被压没. */
+    --params-panel-min-height: 120px;
+    --view-controls-min-height: 120px;
+
+    /* 参数区占右面板高度的比例(分隔条拖动的结果).
+       由 RightSplitController 写到 #app 上覆盖这里;这里只是脚本执行前
+       以及未绑定分隔条时的初始值,与 SPLIT_DEFAULT_RATIO(0.4)一致. */
+    --right-split-basis: 40%;
 }
 
 /* 页面根容器:铺满视口,并统一基础视觉风格 */

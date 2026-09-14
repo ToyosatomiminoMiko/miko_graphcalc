@@ -2,7 +2,8 @@
  * 源码高亮层单测.
  *
  * 锁四条:输入后重绘高亮 HTML;滚动时把 textarea 的 scrollTop/scrollLeft
- * 抄到高亮层(纵横都要);`refresh()` 覆盖程序化改值;缺结构时构造即报错.
+ * 写成高亮内容的 transform(纵横都要,**不**经过裁剪框自己的 scrollTop,
+ * 否则靠近底部时会被夹住而错位);`refresh()` 覆盖程序化改值;缺结构时构造即报错.
  * 另外锁"开关类名"跟着生命周期走:dispose 后文字必须回到可见状态.
  *
  * 这里不断言浏览器排版(项目没有 jsdom/浏览器,见 src/test/domStub.ts):
@@ -60,26 +61,38 @@ describe('高亮渲染', () => {
 });
 
 describe('滚动同步', () => {
-    it('scroll 事件同步纵横向偏移', () => {
-        const { editor, scroller } = setup();
+    it('scroll 事件把纵横偏移写成高亮内容的 transform', () => {
+        const { editor, code } = setup();
 
         editor.scrollTop = 40;
         editor.scrollLeft = 12;
         editor.dispatch('scroll');
 
-        expect(scroller.scrollTop).toBe(40);
-        expect(scroller.scrollLeft).toBe(12);
+        expect(code.style.transform).toBe('translate(-12px, -40px)');
+    });
+
+    it('偏移不经过裁剪框自己的 scrollTop,并把它按回原点', () => {
+        const { editor, scroller } = setup();
+
+        // 模拟滚动锚定/innerHTML 重排把裁剪框滚偏:不能与 transform 叠加成双倍偏移
+        scroller.scrollTop = 7;
+        scroller.scrollLeft = 3;
+        editor.scrollTop = 40;
+        editor.dispatch('scroll');
+
+        expect(scroller.scrollTop).toBe(0);
+        expect(scroller.scrollLeft).toBe(0);
     });
 
     it('ResizeObserver 触发时重新校准偏移', () => {
-        const { stub, editor, scroller } = setup();
+        const { stub, editor, code } = setup();
 
         // 拖宽面板后浏览器可能把 scrollTop 夹回去,且不一定补发 scroll 事件
         editor.scrollTop = 25;
         expect(stub.resizeObservers).toHaveLength(1);
         stub.resizeObservers[0].trigger();
 
-        expect(scroller.scrollTop).toBe(25);
+        expect(code.style.transform).toBe('translate(0px, -25px)');
     });
 });
 

@@ -7,7 +7,7 @@
  * 1. 软换行:textarea 默认把长行折成多个视觉行,行号(按 \n 计)就无法
  *    一一对应--所以这里关闭软换行(white-space: pre),让 源码行 == 视觉行;
  * 2. 行高对齐:gutter 与 textarea 必须同字体/字号/行高,且首行起始位置
- *    一致(见 panels.css 中 padding-top 的推导注释);
+ *    一致(见 editor.css 中 padding-top 的推导注释);
  * 3. 滚动同步:文本在 textarea 内部滚动,行号在外部,只能用
  *    translateY(-scrollTop) 跟随,并在 scroll / input / 容器尺寸变化
  *    (面板折叠,拖宽拖高)时重同步.
@@ -27,7 +27,7 @@
  * 为什么对外要暴露 `refresh()`:`input` 事件只覆盖用户键入;若将来有代码
  * 程序化写 `editor.value`(载入示例/撤销到某版本),行号不会自己更新.
  */
-/** gutter 里除数字本身之外的固定宽度:左 padding 8 + 行号右 padding 6 + 边框 1,与 panels.css 对应. */
+/** gutter 里除数字本身之外的固定宽度:左 padding 8 + 行号右 padding 6 + 边框 1,与 editor.css 对应. */
 const GUTTER_CHROME_PX = 15;
 
 /** 槽宽下限,与 base.css 里 --code-gutter-width 的兜底值一致. */

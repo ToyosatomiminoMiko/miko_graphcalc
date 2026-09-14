@@ -14,7 +14,7 @@
  * 语法里新增一个 `object_kind` 却忘了加进这里,测试会红.
  */
 
-/** 一棵源码里各词法类别对应的 span 类名后缀(`dsl-<kind>`),配色在 panels.css. */
+/** 一棵源码里各词法类别对应的 span 类名后缀(`dsl-<kind>`),配色在 editor.css. */
 export type DslTokenKind =
     | 'comment'
     | 'string'

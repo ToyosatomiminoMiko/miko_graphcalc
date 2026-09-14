@@ -7,12 +7,18 @@
  * IME 全部还是浏览器原生 textarea 的,高亮只是一层 pointer-events: none
  * 的背景,着色错了也不影响编译.
  *
- * 三个必须对齐的点(与 panels.css 的注释配套):
+ * 三个必须对齐的点(与 editor.css 的注释配套):
  * 1. 字体/字号/行高/制表位与 textarea 完全相同,否则字宽字高不一致;
  * 2. 内边距相同(10px 12px),首字符起点才一致;
- * 3. 滚动同步:高亮层自己就是滚动容器,直接把 textarea 的 scrollTop/scrollLeft
- *    抄过来即可.行号栏走的是 transform,那是因为它只需要纵向跟随;
- *    这里纵横都要,交给滚动容器比自己推导 padding 偏移可靠.
+ * 3. 滚动同步:把 textarea 的 scrollTop/scrollLeft 原样写成高亮内容的
+ *    transform(见 sync),**不能**改成"抄给高亮容器自己的 scrollTop".
+ *    原因是两边的 client 尺寸天生不等:textarea 的滚动条要占位(经典滚动条
+ *    约 15px),而高亮层是 overflow: hidden 不占,于是两者的最大
+ *    scrollTop/scrollLeft 恰好差一个滚动条厚度.偏移越靠近底部/右端,抄过去
+ *    的值越会被浏览器夹住(clamp),高亮层最多滞后 ~15px(约 0.8 行),光标和
+ *    选区就会与着色后的文字错开(实测:未夹住时偏差 0.0px,夹住后 15.1px).
+ *    transform 只经过一个元素,没有第二个滚动容器的上限,永远不会被夹住.
+ *    行号栏用的是同一套方案(见 EditorLineNumbers).
  *
  * 为什么用类名开开关(`is-highlighted`):CSS 里"文字透明"与"高亮层显示"
  * 由同一个类控制.脚本没跑或结构缺失时构造就抛错,类名不会加上,textarea
@@ -20,7 +26,7 @@
  */
 import { highlightDsl } from './dslHighlight';
 
-/** 打开高亮层的类名:同时负责 textarea 文字透明与高亮层显示(见 panels.css). */
+/** 打开高亮层的类名:同时负责 textarea 文字透明与高亮层显示(见 editor.css). */
 export const HIGHLIGHT_ENABLED_CLASS = 'is-highlighted';
 
 /**
@@ -28,9 +34,14 @@ export const HIGHLIGHT_ENABLED_CLASS = 'is-highlighted';
  * EditorLineNumbers 同一约定:结构约束可见,而不是藏在"父节点里按 id 查").
  */
 export interface EditorHighlightElements {
-    /** 滚动容器(`#dsl-editor-highlight`),尺寸与 textarea 完全重合. */
+    /**
+     * 裁剪框(`#dsl-editor-highlight`),尺寸与 textarea 完全重合.
+     *
+     * 它只负责 `overflow: hidden` 裁剪,不承担滚动:偏移写在内容元素的
+     * transform 上(见 sync).结构上仍然必需,所以取不到就构造报错.
+     */
     readonly scroller: HTMLElement | null;
-    /** 承载高亮 HTML 的 `<pre>`(`#dsl-editor-highlight-code`). */
+    /** 承载高亮 HTML 的 `<pre>`(`#dsl-editor-highlight-code`),transform 的载体. */
     readonly code: HTMLElement | null;
 }
 
@@ -81,10 +92,21 @@ export class EditorHighlight {
         this.sync();
     };
 
+    /**
+     * scroll / 尺寸变化:把 textarea 的横纵偏移写成高亮内容的 transform.
+     *
+     * 为什么不用高亮层自己的 scrollTop:见文件头第 3 条--两个滚动容器的
+     * client 尺寸差一个滚动条厚度,靠近底部/右端时偏移会被夹住,表现为
+     * "越往下,着色后的文字越跟不上光标".
+     */
     private readonly sync = (): void => {
         if (this.disposed) return;
-        this.scroller.scrollTop = this.editor.scrollTop;
-        this.scroller.scrollLeft = this.editor.scrollLeft;
+        this.code.style.transform =
+            `translate(${-this.editor.scrollLeft}px, ${-this.editor.scrollTop}px)`;
+        // 裁剪框仍是可被程序化滚动的盒子(滚动锚定,innerHTML 重排都可能动它),
+        // 一旦被滚走,就会与上面的 transform 叠加成双倍偏移,所以每次按回原点.
+        this.scroller.scrollTop = 0;
+        this.scroller.scrollLeft = 0;
     };
 
     dispose(): void {
