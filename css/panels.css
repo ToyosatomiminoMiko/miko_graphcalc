@@ -10,6 +10,8 @@
 
 /* 标题栏:显示面板名称,按钮靠右排列 */
 .panel-header {
+    /* 示例浮层以标题栏为定位参照(见文件末尾"示例浮层") */
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -32,13 +34,26 @@
     white-space: nowrap;
 }
 
+/* 标题栏右侧按钮组:整组靠右,组内按钮不再各自 auto 推右 */
+.panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.panel-header-actions button {
+    margin-left: 0;
+}
+
 /* 面板标题保持单行,避免折叠时换行 */
 .panel-title {
     white-space: nowrap;
 }
 
-/* 折叠时隐藏标题和左侧"运行"按钮,仅保留展开按钮 */
+/* 折叠时隐藏标题和左侧"运行"/"示例"按钮,仅保留展开按钮 */
 .panel.collapsed .panel-title,
+.panel.collapsed #example-btn,
 .panel.collapsed #run-btn,
 .panel.collapsed .object-list-hint {
     display: none;
@@ -627,4 +642,94 @@
     font-size: 12px;
     color: #7f8db3;
     overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+ * 示例浮层
+ * --------------------------------------------------------------------------
+ * 锚在标题栏正下方,盖住源码编辑区,宽度撑满面板.
+ * 开合只有一个状态源:菜单上的 .is-open(与按钮 aria-expanded 一起由
+ * ExampleLoaderController 维护),这里只负责视觉.
+ * ========================================================================== */
+
+.example-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: none;
+    box-sizing: border-box;
+    /* 左面板通高,所以按视口高度留出标题栏与底部余量,超出时自己滚动 */
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    padding: 6px;
+    background: rgba(16, 20, 34, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.example-menu.is-open {
+    display: block;
+}
+
+/* 折叠时按钮已隐藏,浮层也不能留在屏幕上 */
+.panel.collapsed .example-menu {
+    display: none;
+}
+
+/* 分组:组标题 + 若干菜单项;组间用细分隔线,不再单独占一行留白 */
+.example-menu-group + .example-menu-group {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.example-menu-group-title {
+    padding: 4px 8px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: #6f7ca6;
+}
+
+/* 菜单项:中文标题在左,文件名做次要对照靠右 */
+.example-menu-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px 8px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #c3cdea;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.example-menu-item:hover,
+.example-menu-item:focus-visible {
+    background: rgba(109, 213, 255, 0.14);
+    color: #e8f2ff;
+    outline: none;
+}
+
+/* 已载入的示例:持续可见的左侧标记,不用底色抢注意力 */
+.example-menu-item.is-active {
+    background: rgba(109, 213, 255, 0.1);
+    box-shadow: inset 2px 0 0 #6dd5ff;
+    color: #aac8ff;
+}
+
+.example-menu-file {
+    flex: 0 0 auto;
+    font-family: var(--code-font-family);
+    font-size: 10px;
+    color: #55618c;
 }

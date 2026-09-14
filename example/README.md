@@ -1,9 +1,16 @@
 # GraphCalc 示例集
 
-所有示例都是可直接粘贴到 GraphCalc 左侧"源码"编辑框,点"运行"的完整
-DSL(`.miko` 语法)源码片段.文件扩展名沿用 `.scad`(项目里没有示例加载
-器,复制文件文本即可运行).文件名按主题命名(不使用序号),并在文件头
-注释说明所演示的功能与可调参数.
+所有示例都是完整的 DSL(`.miko` 语法)源码,下面两张表同时也是应用内
+**示例**菜单的内容:打开左侧「源码」面板标题栏的"示例"按钮,选中一项即可
+载入并立即运行,不必手工复制文本.载入会整段替换编辑器内容,但用的是
+编辑管线的插入命令而非直接赋值,所以浏览器原生撤销栈是保留的--一次
+Ctrl+Z 就能退回载入前的代码.文件扩展名沿用 `.scad`,文件名按主题命名
+(不使用序号),并在文件头注释说明所演示的功能与可调参数.
+
+> **新增示例**:在 `example/` 放 `.scad` 文件,并在
+> `src/ui/examples/exampleCatalog.ts` 里登记一行(标题 + 分组).
+> 两边对不上会被 `src/ui/examples/exampleCatalog.test.ts` 挡住;示例本身
+> 能否编译由 `src/compiler/dsl/exampleScenes.test.ts` 全量跑一遍.
 
 ## 求导 / 偏导
 
@@ -36,3 +43,4 @@ DSL(`.miko` 语法)源码片段.文件扩展名沿用 `.scad`(项目里没有示
 | `intersection_surfaces.scad` | 曲面 ∩ 曲面(平面)-> 三维交线 |
 | `double_integral_region.scad` | `region` 面积图形作域的二重积分(辛普森法) |
 | `animation_box_rotations.scad` | 动画片段 `rotate` 列表按顺序播放 |
+| `Zemlya.scad` | 最小球体场景:一个 `point` 标记 + 一个半透明球体(点样式与球体渲染的手动试验台) |

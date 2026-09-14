@@ -22,6 +22,15 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 当前支持范围
 
+- 内置示例菜单:左侧「源码」面板标题栏的"示例"按钮打开分组清单
+  (求导 / 偏导 与 其他主题),选中即整段替换编辑器源码并立即运行.
+  示例文本在构建期由 `import.meta.glob(..., { query: '?raw' })` 从
+  `example/*.scad` 内联进 bundle(运行时不 fetch,离线可用),`example/`
+  仍是唯一真相源;清单与文件集的一一对应由
+  `src/ui/examples/exampleCatalog.test.ts` 守住.载入走"全选 +
+  `execCommand('insertText')`"覆盖而不是直接赋值,浏览器原生撤销栈得以
+  保留,一次 Ctrl+Z 就能退回载入前手写的代码(Chromium 152 / Firefox 155
+  实测;撤销环节的取舍见 `src/ui/examples/replaceEditorSource.ts`)
 - `param`:参数面板与实时刷新;`param φ = 0 in cyclic [-3.14159, 3.14159, 0.01]`
   显式声明**循环类系数**(球坐标方位角这类圆周量),越界值按区间长度回绕到
   `[min, max)` 而不是夹到端点;不写 `cyclic` 的参数一律按普通参数处理

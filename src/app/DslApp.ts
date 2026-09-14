@@ -25,6 +25,9 @@ import { EditorLineNumbers } from '../ui/EditorLineNumbers';
 import { FormulaCopyController } from '../ui/FormulaCopyController';
 import { ObjectListController } from '../ui/ObjectListController';
 import { PanelController } from '../ui/PanelController';
+import { ExampleLoaderController } from '../ui/examples/ExampleLoaderController';
+import { exampleSource, type ExampleEntry } from '../ui/examples/exampleCatalog';
+import { replaceTextareaSource } from '../ui/examples/replaceEditorSource';
 
 export class DslApp {
     private readonly eventBus = new EventBus<GraphCalcEvents>();
@@ -35,6 +38,7 @@ export class DslApp {
     private readonly diagnosticsController: DiagnosticsController;
     private readonly objectListController: ObjectListController;
     private readonly formulaCopyController: FormulaCopyController;
+    private readonly exampleLoader: ExampleLoaderController;
 
     private readonly editor: HTMLTextAreaElement;
     private readonly runButton: HTMLButtonElement;
@@ -101,6 +105,13 @@ export class DslApp {
             (name) => this._scheduleRefresh(name),
         );
         this.formulaCopyController = new FormulaCopyController(formulaCopyHint);
+        this.exampleLoader = new ExampleLoaderController(
+            {
+                button: document.getElementById('example-btn')!,
+                menu: document.getElementById('example-menu')!,
+            },
+            (entry) => this._loadExample(entry),
+        );
         this.renderController = new RenderController(
             viewport,
             this.store,
@@ -117,6 +128,9 @@ export class DslApp {
         this.panelController = new PanelController();
         this.panelController.bind(document.getElementById('app')!);
         this.formulaCopyController.bind(document.getElementById('app')!);
+        // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听
+        // (键盘那条路仍然只走 KeyboardController).
+        this.exampleLoader.bind(document.getElementById('app')!);
 
         this.keyboardController = new KeyboardController(this.editor, {
             onHome: () => this.renderController.resetHome(),
@@ -124,6 +138,10 @@ export class DslApp {
         });
         // 公式复制的 Enter/Space 也注册进唯一的键盘出口,控制器本身不再绑 keydown.
         this.keyboardController.register(this.formulaCopyController.keyboardBinding());
+        // 示例浮层的 Esc / 上下键同样注册进唯一出口.
+        for (const binding of this.exampleLoader.keyboardBindings()) {
+            this.keyboardController.register(binding);
+        }
         this.keyboardController.bind();
 
         window.addEventListener('resize', this.onResize);
@@ -152,6 +170,7 @@ export class DslApp {
         this.diagnosticsController.dispose();
         this.objectListController.dispose();
         this.formulaCopyController.dispose();
+        this.exampleLoader.dispose();
     }
 
     async run(): Promise<void> {
@@ -192,6 +211,39 @@ export class DslApp {
 
     private _wireEditor(): void {
         this.runButton.addEventListener('click', () => void this.run());
+    }
+
+    /**
+     * 载入示例:替换编辑器源码并立即运行.
+     *
+     * 写入走 `replaceTextareaSource`(全选 + execCommand 覆盖),这样用户
+     * 手写的代码还留在浏览器原生撤销栈里,一次 Ctrl+Z 就能整段退回.
+     *
+     * 会话状态不必在这里清理:`run()` -> `CompileController.run` 会把新源码
+     * 交给 `SceneStore.commitSource`,而源码内容一变,实体/分析/积分/求交的
+     * 隐藏集合就整体清空(见 SceneStore.commitSource 与 SceneStore.test.ts).
+     */
+    private _loadExample(entry: ExampleEntry): void {
+        const source = exampleSource(entry.file);
+        if (source === null) {
+            this.diagnosticsController.add(
+                'error',
+                `示例源码缺失:example/${entry.file}`,
+            );
+            return;
+        }
+
+        replaceTextareaSource(this.editor, source);
+        // 全选覆盖后光标停在文末,编辑器会跟着滚到底部;载入后应当看到开头.
+        this.editor.setSelectionRange(0, 0);
+        this.editor.scrollTop = 0;
+        // execCommand 成功后浏览器自己会派发 input(行号栏跟着更新),兜底路径
+        // 不会;统一再刷一次,两条路径的行为就一致了(EditorLineNumbers.refresh
+        // 本就是为"程序化改写编辑器"准备的).
+        this.lineNumbers.refresh();
+
+        this.exampleLoader.setActive(entry.file);
+        void this.run();
     }
 
     private animate = (timestamp: number): void => {

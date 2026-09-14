@@ -267,6 +267,20 @@ export class StubElement {
     }
 
     /**
+     * 真 DOM 的 `contains`:other 是否在本节点子树里(含自身).
+     * "点浮层外部关闭"这类判断要用它,桩必须实现--否则控制器只能改用
+     * `closest` 之类的替代写法,而那是被测试基建牵着走的假实现.
+     */
+    contains(other: StubElement | StubText | null): boolean {
+        let node: StubElement | StubText | null = other;
+        while (node !== null) {
+            if (node === this) return true;
+            node = node.parent;
+        }
+        return false;
+    }
+
+    /**
      * 支持 `{ signal }`(真 DOM 语义的一个子集):signal 已 abort 时不再注册,
      * 注册后 abort 会摘掉监听.控制器用 AbortController 成对管理监听,
      * 桩若不实现这条,"dispose 后再 bind 会叠加旧监听"的回归会被遮住.
@@ -416,8 +430,11 @@ export interface DomStub {
     readonly resizeObservers: StubResizeObserver[];
     /** 写入根元素的 CSS 变量(applyUiConfig/PanelController). */
     readonly rootVariables: Map<string, string>;
-    /** 执行过的 legacy 复制命令数,以及可改写的返回值. */
-    readonly execCommand: { calls: string[]; result: boolean };
+    /**
+     * 执行过的 `document.execCommand`:命令名序列,每次调用的完整参数,
+     * 以及可改写的返回值(测试用它模拟命令被拒绝).
+     */
+    readonly execCommand: { calls: string[]; args: unknown[][]; result: boolean };
 }
 
 export interface StubWindow {
@@ -505,7 +522,7 @@ export function installDomStub(): DomStub {
 
     const resizeObservers: StubResizeObserver[] = [];
     const rootVariables = new Map<string, string>();
-    const execCommand = { calls: [] as string[], result: true };
+    const execCommand = { calls: [] as string[], args: [] as unknown[][], result: true };
 
     // documentElement 上的变量写入便于断言 applyUiConfig 的默认目标.
     documentElement.style.setProperty = (name: string, value: string): void => {
@@ -542,8 +559,12 @@ export function installDomStub(): DomStub {
         configurable: true,
         writable: true,
     });
-    (document as unknown as Record<string, unknown>).execCommand = (command: string) => {
+    (document as unknown as Record<string, unknown>).execCommand = (
+        command: string,
+        ...rest: unknown[]
+    ) => {
         execCommand.calls.push(command);
+        execCommand.args.push([command, ...rest]);
         return execCommand.result;
     };
 

@@ -22,6 +22,7 @@
  * 这条规则注册进去,由它统一分发.
  */
 import type { KeyboardBinding } from '../service/KeyboardController';
+import { runLegacyEditorCommand } from './legacyEditorCommand';
 
 const HINT_RESET_DELAY = 1200;
 
@@ -52,12 +53,8 @@ function legacyCopy(text: string): boolean {
     document.body.append(staging);
     staging.select();
 
-    let copied = false;
-    try {
-        copied = document.execCommand('copy');
-    } catch {
-        copied = false;
-    }
+    // 已弃用的 execCommand 只在 legacyEditorCommand 里收口调用一次.
+    const copied = runLegacyEditorCommand('copy');
     staging.remove();
     return copied;
 }

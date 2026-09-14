@@ -15,6 +15,10 @@
 - [WASM 边界成本与求值迁移实测](wasm-boundary-cost.md) -- 回答"积分是否已迁到
   Rust""WASM↔JS 拷贝到底贵不贵";记录 P0(求值器去 `HashMap<String, f64>`)
   的前后实测数字,以及明确不该迁移的项.
+- [教学化改造路线图](teaching-roadmap.md) -- 规划文档:把 GraphCalc 从"能看
+  结论的可视化器"做成**教学工具 + 自学教材**.含数学表达力与教学动线缺口
+  清单,分阶段任务表(每项带依赖/工作量/验收/风险/降级),单课与习题设计
+  模板,自学侧导读计划,以及"明确不要做的事"清单.
 
 配套示例见 [`../example/README.md`](../example/README.md)(求导/偏导
 示例为 `derivative_curve.scad`,`derivative_rules.scad`,
