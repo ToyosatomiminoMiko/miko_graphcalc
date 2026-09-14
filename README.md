@@ -103,13 +103,20 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 写成 `:root` 上的 CSS 变量,再由 `css/panels.css` 的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
-  作用于左面板源码编辑区(textarea 与行号栏共用同一组值);
+  作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
 - `UI_CONFIG.formula.katexFontSize`:底部对象列表里 KaTeX 公式的字号,
   单位 em,基准是 `.object-expr` 的 16px.
 
 改完刷新页面即可.`css/base.css` 的 `:root` 里有同名兜底变量,只负责
 脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致.行号槽宽不写死:
 `EditorLineNumbers` 按当前字体与最大行号位数动态写入 `--code-gutter-width`.
+
+源码高亮不引入编辑器组件:着色后的源码渲染在 textarea 背后的
+`#dsl-editor-highlight` 层里,textarea 只把文字设为透明(光标/选区/撤销/IME
+仍由原生 textarea 负责).透明与显示由 `EditorHighlight` 在首次渲染成功后加上的
+`is-highlighted` 类同时开关,脚本没跑时它就是一个普通输入框.分词与配色见
+`src/ui/dslHighlight.ts` 与 `css/panels.css`;关键字表由 `dslHighlight.test.ts`
+直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,语法文件新增枚举值不会漏.
 
 ## 求交
 

@@ -22,6 +22,7 @@ import { RenderController } from './RenderController';
 import { ParamPanelController } from '../ui/ParamPanelController';
 import { DiagnosticsController } from '../ui/DiagnosticsController';
 import { EditorLineNumbers } from '../ui/EditorLineNumbers';
+import { EditorHighlight } from '../ui/EditorHighlight';
 import { FormulaCopyController } from '../ui/FormulaCopyController';
 import { ObjectListController } from '../ui/ObjectListController';
 import { PanelController } from '../ui/PanelController';
@@ -43,6 +44,7 @@ export class DslApp {
     private readonly editor: HTMLTextAreaElement;
     private readonly runButton: HTMLButtonElement;
     private readonly lineNumbers: EditorLineNumbers;
+    private readonly editorHighlight: EditorHighlight;
     private panelController: PanelController | null = null;
 
     private animationFrameId: number | null = null;
@@ -80,6 +82,12 @@ export class DslApp {
         this.lineNumbers = new EditorLineNumbers(this.editor, {
             gutter: document.getElementById('dsl-editor-gutter'),
             numbers: document.getElementById('dsl-editor-lines'),
+        });
+        // 高亮层同样由装配层取节点传入;它和行号栏一样监听 input/scroll,
+        // 但一个只画行号(translate),一个当滚动容器用(见各自类的说明).
+        this.editorHighlight = new EditorHighlight(this.editor, {
+            scroller: document.getElementById('dsl-editor-highlight'),
+            code: document.getElementById('dsl-editor-highlight-code'),
         });
 
         this.compileController = new CompileController(this.store);
@@ -164,6 +172,7 @@ export class DslApp {
 
         this.panelController?.dispose();
         this.lineNumbers.dispose();
+        this.editorHighlight.dispose();
         this.renderController.dispose();
         this.compileController.dispose();
         this.paramPanelController.dispose();
@@ -241,6 +250,7 @@ export class DslApp {
         // 不会;统一再刷一次,两条路径的行为就一致了(EditorLineNumbers.refresh
         // 本就是为"程序化改写编辑器"准备的).
         this.lineNumbers.refresh();
+        this.editorHighlight.refresh();
 
         this.exampleLoader.setActive(entry.file);
         void this.run();

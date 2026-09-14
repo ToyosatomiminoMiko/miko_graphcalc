@@ -76,14 +76,17 @@
 }
 
 /* --------------------------------------------------------------------------
- * 行号栏布局:gutter + textarea 拼排.
+ * 编辑区布局:gutter + (高亮层 + textarea) 叠放.
  *
- * 对齐的两条铁律(与 src/ui/EditorLineNumbers.ts 配套):
+ * 对齐的三条铁律(与 src/ui/EditorLineNumbers.ts / EditorHighlight.ts 配套):
  * 1. textarea 关闭软换行(white-space: pre),"源码行 == 视觉行",
  *    行号只需按 \n 计数即可逐行对应;
  * 2. gutter 与 textarea 使用完全相同的字体/字号/行高,并且起始位置一致
  *    (外框 border 1px + textarea padding-top 10px = gutter padding-top 11px),
- *    这样纵向滚动时只需把 gutter 内容按 -scrollTop 平移.
+ *    这样纵向滚动时只需把 gutter 内容按 -scrollTop 平移;
+ * 3. 高亮层与 textarea 严格同尺寸重叠,字体/行高/内边距逐项相同,滚动偏移
+ *    由 JS 直接抄 textarea 的 scrollTop/scrollLeft(见 EditorHighlight),
+ *    不在这里估算任何 padding 差值.
  * -------------------------------------------------------------------------- */
 
 /* 外框:统一承担圆角/边框/底色,textarea 内部滚动不越界 */
@@ -98,6 +101,60 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
 }
+
+/* 输入区包裹层:唯一职责是给"高亮层 + textarea"提供一个共同的定位参照,
+   它本身不承担滚动(textarea 内部滚动),所以尺寸约束要原样透传下去 */
+#dsl-editor-input {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* 高亮层:默认不显示,由 EditorHighlight 给 textarea 加上 .is-highlighted 后
+   才出现(脚本没跑/结构缺失时文字仍然可见,不会变成一片空白).
+   它自己就是滚动容器:尺寸与 textarea 的边框盒完全重合,内容超出被裁掉,
+   不出现滚动条;scrollTop/scrollLeft 由 JS 同步. */
+#dsl-editor-highlight {
+    display: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+#dsl-editor.is-highlighted + #dsl-editor-highlight {
+    display: block;
+}
+
+/* 高亮内容:padding/字体/行高必须与 #dsl-editor 逐项相同,否则首字符起点或
+   换行位置会差一个像素,越往右下越明显 */
+#dsl-editor-highlight-code {
+    margin: 0;
+    padding: 10px 12px;
+    font-family: var(--code-font-family);
+    font-size: var(--code-font-size);
+    line-height: var(--code-line-height);
+    tab-size: var(--code-tab-size, 4);
+    white-space: pre;
+    color: #dbe4ff;
+}
+
+/* --------------------------------------------------------------------------
+ * 高亮配色(只作用于高亮层,textarea 的文字是透明的).
+ *
+ * 取色沿用深蓝底:青色 #6dd5ff 是场景里的主色,继续用来标"选项名";
+ * 注释刻意用行号同色 #55618c--它在源码里密度最高,必须最不抢眼.
+ * -------------------------------------------------------------------------- */
+#dsl-editor-highlight-code .dsl-comment { color: #55618c; }
+#dsl-editor-highlight-code .dsl-string { color: #9ad48a; }
+#dsl-editor-highlight-code .dsl-number { color: #e0a56b; }
+#dsl-editor-highlight-code .dsl-keyword { color: #c678dd; }
+#dsl-editor-highlight-code .dsl-property { color: #6dd5ff; }
+#dsl-editor-highlight-code .dsl-operator { color: #9aa7d4; }
+#dsl-editor-highlight-code .dsl-bracket { color: #7f8bbd; }
 
 /* 行号槽:宽度随字体与行数变化,内容超出时裁剪,靠 translate 跟随滚动 */
 #dsl-editor-gutter {
@@ -127,14 +184,17 @@
     will-change: transform;
 }
 
-/* DSL 源码输入框:使用等宽字体,禁止缩放,不软换行 */
+/* DSL 源码输入框:使用等宽字体,禁止缩放,不软换行.
+   position/z-index 把它压在高亮层之上:文字透明后,光标,选区和原生输入
+   行为仍然由这个真 textarea 负责 */
 #dsl-editor {
+    position: relative;
+    z-index: 1;
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     resize: none;
     background: transparent;
-    color: #dbe4ff;
     border: 0;
     outline: none;
     padding: 10px 12px;
@@ -144,6 +204,18 @@
     white-space: pre;
     overflow-wrap: normal;
     tab-size: var(--code-tab-size, 4);
+}
+
+/* 高亮层就位:文字让位(只留光标色),着色完全由背景层显示 */
+#dsl-editor.is-highlighted {
+    color: transparent;
+    caret-color: #dbe4ff;
+}
+
+/* 透明文字下的选区要自己给底色:默认选区色偏淡,不给的话选中一段时
+   会与高亮层的文字糊在一起 */
+#dsl-editor::selection {
+    background: rgba(109, 213, 255, 0.28);
 }
 
 /* ==========================================================================

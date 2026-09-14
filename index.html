@@ -41,6 +41,11 @@
                     <div id="dsl-editor-gutter" aria-hidden="true">
                         <pre id="dsl-editor-lines"></pre>
                     </div>
+                    <!-- 输入区包裹层:textarea 与背后的高亮层严格同尺寸重叠.
+                         textarea 里的文字仍然是真的(光标/选区/撤销/IME 全靠它),
+                         只是颜色透明,由高亮层透出着色后的源码(见 EditorHighlight).
+                         注意:textarea 的内容不参与缩进,改缩进会改变默认源码. -->
+                    <div id="dsl-editor-input">
                     <textarea id="dsl-editor" spellcheck="false">
 point P = [0, 0, 0];
 
@@ -206,6 +211,10 @@ intersection X = intersection(s1, s2) {
 };
 
 </textarea>
+                        <div id="dsl-editor-highlight" aria-hidden="true">
+                            <pre id="dsl-editor-highlight-code"></pre>
+                        </div>
+                    </div>
                 </div>
             </section>
             <div class="resize-handle resize-handle-right" data-resize-panel="left-panel"></div>

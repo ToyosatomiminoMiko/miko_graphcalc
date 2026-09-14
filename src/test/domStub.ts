@@ -118,6 +118,16 @@ export class StubElement {
     max = '';
     step = '';
     scrollTop = 0;
+    /** 高亮层要把 textarea 的横纵偏移一起抄过去,桩里两个方向都要有. */
+    scrollLeft = 0;
+    /**
+     * 桩**不解析 HTML**:innerHTML 只保存字符串,子节点树不跟着变.
+     *
+     * 唯一的使用者是源码高亮层(EditorHighlight 把高亮 HTML 写进背景层),
+     * 测试要断言的正是"写进去的 HTML 是什么",而不是浏览器的解析结果;
+     * 需要节点树的地方仍走 createElement/append.
+     */
+    innerHTML = '';
     checked = false;
     /** `<details>` 的开合状态;普通元素上无意义. */
     open = false;
