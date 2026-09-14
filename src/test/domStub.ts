@@ -129,6 +129,8 @@ export class StubElement {
      */
     innerHTML = '';
     checked = false;
+    /** 按钮的禁用态:参数行的重置按钮靠它在"已停在声明值"时置灰. */
+    disabled = false;
     /** `<details>` 的开合状态;普通元素上无意义. */
     open = false;
     /**
@@ -428,6 +430,7 @@ export class StubElement {
         copy.value = this.value;
         copy.type = this.type;
         copy.open = this.open;
+        copy.disabled = this.disabled;
         Object.assign(copy.dataset, this.dataset);
         for (const [name, value] of this.attributes) copy.setAttribute(name, value);
         if (deep) {

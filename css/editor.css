@@ -114,7 +114,7 @@
     box-sizing: border-box;
     /* 由 EditorLineNumbers 按 "最大行号位数 x 实际字体数字宽 + 内边距/边框"
        写入,写死宽度会在 3 位行号或更大的字号下裁掉行号 */
-    width: var(--code-gutter-width, 32px);
+    width: var(--code-gutter-width);
     padding: 11px 0 11px 8px; /* 顶部 11px = 外框 border 1px + 编辑区 padding 10px */
     overflow: hidden;
     background: #0a0e1c;

@@ -33,7 +33,9 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   实测;撤销环节的取舍见 `src/ui/examples/replaceEditorSource.ts`)
 - `param`:参数面板与实时刷新;`param φ = 0 in cyclic [-3.14159, 3.14159, 0.01]`
   显式声明**循环类系数**(球坐标方位角这类圆周量),越界值按区间长度回绕到
-  `[min, max)` 而不是夹到端点;不写 `cyclic` 的参数一律按普通参数处理
+  `[min, max)` 而不是夹到端点;不写 `cyclic` 的参数一律按普通参数处理.
+  每条滑块行末端的 `↺` 把该参数退回 `in` 前的声明值(`param a = 1 in [...]`
+  里的 `1`),单项复位不必重按"运行";已经停在该值上时按钮置灰
 - `curve` / `surface` / `vector_field` / `point` / `vector`:基础几何对象
 - 对象相加:`curve`/`surface` 的表达式可以按名引用同类对象,`+` 就是逐点
   函数相加(`curve c3 = c1 + c2` 即 y = f1(x) + f2(x),`surface s3 = s1 + s2`
@@ -98,19 +100,29 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 界面样式配置
 
-代码区字体与 KaTeX 字号**不做运行时设置界面**,也不落 localStorage:
+代码区字体,KaTeX 字号与面板几何**不做运行时设置界面**,也不落 localStorage:
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/applyUiConfig.ts`
-写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区)与
-`css/panels.css`(面板与对象列表)的 `var()` 消费.
+写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
+`css/panels.css`(面板与对象列表),`css/controls.css` 与 `css/base.css`
+的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
+  `gutterMinWidth` 是行号槽宽下限;
 - `UI_CONFIG.formula.katexFontSize`:底部对象列表里 KaTeX 公式的字号,
-  单位 em,基准是 `.object-expr` 的 16px.
+  单位 em,基准是 `.object-expr` 的 16px;
+- `UI_CONFIG.panel`:三个面板的尺寸与右侧"参数区 / 视图区"的分割比例.
+  拖拽的夹取上下限(`sideMin/MaxWidth`,`footerMin/MaxHeight`,
+  `splitMin/MaxRatio`)CSS 用不到,只活在这里;默认尺寸,折叠尺寸,
+  两个最小高度与默认分割比例 CSS 首帧要消费,因此在 `css/base.css` 的
+  `:root` 有一份同名兜底,而 `#app` 的 `--left/right-panel-width` 与
+  `--footer-height` 只是 `var()` 派生,不再重复数字.
 
-改完刷新页面即可.`css/base.css` 的 `:root` 里有同名兜底变量,只负责
-脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致.行号槽宽不写死:
-`EditorLineNumbers` 按当前字体与最大行号位数动态写入 `--code-gutter-width`.
+改完刷新页面即可.`css/base.css` 的 `:root` 兜底只负责脚本执行前的首帧,
+必须与 `UI_CONFIG` 保持一致--这条约定由 `applyUiConfig.test.ts` 逐字断言,
+只改 `uiConfig.ts` 或只改 CSS 都会先失败在测试上,不会静默闪一帧旧样式.
+行号槽宽不写死:`EditorLineNumbers` 按当前字体与最大行号位数动态写入
+`--code-gutter-width`.
 
 源码高亮不引入编辑器组件:着色后的源码渲染在 textarea 背后的
 `#dsl-editor-highlight` 层里,textarea 只把文字设为透明(光标/选区/撤销/IME

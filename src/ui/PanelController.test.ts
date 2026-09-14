@@ -10,6 +10,7 @@
  * 拖拽尺寸路径需要 `getComputedStyle` 与 window 指针事件,不在本文件覆盖.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { UI_CONFIG } from '../config/uiConfig';
 import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
 import { PanelController } from './PanelController';
 
@@ -90,7 +91,9 @@ describe('折叠态的可访问语义(UI-P3.2)', () => {
         expect(left.header.style.display).toBe('');
         expect(left.body.style.display).toBe('none');
         expect(left.handle.style.display).toBe('none');
-        expect(root.style.getPropertyValue('--left-panel-width')).toBe('44px');
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.collapsedSideWidth}px`,
+        );
     });
 
     it('再次点击恢复展开与原始宽度', () => {
@@ -103,7 +106,9 @@ describe('折叠态的可访问语义(UI-P3.2)', () => {
         expect(left.panel.classList.contains('collapsed')).toBe(false);
         expect(left.button.textContent).toBe('收起');
         expect(left.body.style.display).toBe('');
-        expect(root.style.getPropertyValue('--left-panel-width')).toBe('300px');
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideDefaultWidth}px`,
+        );
     });
 
     it('各面板互不影响', () => {
@@ -115,7 +120,9 @@ describe('折叠态的可访问语义(UI-P3.2)', () => {
         expect(left.panel.classList.contains('collapsed')).toBe(true);
         expect(bottom.panel.classList.contains('collapsed')).toBe(false);
         expect(bottom.body.style.display).toBe('');
-        expect(root.style.getPropertyValue('--footer-height')).toBe('240px');
+        expect(root.style.getPropertyValue('--footer-height')).toBe(
+            `${UI_CONFIG.panel.footerDefaultHeight}px`,
+        );
     });
 });
 
@@ -133,7 +140,9 @@ describe('dispose 复位与重复 bind(UI-P3.3)', () => {
         expect(left.handle.style.display).toBe('');
         expect(left.button.textContent).toBe('收起');
         expect(left.button.getAttribute('aria-expanded')).toBe('true');
-        expect(root.style.getPropertyValue('--left-panel-width')).toBe('300px');
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideDefaultWidth}px`,
+        );
     });
 
     it('dispose 后再次 bind,折叠/展开仍然自洽', () => {
@@ -150,7 +159,9 @@ describe('dispose 复位与重复 bind(UI-P3.3)', () => {
         left.button.dispatch('click');
         expect(left.panel.classList.contains('collapsed')).toBe(true);
         expect(left.button.textContent).toBe('展开');
-        expect(root.style.getPropertyValue('--left-panel-width')).toBe('44px');
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.collapsedSideWidth}px`,
+        );
     });
 
     it('dispose 会摘掉旧监听:重新 bind 只保留一份监听', () => {
@@ -170,6 +181,8 @@ describe('dispose 复位与重复 bind(UI-P3.3)', () => {
         left.button.dispatch('click');
         expect(left.panel.classList.contains('collapsed')).toBe(true);
         expect(left.button.textContent).toBe('展开');
-        expect(root.style.getPropertyValue('--left-panel-width')).toBe('44px');
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.collapsedSideWidth}px`,
+        );
     });
 });

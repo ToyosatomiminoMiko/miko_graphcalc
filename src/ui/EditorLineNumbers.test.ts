@@ -5,6 +5,7 @@
  * 缺结构时构造即报错(依赖不再藏在"父节点里按 id 查"的实现里).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { UI_CONFIG } from '../config/uiConfig';
 import { installDomStub, type DomStub, type StubElement } from '../test/domStub';
 import { EditorLineNumbers } from './EditorLineNumbers';
 
@@ -74,8 +75,10 @@ describe('行号重绘与滚动同步', () => {
 
     it('按字体度量写入 gutter 槽宽', () => {
         const { gutter } = setup();
-        // 桩的 measureText 按字符数给宽:2 位数 -> 16px + 15px chrome = 31 -> 下限 32px.
-        expect(gutter.style.getPropertyValue('--code-gutter-width')).toBe('32px');
+        // 桩的 measureText 按字符数给宽:2 位数 -> 16px + 15px chrome = 31 -> 落到下限.
+        expect(gutter.style.getPropertyValue('--code-gutter-width')).toBe(
+            `${UI_CONFIG.editor.gutterMinWidth}px`,
+        );
     });
 });
 

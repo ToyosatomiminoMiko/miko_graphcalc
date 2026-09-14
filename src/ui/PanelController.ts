@@ -1,13 +1,20 @@
+import { UI_CONFIG } from '../config/uiConfig';
+
 type PanelId = 'left-panel' | 'right-panel' | 'bottom-panel';
 
-const SIDE_MIN_WIDTH = 220;
-const SIDE_MAX_WIDTH = 560;
-const SIDE_DEFAULT_WIDTH = 300;
-const FOOTER_MIN_HEIGHT = 160;
-const FOOTER_MAX_HEIGHT = 640;
-const FOOTER_DEFAULT_HEIGHT = 240;
-const COLLAPSED_SIDE_WIDTH = 44;
-const COLLAPSED_FOOTER_HEIGHT = 40;
+// 尺寸的唯一真相源是 UI_CONFIG.panel(见那里的说明):这里只是取个短名字.
+// 默认尺寸/折叠尺寸在 css/base.css 的 :root 里有一份首帧兜底,由
+// applyUiConfig.test.ts 锁住一致性;上下限 CSS 不消费,没有第二处副本.
+const {
+    sideMinWidth: SIDE_MIN_WIDTH,
+    sideMaxWidth: SIDE_MAX_WIDTH,
+    sideDefaultWidth: SIDE_DEFAULT_WIDTH,
+    footerMinHeight: FOOTER_MIN_HEIGHT,
+    footerMaxHeight: FOOTER_MAX_HEIGHT,
+    footerDefaultHeight: FOOTER_DEFAULT_HEIGHT,
+    collapsedSideWidth: COLLAPSED_SIDE_WIDTH,
+    collapsedFooterHeight: COLLAPSED_FOOTER_HEIGHT,
+} = UI_CONFIG.panel;
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
@@ -40,7 +47,7 @@ export class PanelController {
         'left-panel': SIDE_DEFAULT_WIDTH,
         'right-panel': SIDE_DEFAULT_WIDTH,
     };
-    private footerHeight = FOOTER_DEFAULT_HEIGHT;
+    private footerHeight: number = FOOTER_DEFAULT_HEIGHT;
     private readonly collapsed = new Set<PanelId>();
     private readonly bindings = new Map<PanelId, PanelBinding>();
 

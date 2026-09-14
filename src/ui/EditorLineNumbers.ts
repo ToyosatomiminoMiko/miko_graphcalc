@@ -27,11 +27,13 @@
  * 为什么对外要暴露 `refresh()`:`input` 事件只覆盖用户键入;若将来有代码
  * 程序化写 `editor.value`(载入示例/撤销到某版本),行号不会自己更新.
  */
+import { UI_CONFIG } from '../config/uiConfig';
+
 /** gutter 里除数字本身之外的固定宽度:左 padding 8 + 行号右 padding 6 + 边框 1,与 editor.css 对应. */
 const GUTTER_CHROME_PX = 15;
 
-/** 槽宽下限,与 base.css 里 --code-gutter-width 的兜底值一致. */
-const GUTTER_MIN_WIDTH_PX = 32;
+/** 槽宽下限,唯一真相源是 UI_CONFIG.editor.gutterMinWidth(base.css 有同名首帧兜底). */
+const GUTTER_MIN_WIDTH_PX = UI_CONFIG.editor.gutterMinWidth;
 
 /** 行号栏依赖的两个兄弟节点;由装配层取好传入(取不到时构造即报错). */
 export interface EditorLineNumberElements {

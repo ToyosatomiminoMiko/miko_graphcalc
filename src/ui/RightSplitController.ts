@@ -18,6 +18,8 @@
  * 回到默认比例(见 README 的"代码区字体与 KaTeX 字号"一节).
  */
 
+import { UI_CONFIG } from '../config/uiConfig';
+
 /** 分隔条 DOM 契约. */
 export interface RightSplitBinding {
     /** 分隔条本身(拖动与键盘的落点). */
@@ -26,11 +28,17 @@ export interface RightSplitBinding {
     readonly panel: HTMLElement;
 }
 
-/** 参数区占右面板高度的比例边界:两边都必须留出可点可看的一块. */
-export const SPLIT_MIN_RATIO = 0.15;
-export const SPLIT_MAX_RATIO = 0.8;
+/**
+ * 参数区占右面板高度的比例边界:两边都必须留出可点可看的一块.
+ *
+ * 值来自 UI_CONFIG.panel(唯一真相源);边界只有这里当数字用,CSS 不消费,
+ * 因此没有第二处副本.默认比例另外在 css/base.css 有首帧兜底,由
+ * RightSplitController.test.ts 锁住一致.
+ */
+export const SPLIT_MIN_RATIO = UI_CONFIG.panel.splitMinRatio;
+export const SPLIT_MAX_RATIO = UI_CONFIG.panel.splitMaxRatio;
 /** 默认比例,与"参数区 flex-grow,视图区 max-height: 40%"的初始观感一致. */
-export const SPLIT_DEFAULT_RATIO = 0.4;
+export const SPLIT_DEFAULT_RATIO = UI_CONFIG.panel.splitDefaultRatio;
 
 /** 键盘一次调整的比例步长. */
 const KEY_STEP = 0.03;
@@ -72,7 +80,7 @@ export class RightSplitController {
     private binding: RightSplitBinding | null = null;
     private abortController: AbortController | null = null;
     private dragging = false;
-    private ratio = SPLIT_DEFAULT_RATIO;
+    private ratio: number = SPLIT_DEFAULT_RATIO;
     /** 上一次指针的 y;拖动中每次移动都把它当作新的基准点(见 _onPointerMove). */
     private lastPointerY: number | null = null;
 
