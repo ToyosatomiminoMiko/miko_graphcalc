@@ -62,7 +62,7 @@ export const UI_CONFIG = {
     panel: {
         /** 左右侧面板宽度(px):拖拽夹取范围与初始宽度. */
         sideMinWidth: 220,
-        sideMaxWidth: 560,
+        sideMaxWidth: 875,
         sideDefaultWidth: 300,
         /** 底部面板高度(px):拖拽夹取范围与初始高度. */
         footerMinHeight: 160,
