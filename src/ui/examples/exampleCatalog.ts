@@ -39,6 +39,7 @@ const EXAMPLE_MODULES = import.meta.glob('/example/*.scad', {
  * 菜单顺序即此数组顺序,按主题分组,组内按讲解顺序排.
  * 标题与 `example/README.md` 的表对应,但用短名,避免在 300px 宽的面板里换行.
  */
+const _orther = '其他主题';
 export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'derivative_graph.scad', title: '导数函数图像', group: '求导 / 偏导' },
     { file: 'derivative_curve.scad', title: '一元函数求导', group: '求导 / 偏导' },
@@ -47,12 +48,13 @@ export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'divergence_vector_field.scad', title: '散度 div(F)', group: '求导 / 偏导' },
     { file: 'curl_vector_field.scad', title: '旋度 curl(F)', group: '求导 / 偏导' },
     { file: 'sphere_gradient.scad', title: '球体隐式场梯度', group: '求导 / 偏导' },
-    { file: 'object_addition.scad', title: '对象相加', group: '其他主题' },
-    { file: 'intersection_line_curves.scad', title: '曲线 ∩ 曲线', group: '其他主题' },
-    { file: 'intersection_surfaces.scad', title: '曲面 ∩ 曲面', group: '其他主题' },
-    { file: 'double_integral_region.scad', title: 'region 域二重积分', group: '其他主题' },
-    { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: '其他主题' },
-    { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: '其他主题' },
+    { file: 'gauss_surface.scad', title: '高斯钟形曲面', group: '求导 / 偏导' },
+    { file: 'object_addition.scad', title: '对象相加', group: _orther },
+    { file: 'intersection_line_curves.scad', title: '曲线 ∩ 曲线', group: _orther },
+    { file: 'intersection_surfaces.scad', title: '曲面 ∩ 曲面', group: _orther },
+    { file: 'double_integral_region.scad', title: 'region 域二重积分', group: _orther },
+    { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: _orther },
+    { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: _orther },
 ];
 
 /**

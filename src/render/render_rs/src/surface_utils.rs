@@ -34,9 +34,12 @@
 //                   · 任一顶点 z 为 NaN(防止 NaN 面法线经顶点平均污染
 //                     相邻正常三角形);
 //                   · 单元跨过竖直渐近线/间断(某条边两端 z 符号相反且
-//                     跳变远超该方向的中位跳变)--像 tan(x) 在渐近线两侧
-//                     都是"有限但巨大"的 z 值,不会产生 NaN,若不按此剔除
-//                     会被画成一堵贯穿渐近线的"墙".
+//                     中点值跳出两端,再叠加"跳变远超该方向的中位跳变"
+//                     或"中点值远超两端幅值"任一条)--像 tan(x) 在渐近线
+//                     两侧都是"有限但巨大"的 z 值,不会产生 NaN,若不按此
+//                     剔除会被画成一堵贯穿渐近线的"墙";
+//                     符号相反但中点介于两端的光滑过零必须放行,否则会在
+//                     曲面上误切出一条方形空洞.
 //              ③ generate_valid_indices()    网格索引
 //                 只对有效单元出两个三角形,每格拆 (a,b,d)+(a,d,c);
 //                 无效单元不产出任何索引,这才是真正参与绘制的几何.
@@ -129,12 +132,22 @@ fn edge_median(z_values: &[f64], cols: usize, rows: usize, horizontal: bool) -> 
 
 /// 判断一条"符号翻转"边是否跨越了竖直渐近线.
 ///
-/// 两个互相补充的信号(任一成立即可判为间断,避免互相漏检):
-/// - **跳变远超**该方向的中位跳变:捕捉渐近线靠近网格点,近侧采样值已经
-///   很大的情形;
-/// - **中点发散**:在边中点重新求值,若远超两端 z 幅值,捕捉渐近线落在
-///   单元中部,两侧采样值都不大的情形.该项尺度无关,对 `tan(x*a)` 任意
-///   `a` 都稳定,不会因渐近线变密而被全局中位数污染.
+/// 变号边的绝大多数是"函数正常穿过零",而不是发散:例如
+/// `z = x * e^{-(x²+y²)}` 在 x=0 一整列,`∂/∂x[e^{-(x²+y²)}]` 的过零线,
+/// 都是光滑变号.因此这里先取边中点值 `f_mid`,再按下面的次序判定:
+///
+/// 1. **中点无定义** -> 间断(渐近线穿过单元,采样拿不到值);
+/// 2. **中点介于两端之间**(`min(z0, z1) <= f_mid <= max(z0, z1)`) ->
+///    函数在这条边上单调穿零,直接放行.这一票否决是必需的:它挡住的是
+///    `POLE_JUMP_FACTOR` 那一路的误判 -- 曲面大片平坦时全局中位跳变很小,
+///    而变号列的跳变可能超过它的 16 倍,只看跳变倍数会在光滑曲面上切出
+///    一条方形空洞(回归用例 `smooth_zero_crossing_keeps_all_cells`);
+/// 3. **中点跳出两端** -> 两路互相补充的信号任一成立即判为间断:
+///    - **跳变远超**该方向的中位跳变:捕捉渐近线靠近网格点,近侧采样值
+///      已经很大的情形;
+///    - **中点发散**(`f_mid` 远超两端 z 幅值):捕捉渐近线落在单元中部,
+///      两侧采样值都不大的情形.该项尺度无关,对 `tan(x*a)` 任意 `a` 都
+///      稳定,不会因渐近线变密而被全局中位数污染.
 ///
 /// 仅当两端 z 符号相反时才检查,以排除"平滑但陡峭"的正常边.
 #[allow(clippy::too_many_arguments)]
@@ -151,16 +164,19 @@ fn edge_crosses_discontinuity(
     if (z0 < 0.0) == (z1 < 0.0) {
         return false;
     }
-    if median_jump > 0.0 && (z1 - z0).abs() > POLE_JUMP_FACTOR * median_jump {
-        return true;
-    }
     let f_mid = math_rs::field_core::evaluate_scalar(expr, names, values, mid_x, mid_y, 0.0)
         .unwrap_or(f64::NAN);
     if !f_mid.is_finite() {
         return true;
     }
+    if f_mid >= z0.min(z1) && f_mid <= z0.max(z1) {
+        return false;
+    }
     let scale = z0.abs().max(z1.abs()).max(f64::MIN_POSITIVE);
-    f_mid.abs() > POLE_MIDPOINT_FACTOR * scale
+    if f_mid.abs() > POLE_MIDPOINT_FACTOR * scale {
+        return true;
+    }
+    median_jump > 0.0 && (z1 - z0).abs() > POLE_JUMP_FACTOR * median_jump
 }
 
 /// 逐单元判断是否可参与绘制.
@@ -181,6 +197,9 @@ fn edge_crosses_discontinuity(
 ///
 /// `tan(x*a)` 这类曲面在渐近线两侧都是"有限但巨大"的 z 值,不会产生 NaN,
 /// 若不按此剔除,跨线单元会被画成一堵贯穿渐近线的"墙".
+///
+/// 注意:符号相反**不等于**间断.光滑过零(中点值介于两端之间)一律放行,
+/// 否则 `z = x*e^{-(x²+y²)}` 这类曲面会在变号线上被切出一条空洞.
 #[allow(clippy::too_many_arguments)]
 fn compute_valid_cells(
     z_values: &[f64],
@@ -525,6 +544,48 @@ mod tests {
             "剔除量应只集中在渐近线附近,实际有效 {} / 全量 {}",
             result.valid_indices.len(),
             full
+        );
+    }
+
+    #[test]
+    fn smooth_zero_crossing_keeps_all_cells() {
+        // `x * e^{-(x²+y²)}` 在 x=0 一整列光滑穿过零.变号边的跳变远超全局
+        // 中位跳变(中位数被大片平坦区拉低),若只看"跳变 > 16×中位跳变"就会
+        // 把这一列误判成渐近线,在曲面上切出一条方形空洞.
+        // 回归来源:example/gauss_surface.scad 里 `derivative dx =
+        // derivative(s1, x)` 生成的曲面 dx = ∂/∂x[j·e^{-a(x²+y²)}] 同样是
+        // 关于 x 的奇函数,默认 a=0.1 时在 x=0 附近丢过一条方形空洞.
+        let result = run("x * exp(-(x ^ 2 + y ^ 2))", &[]);
+        let full = 64usize * 64usize * 6;
+        assert_eq!(
+            result.valid_indices.len(),
+            full,
+            "光滑过零的曲面不应剔除任何单元"
+        );
+    }
+
+    #[test]
+    fn gaussian_derivative_surface_keeps_all_cells() {
+        // 原始报告用例(example/gauss_surface.scad):偏导曲面
+        // dx = ∂/∂x[3·e^{-0.1(x²+y²)}],range=[-8,8]² / segments=96.
+        // 旧判据只按"跳变 > 16×中位跳变"就会在 x∈[0, 1/6],y∈[-2.5, 2.33]
+        // 丢掉 30 个单元,渲染成一条方形空洞.表达式取编译器展开后的原样.
+        let result = sample_and_process_surface(
+            "-(3 * (2.718281828459045 ^ (-(0.1 * (x ^ 2 + y ^ 2))) * (0.2 * x)))",
+            &[],
+            &[],
+            -8.0,
+            8.0,
+            -8.0,
+            8.0,
+            96,
+            96,
+        )
+        .unwrap();
+        assert_eq!(
+            result.valid_indices.len(),
+            96 * 96 * 6,
+            "高斯曲面的 x 偏导曲面在过零线上不应出现空洞"
         );
     }
 
