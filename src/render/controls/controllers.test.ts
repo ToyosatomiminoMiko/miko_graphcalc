@@ -21,6 +21,7 @@ import { installDomStub, StubElement } from '../../test/domStub';
 import { EventBus } from '../../service/EventBus';
 import type { CamMode, GraphCalcEvents, ViewHome } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 import { createViewPanel, type ViewPanel } from '../../ui/view/ViewPanel';
 import { CameraToggle } from './CameraToggle';
 import { RotationLockController } from './RotationLockController';
@@ -163,7 +164,7 @@ describe('PointStyleController 大小/比例单一来源(RND-P3.2)', () => {
         expect(emitted[1]).toBeCloseTo(base, 10);
         expect(field.readText()).toBe('1');
         expect(panel.point.valueLabel.textContent).toBe('缩放');
-        expect(field.input.step).toBe('0.1');
+        expect(field.input.step).toBe(String(UI_CONFIG.view.point.scaleStep));
 
         // 比例 2 -> 半径 2 倍
         field.writeText('2');
@@ -175,7 +176,7 @@ describe('PointStyleController 大小/比例单一来源(RND-P3.2)', () => {
         expect(emitted[3]).toBeCloseTo(base * 2, 10);
         expect(field.readText()).toBe(String(Number((base * 2).toFixed(4))));
         expect(panel.point.valueLabel.textContent).toBe('大小');
-        expect(field.input.step).toBe('0.05');
+        expect(field.input.step).toBe(String(UI_CONFIG.view.point.sizeStep));
 
         // 大小模式直接输入绝对值
         field.writeText('0.5');

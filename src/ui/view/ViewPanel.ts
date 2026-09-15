@@ -6,7 +6,7 @@
  * 改某个控制器的 id 字符串,再祈祷页面上没有同名 id.现在改成:
  *
  * ```text
- * ViewPanel(本文件)   布局 + 控件实例 + 初值(唯一读 RENDER_CONFIG 的视图代码)
+ * ViewPanel(本文件)   布局 + 控件实例 + 初值(唯一读配置的视图代码)
  *      │  handles
  *      ▼
  * 10 个 Controller     状态 + 校验 + EventBus 广播(不再碰 document)
@@ -15,9 +15,11 @@
  * 三条约定:
  * 1. **本文件不认识 EventBus**:它只建控件,给初值,把 handle 交出去;谁订阅,
  *    广播什么事件由控制器决定.所以这里是纯视图,可以在测试里单独装配断言.
- * 2. **初值只在这里读一次**`RENDER_CONFIG`.控制器不再各自持有"配置初值 +
- *    DOM 初值"两份,而是开局用 `handle.get()` 把视图当前值收进自己的状态,
- *    再广播一次(等价于老代码的"启动时按配置同步一次").
+ * 2. **配置只在这里读一次**:`RENDER_CONFIG` 给的是"渲染默认值"(初值),
+ *    `UI_CONFIG.view` 给的是"控件能拖多细/有哪些选项"(min/step/清单).
+ *    控制器不再各自持有"配置初值 + DOM 初值"两份,而是开局用 `handle.get()`
+ *    把视图当前值收进自己的状态,再广播一次(等价于老代码的"启动时按配置
+ *    同步一次").
  * 3. **句柄所有权归控制器**:面板本身不 `dispose` -- 每个控件恰好交给一个
  *    控制器,由它的 `dispose()` 统一解绑(见 `RenderController.wireViewControls`).
  *
@@ -27,10 +29,12 @@
  * `getElementById` 用的 id.
  */
 import { RENDER_CONFIG, type UpAxis } from '../../config/renderConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 import type { AxisName, CamMode, GridPlane, PointMode, ViewHome } from '../../render/types';
 import { el } from '../widgets/dom';
 import { createNumberField, type NumberFieldHandle } from '../widgets/NumberField';
 import {
+    createControlGroup,
     createFieldLabel,
     createInlineToggle,
     createNumberRow,
@@ -49,14 +53,6 @@ import { createSwitch, type SwitchHandle } from '../widgets/Switch';
  */
 export const CAM_MODE_WHEN_CHECKED: CamMode = 'orthographic';
 export const CAM_MODE_WHEN_UNCHECKED: CamMode = 'perspective';
-
-/** ViewCube 暴露的四个预置视角,顺序与 `repeat(4, 1fr)` 的列数一致. */
-const VIEW_CUBE_ITEMS: ReadonlyArray<{ value: ViewHome; label: string }> = [
-    { value: 'top', label: '上' },
-    { value: 'front', label: '前' },
-    { value: 'right', label: '右' },
-    { value: 'isometric', label: 'ISO' },
-];
 
 /** 点的数值显示口径:保留 4 位小数再去零(与老 `PointStyleController` 一致). */
 function formatPointValue(value: number): string {
@@ -111,6 +107,7 @@ export interface ViewPanel {
 /** 建出整块视图面板并挂进 `host`.`host` 原有内容会被清空. */
 export function createViewPanel(host: HTMLElement): ViewPanel {
     const config = RENDER_CONFIG;
+    const view = UI_CONFIG.view;
 
     // ── 相机 ────────────────────────────────────────────────────────────
     // 透视/正交两段文字是"点一下也能切"的旁路入口;开关才是可访问的主入口,
@@ -132,9 +129,7 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     // 面板由脚本生成,浏览器不会恢复动态节点的表单态,所以固定从 false 起.
     const rotationLock = createSwitch({ value: false });
 
-    const camera = el(
-        'div',
-        { class: 'cam-toggle' },
+    const camera = createRow(
         perspective,
         cameraToggle.element,
         orthographic,
@@ -143,17 +138,18 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     );
 
     // ── 预置视角 ────────────────────────────────────────────────────────
+    // 选项与列数都来自 UI_CONFIG:加一个视角只改配置,这里不用动.
     const viewCube = createSegmented<ViewHome>({
-        class: 'viewcube',
+        columns: view.viewCube.length,
         ariaLabel: '预置视角',
         value: config.camera.defaultHome,
-        items: VIEW_CUBE_ITEMS,
+        items: view.viewCube,
     });
 
     // ── 点 ──────────────────────────────────────────────────────────────
     const pointVisible = createSwitch({ value: config.scene.point.visible });
     const pointMode = createSegmented<PointMode>({
-        class: 'point-mode',
+        columns: 2,
         ariaLabel: '点的显示方式',
         value: 'size',
         items: [
@@ -163,23 +159,23 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     });
     const pointValue = createNumberField({
         value: config.scene.point.radius,
-        min: 0,
-        step: 0.05,
+        min: view.point.min,
+        step: view.point.sizeStep,
         format: formatPointValue,
     });
-    const pointValueRow = createNumberRow('point-row', '大小', pointValue);
-    const point = el(
-        'section',
-        { class: 'point-controls' },
-        el('header', { class: 'point-title', text: '点' }),
-        createSwitchRow('point-row', '全局可见', pointVisible),
+    const pointValueRow = createNumberRow('大小', pointValue);
+    const point = createControlGroup(
+        '点',
+        createSwitchRow('全局可见', pointVisible),
         pointMode.element,
         pointValueRow.row,
     );
 
     // ── 坐标轴(含网格刻度)────────────────────────────────────────────
     const upAxis = createSegmented<UpAxis>({
-        class: 'axis-up-mode',
+        columns: 3,
+        // 三选一按钮组在行内吃掉剩余宽度,又不无限拉长
+        modifier: 'segmented--inline',
         ariaLabel: '向上轴',
         value: config.scene.upAxis,
         items: [
@@ -190,8 +186,8 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     });
     const axisLineWidth = createNumberField({
         value: config.scene.axisLineWidth,
-        min: 1,
-        step: 0.5,
+        min: view.axis.lineWidthMin,
+        step: view.axis.lineWidthStep,
     });
     const axisTicks = createSwitch({ value: config.scene.axisTicks.visible });
     const axisPiUnit = createSwitch({ value: config.scene.axisTicks.piUnit });
@@ -207,50 +203,44 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     };
     const gridMajorWidth = createNumberField({
         value: config.scene.grid.majorLineWidth,
-        min: 1,
-        step: 0.5,
+        min: view.axis.gridMajorMin,
+        step: view.axis.gridMajorStep,
     });
     const gridMinorWidth = createNumberField({
         value: config.scene.grid.minorLineWidth,
-        min: 0.5,
-        step: 0.25,
+        min: view.axis.gridMinorMin,
+        step: view.axis.gridMinorStep,
     });
 
-    const axis = el(
-        'section',
-        { class: 'axis-controls' },
-        el('header', { class: 'axis-title', text: '坐标轴' }),
-        createRow('axis-row', el('span', { text: '向上' }), upAxis.element),
-        createNumberRow('axis-row', '线宽', axisLineWidth).row,
-        createSwitchRow('axis-row', '刻度', axisTicks),
-        createSwitchRow('axis-row', 'π 单位', axisPiUnit),
+    const axis = createControlGroup(
+        '坐标轴',
+        createRow(el('span', { text: '向上' }), upAxis.element),
+        createNumberRow('线宽', axisLineWidth).row,
+        createSwitchRow('刻度', axisTicks),
+        createSwitchRow('π 单位', axisPiUnit),
         createRow(
-            'axis-row',
             el('span', { text: '标签' }),
             createInlineToggle('X', axisLabels.x),
             createInlineToggle('Y', axisLabels.y),
             createInlineToggle('Z', axisLabels.z),
         ),
         createRow(
-            'axis-row',
             el('span', { text: '网格' }),
             createInlineToggle('XZ', gridPlanes.xz),
             createInlineToggle('XY', gridPlanes.xy),
             createInlineToggle('YZ', gridPlanes.yz),
         ),
-        createNumberRow('axis-row', '大刻度线宽', gridMajorWidth).row,
-        createNumberRow('axis-row', '小刻度线宽', gridMinorWidth).row,
+        createNumberRow('大刻度线宽', gridMajorWidth).row,
+        createNumberRow('小刻度线宽', gridMinorWidth).row,
     );
 
     // ── 曲面 ────────────────────────────────────────────────────────────
     const surfaceWireframe = createSwitch({ value: config.surfaceMesh.wireframeVisible });
     const surfaceColorMap = createSwitch({ value: config.surfaceMesh.colorMapEnabled });
-    const surface = el(
-        'section',
-        { class: 'surface-controls' },
-        el('header', { class: 'surface-title', text: '曲面' }),
-        createSwitchRow('surface-row', '网格', surfaceWireframe),
-        createSwitchRow('surface-row', '颜色映射', surfaceColorMap),
+    const surface = createControlGroup(
+        '曲面',
+        createSwitchRow('网格', surfaceWireframe),
+        createSwitchRow('颜色映射', surfaceColorMap),
     );
 
     host.replaceChildren(camera, viewCube.element, point, axis, surface);

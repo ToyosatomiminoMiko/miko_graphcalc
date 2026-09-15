@@ -2,18 +2,24 @@
  * 单选控件(分段按钮组):一组按钮里同时只有一个 `.active`.
  *
  * 覆盖右侧"视图"面板里三处同样的东西:
- * - 点的"设定大小 / 按比例缩放"(`.point-mode`,两列);
- * - 坐标轴"向上 X/Y/Z"(`.axis-up-mode`,三列);
- * - ViewCube 预置视角(`.viewcube`,四列).
+ * - 点的"设定大小 / 按比例缩放"(2 列);
+ * - 坐标轴"向上 X/Y/Z"(3 列,且要在行内撑满);
+ * - ViewCube 预置视角(4 列).
  *
- * 产出结构与原来的手写 HTML 同构,列数由 `css/controls.css` 按类名给:
+ * 三者过去各有一个类名(`.point-mode` / `.axis-up-mode` / `.viewcube`),CSS 里
+ * 是三份逐字相同的规则;现在统一产出 `.segmented`,差异只剩两处参数:
  *
  * ```html
- * <div class="point-mode" role="group" aria-label="...">
+ * <div class="segmented" role="group" aria-label="..."
+ *      style="--segmented-columns: 2">
  *   <button type="button" aria-pressed="true">设定大小</button>
  *   <button type="button" aria-pressed="false">按比例缩放</button>
  * </div>
  * ```
+ *
+ * - **列数**走 `--segmented-columns`(与实体行的 `--object-color` 同一手法:
+ *   值由 TS 给,CSS 只消费),不在 CSS 里为每个调用点写一条规则;
+ * - **行内撑满**这类布局差异走 `modifier`(`segmented--inline`),样式仍归 CSS.
  *
  * 为什么是 `role="group"` + `aria-pressed` 而不是 `role="radiogroup"` +
  * `role="radio"`:后者的键盘约定是"整组一个 Tab 停靠点 + 方向键在组内移动",
@@ -32,8 +38,10 @@ export interface SegmentedItem<T extends string> {
 }
 
 export interface SegmentedOptions<T extends string> {
-    /** 容器已有的样式类(`point-mode` / `axis-up-mode` / `viewcube`). */
-    class: string;
+    /** 列数:等分列宽,写进 `--segmented-columns`. */
+    columns: number;
+    /** 附加布局修饰类(如行内撑满的 `segmented--inline`);默认没有. */
+    modifier?: string;
     /** 组名:一组按钮必须能被读屏当成一个整体念出来. */
     ariaLabel: string;
     /** 初值;应当出现在 `items` 里,否则开局没有任何按钮是选中的. */
@@ -62,9 +70,12 @@ export function createSegmented<T extends string>(
     let current = options.value;
 
     const element = el('div', {
-        class: options.class,
+        class: options.modifier === undefined
+            ? 'segmented'
+            : `segmented ${options.modifier}`,
         attrs: { role: 'group', 'aria-label': options.ariaLabel },
     });
+    element.style.setProperty('--segmented-columns', String(options.columns));
 
     /** 唯一的高亮写入点:由 `current` 推导,别处不再各自 toggle `.active`. */
     const sync = (): void => {

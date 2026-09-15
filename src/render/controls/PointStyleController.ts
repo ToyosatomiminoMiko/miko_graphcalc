@@ -1,6 +1,7 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 import type { PointMode } from '../../render/types';
 import type { PointControls } from '../../ui/view/ViewPanel';
 
@@ -74,7 +75,7 @@ export class PointStyleController {
      * 不广播.
      */
     private _applyInput(raw: number | null): void {
-        if (raw === null || raw < 0) {
+        if (raw === null || raw < UI_CONFIG.view.point.min) {
             this.controls.value.write(this._displayValue());
             return;
         }
@@ -84,8 +85,13 @@ export class PointStyleController {
 
     private _syncModeUI(): void {
         this.controls.valueLabel.textContent = this.mode === 'size' ? '大小' : '缩放';
-        // 步长随模式变:绝对值步长 0.05,比例步长 0.1(与老面板一致)
-        this.controls.value.input.step = this.mode === 'size' ? '0.05' : '0.1';
+        // 步长随模式变:绝对值与比例各有一档,数值来自 UI_CONFIG(与建面板时
+        // 写进 `min`/`step` 的是同一份配置).
+        this.controls.value.input.step = String(
+            this.mode === 'size'
+                ? UI_CONFIG.view.point.sizeStep
+                : UI_CONFIG.view.point.scaleStep,
+        );
         this.controls.value.write(this._displayValue());
     }
 

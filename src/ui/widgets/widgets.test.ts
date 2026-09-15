@@ -9,11 +9,18 @@
  * 3. **dispose 真解绑** -- 桩复刻了 `{ signal }` 语义,控件漏掉 signal 接线
  *    会让"dispose 后仍响应事件"的回归暴露出来.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, StubElement } from '../../test/domStub';
 import { createButton } from './Button';
+import { el } from './dom';
 import { createNumberField } from './NumberField';
-import { createInlineToggle, createNumberRow, createSwitchRow } from './Row';
+import { createPopover } from './Popover';
+import {
+    createControlGroup,
+    createInlineToggle,
+    createNumberRow,
+    createSwitchRow,
+} from './Row';
 import { createSegmented } from './Segmented';
 import { createSlider } from './Slider';
 import { createSwitch } from './Switch';
@@ -79,15 +86,17 @@ describe('createSegmented', () => {
         { value: 'scale' as Mode, label: '按比例缩放' },
     ];
 
-    it('产出容器类名与按钮,初值决定 .active', () => {
+    it('产出统一的 .segmented 容器,列数写进 --segmented-columns', () => {
         const handle = createSegmented<Mode>({
-            class: 'point-mode',
+            columns: 2,
             ariaLabel: '点的显示方式',
             value: 'size',
             items,
         });
 
-        expect(handle.element.className).toBe('point-mode');
+        expect(handle.element.className).toBe('segmented');
+        // 列数由控件给,CSS 消费:三个调用点过去各有一条 CSS 规则,现在只剩这一份
+        expect(handle.element.style.getPropertyValue('--segmented-columns')).toBe('2');
         expect(handle.element.getAttribute('aria-label')).toBe('点的显示方式');
         const buttons = stub(handle.element).children as StubElement[];
         expect(buttons).toHaveLength(2);
@@ -97,10 +106,23 @@ describe('createSegmented', () => {
         expect(buttons[1].classList.contains('active')).toBe(false);
     });
 
+    it('modifier 追加布局修饰类(行内撑满),不影响基础类名', () => {
+        const handle = createSegmented<Mode>({
+            columns: 3,
+            modifier: 'segmented--inline',
+            ariaLabel: '向上轴',
+            value: 'size',
+            items,
+        });
+
+        expect(handle.element.className).toBe('segmented segmented--inline');
+        expect(handle.element.style.getPropertyValue('--segmented-columns')).toBe('3');
+    });
+
     it('点击切换高亮并只回调一次;重复点已选项不回调', () => {
         const seen: Mode[] = [];
         const handle = createSegmented<Mode>({
-            class: 'point-mode',
+            columns: 2,
             ariaLabel: '点的显示方式',
             value: 'size',
             items,
@@ -121,7 +143,7 @@ describe('createSegmented', () => {
     it('set() 只改高亮,不回调;dispose 后不再响应点击', () => {
         const seen: Mode[] = [];
         const handle = createSegmented<Mode>({
-            class: 'point-mode',
+            columns: 2,
             ariaLabel: '点的显示方式',
             value: 'size',
             items,
@@ -288,12 +310,117 @@ describe('createButton', () => {
     });
 });
 
-describe('行与行内小件', () => {
+describe('createPopover', () => {
+    function setup(): {
+        trigger: HTMLButtonElement;
+        panel: HTMLDivElement;
+        root: HTMLDivElement;
+        handle: ReturnType<typeof createPopover>;
+    } {
+        const root = el('div');
+        const trigger = el('button', { text: '示例' });
+        const panel = el('div', { class: 'example-menu' });
+        panel.id = 'example-menu';
+        root.append(trigger, panel);
+        document.body.append(root);
+
+        const handle = createPopover({ trigger, panel });
+        handle.bind(root);
+        return { trigger, panel, root, handle };
+    }
+
+    it('初始关闭,aria 关系指向浮层', () => {
+        const { trigger, panel, handle } = setup();
+
+        expect(handle.isOpen).toBe(false);
+        expect(panel.classList.contains('is-open')).toBe(false);
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(trigger.getAttribute('aria-controls')).toBe('example-menu');
+    });
+
+    it('点触发按钮开合,并通知订阅者', () => {
+        const { trigger, panel, handle } = setup();
+        const seen: boolean[] = [];
+        handle.onOpenChange((open) => seen.push(open));
+
+        stub(trigger).dispatch('click');
+        expect(handle.isOpen).toBe(true);
+        expect(panel.classList.contains('is-open')).toBe(true);
+        expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+        stub(trigger).dispatch('click');
+        expect(handle.isOpen).toBe(false);
+        expect(seen).toEqual([true, false]);
+    });
+
+    it('点浮层外关闭;点浮层内与触发按钮都不关闭', () => {
+        const { trigger, panel, root, handle } = setup();
+        stub(trigger).dispatch('click');
+
+        const inside = el('span', { text: '项' });
+        panel.append(inside);
+        stub(root).dispatch('click', { target: inside });
+        expect(handle.isOpen).toBe(true);
+
+        // 按钮的 click 会冒泡到根节点:不排除它就会"刚打开又被关掉"
+        stub(root).dispatch('click', { target: trigger });
+        expect(handle.isOpen).toBe(true);
+
+        stub(root).dispatch('click', { target: root });
+        expect(handle.isOpen).toBe(false);
+    });
+
+    it('close({ focusTrigger }) 交还焦点;open/close 幂等', () => {
+        const { trigger, handle } = setup();
+        const focus = vi.spyOn(trigger, 'focus');
+
+        handle.open();
+        handle.open();
+        expect(handle.isOpen).toBe(true);
+
+        handle.close({ focusTrigger: true });
+        expect(focus).toHaveBeenCalledTimes(1);
+        // 已经关着时不再重复聚焦(鼠标点外部关闭不该抢焦点)
+        handle.close({ focusTrigger: true });
+        expect(focus).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispose 关闭浮层并摘掉监听', () => {
+        const { trigger, panel, handle } = setup();
+        stub(trigger).dispatch('click');
+
+        handle.dispose();
+
+        expect(handle.isOpen).toBe(false);
+        expect(panel.classList.contains('is-open')).toBe(false);
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+        stub(trigger).dispatch('click');
+        expect(handle.isOpen).toBe(false);
+    });
+});
+
+describe('小节,行与行内小件', () => {
+    it('createControlGroup 用标题给小节命名(aria-labelledby)', () => {
+        const toggle = createSwitch({ value: true });
+        const group = createControlGroup('点', createSwitchRow('全局可见', toggle));
+
+        expect(group.className).toBe('control-group');
+        expect(group.tagName).toBe('section');
+        const header = stub(group).children[0] as StubElement;
+        expect(header.tagName).toBe('header');
+        expect(header.className).toBe('control-title');
+        expect(header.textContent).toBe('点');
+        // 标题 id 与 aria-labelledby 指向同一个节点,小节才成为有名字的 region
+        expect(group.getAttribute('aria-labelledby')).toBe(header.id);
+        expect(header.id).not.toBe('');
+    });
+
     it('createSwitchRow 让可见文字成为 <label for> 的名字来源', () => {
         const toggle = createSwitch({ value: true });
-        const row = createSwitchRow('point-row', '全局可见', toggle);
+        const row = createSwitchRow('全局可见', toggle);
 
-        expect(row.className).toBe('point-row');
+        expect(row.className).toBe('control-row');
         const label = stub(row).children[0] as StubElement;
         expect(label.tagName).toBe('label');
         expect(label.textContent).toBe('全局可见');
@@ -301,20 +428,20 @@ describe('行与行内小件', () => {
         expect(stub(row).children[1]).toBe(stub(toggle.element));
     });
 
-    it('createInlineToggle 产出 .axis-switch-group', () => {
+    it('createInlineToggle 产出 .control-toggle-group', () => {
         const toggle = createSwitch({ value: true });
         const group = createInlineToggle('X', toggle);
 
-        expect(group.className).toBe('axis-switch-group');
+        expect(group.className).toBe('control-toggle-group');
         expect((stub(group).children[0] as StubElement).htmlFor)
             .toBe(toggle.input.id);
     });
 
     it('createNumberRow 把标签与数字框关联,并返回标签节点', () => {
         const field = createNumberField({ value: 3, min: 1, step: 0.5 });
-        const { row, label } = createNumberRow('axis-row', '线宽', field);
+        const { row, label } = createNumberRow('线宽', field);
 
-        expect(row.className).toBe('axis-row');
+        expect(row.className).toBe('control-row');
         expect(label.htmlFor).toBe(field.input.id);
         expect(stub(row).children[1]).toBe(stub(field.input));
     });

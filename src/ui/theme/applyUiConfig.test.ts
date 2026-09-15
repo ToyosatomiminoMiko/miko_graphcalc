@@ -60,7 +60,7 @@ describe('uiConfigCssVariables', () => {
         );
     });
 
-    it('拖拽夹取上下限不进 CSS:它们只被控制器当数字用', () => {
+    it('拖拽夹取上下限与视图控件参数都不进 CSS:它们只被控制器当数字用', () => {
         const variables = uiConfigCssVariables();
 
         // 上限只活在 UI_CONFIG.panel 里,CSS 没有同名变量也就没有第二处副本.
@@ -70,9 +70,13 @@ describe('uiConfigCssVariables', () => {
         expect(Object.keys(variables)).not.toContain('--footer-min-height');
         expect(Object.keys(variables)).not.toContain('--right-split-min');
         expect(Object.keys(variables)).not.toContain('--right-split-max');
+        // UI_CONFIG.view 整段同理(控件的 min/step 与 ViewCube 选项清单);
+        // "没有多出变量"由下面那条 13 条的计数断言兜底.
+        expect(Object.keys(variables).filter((name) => name.includes('segmented')))
+            .toEqual([]);
     });
 
-    it('整张映射表都是非空字符串', () => {
+    it('整张映射表都是非空字符串(条数固定:新增变量必须同步 base.css 兜底)', () => {
         const variables = uiConfigCssVariables();
 
         expect(Object.keys(variables)).toHaveLength(13);
@@ -105,6 +109,30 @@ describe('UI_CONFIG', () => {
         expect(panel.splitMinRatio).toBeLessThanOrEqual(panel.splitDefaultRatio);
         expect(panel.splitDefaultRatio).toBeLessThanOrEqual(panel.splitMaxRatio);
         expect(panel.splitMaxRatio).toBeLessThan(1);
+    });
+
+    it('视图控件参数自洽:步长为正,下限非负且小刻度不比大刻度粗', () => {
+        const view = UI_CONFIG.view;
+
+        expect(view.point.min).toBeGreaterThanOrEqual(0);
+        expect(view.point.sizeStep).toBeGreaterThan(0);
+        expect(view.point.scaleStep).toBeGreaterThan(0);
+
+        expect(view.axis.lineWidthMin).toBeGreaterThan(0);
+        expect(view.axis.lineWidthStep).toBeGreaterThan(0);
+        expect(view.axis.gridMajorMin).toBeGreaterThan(0);
+        expect(view.axis.gridMajorStep).toBeGreaterThan(0);
+        expect(view.axis.gridMinorMin).toBeGreaterThan(0);
+        expect(view.axis.gridMinorStep).toBeGreaterThan(0);
+        expect(view.axis.gridMinorMin).toBeLessThanOrEqual(view.axis.gridMajorMin);
+        expect(view.axis.gridMinorStep).toBeLessThanOrEqual(view.axis.gridMajorStep);
+
+        // ViewCube 的选项要唯一,否则同名按钮会有两个高亮/两个都点不动
+        const values: string[] = view.viewCube.map((item) => item.value);
+        expect(new Set(values).size).toBe(values.length);
+        for (const item of view.viewCube) {
+            expect(item.label.length).toBeGreaterThan(0);
+        }
     });
 });
 

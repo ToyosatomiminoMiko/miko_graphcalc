@@ -1,6 +1,7 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import { UI_CONFIG } from '../../config/uiConfig';
 import type { GridPlane } from '../../render/types';
 import type { AxisControls } from '../../ui/view/ViewPanel';
 import type { NumberFieldHandle } from '../../ui/widgets/NumberField';
@@ -78,7 +79,10 @@ export class GridTicksController {
 
     /** 线宽输入框接线:非法输入回填上一个合法值,合法输入立即广播. */
     private _wireWidth(field: NumberFieldHandle, kind: 'major' | 'minor'): void {
-        const min = kind === 'major' ? 1 : 0.5;
+        // 下限与面板写给数字框的 `min` 同源(UI_CONFIG.view.axis)
+        const min = kind === 'major'
+            ? UI_CONFIG.view.axis.gridMajorMin
+            : UI_CONFIG.view.axis.gridMinorMin;
         const apply = (raw: number | null): void => {
             const current = kind === 'major' ? this.majorWidth : this.minorWidth;
             if (raw === null || raw < min) {

@@ -1,12 +1,22 @@
 /* ==========================================================================
  * GraphCalc 视图控制样式
  * --------------------------------------------------------------------------
- * 负责右侧面板中的相机/视图交互控件:
- *   - 透视/正交相机切换
- *   - 旋转锁定开关
- *   - 预置视角按钮(ViewCube)
+ * 右侧"视图"面板的控件样式.结构与类名由 `src/ui/view/ViewPanel.ts` 决定,
+ * 控件实例由 `src/ui/widgets/*` 生成;这里的类名就是 TS 与 CSS 之间的契约.
  *
- * 相机切换与旋转锁定共用 .switch/.slider 开关样式.
+ * 词汇表(与 widgets 一一对应):
+ *   .control-group         小节(点 / 坐标轴 / 曲面)
+ *   .control-title         小节标题
+ *   .control-row           "文字 + 控件"的行(相机行与各小节的行共用一条规则)
+ *   .control-toggle-group  行内小开关组(X/Y/Z 标签,网格 XZ/XY/YZ)
+ *   .segmented             分段按钮组(单选);列数由 --segmented-columns 给
+ *   .switch / .slider      开关
+ *   .cam-label             相机模式的可点文字
+ *
+ * 为什么合并:改造前 `.point-row` / `.axis-row` / `.surface-row` / `.cam-toggle`
+ * 是四条**逐字相同**的规则,`.point-mode` / `.axis-up-mode` / `.viewcube` 的三组
+ * 按钮样式也逐字相同,只是类名不同.类名分开没有语义收益,只会让"加一个新小节"
+ * 要复制三份 CSS;现在小节之间的差异只剩"列数"与"是否在行内撑满",各自一句话.
  * ========================================================================== */
 
 /* 视图控制区域整体布局.
@@ -24,11 +34,48 @@
     gap: 8px;
 }
 
-/* 相机模式切换行:文字标签与开关横向排列 */
-.cam-toggle {
+/* 小节容器:点 / 坐标轴 / 曲面.小节之间用分隔线划开,内部行距与面板一致. */
+.control-group {
+    border-top: 1px solid var(--color-border-divider);
+    padding-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 小节标题 */
+.control-title {
+    font-size: 12px;
+    color: var(--color-text-active);
+}
+
+/* 行:文字与控件横向排列.
+   相机行(`透视 [开关] 正交 锁定旋转 [开关]`)与各小节的行共用这一条. */
+.control-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+/* 行内数字框:吃掉剩余宽度但固定 76px,贴右(margin-left:auto). */
+.control-row input[type="number"] {
+    width: 76px;
+    margin-left: auto;
+    background: var(--color-bg-sunken);
+    color: var(--color-text-strong);
+    border: 1px solid var(--color-border-input);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+/* 行内小开关组(如 X/Y/Z 标签,刻度/网格):文字与开关贴在一起,不撑满整行. */
+.control-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: var(--color-text-muted);
 }
@@ -92,104 +139,24 @@
 }
 
 /* ==========================================================================
- * ViewCube 预置视角
+ * 分段按钮组(单选)
  * ========================================================================== */
 
-/* 四个视角按钮等宽排列 */
-.viewcube {
+/* 列数由控件按 `columns` 写进 `--segmented-columns`,缺省两列. */
+.segmented {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(var(--segmented-columns, 2), 1fr);
     gap: 6px;
 }
 
-.viewcube button {
-    padding: 5px 0;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 8px;
-    background: var(--color-fill-control);
-    color: var(--color-text-muted);
-    font-size: 12px;
-    cursor: pointer;
-}
-
-/* 当前视角按钮高亮 */
-.viewcube button.active {
-    background: var(--color-select-bg);
-    border-color: var(--color-select-border);
-    color: var(--color-text-active);
-}
-
-/* ==========================================================================
- * 点对象控制
- * ========================================================================== */
-
-.point-controls,
-.axis-controls,
-.surface-controls {
-    border-top: 1px solid var(--color-border-divider);
-    padding-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.point-title,
-.axis-title,
-.surface-title {
-    font-size: 12px;
-    color: var(--color-text-active);
-}
-
-.point-row,
-.axis-row,
-.surface-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-.point-row input[type="number"],
-.axis-row input[type="number"] {
-    width: 76px;
-    margin-left: auto;
-    background: var(--color-bg-sunken);
-    color: var(--color-text-strong);
-    border: 1px solid var(--color-border-input);
-    border-radius: 6px;
-    padding: 4px 6px;
-    font-size: 12px;
-}
-
-/* 同一行内的开关组(如 X/Y/Z 标签,刻度/网格) */
-.axis-switch-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-/* 向上轴三选一按钮组(X/Y/Z) */
-.axis-up-mode {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
+/* 行内变体:在 `.control-row` 里吃掉剩余宽度,但不无限拉长(向上轴 X/Y/Z). */
+.segmented--inline {
     flex: 1;
     max-width: 150px;
     margin-left: auto;
 }
 
-/* 大小/缩放模式切换按钮 */
-.point-mode {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-}
-
-.point-mode button,
-.axis-up-mode button {
+.segmented button {
     padding: 5px 0;
     border: 1px solid var(--color-border-strong);
     border-radius: 8px;
@@ -199,8 +166,8 @@
     cursor: pointer;
 }
 
-.point-mode button.active,
-.axis-up-mode button.active {
+/* 当前选中项高亮 */
+.segmented button.active {
     background: var(--color-select-bg);
     border-color: var(--color-select-border);
     color: var(--color-text-active);

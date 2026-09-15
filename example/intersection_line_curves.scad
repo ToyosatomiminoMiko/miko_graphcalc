@@ -3,17 +3,18 @@
 // =============================================================
 
 // 定义系数(直线斜率与截距)
-param j = 0.6 in [-5, 5, 0.1];
-param k = -0.4 in [-5, 5, 0.1];
+param a = 0.6 in [-5, 5, 0.1];
+param b = -0.4 in [-5, 5, 0.1];
+param c = -0.4 in [-5, 5, 0.1];
 
 // 两条直线 y = j*x 与 y = k*x + j
-curve l1 = x * j {
+curve l1 = x * a {
     color = "#00ffff";
     range = [-8, 8];
     segments = 256;
 }
 
-curve l2 = x * k + j {
+curve l2 = x * b + c {
     color = "#ffff00";
     range = [-8, 8];
     segments = 256;

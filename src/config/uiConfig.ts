@@ -5,6 +5,10 @@
  * 或渲染逻辑.真正落到页面的是 `src/ui/theme/applyUiConfig.ts`,它把这些值写成
  * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
+ * 例外:`panel` 里的拖拽夹取范围与整个 `view` 段落**只有 TS 消费**,CSS 没有
+ * 同名变量,所以不进 `applyUiConfig` 的映射表(见各自的注释);它们放在这里的
+ * 理由是"界面默认值"这一条,而不是"要变成 CSS 变量".
+ *
  * 生效方式:改这里 -> 刷新页面(vite 开发态自动重建).
  * `css/base.css` 的 `:root` 里有同名变量的兜底值,必须与本文件保持一致:
  * 兜底只负责脚本执行前的首帧,正常路径一定会被 applyUiConfig 覆盖.
@@ -78,5 +82,49 @@ export const UI_CONFIG = {
         splitMinRatio: 0.15,
         splitMaxRatio: 0.8,
         splitDefaultRatio: 0.4,
+    },
+    /**
+     * 视图控件(右侧"视图"面板)的行为参数.
+     *
+     * 与 `panel` 里那部分同理,**CSS 用不到**这些值:它们是控件的 min/step 与
+     * 选项清单,只被 `ui/view/ViewPanel` 与 `render/controls/*` 当数字/数据用,
+     * 所以不进 `applyUiConfig` 的变量表,`css/base.css` 里也就没有第二份副本.
+     *
+     * 与 `renderConfig` 的分工:那里是**渲染默认值**(点半径 0.2,轴线宽 3),
+     * 这里是**控件的可调范围与步长**.同名量的默认值与步长分居两处是刻意的:
+     * 改默认值不该顺带改用户能拖多细,也不该让"渲染要不要画这个"受 UI 影响.
+     */
+    view: {
+        point: {
+            /** 半径下限(比例模式的下限同为 0). */
+            min: 0,
+            /** "设定大小"模式的步长. */
+            sizeStep: 0.05,
+            /** "按比例缩放"模式的步长. */
+            scaleStep: 0.1,
+        },
+        axis: {
+            /** 坐标轴线宽(px)的下限与步长. */
+            lineWidthMin: 1,
+            lineWidthStep: 0.5,
+            /** 网格大刻度线宽(px). */
+            gridMajorMin: 1,
+            gridMajorStep: 0.5,
+            /** 网格小刻度线宽(px). */
+            gridMinorMin: 0.5,
+            gridMinorStep: 0.25,
+        },
+        /**
+         * ViewCube 暴露的预置视角:顺序即按钮顺序,列数取它的长度.
+         *
+         * 只列 UI 真正给出口的四个(`ViewHome` 还有 bottom/back/left);需要时
+         * 在这里加一条即可,值域与 `render/types` 的 `ViewHome` 同域.
+         */
+        viewCube: [
+            { value: 'top', label: '上' },
+            { value: 'front', label: '前' },
+            { value: 'right', label: '右' },
+            { value: 'isometric', label: 'ISO' },
+        ],
     },
 } as const;

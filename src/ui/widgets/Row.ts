@@ -1,20 +1,22 @@
 /**
- * 行与行内小件:把"文字 + 控件"的三种常见排布收成函数.
+ * 行,小节与行内小件:把视图面板里"文字 + 控件"的三种常见排布收成函数.
  *
- * 右面板的 `.point-row` / `.axis-row` / `.surface-row` 在 CSS 里是同一套规则
- * (`display:flex; align-items:center; gap:8px`),类名分开只是历史;这里按
- * 原类名参数化,视觉与原来完全一致,将来若要合并成 `.control-row`,只改调用
- * 点传的字符串即可.
+ * 类名固定,不再由调用方给:
+ * - `.control-row`:相机行与各小节的行在 CSS 里本是同一条规则
+ *   (`.point-row` / `.axis-row` / `.surface-row` / `.cam-toggle` 四份逐字相同),
+ *   合并后差异不复存在,调用方也就没有"传哪个类名"的选择;
+ * - `.control-group` / `.control-title`:小节容器与标题;
+ * - `.control-toggle-group`:行内小开关组(X/Y/Z 标签,网格 XZ/XY/YZ).
  *
  * 可见文字一律做成 `<label for>` 而不是 `<span>`:
- * - `.xxx-row` 的字号/颜色是**继承**的,`<label>` 与 `<span>` 渲染无差别;
+ * - `.control-row` 的字号/颜色是**继承**的,`<label>` 与 `<span>` 渲染无差别;
  * - 但 `<label for>` 把可访问名给了控件,点文字也能切换开关 -- 老写法里
  *   `#pointVisible` / `#axisLabelX` 这些控件一个可访问名都没有(UI-P3.1 的
  *   同类问题).
  *
  * 用这些件时,**控件不要再给 `aria-label`**:可见标签已经命名了它.
  */
-import { el, type Child } from './dom';
+import { el, nextWidgetId, type Child } from './dom';
 import type { NumberFieldHandle } from './NumberField';
 import type { SwitchHandle } from './Switch';
 
@@ -30,22 +32,33 @@ export function createFieldLabel(text: string, forId: string): HTMLLabelElement 
     return label;
 }
 
-/** 行容器:`<div class="point-row">...</div>`. */
-export function createRow(className: string, ...children: Child[]): HTMLDivElement {
-    return el('div', { class: className }, ...children);
+/**
+ * 小节:`<section class="control-group" aria-labelledby=标题id>`,标题是
+ * `<header class="control-title">`.
+ *
+ * 用 `aria-labelledby` 而不是让标题纯做视觉:一个 `<section>` 有可访问名之后
+ * 才成为读屏可跳转的 region,标题文字也就顺带成了这一块的名字.
+ */
+export function createControlGroup(title: string, ...children: Child[]): HTMLElement {
+    const titleId = nextWidgetId('control-title');
+    const header = el('header', { class: 'control-title', text: title });
+    header.id = titleId;
+    return el(
+        'section',
+        { class: 'control-group', attrs: { 'aria-labelledby': titleId } },
+        header,
+        ...children,
+    );
 }
 
-/**
- * 一行"文字 + 开关":`<div class="point-row"><label for>文字</label>开关</div>`.
- *
- * 与原 HTML 的唯一差别是文字元素由 `<span>` 变成 `<label for>`(见文件头).
- */
-export function createSwitchRow(
-    className: string,
-    text: string,
-    toggle: SwitchHandle,
-): HTMLDivElement {
-    return createRow(className, createFieldLabel(text, toggle.input.id), toggle.element);
+/** 行容器:`<div class="control-row">...</div>`. */
+export function createRow(...children: Child[]): HTMLDivElement {
+    return el('div', { class: 'control-row' }, ...children);
+}
+
+/** 一行"文字 + 开关":`<div class="control-row"><label for>文字</label>开关</div>`. */
+export function createSwitchRow(text: string, toggle: SwitchHandle): HTMLDivElement {
+    return createRow(createFieldLabel(text, toggle.input.id), toggle.element);
 }
 
 /**
@@ -55,20 +68,19 @@ export function createSwitchRow(
  * 调用方拿到它即可改文案,不必再按 id 去查.
  */
 export function createNumberRow(
-    className: string,
     text: string,
     field: NumberFieldHandle,
 ): { row: HTMLDivElement; label: HTMLLabelElement } {
     const label = createFieldLabel(text, field.input.id);
-    const row = createRow(className, label, field.element);
+    const row = createRow(label, field.element);
     return { row, label };
 }
 
-/** 行内小开关组(`.axis-switch-group`):用于"标签 X/Y/Z"与"网格 XZ/XY/YZ". */
+/** 行内小开关组(`.control-toggle-group`):"标签 X/Y/Z"与"网格 XZ/XY/YZ". */
 export function createInlineToggle(text: string, toggle: SwitchHandle): HTMLDivElement {
     return el(
         'div',
-        { class: 'axis-switch-group' },
+        { class: 'control-toggle-group' },
         createFieldLabel(text, toggle.input.id),
         toggle.element,
     );
