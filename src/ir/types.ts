@@ -297,10 +297,14 @@ export type SceneObject =
 /**
  * 微分分析结果(纯数值结果).
  *
- * 这里只保留已实现算子;AST 侧的 `AnalysisOpKind` 还会带
- * `jacobian`/`laplacian`,用于在编译期给出"暂未实现"诊断.
+ * 这里只保留已实现算子;AST 侧的 `AnalysisOpKind` 还会带 `jacobian`,
+ * 用于在编译期给出"暂未实现"诊断.
+ *
+ * `laplacian` 是标量算子(标量场进,标量出):`∇²f = f_xx + f_yy + f_zz`,
+ * 结果落在 `AnalysisResult.scalar`,`vector` 恒为零向量.向量场的逐分量
+ * 拉普拉斯 `∇²F`(结果仍是向量)当前不提供,见 docs/derivatives-guide.md.
  */
-export type AnalysisOp = 'gradient' | 'divergence' | 'curl';
+export type AnalysisOp = 'gradient' | 'divergence' | 'curl' | 'laplacian';
 /**
  * 分析可视化中的可画元素:
  * - `point`/`normal`:通用,点 + 法向(曲线求导时为切线的法向)箭矢;
@@ -321,7 +325,8 @@ export interface AnalysisResult {
      * `∇f = (f_x, f_y, f_z)`(curve 的 f_y 记 0),系数保持符号(如 `a`),
      * 由 `cachedDerivativeExpression` 在声明级做一次符号求导得到.
      *
-     * 标量场源(curve/surface/implicit/球体)的 gradient 给值;divergence/curl
+     * 标量场源(curve/surface/implicit/球体)的 gradient 给值;laplacian 写作
+     * `∇²f = (f_xx + f_yy + f_zz)`(同样是标量场的符号展开);divergence/curl
      * 的定义需要向量场分量,IR 里没有逐分量符号表达式,故为 undefined,
      * 列表此时只给数值.渲染/数值路径不读这个字段.
      */
@@ -329,12 +334,20 @@ export interface AnalysisResult {
     /**
      * 分析点相对世界原点的球坐标 `[r, θ, φ]`,供结果列表展示.
      *
-     * 只对隐式场/球体的 gradient 给值(它们的 `at` 可以用球坐标显式声明,
-     * 结果也就用同一套坐标回显);θ/φ 约定见
+     * 只对隐式场/球体的 gradient / laplacian 给值(它们的 `at` 可以用球坐标
+     * 显式声明,结果也就用同一套坐标回显);θ/φ 约定见
      * `math/CoordinateSystem.ts` 与 `numericConfig.analysis.
      * sphericalAngleConvention`.其余分析为 undefined.
      */
     pointSpherical?: [number, number, number];
+    /**
+     * 算子的向量结果.
+     *
+     * - gradient:法向(scalar 场给值;curve 为 (-f', 1, 0) 归一化);
+     * - curl:旋度向量;
+     * - divergence / laplacian:标量算子,恒为 `[0, 0, 0]`(渲染层据此
+     *   不会画出箭矢,即使 `show` 里显式写了 `normal`).
+     */
     vector: [number, number, number];
     /**
      * 切线方向(未归一化,(1, f', 0),位于 z=0 曲线平面).

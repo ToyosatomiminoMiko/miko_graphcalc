@@ -175,8 +175,19 @@ describe('求值条目的折叠结构', () => {
         expect(summaryFormula.dataset.tex).toBeUndefined();
     });
 
-    it('摘要行是 <summary>:点它由浏览器开合,行内没有自建热区', () => {
+    it('拉普拉斯条目的彩色标签是"拉普拉斯",类名带 laplacian', () => {
         const { analysisList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            analyses: [{ ...analysis, op: 'laplacian', symbolic: '\\nabla^2 f=2+2' }],
+        });
+
+        const badge = analysisList.querySelector<StubElement>('.kind-badge')!;
+        expect(badge.className).toBe('kind-badge kind-analysis kind-analysis-laplacian');
+        expect(badge.textContent).toBe('拉普拉斯');
+    });
+
+    it('摘要行是 <summary>:点它由浏览器开合,行内没有自建热区', () => {        const { analysisList, controller } = createController();
         controller.renderScene(scene);
 
         const details = analysisList.querySelector<StubElement>('.eval-details')!;

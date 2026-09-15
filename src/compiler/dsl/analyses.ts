@@ -1,6 +1,6 @@
 /**
  * 微分分析编译.
- * 负责 gradient/divergence/curl 的符号求导与 WASM 数值求值编排.
+ * 负责 gradient/divergence/curl/laplacian 的符号求导与 WASM 数值求值编排.
  *
  * 202609 review 结论(hidden 语义,与 intersections/integrals 统一):
  * "隐藏 = 先完整校验,后禁用,仅跳过数值计算".分析语句即使被隐藏也必须
@@ -11,9 +11,14 @@
  * param/object/animation 的"重复声明"契约一致.
  *
  * 隐式场扩展(implicit / sphere):这两类源没有显式因变量,`at` 给的是空间点,
- * 先沿 ∇f 牛顿投影到等值面再取法向,数学与失败语义都收在 ./implicitField.ts;
- * 本文件只负责 kind × 算子分派,at 数量,show 缺省与结果落 IR.3D 场的
- * `at` 语法上至少两个坐标,第三个缺省按 0 补全(与 docs 的说明一致).
+ * 先沿 ∇f 牛顿投影到等值面再取法向/二阶导值,数学与失败语义都收在
+ * ./implicitField.ts;本文件只负责 kind × 算子分派,at 数量,show 缺省与结果
+ * 落 IR.3D 场的 `at` 语法上至少两个坐标,第三个缺省按 0 补全(与 docs 的
+ * 说明一致).
+ *
+ * 拉普拉斯算子(标量场):`∇²f = f_xx + f_yy + f_zz` 与 gradient 共用同一份
+ * "维度决定哪几项参与"的口径,只是把一阶导换成一阶导的再求导
+ * (见 secondDerivatives);向量场的逐分量 `∇²F` 不在此列,编译期显式拒绝.
  */
 import type {
     AnalysisCallName,
@@ -32,6 +37,7 @@ import {
     evaluate_curl_point as wasmEvaluateCurlPoint,
     evaluate_divergence_point as wasmEvaluateDivergencePoint,
     evaluate_gradient_point as wasmEvaluateGradientPoint,
+    evaluate_laplacian_point as wasmEvaluateLaplacianPoint,
 } from '../../wasm/math_rs/math_rs';
 import { splitCoefficients } from '../../math/adapters/coefficientUtils';
 import {
@@ -44,10 +50,15 @@ import { buildParamScope } from './params';
 import {
     cachedDerivativeExpression,
     cachedLatexExpression,
+    evaluateExpressionAt,
     evaluateNumber,
     normalizeExpression,
 } from './expression';
-import { implicitFieldFor, projectToLevelSet } from './implicitField';
+import {
+    implicitFieldFor,
+    projectToLevelSet,
+    type ImplicitField,
+} from './implicitField';
 
 /** 每个算子的规范函数名,解析出的 `call` 必须与之一致. */
 const ANALYSIS_CALL_NAMES: Record<AnalysisOpKind, AnalysisCallName> = {
@@ -92,6 +103,78 @@ function symbolicGradientLatex(expr: string, dim: 2 | 3): string {
         .map((component) => cachedLatexExpression(component))
         .join(',\\ ');
     return `\\nabla f=\\left(${components}\\right)`;
+}
+
+/**
+ * 对声明级表达式求三个**二阶**偏导 `(f_xx, f_yy, f_zz)`,返回表达式字符串.
+ *
+ * 与 {@link symbolicGradientLatex} 的维度口径完全一致:
+ * - `dim = 2`(一元 curve / 二维隐式场):对 z 求导恒为 0,记 `'0'`,不再进
+ *   符号引擎;curve 的 `f_yy` 虽然符号上是真实的,但调用方按 `dim = 2` 传
+ *   `expr` 时 y 并不出现,二次求导自然得 0;
+ * - `dim = 3`(曲面 / 三维隐式场 / 球体):三分量都真实求导(曲面不含 z,
+ *   `f_zz` 自然得 0).
+ *
+ * 求导是"对一阶导再求一次",链式/乘积/商/幂法则全部复用符号引擎既有规则
+ * (`cachedDerivativeExpression`),不新增微分能力;表达式级缓存让二阶导在
+ * 同一表达式上只算一次.
+ */
+function secondDerivatives(expr: string, dim: 2 | 3): [string, string, string] {
+    const fxExpr = cachedDerivativeExpression(expr, 'x');
+    const fyExpr = cachedDerivativeExpression(expr, 'y');
+    if (dim === 2) {
+        return [
+            cachedDerivativeExpression(fxExpr, 'x'),
+            cachedDerivativeExpression(fyExpr, 'y'),
+            '0',
+        ];
+    }
+    const fzExpr = cachedDerivativeExpression(expr, 'z');
+    return [
+        cachedDerivativeExpression(fxExpr, 'x'),
+        cachedDerivativeExpression(fyExpr, 'y'),
+        cachedDerivativeExpression(fzExpr, 'z'),
+    ];
+}
+
+/**
+ * 标量场的拉普拉斯算子符号式 `∇²f = f_xx + f_yy + f_zz`(LaTeX).
+ *
+ * 与 {@link symbolicGradientLatex} 同一展示契约:先把算子作用在源函数上
+ * 写成公式(系数保持符号),再在细节里给该点的数值.与 `∇·F`/`∇×F` 不同,
+ * 标量场有真实的逐项符号展开可看,所以展开行不是"编造中间步骤".
+ *
+ * 维度口径:一元 curve 与二维隐式场 `dim = 2`(z 项恒 0),曲面 `dim = 3`
+ * (z 项自然得 0);这保证同一份 `expr` 在 gradient 与 laplacian 两处展开
+ * 出的符号式不会互相矛盾.
+ */
+function symbolicLaplacianLatex(expr: string, dim: 2 | 3): string {
+    const terms = secondDerivatives(expr, dim)
+        .map((term) => cachedLatexExpression(term))
+        .join('+');
+    return `\\nabla^2 f=${terms}`;
+}
+
+/**
+ * 隐式场(implicit / sphere)在投影点处的 ∇²f 标量值.
+ *
+ * 与 curve/surface 走 WASM 数值核不同,隐式场的二阶偏导已经在场闭包内部
+ * 求好(`implicitField.laplacian`,符号/解析两条来源),这里只把 `null`
+ * (定义域外,符号未声明)收成语句级编译错误,失败语义与既有路径一致:
+ * 宁可报错也不静默画一个没有数值的分析点(同 `projectToLevelSet`).
+ */
+function laplacianAtFieldPoint(
+    field: ImplicitField,
+    point: readonly [number, number, number],
+    context: string,
+): number {
+    const value = field.laplacian(point[0], point[1], point[2]);
+    if (value === null) {
+        throw new Error(
+            `${context} 在 [${point[0]}, ${point[1]}, ${point[2]}] 处 ∇²f 无法求值`,
+        );
+    }
+    return value;
 }
 
 /**
@@ -198,20 +281,29 @@ function compileAnalysisStatement(
         );
     }
 
-    if (statement.op === 'jacobian' || statement.op === 'laplacian') {
+    // laplacian 已在下面实现(标量场);jacobian 仍无实现,明确报错而不是静默忽略.
+    if (statement.op === 'jacobian') {
         throw new Error(`分析算子 ${statement.op} 暂未实现`);
     }
 
     // ---- 校验面 1:对象 kind × 算子 可用矩阵 ----
-    // 标量场源(curve/surface/implicit/球体)只支持 gradient;vector_field
-    // 只支持 divergence/curl.这里只读"隐式维度"这个声明级信息,真正的
-    // 隐式场闭包(含符号偏导)推迟到 hidden 分支之后再建,保证隐藏项不做
-    // WASM 符号求值(与文件头"先完整校验,后禁用"的契约一致).
+    // 标量场源(curve/surface/implicit/球体)支持 gradient 与 laplacian;
+    // vector_field 只支持 divergence/curl.这里只读"隐式维度"这个声明级
+    // 信息,真正的隐式场闭包(含符号偏导)推迟到 hidden 分支之后再建,保证
+    // 隐藏项不做 WASM 符号求值(与文件头"先完整校验,后禁用"的契约一致).
     const implicitDim: 2 | 3 | null = object.kind === 'implicit'
         ? object.dim
         : object.kind === 'sphere'
             ? 3
             : null;
+    if (statement.op === 'laplacian' && object.kind === 'vector_field') {
+        // 向量场的逐分量拉普拉斯 ∇²F = (∇²P, ∇²Q, ∇²R) 需要"一个源对象 ->
+        // 三分量结果"的新 IR 形状,当前不提供(文档里已明确标注).这里显式
+        // 拒绝,避免落进下面"标量场 else 分支"被当成标量场静默处理.
+        throw new Error(
+            `分析算子 laplacian 不能应用于 vector_field 类型对象(逐分量拉普拉斯 ∇²F 暂不实现)`,
+        );
+    }
     if (statement.op === 'divergence' || statement.op === 'curl') {
         if (object.kind !== 'vector_field') {
             throw new Error(
@@ -243,10 +335,19 @@ function compileAnalysisStatement(
     // 3D 隐式场/球体的笛卡尔 at 在语法上同样至少两个数,第三个缺省按 0 补全
     // (见 docs/derivatives-guide.md:建议写全 [x, y, z]).
     // 球坐标形式的 2 个参数含义不同(θ, φ),r 取源球体半径,故下限同样是 2.
-    const requiredAtCount = object.kind === 'vector_field' && !isSphericalAt
-        ? 3
-        : object.kind === 'surface' || implicitDim !== null
+    // laplacian 与 gradient 共用同一套"标量场 + at"口径,故共用同一份下限:
+    // vector_field(div/curl)至少 3 个;surface / 三维隐式场 / 球体至少 2 个
+    // (第三个按 0 补全);一元 curve 只需 1 个;球坐标形式 2 个起(θ, φ).
+    const isScalarFieldOp = statement.op === 'gradient'
+        || statement.op === 'laplacian';
+    const requiredAtCount = isScalarFieldOp
+        ? (object.kind === 'surface' || implicitDim !== null)
             ? 2
+            : isSphericalAt
+                ? 2
+                : 1
+        : object.kind === 'vector_field' && !isSphericalAt
+            ? 3
             : isSphericalAt
                 ? 2
                 : 1;
@@ -275,11 +376,14 @@ function compileAnalysisStatement(
     // show 白名单也在隐藏前校验,避免隐藏项带着拼写错误的 show 静默存活.
     // 缺省项按源对象分派:一元 curve 求导与 2D 隐式曲线默认连同切线一起画,
     // 让"求导要有切线"在没写 show 时也成立;曲面/3D 隐式场/向量场沿用
-    // [point, normal].
-    const defaultShow: AnalysisShow[] = statement.op === 'gradient'
-        && (object.kind === 'curve' || implicitDim === 2)
-        ? ['point', 'normal', 'tangent']
-        : ['point', 'normal'];
+    // [point, normal].laplacian 是标量算子,没有方向可画(vector 恒零),
+    // 缺省只给测量点,不给 normal(否则列表里会挂一个永远不渲染的箭矢).
+    const defaultShow: AnalysisShow[] = statement.op === 'laplacian'
+        ? ['point']
+        : statement.op === 'gradient'
+            && (object.kind === 'curve' || implicitDim === 2)
+            ? ['point', 'normal', 'tangent']
+            : ['point', 'normal'];
     const show = parseShowOption(statement.options, defaultShow);
 
     // ---- 隐藏:仅保留列表项,不执行数值计算 ----
@@ -299,19 +403,45 @@ function compileAnalysisStatement(
 
     // ---- 隐式场(implicit / sphere):投影到等值面的点分析 ----
     // 与 curve/surface 的差别:at 给的是空间点而不是"因变量已解出"的
-    // 自变量,∇f 在空间处处有定义,但"切平面/切向量"只对等值面上的点有
-    // 意义,因此先沿 ∇f 牛顿投影到 f = level,再取该处法向.
-    // 2D 隐式曲线额外给出平面内切线(与 curve 求导的 tangent 对位).
-    // 正式的场闭包(含符号偏导)只在没被隐藏时才建;系数由闭包自己持有.
+    // 自变量,∇f 在空间处处有定义,但"拉普拉斯/切平面"要落在等值面上谈
+    // 才有几何意义,因此先沿 ∇f 牛顿投影到 f = level,再在该点取值:
+    // - gradient:该处单位法向(2D 曲线额外给平面内切线);
+    // - laplacian:该处 ∇²f 的标量值(不需要法向,f 值也不作展示).
+    // 正式的场闭包(含符号偏导/二阶偏导)只在没被隐藏时才建;系数由闭包持有.
     const field = implicitFieldFor(object);
     if (field !== null) {
         const projected = projectToLevelSet(field, at, `分析 ${statement.name}`);
+        if (statement.op === 'laplacian') {
+            results.push({
+                name: statement.name,
+                op: 'laplacian',
+                point: projected.point,
+                // 算子符号式:列表先展开 ∇²f = f_xx + f_yy + f_zz,再给数值.
+                symbolic: symbolicLaplacianLatex(field.expr, field.dim),
+                // 隐式场/球体的分析点是三维空间点,结果列表同时给出球坐标
+                // [r, θ, φ](相对世界原点);由坐标系类换算,约定与 at spherical
+                // 共用同一份全局配置.
+                pointSpherical: analysisSphericalSystem().fromCartesian(projected.point),
+                // 标量算子:没有法向可言,IR 里向量记零,渲染层不画箭矢.
+                vector: [0, 0, 0],
+                tangent: null,
+                scalar: laplacianAtFieldPoint(
+                    field,
+                    projected.point,
+                    `分析 ${statement.name}`,
+                ),
+                show,
+                enabled: true,
+            });
+            return;
+        }
         results.push({
             name: statement.name,
             op: 'gradient',
             point: projected.point,
             // 算子符号式:列表先展开 ∇f,再给该点的数值结果.
-            symbolic: symbolicGradientLatex(field.expr, field.dim),            // 隐式场/球体的分析点是三维空间点,结果列表同时给出球坐标
+            symbolic: symbolicGradientLatex(field.expr, field.dim),
+            // 隐式场/球体的分析点是三维空间点,结果列表同时给出球坐标
             // [r, θ, φ](相对世界原点);由坐标系类换算,约定与 at spherical
             // 共用同一份全局配置.
             pointSpherical: analysisSphericalSystem().fromCartesian(projected.point),
@@ -325,12 +455,66 @@ function compileAnalysisStatement(
         return;
     }
 
+    // 经过 op×kind gate,此处的曲线/曲面 + 标量算子只剩 gradient:
+    // laplacian 已在上面的分支内就地消费并 return.
     if (object.kind === 'curve' || object.kind === 'surface') {
-        // 经过 op×kind gate,此处 statement.op 必为 gradient.
+        const isCurve = object.kind === 'curve';
         const { names: coeffNames, values: coeffValues } = splitCoefficients(
             object.coefficients,
         );
-        const isCurve = object.kind === 'curve';
+
+        if (statement.op === 'laplacian') {
+            // dim 口径与 gradient 一致:curve 为 2(只累加 f_xx),surface 为 3
+            // (f_zz 对 z 求导自然得 0),数值核只做"三项之和"不含维度判断.
+            const dim: 2 | 3 = isCurve ? 2 : 3;
+            const [fxxExpr, fyyExpr, fzzExpr] = secondDerivatives(object.expr, dim);
+            // 一元 curve 只有 x 一个自由变量:第二/第三个 at 分量不参与.
+            const surfaceX = at[0];
+            const surfaceY = isCurve ? 0 : at[1];
+            const scalar = wasmEvaluateLaplacianPoint(JSON.stringify({
+                fxx_expr: fxxExpr,
+                fyy_expr: fyyExpr,
+                fzz_expr: fzzExpr,
+                coeff_names: coeffNames,
+                coeff_values: coeffValues,
+                x: surfaceX,
+                y: surfaceY,
+                z: 0,
+            }));
+            // 测量点落在源曲线上,而不是 at 给出的自变量点:与 gradient/divergence
+            // "点在图形上"的既有观感一致(∇²f 的数值本身与这个纵坐标无关).
+            const surfaceScope: Record<string, number> = {};
+            for (let index = 0; index < coeffNames.length; index += 1) {
+                surfaceScope[coeffNames[index]] = coeffValues[index];
+            }
+            const surfaceValue = evaluateExpressionAt(
+                object.expr,
+                surfaceScope,
+                surfaceX,
+                surfaceY,
+                0,
+            );
+            if (surfaceValue === null) {
+                throw new Error(
+                    `分析 ${statement.name} 在 [${surfaceX}, ${surfaceY}] 处无法求值`,
+                );
+            }
+            results.push({
+                name: statement.name,
+                op: 'laplacian',
+                point: isCurve
+                    ? [surfaceX, surfaceValue, 0]
+                    : [surfaceX, surfaceY, surfaceValue],
+                symbolic: symbolicLaplacianLatex(object.expr, dim),
+                vector: [0, 0, 0],
+                tangent: null,
+                scalar,
+                show,
+                enabled: true,
+            });
+            return;
+        }
+
         const payload = JSON.stringify({
             surface_expr: normalizeExpression(object.expr),
             fx_expr: cachedDerivativeExpression(object.expr, 'x'),

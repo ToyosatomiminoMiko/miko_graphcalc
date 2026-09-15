@@ -47,6 +47,8 @@ export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'partial_derivative_surface.scad', title: '二元函数偏导', group: '求导 / 偏导' },
     { file: 'divergence_vector_field.scad', title: '散度 div(F)', group: '求导 / 偏导' },
     { file: 'curl_vector_field.scad', title: '旋度 curl(F)', group: '求导 / 偏导' },
+    { file: 'laplacian_scalar_field.scad', title: '拉普拉斯 ∇²f', group: '求导 / 偏导' },
+    { file: 'laplacian_harmonic.scad', title: '调和场 ∇²f = 0', group: '求导 / 偏导' },
     { file: 'sphere_gradient.scad', title: '球体隐式场梯度', group: '求导 / 偏导' },
     { file: 'gauss_surface.scad', title: '高斯钟形曲面', group: '求导 / 偏导' },
     { file: 'object_addition.scad', title: '对象相加', group: _orther },

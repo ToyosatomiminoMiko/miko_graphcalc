@@ -1,7 +1,7 @@
 use crate::eval_core::CompiledEvaluator;
 
 // ================================================================
-// field_core — 标量场 / 向量场的梯度\散度\旋度数值核心
+// field_core - 标量场 / 向量场的梯度\散度\旋度\拉普拉斯数值核心
 //
 // 架构流程:
 //   Rust 符号引擎负责解析表达式并生成符号偏导表达式
@@ -122,6 +122,55 @@ pub fn evaluate_divergence_point(
 }
 
 // ================================================================
+// 拉普拉斯算子
+// ================================================================
+
+/// 计算三维标量场 `f(x, y, z)` 在点 `(x, y, z)` 处的拉普拉斯算子值
+///
+/// # 公式
+/// ∇²f = ∇·(∇f) = ∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²
+///
+/// # 参数
+/// * `fxx_expr` - ∂²f/∂x² 的表达式
+/// * `fyy_expr` - ∂²f/∂y² 的表达式
+/// * `fzz_expr` - ∂²f/∂z² 的表达式
+/// * `coeff_names` - 系数变量名列表
+/// * `coeff_values` - 对应的系数值
+/// * `x`, `y`, `z` - 点的坐标
+///
+/// # 返回
+/// 拉普拉斯算子值 `∇²f`(标量)
+///
+/// # 维度口径
+/// 与 [`evaluate_gradient_point`] 一致:一元 curve 的 `fyy`/`fzz` 传 `"0"`,
+/// 曲面 `z = f(x, y)` 的 `fzz` 传 `"0"`;调用方按源对象的维度给出真实的
+/// 二阶偏导表达式,本函数只求三项之和,不做维度推断.
+#[allow(clippy::too_many_arguments)]
+pub fn evaluate_laplacian_point(
+    fxx_expr: &str,
+    fyy_expr: &str,
+    fzz_expr: &str,
+    coeff_names: &[String],
+    coeff_values: &[f64],
+    x: f64,
+    y: f64,
+    z: f64,
+) -> Result<f64, String> {
+    let mut fxx_evaluator: CompiledEvaluator =
+        CompiledEvaluator::new(fxx_expr, coeff_names, coeff_values)?;
+    let mut fyy_evaluator: CompiledEvaluator =
+        CompiledEvaluator::new(fyy_expr, coeff_names, coeff_values)?;
+    let mut fzz_evaluator: CompiledEvaluator =
+        CompiledEvaluator::new(fzz_expr, coeff_names, coeff_values)?;
+
+    let fxx: f64 = fxx_evaluator.eval_at_strict(x, y, z)?;
+    let fyy: f64 = fyy_evaluator.eval_at_strict(x, y, z)?;
+    let fzz: f64 = fzz_evaluator.eval_at_strict(x, y, z)?;
+
+    Ok(fxx + fyy + fzz)
+}
+
+// ================================================================
 // 旋度
 // ================================================================
 
@@ -232,5 +281,36 @@ mod tests {
         assert!(cx.abs() < 1e-9);
         assert!(cy.abs() < 1e-9);
         assert!((cz - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn laplacian_of_radial_quadratic() {
+        let (names, values) = no_coeffs();
+        // f = x^2 + y^2:f_xx = 2, f_yy = 2, f_zz = 0 -> ∇²f = 4.
+        let value =
+            evaluate_laplacian_point("2", "2", "0", &names, &values, 3.0, 4.0, 0.0).unwrap();
+
+        assert!((value - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn laplacian_of_harmonic_field_is_zero() {
+        let (names, values) = no_coeffs();
+        // f = x^2 - y^2 是调和函数:f_xx = 2, f_yy = -2, 和为 0.
+        let value =
+            evaluate_laplacian_point("2", "-2", "0", &names, &values, 1.0, 2.0, 0.0).unwrap();
+
+        assert!(value.abs() < 1e-9);
+    }
+
+    #[test]
+    fn laplacian_keeps_coefficients_in_every_component() {
+        let names = vec!["a".to_string(), "k".to_string()];
+        let values = vec![3.0, 2.0];
+        // 表达式可以显式引用系数名,三个分量各自代入同一份系数组.
+        let value =
+            evaluate_laplacian_point("a", "a", "k * 2", &names, &values, 0.0, 0.0, 0.0).unwrap();
+
+        assert!((value - 10.0).abs() < 1e-9);
     }
 }

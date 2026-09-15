@@ -170,3 +170,20 @@ pub struct EvaluateCurlPointPayload {
     pub y: f64,
     pub z: f64,
 }
+
+/// `evaluate_laplacian_point`:拉普拉斯算子数值求值请求(标量场,三项二阶偏导).
+///
+/// 维度口径与 `EvaluateGradientPointPayload` 一致:一元 curve 的 `fyy_expr`
+/// 与 curve/surface 的 `fzz_expr` 由调用方传 `"0"`,本结构体不做维度推断.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluateLaplacianPointPayload {
+    pub fxx_expr: String,
+    pub fyy_expr: String,
+    pub fzz_expr: String,
+    pub coeff_names: Vec<String>,
+    pub coeff_values: Vec<f64>,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}

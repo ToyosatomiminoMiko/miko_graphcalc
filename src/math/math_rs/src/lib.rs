@@ -35,8 +35,8 @@ use integral_method::IntegralMethod;
 use wasm_bindgen::prelude::*;
 use wasm_payloads::{
     EvaluateCurlPointPayload, EvaluateDivergencePointPayload, EvaluateGradientPointPayload,
-    Integrate1dPayload, Integrate2dPayload, IntegrateRegionPayload, IntegrateSolidPayload,
-    IntersectPairPayload, SampleVectorFieldPayload,
+    EvaluateLaplacianPointPayload, Integrate1dPayload, Integrate2dPayload, IntegrateRegionPayload,
+    IntegrateSolidPayload, IntersectPairPayload, SampleVectorFieldPayload,
 };
 
 fn math_error(message: impl Into<String>) -> JsValue {
@@ -635,6 +635,34 @@ pub fn evaluate_curl_point(payload: &str) -> Result<CurlPointResult, JsValue> {
     Ok(CurlPointResult { x, y, z })
 }
 
+/// 拉普拉斯算子数值求值入口;参数走 JSON 请求(见 `wasm_payloads`).
+///
+/// 标量场进,标量出:`∇²f = f_xx + f_yy + f_zz`,与散度同款的单值返回.
+#[wasm_bindgen]
+pub fn evaluate_laplacian_point(payload: &str) -> Result<f64, JsValue> {
+    let EvaluateLaplacianPointPayload {
+        ref fxx_expr,
+        ref fyy_expr,
+        ref fzz_expr,
+        ref coeff_names,
+        ref coeff_values,
+        x,
+        y,
+        z,
+    } = parse_payload::<EvaluateLaplacianPointPayload>(payload)?;
+    field_core::evaluate_laplacian_point(
+        fxx_expr,
+        fyy_expr,
+        fzz_expr,
+        coeff_names,
+        coeff_values,
+        x,
+        y,
+        z,
+    )
+    .map_err(math_error)
+}
+
 // ================================================================
 // 分发层 / 契约层测试
 //
@@ -649,7 +677,8 @@ pub fn evaluate_curl_point(payload: &str) -> Result<CurlPointResult, JsValue> {
 mod glue_tests {
     use super::*;
     use wasm_payloads::{
-        Integrate1dPayload, Integrate2dPayload, IntegrateRegionPayload, IntegrateSolidPayload,
+        EvaluateLaplacianPointPayload, Integrate1dPayload, Integrate2dPayload,
+        IntegrateRegionPayload, IntegrateSolidPayload,
     };
 
     fn no_coeffs() -> (Vec<String>, Vec<f64>) {
@@ -702,6 +731,38 @@ mod glue_tests {
             error.to_string().contains("unknown field"),
             "错误应点名未知字段: {error}"
         );
+    }
+
+    #[test]
+    fn laplacian_point_glue_known_values() {
+        let (names, values) = no_coeffs();
+        // f = x^2 + y^2 曲面:∇²f = 2 + 2 + 0 = 4(曲面源 f_zz 传 "0").
+        let request = EvaluateLaplacianPointPayload {
+            fxx_expr: "2".to_string(),
+            fyy_expr: "2".to_string(),
+            fzz_expr: "0".to_string(),
+            coeff_names: names.clone(),
+            coeff_values: values.clone(),
+            x: 3.0,
+            y: 4.0,
+            z: 0.0,
+        };
+        let result = evaluate_laplacian_point(&payload_of(&request)).expect("laplacian 应成功");
+        approx(result, 4.0, 1e-12, "∇²(x^2 + y^2)");
+
+        // 调和场 f = x^2 - y^2:2 + (-2) + 0 = 0,数值上应为精确 0.
+        let request = EvaluateLaplacianPointPayload {
+            fxx_expr: "2".to_string(),
+            fyy_expr: "-2".to_string(),
+            fzz_expr: "0".to_string(),
+            coeff_names: names,
+            coeff_values: values,
+            x: 1.0,
+            y: 2.0,
+            z: 0.0,
+        };
+        let result = evaluate_laplacian_point(&payload_of(&request)).expect("laplacian 应成功");
+        approx(result, 0.0, 1e-12, "∇²(x^2 - y^2)");
     }
 
     #[test]

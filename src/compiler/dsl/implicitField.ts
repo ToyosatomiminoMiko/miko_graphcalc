@@ -1,6 +1,6 @@
 /**
  * 隐式标量场:把"隐式对象"与"球体"统一成 `f(x,y,z) = level`,并提供
- * 点求值,∇f 与"沿梯度投影到等值面"三项能力.
+ * 点求值,∇f,二阶偏导合成的 ∇²f 与"沿梯度投影到等值面"四项能力.
  *
  * 为什么需要这一层:curve/surface 的 gradient 之所以简单,是因为它们的
  * 方程已经解出了因变量(`y=f(x)` / `z=f(x,y)`),分析点由 `at` 的 x/y
@@ -42,6 +42,17 @@ export interface ImplicitField {
     level: number;
     value(x: number, y: number, z: number): number | null;
     gradient(x: number, y: number, z: number): [number, number, number] | null;
+    /**
+     * 拉普拉斯算子 `∇²f = f_xx + f_yy + f_zz` 在空间点的值.
+     *
+     * 与 `gradient` 同一份分工:二阶偏导在声明级由 Rust 符号引擎算出(带缓存),
+     * 每次参数刷新只重新做数值求值;`null` 表示该点不可求值(定义域外).
+     *
+     * 口径由各构造器按自己的维度收口:2D 隐式曲线只累加 f_xx + f_yy(与
+     * "+z 方向恒 0"等价),球体是解析闭式 `∇²(|p−c|²−r²) = 6`,不必走符号
+     * 引擎.调用方(`dsl/analyses.ts`)不重复这份维度判断.
+     */
+    laplacian(x: number, y: number, z: number): number | null;
 }
 
 /** 投影结果:等值面上的点,单位法向,2D 切线(3D 为 null)与投影点处的 f 值. */
@@ -88,6 +99,14 @@ export function implicitFieldOf(object: ImplicitObject): ImplicitField {
         ? cachedDerivativeExpression(object.expr, 'z')
         : '0';
 
+    // 二阶偏导只在声明级算一次(表达式级缓存).2D 曲线不构造 z 方向导数:
+    // 恒 0 的分量直接记为 '0',省掉一次符号求导,与 gzExpr 的处理同源.
+    const fxxExpr = cachedDerivativeExpression(gxExpr, 'x');
+    const fyyExpr = cachedDerivativeExpression(gyExpr, 'y');
+    const fzzExpr = object.dim === 3
+        ? cachedDerivativeExpression(gzExpr, 'z')
+        : '0';
+
     return {
         name: object.name,
         expr: object.expr,
@@ -100,6 +119,13 @@ export function implicitFieldOf(object: ImplicitObject): ImplicitField {
             const gz = evaluateExpressionAt(gzExpr, scope, x, y, z);
             if (gx === null || gy === null || gz === null) return null;
             return [gx, gy, gz];
+        },
+        laplacian: (x, y, z) => {
+            const fxx = evaluateExpressionAt(fxxExpr, scope, x, y, z);
+            const fyy = evaluateExpressionAt(fyyExpr, scope, x, y, z);
+            const fzz = evaluateExpressionAt(fzzExpr, scope, x, y, z);
+            if (fxx === null || fyy === null || fzz === null) return null;
+            return fxx + fyy + fzz;
         },
     };
 }
@@ -136,6 +162,9 @@ export function sphereImplicitField(object: SphereObject): ImplicitField {
             2 * (y - cy),
             2 * (z - cz),
         ],
+        // ∇²(|p−c|² − r²) = 2 + 2 + 2 = 6:球体的隐式函数是二次型,拉普拉斯
+        // 处处为常数,与中心/半径无关,故给解析闭式而不走符号引擎.
+        laplacian: () => 6,
     };
 }
 

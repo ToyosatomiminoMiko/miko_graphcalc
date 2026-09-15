@@ -41,6 +41,10 @@ function vectorLatex(values: readonly number[]): string {
  * 只给"哪个算子在哪个点":数值放到展开细节里,同一行不重复出现算子与结果.
  * 标量场梯度在 `symbolic` 里带符号定义 `∇f = (f_x, f_y, f_z)`,点代入该
  * 定义后就是细节里的中间步骤.
+ *
+ * 例外:散度/拉普拉斯是标量算子,数值本身就是整个结果(scalar 域),没有
+ * "逐分量展开"可言,因此摘要直接排 `算子(P) = 数值`;旋度是向量算子,同样
+ * 直接把向量排进摘要.梯度则只给书写形式,数值留在细节.
  */
 export function analysisLatexSummary(analysis: AnalysisResult): LatexLine {
     const point = vectorLatex(analysis.point);
@@ -51,16 +55,18 @@ export function analysisLatexSummary(analysis: AnalysisResult): LatexLine {
             return `\\nabla\\cdot\\mathbf{F}\\left(${point}\\right)=${latexNumberText(analysis.scalar ?? NaN)}`;
         case 'curl':
             return `\\nabla\\times\\mathbf{F}\\left(${point}\\right)=${vectorLatex(analysis.vector)}`;
+        case 'laplacian':
+            return `\\nabla^{2}f\\left(${point}\\right)=${latexNumberText(analysis.scalar ?? NaN)}`;
     }
 }
 
 /**
  * 分析结果细节:展开后逐行排版,按"先算子的符号展开,再该点的数值"排列.
  *
- * 梯度(与求导对象同一个展示契约:先给算子公式,再给结果):
- * 1. `∇f = (f_x, f_y, f_z)`(符号定义,保持系数符号);
- * 2. `∇f(P) = (数值, ...)`;
- * 3. `P = (...)`,球坐标回显 `(r, θ, φ)`,`f(P)`,切线 `T`.
+ * 梯度与拉普拉斯(与求导对象同一个展示契约:先给算子公式,再给结果):
+ * 1. `∇f = (f_x, f_y, f_z)` / `∇²f = f_xx + f_yy + f_zz`(符号展开,保持系数符号);
+ * 2. `∇f(P) = (数值, ...)` / `(∇²f)(P) = 数值`;
+ * 3. `P = (...)`,球坐标回显 `(r, θ, φ)`,梯度额外给 `f(P)` 与切线 `T`.
  *
  * 散度/旋度没有逐分量符号表达式(IR 不保存向量场分量的符号式),因此只给
  * 数值结果行,不编造中间步骤.
@@ -77,6 +83,10 @@ export function analysisLatexDetails(analysis: AnalysisResult): EvaluationDetail
     } else if (analysis.op === 'divergence') {
         lines.push(
             `\\left(\\nabla\\cdot\\mathbf{F}\\right)\\left(P\\right)=${latexNumberText(analysis.scalar ?? NaN)}`,
+        );
+    } else if (analysis.op === 'laplacian') {
+        lines.push(
+            `\\left(\\nabla^{2}f\\right)\\left(P\\right)=${latexNumberText(analysis.scalar ?? NaN)}`,
         );
     } else {
         lines.push(

@@ -91,6 +91,15 @@ describe('analysisLatexSummary', () => {
         expect(analysisLatexSummary(analysis({ op: 'curl' })))
             .toContain('\\nabla\\times\\mathbf{F}');
     });
+
+    it('拉普拉斯是标量算子,摘要直接给算子与数值', () => {
+        const summary = analysisLatexSummary(analysis({
+            op: 'laplacian',
+            symbolic: '\\nabla^2 f=2+2',
+            scalar: 4,
+        }));
+        expect(summary).toBe('\\nabla^{2}f\\left(\\left(1,\\ 2,\\ 3\\right)\\right)=4');
+    });
 });
 
 /** 细节行 -> LaTeX 文本数组;公式行取 latex,文本行原样取 text. */
@@ -124,6 +133,23 @@ describe('analysisLatexDetails', () => {
     it('切线只在有值时出', () => {
         const withTangent = detailTexts(analysisLatexDetails(analysis({ tangent: [1, 2, 0] })));
         expect(withTangent.some((line) => line.startsWith('\\mathbf{T}='))).toBe(true);
+    });
+
+    it('拉普拉斯先展开二阶导符号式,再给该点的标量结果', () => {
+        const symbolic = '\\nabla^2 f=2+2';
+        const lines = detailTexts(analysisLatexDetails(analysis({
+            op: 'laplacian',
+            symbolic,
+            // 标量算子:向量恒零(渲染层据此不画箭矢).
+            vector: [0, 0, 0],
+            scalar: 4,
+        })));
+        expect(lines[0]).toBe(symbolic);
+        expect(lines[1]).toBe('\\left(\\nabla^{2}f\\right)\\left(P\\right)=4');
+        expect(lines[2]).toBe('P=\\left(1,\\ 2,\\ 3\\right)');
+        // 拉普拉斯没有 f(P)/切线的展示(symbolic 与数值两行已经完整).
+        expect(lines.some((line) => line.startsWith('\\mathbf{T}='))).toBe(false);
+        expect(lines.some((line) => line.startsWith('f\\left(P\\right)'))).toBe(false);
     });
 });
 

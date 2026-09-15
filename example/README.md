@@ -22,12 +22,15 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名沿用 `.scad`,文件名按
 | `partial_derivative_surface.scad` | 二元函数偏导:`gradient` 作用于 `surface` 求 ∂f/∂x,∂f/∂y,画法向与切平面(`tangent_plane`);含鞍面 fx=fy=0 处切平面水平的演示 |
 | `divergence_vector_field.scad` | 散度 `div(F)`:线性源/汇场 div = a+b+c 与刚体旋转场 div ≡ 0 的对照 |
 | `curl_vector_field.scad` | 旋度 `curl(F)`:刚体旋转场 curl = (0,0,2w) 与保守梯度场 curl = (0,0,0) 的对照 |
+| `laplacian_scalar_field.scad` | 拉普拉斯 `laplacian(s)`:抛物面 `z = a*x² + b*y²` 的 `∇²f = 2a + 2b`(处处常数,拖滑块直接改数值) |
+| `laplacian_harmonic.scad` | 拉普拉斯四类源对照(curve/surface/二维与三维 implicit)与调和场 `∇²f = 0`;球体/隐式场先投影到等值面再取值 |
 | `sphere_gradient.scad` | 隐式场:球体 `derivative` -> ∇f 向量场,`gradient` 在空间点取 ∇f 并沿梯度投影到球面画点/法向/切平面;`at spherical(θ, φ)` 球坐标写法与 `in cyclic [...]` 循环类系数(φ 越界回绕转圈);`implicit f(x,y,z)=0` 的通用写法 |
 
 > 说明:DSL 层求导有两种形态--`derivative` 语句把符号导数画成整条函数
-> 曲线/曲面;`gradient` / `divergence` / `curl` 在指定点做点分析(切线/
-> 法向/切平面/散度/旋度),符号引擎都在编译期完成求导;
-> `jacobian` / `laplacian` 语法可解析但编译期报"暂未实现".
+> 曲线/曲面;`gradient` / `divergence` / `curl` / `laplacian` 在指定点做
+> 点分析(切线/法向/切平面/散度/旋度/二阶标量),符号引擎都在编译期完成
+> 求导;`jacobian` 语法可解析但编译期报"暂未实现",向量场的逐分量
+> 拉普拉斯 `∇²F` 也会报"暂不实现".
 > 详见 `../docs/derivatives-guide.md`.
 >
 > 第三种形态是"隐式场":`sphere`(球体)与 `implicit` 对象没有解出因变量,

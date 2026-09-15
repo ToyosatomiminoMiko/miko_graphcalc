@@ -31,14 +31,22 @@
     θ/φ 约定由 `numericConfig.analysis.sphericalAngleConvention` 全局配置
     (physics 默认 / math);隐式场/球体的 gradient 结果额外携带
     `pointSpherical` 供结果列表回显;
-  - div/curl = `vector_field` 上的六个一阶偏导组合.
+  - div/curl = `vector_field` 上的六个一阶偏导组合;
+  - laplacian = 标量场上的三个**二阶**偏导之和
+    `∇²f = f_xx + f_yy + f_zz`,与 gradient 共用同一份"维度决定哪几项
+    参与"的口径(curve 为 2 维,surface 的 z 项恒 0);对一阶偏导再求一次
+    偏导即可,不新增微分规则.隐式场/球体的二阶偏导收在场闭包
+    `ImplicitField.laplacian`(implicit 走符号二阶导,球体用解析闭式 6).
 - **求导本身在编译期完成(符号求导),数值求值在 WASM 内完成**,对象与
   分析结果都是"纯数据",拖动参数只重新求值,不重新求导(表达式级缓存).
 - **`derivative` 语句输出"导数函数对象",分析算子输出"点值"**:前者是
   整条 f′ 曲线(f′ 表达式作为新对象表达式),后者是在某一点求 f′(px),
-  fx/fy(px,py),div/curl(px,py,pz).
-- **jacobian / laplacian 未实现**:pest 语法与 AST 类型已接受,编译期
-  (`analyses.ts`)抛"分析算子 ... 暂未实现".
+  fx/fy(px,py),div/curl(px,py,pz),∇²f(px,py).
+- **jacobian 未实现**:pest 语法与 AST 类型已接受,编译期
+  (`analyses.ts`)抛"分析算子 ... 暂未实现".`laplacian` 已实现(标量场);
+  **向量场的逐分量拉普拉斯 `∇²F = (∇²P, ∇²Q, ∇²R)` 暂不实现**,对
+  `vector_field` 写 `laplacian` 会被 `analyses.ts` 显式拒绝(错误文案
+  带"逐分量拉普拉斯 ∇²F 暂不实现"),而不是落进标量场分支被静默处理.
 
 ## 2. 主要代码路径
 
@@ -54,22 +62,31 @@ AST AnalysisStatement { op, call, source, at[], options[] }
       cachedDerivativeExpression(expr, 'x' | 'y')   compiler/dsl/expression.ts
         │ wasm symbolic_derivative(expr, variable)   math_rs/src/lib.rs
         │   └─ symbolic/derivative.rs + builtins.rs(法则/函数表)
+· 曲线/曲面(拉普拉斯):对一阶导再求一次导得到 f_xx / f_yy / f_zz
+      secondDerivatives(expr, dim)  dsl/analyses.ts(复用同一份符号引擎缓存)
 · 隐式场/球体(梯度):implicitFieldFor(object) -> f 与 ∇f 的点求值闭包
       implicitField.ts::projectToLevelSet 沿 ∇f 牛顿投影到 f = level
         │ 数值求值 evaluateExpressionAt -> wasm evaluate_scalar
         │ (球体的 f/∇f 是解析式,不再走符号引擎)
+· 隐式场/球体(拉普拉斯):同一投影点上的 ImplicitField.laplacian
+      implicitField.ts(implicit 走符号二阶导;球体给解析闭式 6)
         ▼
 JSON payload -> evaluate_gradient_point / evaluate_divergence_point /
-              evaluate_curl_point(lib.rs) -> field_core.rs 数值求值
+              evaluate_curl_point / evaluate_laplacian_point(lib.rs)
+              -> field_core.rs 数值求值
         ▼
 IR AnalysisResult { point, vector, tangent, scalar, show, enabled }
         │
         ├─ AnalysisRenderer.ts     渲染 point/normal/tangent/tangent_plane
-        └─ ObjectListController.ts "结果"列表:∇f / ∇·F / ∇×F 与 f(P)
+        └─ ObjectListController.ts "结果"列表:∇f / ∇·F / ∇×F / ∇²f 与 f(P)
 ```
 
 - 曲线 gradient 的 payload:`fy_expr = '0'`(第二 at 坐标不参与);
 - 曲面 gradient 的向量 = normalize(−fx, −fy, 1);曲线 = normalize(−f′, 1, 0);
+- laplacian 的 payload 是三项二阶偏导 `fxx_expr`/`fyy_expr`/`fzz_expr`,
+  数值核只做 `f_xx + f_yy + f_zz`(标量返回,与散度同款签名);`at` 口径
+  与 gradient 相同,但测量点仍落在源图形上(靠 `evaluate_scalar` 取一次
+  f 值),`vector` 恒 `[0,0,0]`,`show` 缺省 `[point]`;
 - curve 求导的切线方向 `tangent = (1, f′, 0)` 未归一化,Δx 半长由
   `renderConfig.analysis.tangentHalfLength`(默认 2)控制;
 - 符号引擎:`math_rs/src/symbolic/derivative.rs` 按节点分派(常数/变量/
@@ -122,12 +139,20 @@ f′ 曲线可视化,应在 DSL/IR 层增加显式语义(参考 §5 的未实现
 
 ## 5. 已知边界与未实现
 
-- `jacobian` / `laplacian`:AST 类型 `AnalysisOpKind` 与 pest
-  `analysis_op` 已收,但 analyses.ts 编译期直接抛"暂未实现";加算子时
-  需同步 `compiler_rs/src/miko.pest` 与 `ast/types.ts`.
+- `jacobian`:AST 类型 `AnalysisOpKind` 与 pest `analysis_op` 已收,但
+  analyses.ts 编译期直接抛"暂未实现";加算子时需同步
+  `compiler_rs/src/miko.pest` 与 `ast/types.ts`.
+- **向量场的逐分量拉普拉斯 `∇²F = (∇²P, ∇²Q, ∇²R)`**:未实现,且**不会**
+  被当成标量场处理--`analyses.ts` 对 `laplacian(vector_field)` 直接报
+  "逐分量拉普拉斯 ∇²F 暂不实现".要落地它需要"一个源对象 -> 三分量结果"
+  的新 IR 形状(现在 `AnalysisResult` 的 `scalar`/`vector` 是二选一),
+  以及三分量各自的二阶偏导 payload,属于独立一组改动.
+  (`laplacian` 的标量场部分已实现,见 §1 与 §2.)
 - 高阶/混合偏导没有独立语句,但可用 `derivative` 链式求导得到:每步把
   上一步的导数对象当源对象即可(如 `derivative(d = derivative(s, x))` 得
   ∂²f/∂x²,`derivative(dy = derivative(d, y))` 得 ∂²f/∂y∂x).
+  `laplacian` 内部正是走这条链式路径(`secondDerivatives`),只是不暴露
+  混合偏导 `f_xy`.
 - 对数组/向量表达式求导:未支持(`derivative` 源只能是
   curve/surface/implicit/sphere;对 vector_field 求导会报"只能应用于
   curve/surface/implicit/sphere 类型对象").
@@ -150,6 +175,13 @@ f′ 曲线可视化,应在 DSL/IR 层增加显式语义(参考 §5 的未实现
 
 - TS:`src/compiler/dsl/DslCompiler.test.ts` 覆盖 curve/surface
   gradient 的 payload,归一化法向,tangent 默认与显式 show,div/curl
-  数值编排,kind×算子非法组合与 call 不匹配等;
+  数值编排,laplacian 三类源(curve/surface 走 WASM 数值核,
+  implicit 走场闭包)与 `vector_field` 的逐分量报错,kind×算子非法组合
+  与 call 不匹配等;
+- 展示层:`src/compiler/dsl/evaluationLatex.test.ts` 锁定 laplacian
+  摘要/细节两行公式,`src/ui/objects/ObjectListController.test.ts`
+  锁定"拉普拉斯"彩色标签;
 - Rust:`src/math/math_rs/src/symbolic/mod.rs` 单元测试覆盖符号求导
-  法则与化简(`sin(x*a)`,`abs` 的 sign 语义,常数折叠等).
+  法则与化简(`sin(x*a)`,`abs` 的 sign 语义,常数折叠等);
+  `field_core.rs` / `lib.rs` 的 glue 测试覆盖 `evaluate_laplacian_point`
+  的已知真值(抛物面 4,调和场 0)与 payload 契约.

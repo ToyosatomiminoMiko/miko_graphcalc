@@ -8,7 +8,8 @@
 - **指定点的分析**(切线/法向/切平面):由"微分分析"算子承载,符号引擎在
   编译期求导,运行时在 `at` 指定的点求值.一元导数 = `curve` 上的
   `gradient` 分析,偏导 = `surface` 上的 `gradient` 分析,向量场的导数
-  组合 = `divergence` / `curl` 分析.见 §2 起.
+  组合 = `divergence` / `curl` 分析,标量场的二阶组合 = `laplacian`.
+  见 §2 起.
 
 实现层面的讨论见 [derivatives-impl.md](derivatives-impl.md).
 
@@ -212,7 +213,54 @@ curl      名称 = curl(F) at [px, py, pz];
 与无旋梯度场对照).注意"无旋"与"无散"是彼此独立的两个性质:线性
 源/汇场 `[a*x, b*y, c*z]` 无旋但有散.
 
-## 5. 算子 × 对象可用矩阵与校验
+## 5. 标量场的拉普拉斯算子:laplacian
+
+语法(`curve` / `surface` / `implicit` / `sphere` 这些**标量场**源):
+
+```text
+laplacian 名称 = laplacian(源对象) at [px, py, pz] {
+    show = [point];   // 可选,见 §6
+};
+```
+
+拉普拉斯算子是"梯度的散度",也是标量算子:标量场进,标量出,
+
+```text
+∇²f = ∇·(∇f) = f_xx + f_yy + f_zz
+```
+
+- **point**:源图形上的分析点(黄色圆点).与 `gradient` 的曲面点口径
+  一致:curve 上是 `(px, f(px), 0)`,surface 上是 `(px, py, f(px,py))`,
+  隐式场/球体上是沿 `∇f` 投影到等值面后的点(并回显球坐标);
+- 数值 `∇²f(P)` 直接排进结果列表的摘要行,展开细节里先给二阶导的
+  符号展开 `∇²f = f_xx + f_yy + f_zz`(系数保持符号),再给该点的数值.
+
+**维度口径与 `gradient` 一致**--哪几个方向算作"独立变量"由源对象决定:
+
+| 源 | 独立变量 | `∇²f` |
+| --- | --- | --- |
+| `curve` | 只有 x | `f''(x)` |
+| `surface` | x, y(不含 z) | `f_xx + f_yy` |
+| `implicit`(二维) | x, y | `f_xx + f_yy` |
+| `implicit`(三维)/`sphere` | x, y, z | `f_xx + f_yy + f_zz` |
+
+`∇²f = 0` 的函数叫**调和函数**:它既没有"源"也没有"汇".经典例子是
+`f = x² − y²`(双曲抛物面)与线性函数;而 `f = x² + y²` 的 `∇²f = 4`
+处处为正,是"处处有源"的场(注意:水平集 `x² + y² = R²` 本身是圆,
+但水平集函数并不调和,两者不要混为一谈).
+
+示例:`example/laplacian_scalar_field.scad`(抛物面 `z = a*x² + b*y²`,
+`∇²f = 2a + 2b` 处处常数,拖动滑块直接改变数值),
+`example/laplacian_harmonic.scad`(curve / surface / 二维与三维 implicit
+四类源对照,含调和场数值恒为 0).
+
+**暂不实现**:向量场的**逐分量拉普拉斯**
+`∇²F = (∇²P, ∇²Q, ∇²R)`(结果仍是向量)当前不提供;对
+`vector_field` 写 `laplacian` 会在编译期报
+"逐分量拉普拉斯 ∇²F 暂不实现"而不是被当成标量场静默处理.`jacobian`
+同样未实现(报"暂未实现").
+
+## 6. 算子 × 对象可用矩阵与校验
 
 | 算子 | 对象 | 结果 | `at` 至少 |
 | --- | --- | --- | --- |
@@ -220,6 +268,7 @@ curl      名称 = curl(F) at [px, py, pz];
 | `gradient grad(...)` | `surface`(偏导) | 点/法向/切平面 | 2 个数 |
 | `gradient grad(...)` | `implicit`(二维) | 点/切线/法向 | 2 个数 |
 | `gradient grad(...)` | `implicit`(三维)/`sphere` | 点/法向/切平面 | 2 个数(第三个缺省 0) |
+| `laplacian laplacian(...)` | `curve` / `surface` / `implicit` / `sphere` | 标量 | 与同源的 `gradient` 相同 |
 | `divergence div(...)` | `vector_field` | 标量 | 3 个数 |
 | `curl curl(...)` | `vector_field` | 向量 | 3 个数 |
 | `derivative` | `implicit`/`sphere` | ∇f 向量场(`vector_field`) | - |
@@ -229,12 +278,13 @@ curl      名称 = curl(F) at [px, py, pz];
 
 - 引用的对象必须存在;算子不能用于 `point`/`vector`/体积/`region` 等;
 - 等号右侧函数名必须与算子匹配(`gradient g = curl(s1)` 会报错,
-  不会静默当作 gradient 处理);
+  不会静默当作 gradient 处理);函数名一律全名,无缩写;
 - `at` 坐标必须可求值(参数/数字/四则运算);
-- `jacobian` / `laplacian` 语法可解析,但编译期抛出"暂未实现";
+- `laplacian` 只接受标量场源,对 `vector_field` 给出"逐分量暂不实现"的
+  明确诊断(见 §5);`jacobian` 语法可解析,但编译期抛出"暂未实现";
 - 除 `show` 外不接受其他选项;`show` 拼写错误直接报错.
 
-## 6. show 元素与默认值
+## 7. show 元素与默认值
 
 四种可画元素:`point`,`normal`,`tangent`(仅 curve 求导),
 `tangent_plane`(仅 surface 偏导).默认值按源对象分派:
@@ -246,6 +296,11 @@ curl      名称 = curl(F) at [px, py, pz];
 | `implicit`(二维)的 gradient | `[point, normal, tangent]` |
 | `implicit`(三维)/`sphere` 的 gradient | `[point, normal]` |
 | divergence / curl | `[point, normal]` |
+| laplacian(标量算子) | `[point]` |
+
+`laplacian` 的 IR 里向量恒为零向量(标量算子没有方向),渲染层据此不会
+画出箭矢,因此缺省只给 `point`;显式写 `show = [point, normal]` 也不会
+画出任何东西,`normal` 对标量算子没有意义.
 
 其中 `point` 测量点(黄色圆点)与场景 `point` 对象**共用同一个点的
 定义**(`PointRenderer`):半径/全局可见跟随右侧"点"面板
@@ -255,7 +310,7 @@ curl      名称 = curl(F) at [px, py, pz];
 切线方向存于 IR 的 `tangent = (1, f′, 0)`(未归一化,Δx 半长由
 `renderConfig.analysis.tangentHalfLength` 控制),曲面分析该项为 null.
 
-## 7. 符号求导支持范围
+## 8. 符号求导支持范围
 
 curve/surface/向量场的表达式在编译期由 Rust 符号引擎求导,支持:
 
@@ -268,12 +323,15 @@ curve/surface/向量场的表达式在编译期由 Rust 符号引擎求导,支�
 - abs/sign:符号结果用 sign 语义;在 0 处导数不存在,数值求值返回 NaN.
 
 `derivative` 语句把符号求导结果做成新对象,直接画出导数函数曲线/曲面
-(§1).未支持:`jacobian`/`laplacian`(报"暂未实现");数组/向量表达式
-直接求导(报错);混合偏导(fxy)暂无 DSL 入口(可用 `derivative` 链式求导
-得到 f″ 等仅含单个自由变量的高阶导).
+(§1).`laplacian` 复用同一套符号引擎:对一阶偏导再求一次偏导得到
+`f_xx`/`f_yy`/`f_zz`,不新增任何微分规则(§5).未支持:`jacobian`
+(报"暂未实现");向量场的逐分量拉普拉斯 `∇²F`(报"暂不实现",见 §5);
+数组/向量表达式直接求导(报错);混合偏导(fxy)暂无 DSL 入口(可用
+`derivative` 链式求导得到 f″ 等仅含单个自由变量的高阶导).
 
-## 8. 参数联动
+## 9. 参数联动
 
 曲线/曲面/向量场表达式里出现 `param`,求导在编译期完成一次,求值随
 滑块刷新,因此拖动 `a`/`px`/`py` 等参数时,切线/法向/切平面以及
-div/curl 数值都会实时更新(相关示例文件头都注明了每个滑块的作用).
+div/curl/laplacian 数值都会实时更新(相关示例文件头都注明了每个
+滑块的作用).

@@ -30,6 +30,7 @@ const ANALYSIS_KIND_LABELS: Record<AnalysisResult['op'], string> = {
     gradient: '梯度',
     divergence: '散度',
     curl: '旋度',
+    laplacian: '拉普拉斯',
 };
 
 export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {

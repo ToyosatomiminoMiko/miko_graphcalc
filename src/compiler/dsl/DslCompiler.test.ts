@@ -6,6 +6,7 @@ import {
     evaluate_curl_point,
     evaluate_divergence_point,
     evaluate_gradient_point,
+    evaluate_laplacian_point,
     evaluate_scalar,
     symbolic_derivative,
 } from '../../wasm/math_rs/math_rs';
@@ -29,6 +30,7 @@ vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
         evaluate_gradient_point: vi.fn(() => ({ f0: 0, fx: 0, fy: 0 })),
         evaluate_divergence_point: vi.fn(() => 0),
         evaluate_curl_point: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+        evaluate_laplacian_point: vi.fn(() => 0),
         normalize_expression: vi.fn((expr: string) => {
             switch (expr) {
                 case 'sin(x*a)':
@@ -46,11 +48,18 @@ vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
             switch (expr) {
                 case 'sin(x * a)':
                     return variable === 'x' ? 'a * cos(x * a)' : '0';
+                // 二阶偏导:laplacian 会对一阶导再求一次导,登记常用的三条链路.
+                case 'a * cos(x * a)':
+                    return variable === 'x' ? '-(a^2) * sin(x * a)' : '0';
                 case 'sin(x) * cos(y)':
                     // 曲面是 f(x,y):对 z 求偏导恒为 0(真实 Rust 引擎同样返回 0).
                     if (variable === 'x') return 'cos(y) * cos(x)';
                     if (variable === 'y') return '-(sin(x) * sin(y))';
                     return '0';
+                case 'cos(y) * cos(x)':
+                    return variable === 'x' ? '-(cos(y) * sin(x))' : '0';
+                case '-(sin(x) * sin(y))':
+                    return variable === 'y' ? '-(sin(x) * cos(y))' : '0';
                 case '-x':
                     return variable === 'x' ? '-1' : '0';
                 case 'y':
@@ -60,6 +69,14 @@ vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
                 // 隐式场测试用表达式:只登记测试真正用到的偏导,保持 mock 简单.
                 case 'x^2 + y^2 - 1':
                     return variable === 'x' ? '2 * x' : variable === 'y' ? '2 * y' : '0';
+                // laplacian 在隐式场上会对一阶导再求一次导(x^2 + y^2 - 9 = 0
+                // 的圆):二阶偏导虽不依赖变量,但真实引擎仍按"对 x 求导"给常数.
+                case 'x^2 + y^2 - 9':
+                    return variable === 'x' ? '2 * x' : variable === 'y' ? '2 * y' : '0';
+                case '2 * x':
+                    return variable === 'x' ? '2' : '0';
+                case '2 * y':
+                    return variable === 'y' ? '2' : '0';
                 case 'x^2 + y^2 + z^2 - 4':
                     return variable === 'x'
                         ? '2 * x'
@@ -130,14 +147,36 @@ vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
             });
             scope.pi = Math.PI;
             scope.e = Math.E;
+            // 把 DSL 的函数名映射到 JS 实现:一条一次函数(真实引擎支持的内置
+            // 函数的一小部分即可),否则如 `sin` 在 mock 里未定义,evaluate 会
+            // 因 ReferenceError 返回 null(laplacian 的源曲面求值需要它).
+            const builtins = {
+                sin: Math.sin,
+                cos: Math.cos,
+                tan: Math.tan,
+                asin: Math.asin,
+                acos: Math.acos,
+                atan: Math.atan,
+                sinh: Math.sinh,
+                cosh: Math.cosh,
+                tanh: Math.tanh,
+                exp: Math.exp,
+                ln: Math.log,
+                log10: Math.log10,
+                log2: Math.log2,
+                sqrt: Math.sqrt,
+                cbrt: Math.cbrt,
+                abs: Math.abs,
+            };
             // DSL 的幂是 `^`(Rust 符号引擎语义),JS 的 `^` 是按位异或;mock 里
             // 先换成 `**`,否则隐式场的 x^2 会算成 x XOR 2.
             const jsExpr = expr.replace(/\^/g, '**');
             const fn = new Function(
                 ...Object.keys(scope),
+                ...Object.keys(builtins),
                 `return (${jsExpr});`,
             );
-            return fn(...Object.values(scope));
+            return fn(...Object.values(scope), ...Object.values(builtins));
         }),
     };
 });
@@ -1193,7 +1232,189 @@ describe('compileScene', () => {
         });
     });
 
-    it('rejects unimplemented differential operators instead of ignoring them', () => {
+    it('routes laplacian through the WASM field evaluator for curves and surfaces', () => {
+        vi.mocked(evaluate_laplacian_point).mockReturnValueOnce(-8);
+        vi.mocked(evaluate_laplacian_point).mockReturnValueOnce(-0.909);
+        const lapAst: AstProgram = {
+            statements: [
+                ast.statements[0],
+                ast.statements[2],
+                ast.statements[3],
+                {
+                    type: 'analysis',
+                    op: 'laplacian',
+                    name: 'Lc',
+                    call: 'laplacian',
+                    source: 'c',
+                    at: ['1', '0'],
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+                {
+                    type: 'analysis',
+                    op: 'laplacian',
+                    name: 'Ls',
+                    call: 'laplacian',
+                    source: 's',
+                    at: ['1', '2'],
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+            ],
+        };
+
+        const scene = compileScene(lapAst);
+
+        expect(scene.analyses).toHaveLength(2);
+        const [curve, surface] = scene.analyses;
+        expect(curve.op).toBe('laplacian');
+        expect(curve.scalar).toBe(-8);
+        // 测量点落在源曲线上:(px, f(px), 0),f = sin(x * a) 在 x = 1, a = 2 处.
+        expect(curve.point[0]).toBe(1);
+        expect(curve.point[1]).toBeCloseTo(Math.sin(2));
+        expect(curve.point[2]).toBe(0);
+        // 标量算子:没有法向/切线,show 缺省只给测量点.
+        expect(curve.vector).toEqual([0, 0, 0]);
+        expect(curve.tangent).toBeNull();
+        expect(curve.show).toEqual(['point']);
+
+        const curvePayload = JSON.parse(
+            String(vi.mocked(evaluate_laplacian_point).mock.calls[0][0]),
+        ) as Record<string, unknown>;
+        expect(curvePayload).toMatchObject({
+            // f = sin(x*a):f_xx = -(a^2) * sin(x*a);curve 的 y/z 项不参与.
+            fxx_expr: '-(a^2) * sin(x * a)',
+            fyy_expr: '0',
+            fzz_expr: '0',
+            coeff_names: ['a'],
+            coeff_values: [2],
+            x: 1,
+            y: 0,
+            z: 0,
+        });
+
+        expect(surface.op).toBe('laplacian');
+        // 曲面测量点落在 z = f(x, y) 上.
+        expect(surface.point[0]).toBe(1);
+        expect(surface.point[1]).toBe(2);
+        expect(surface.point[2]).toBeCloseTo(Math.sin(1) * Math.cos(2));
+
+        const surfacePayload = JSON.parse(
+            String(vi.mocked(evaluate_laplacian_point).mock.calls[1][0]),
+        ) as Record<string, unknown>;
+        expect(surfacePayload).toMatchObject({
+            // f = sin(x)*cos(y):曲面不含 z,f_zz 记 '0' 且不再进符号引擎.
+            fxx_expr: '-(cos(y) * sin(x))',
+            fyy_expr: '-(sin(x) * cos(y))',
+            fzz_expr: '0',
+            coeff_names: [],
+            x: 1,
+            y: 2,
+            z: 0,
+        });
+    });
+
+    it('projects implicit laplacian onto the level set and keeps the symbol expansion', () => {
+        // 隐式场不走 WASM 数值核:二阶偏导由场闭包(符号/解析)自己持有.
+        vi.mocked(evaluate_laplacian_point).mockClear();
+        const implicitAst: AstProgram = {
+            statements: [
+                {
+                    type: 'object',
+                    kind: 'implicit',
+                    name: 'C',
+                    expr: 'x^2 + y^2 - 9',
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+                {
+                    type: 'analysis',
+                    op: 'laplacian',
+                    name: 'Li',
+                    call: 'laplacian',
+                    source: 'C',
+                    at: ['1', '1'],
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+            ],
+        };
+
+        const scene = compileScene(implicitAst);
+
+        expect(scene.analyses).toHaveLength(1);
+        const [analysis] = scene.analyses;
+        expect(analysis.op).toBe('laplacian');
+        // f_xx = f_yy = 2,f_zz = 0 -> ∇²f = 4,与投影点无关.
+        expect(analysis.scalar).toBe(4);
+        // at=[1,1] 沿 ∇f 投影到半径 3 的圆上:(3/√2, 3/√2, 0).
+        expect(analysis.point[0]).toBeCloseTo(3 / Math.SQRT2);
+        expect(analysis.point[1]).toBeCloseTo(3 / Math.SQRT2);
+        expect(analysis.point[2]).toBe(0);
+        // 隐式场的分析点额外回显球坐标.
+        expect(analysis.pointSpherical).toBeDefined();
+        expect(analysis.vector).toEqual([0, 0, 0]);
+        expect(analysis.tangent).toBeNull();
+        expect(vi.mocked(evaluate_laplacian_point)).not.toHaveBeenCalled();
+    });
+
+    it('rejects component-wise vector laplacian with an explicit message', () => {
+        const badAst: AstProgram = {
+            statements: [
+                ast.statements[4],
+                {
+                    type: 'analysis',
+                    op: 'laplacian',
+                    name: 'L',
+                    call: 'laplacian',
+                    source: 'F',
+                    at: ['1', '2', '3'],
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+            ],
+        };
+
+        // 向量场的逐分量拉普拉斯 ∇²F = (∇²P, ∇²Q, ∇²R) 当前不提供,必须给出
+        // 明确诊断而不是被当成标量场静默处理.
+        expect(() => compileScene(badAst)).toThrow(
+            '分析算子 laplacian 不能应用于 vector_field 类型对象(逐分量拉普拉斯 ∇²F 暂不实现)',
+        );
+    });
+
+    it('rejects laplacian/analysis statements without at', () => {
+        const badAst: AstProgram = {
+            statements: [
+                {
+                    type: 'object',
+                    kind: 'sphere',
+                    name: 'ball',
+                    expr: '[0, 0, 0]',
+                    options: [
+                        { name: 'radius', value: '6' },
+                        { name: 'opacity', value: '0.5' },
+                        { name: 'segments', value: '64' },
+                    ],
+                    span: { start: 0, end: 0 },
+                },
+                {
+                    type: 'analysis',
+                    op: 'laplacian',
+                    name: 'L1',
+                    call: 'laplacian',
+                    source: 'ball',
+                    options: [],
+                    span: { start: 0, end: 0 },
+                },
+            ],
+        };
+
+        // 点分析没有隐含缺省测量点:缺 at 时按"坐标数量不足"报错,而不是
+        // 悄悄用原点或在整块区域内求值.
+        expect(() => compileScene(badAst)).toThrow('at 至少需要 2 个坐标');
+    });
+
+    it('rejects jacobian instead of ignoring it', () => {
         const badAst: AstProgram = {
             statements: [
                 ast.statements[2],
@@ -1713,15 +1934,16 @@ describe('derivative 求导语句', () => {
 
         expect(scene.objects).toHaveLength(3);
         const d2 = scene.objects[2] as { kind: 'curve'; expr: string };
-        // mock 对未知表达式返回 '1'(对 'a * cos(x * a)' 再求 x 导).
+        // mock 登记了真实引擎的二阶导链路:d/dx(a * cos(x * a)) = -(a^2) * sin(x * a)
+        // (laplacian 测试同样依赖这条链路).
         expect(d2.kind).toBe('curve');
-        expect(d2.expr).toBe('1');
+        expect(d2.expr).toBe('-(a^2) * sin(x * a)');
         // 高阶导数公式同样两边都在:算子括号里是上一阶导函数,等号右侧是本阶结果.
         expect(scene.objectFormulas[2]).toBe(
             'y=\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(sin(x * a)\\right)=a * cos(x * a)',
         );
         expect(scene.objectFormulas[3]).toBe(
-            'y=\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(a * cos(x * a)\\right)=1',
+            'y=\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left(a * cos(x * a)\\right)=-(a^2) * sin(x * a)',
         );
     });
 

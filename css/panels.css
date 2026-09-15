@@ -469,8 +469,8 @@
     background: var(--color-accent-tint);
 }
 
-/* 算子维度:梯度/散度/旋度同属"分析"的深色底浅色字体系,只微调色相,
-   既一眼归为同类,又能把三个算子区分开. */
+/* 算子维度:梯度/散度/旋度/拉普拉斯同属"分析"的深色底浅色字体系,只微调
+   色相,既一眼归为同类,又能把四个算子区分开. */
 .kind-analysis-gradient {
     background: var(--color-accent-tint);
 }
@@ -481,6 +481,10 @@
 
 .kind-analysis-curl {
     background: var(--kind-curl-bg);
+}
+
+.kind-analysis-laplacian {
+    background: var(--kind-laplacian-bg);
 }
 
 .kind-integral {

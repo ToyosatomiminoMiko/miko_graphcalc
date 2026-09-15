@@ -67,9 +67,10 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   `at spherical(r, θ, φ)`;θ/φ 约定由 `numericConfig.analysis.
   sphericalAngleConvention` 全局配置(默认 physics:θ 从 +Z 量起;可切
   math),结果列表同时回显 `[r, θ, φ]`.示例 `example/sphere_gradient.scad`
-- `gradient` / `divergence` / `curl`:点分析(求导/偏导经这些微分分析
-  算子暴露:一元求导 = curve 的 gradient,偏导 = surface 的 gradient,
-  div/curl = 向量场的一阶偏导组合;用户文档见 `docs/derivatives-guide.md`)
+- `gradient` / `divergence` / `curl` / `laplacian`:点分析(求导/偏导经这些
+  微分分析算子暴露:一元求导 = curve 的 gradient,偏导 = surface 的
+  gradient,div/curl = 向量场的一阶偏导组合,laplacian = 标量场的
+  `∇²f = f_xx + f_yy + f_zz`;用户文档见 `docs/derivatives-guide.md`)
 - `gradient` 的 `show` 元素:通用 `point`/`normal`;曲面(偏导)与三维
   隐式场/球体可加 `tangent_plane` 画切平面,一元曲线与二维隐式曲线可加
   `tangent` 画切线;曲线求导与二维隐式曲线不写 `show` 时默认画
@@ -77,7 +78,9 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   `[point, normal]`.示例集见 `example/README.md`:
   一元求导 `example/derivative_curve.scad` 与求导法则对照
   `example/derivative_rules.scad`,偏导 `example/partial_derivative_surface.scad`,
-  散度/旋度 `example/divergence_vector_field.scad` 与 `example/curl_vector_field.scad`
+  散度/旋度 `example/divergence_vector_field.scad` 与 `example/curl_vector_field.scad`,
+  拉普拉斯 `example/laplacian_scalar_field.scad` 与调和场对照
+  `example/laplacian_harmonic.scad`
 - `integral`:数值积分 + 黎曼/梯形/辛普森/勒贝格可视化,方法为
   `trapezoid`/`simpson`/`lebesgue`,以及黎曼系列 `riemann:left`/
   `riemann:right`/`riemann:mid`;裸写 `riemann` 等价于 `riemann:left`.
@@ -197,7 +200,10 @@ XZ/XY/YZ 三个坐标平面,各有独立开关,同一行排列.
 
 ## 明确不支持但会报错
 
-- `jacobian`/`laplacian`:解析器接受,编译器会抛出"暂未实现"
+- `jacobian`:解析器接受,编译器会抛出"暂未实现"
+- 向量场的逐分量拉普拉斯 `∇²F`(`laplacian` 作用于 `vector_field`):
+  编译器会抛出"逐分量拉普拉斯 ∇²F 暂不实现";标量场的 `laplacian`
+  已支持(见 `docs/derivatives-guide.md` §5)
 - `scalar`/`vector` 张量声明:编译器会抛出"暂未实现"
 - 积分源必须引用已存在的 `curve`/`surface`/`region` 或体积对象;
   体积域 `integral(S)` 不接受 `range` 选项(域 = 渲染出的世界实体)
@@ -273,7 +279,7 @@ parseMiko()  -> Rust pest 解析 -> AstProgram
 DslCompiler.compileScene()
    ├─ getOrBuildStaticScene()   // 缓存:params / matrix / transform / animation / blueprint
    ├─ materializeObject()       // 用当前参数生成 SceneObject
-   ├─ compileAnalyses()         // gradient / divergence / curl
+   ├─ compileAnalyses()         // gradient / divergence / curl / laplacian
    ├─ compileIntegralTask()     // integral 任务
    └─ compileIntersections()    // intersection 任务(数值交给 Worker)
    │
