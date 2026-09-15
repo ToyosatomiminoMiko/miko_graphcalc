@@ -30,6 +30,7 @@ import { RightSplitController } from '../ui/panels/RightSplitController';
 import { ExampleLoaderController } from '../ui/examples/ExampleLoaderController';
 import { exampleSource, type ExampleEntry } from '../ui/examples/exampleCatalog';
 import { replaceTextareaSource } from '../ui/examples/replaceEditorSource';
+import { createViewPanel, type ViewPanel } from '../ui/view/ViewPanel';
 
 export class DslApp {
     private readonly eventBus = new EventBus<GraphCalcEvents>();
@@ -41,6 +42,12 @@ export class DslApp {
     private readonly objectListController: ObjectListController;
     private readonly formulaCopyController: FormulaCopyController;
     private readonly exampleLoader: ExampleLoaderController;
+    /**
+     * 右侧"视图"面板:布局与控件实例在这里建一次,句柄交给 RenderController
+     * 分发给各控制器(见 `wireViewControls`).它的生命周期不在这里管 --
+     * 每个控件恰好一个控制器所有者,由那些控制器各自 dispose.
+     */
+    private readonly viewPanel: ViewPanel;
 
     private readonly editor: HTMLTextAreaElement;
     private readonly runButton: HTMLButtonElement;
@@ -115,6 +122,7 @@ export class DslApp {
             (name) => this._scheduleRefresh(name),
         );
         this.formulaCopyController = new FormulaCopyController(formulaCopyHint);
+        this.viewPanel = createViewPanel(document.getElementById('view-controls')!);
         this.exampleLoader = new ExampleLoaderController(
             {
                 button: document.getElementById('example-btn')!,
@@ -132,7 +140,7 @@ export class DslApp {
 
     start(): void {
         this.renderController.setupControls();
-        this.renderController.wireViewControls(this.eventBus);
+        this.renderController.wireViewControls(this.eventBus, this.viewPanel);
         this._wireEditor();
 
         this.panelController = new PanelController();

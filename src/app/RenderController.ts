@@ -34,6 +34,7 @@ import { SceneStore } from './SceneStore';
 import { DiagnosticsController } from '../ui/panels/DiagnosticsController';
 import type { DiagnosticEntry } from '../ui/panels/DiagnosticsController';
 import { ObjectListController } from '../ui/objects/ObjectListController';
+import type { ViewPanel } from '../ui/view/ViewPanel';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;
@@ -111,8 +112,13 @@ export class RenderController {
         this._createControls();
     }
 
-    /** 把相机相关 UI 控件挂到 EventBus,保持 DslApp 不直接处理相机细节. */
-    wireViewControls(eventBus: EventBus<GraphCalcEvents>): void {
+    /**
+     * 把"视图"面板的控件挂到 EventBus,保持 DslApp 不直接处理相机细节.
+     *
+     * 面板本身由 DslApp 装配(`createViewPanel`),这里只按分组把句柄发给对应
+     * 控制器:每个控件恰好一个所有者,`dispose` 时各自解绑自己那几个.
+     */
+    wireViewControls(eventBus: EventBus<GraphCalcEvents>, panel: ViewPanel): void {
         // 先注册监听,再创建控制器:控制器启动时会同步一次初始状态
         // (RotationLockController 现在也会),监听晚注册就会丢掉这次同步.
         eventBus.on('camera:changed', ({ camMode }) =>
@@ -125,9 +131,12 @@ export class RenderController {
             this.cameraManager.setRotationLock(locked),
         );
 
-        this.cameraToggle = new CameraToggle(eventBus);
-        this.viewCubeController = new ViewCubeController(eventBus);
-        this.rotationLockController = new RotationLockController(eventBus);
+        this.cameraToggle = new CameraToggle(eventBus, panel.camera);
+        this.viewCubeController = new ViewCubeController(eventBus, panel.viewCube);
+        this.rotationLockController = new RotationLockController(
+            eventBus,
+            panel.camera.rotationLock,
+        );
 
         // OrbitControls 在构造时读取相机 up 向量,真的切换"向上轴"后才需要重建
         eventBus.on('axis:upChanged', ({ axis }) => {
@@ -140,30 +149,33 @@ export class RenderController {
                 }
             }
         });
-        this.axisUpController = new AxisUpController(eventBus);
+        this.axisUpController = new AxisUpController(eventBus, panel.axis.up);
 
         eventBus.on('point:changed', ({ radius, visible }) => {
             this.plotter.setPointStyle({ radius, visible });
             this.analysisRenderer.setPointStyle({ radius, visible });
         });
-        this.pointStyleController = new PointStyleController(eventBus);
+        this.pointStyleController = new PointStyleController(eventBus, panel.point);
 
         eventBus.on('surface:changed', ({ wireframeVisible, colorMapEnabled }) => {
             this.plotter.setSurfaceStyle({ wireframeVisible, colorMapEnabled });
         });
-        this.surfaceStyleController = new SurfaceStyleController(eventBus);
+        this.surfaceStyleController = new SurfaceStyleController(eventBus, panel.surface);
 
         eventBus.on('axis:lineWidthChanged', ({ width }) => {
             this.sceneManager.setAxisLineWidth(width);
         });
-        this.axisLineWidthController = new AxisLineWidthController(eventBus);
+        this.axisLineWidthController = new AxisLineWidthController(
+            eventBus,
+            panel.axis.lineWidth,
+        );
 
         eventBus.on('axis:labelVisibility', ({ x, y, z }) => {
             this.sceneManager.setAxisLabelVisible('x', x);
             this.sceneManager.setAxisLabelVisible('y', y);
             this.sceneManager.setAxisLabelVisible('z', z);
         });
-        this.axisLabelController = new AxisLabelController(eventBus);
+        this.axisLabelController = new AxisLabelController(eventBus, panel.axis.labels);
 
         eventBus.on('grid:changed', ({ xzVisible, xyVisible, yzVisible, ticksVisible, piUnit, majorWidth, minorWidth }) => {
             this.sceneManager.setPlaneVisible('xz', xzVisible);
@@ -173,7 +185,7 @@ export class RenderController {
             this.sceneManager.setTickUnit(piUnit);
             this.sceneManager.setGridLineWidths(majorWidth, minorWidth);
         });
-        this.gridTicksController = new GridTicksController(eventBus);
+        this.gridTicksController = new GridTicksController(eventBus, panel.axis);
     }
 
     private _createControls(): void {

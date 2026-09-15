@@ -1,6 +1,12 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import type { GridPlane } from '../../render/types';
+import type { AxisControls } from '../../ui/view/ViewPanel';
+import type { NumberFieldHandle } from '../../ui/widgets/NumberField';
+
+/** 遍历三个坐标平面时的固定顺序;类型上就是 `GridPlane` 的全集. */
+const PLANES: readonly GridPlane[] = ['xz', 'xy', 'yz'];
 
 /**
  * 网格与坐标轴刻度控制.
@@ -9,99 +15,86 @@ import { RENDER_CONFIG } from '../../config/renderConfig';
  * - 刻度单位开关:普通整数步长 / π 步长(网格与刻度改按 π/2 重排);
  * - 大刻度线宽,小刻度线宽(像素),同时作用于网格线和坐标轴刻度.
  * 变化通过 EventBus 广播,由 RenderController 应用到场景.
+ *
+ * 只接管 `AxisControls` 里属于"网格/刻度"的那部分句柄(`grids` / `ticks` /
+ * `piUnit` / `majorWidth` / `minorWidth`);同一分组里的 up / lineWidth /
+ * labels 归别的控制器,这里不碰也就不会 dispose 错对象.
+ *
+ * 两个线宽输入框沿用"即时回退"策略(见 `NumberField` 文件头):非法文本当场
+ * 回填上一个合法值,只是这个"上一个合法值"由本控制器的状态提供,而不是让
+ * 控件自己猜.
  */
 export class GridTicksController {
-    private readonly planeToggles: Record<'xz' | 'xy' | 'yz', HTMLInputElement | null>;
-    private readonly ticksToggle: HTMLInputElement | null;
-    private readonly piUnitToggle: HTMLInputElement | null;
-    private readonly majorWidthInput: HTMLInputElement | null;
-    private readonly minorWidthInput: HTMLInputElement | null;
-    private readonly _abortController = new AbortController();
+    private readonly planeVisible: Record<GridPlane, boolean>;
+    private ticksVisible: boolean;
+    private piUnit: boolean;
+    private majorWidth: number;
+    private minorWidth: number;
 
-    private readonly planeVisible: Record<'xz' | 'xy' | 'yz', boolean> = {
-        xz: RENDER_CONFIG.scene.grid.planes.xz,
-        xy: RENDER_CONFIG.scene.grid.planes.xy,
-        yz: RENDER_CONFIG.scene.grid.planes.yz,
-    };
-    private ticksVisible = RENDER_CONFIG.scene.axisTicks.visible;
-    private piUnit = RENDER_CONFIG.scene.axisTicks.piUnit;
-    private majorWidth = RENDER_CONFIG.scene.grid.majorLineWidth;
-    private minorWidth = RENDER_CONFIG.scene.grid.minorLineWidth;
+    constructor(
+        private readonly eventBus: EventBus<GraphCalcEvents>,
+        private readonly controls: AxisControls,
+    ) {
+        const { grids, ticks, piUnit, majorWidth, minorWidth } = controls;
 
-    constructor(private readonly eventBus: EventBus<GraphCalcEvents>) {
-        this.planeToggles = {
-            xz: document.getElementById('gridVisibleXZ') as HTMLInputElement | null,
-            xy: document.getElementById('gridVisibleXY') as HTMLInputElement | null,
-            yz: document.getElementById('gridVisibleYZ') as HTMLInputElement | null,
+        this.planeVisible = {
+            xz: grids.xz.get(),
+            xy: grids.xy.get(),
+            yz: grids.yz.get(),
         };
-        this.ticksToggle =
-            document.getElementById('axisTicksVisible') as HTMLInputElement | null;
-        this.piUnitToggle =
-            document.getElementById('axisTicksPiUnit') as HTMLInputElement | null;
-        this.majorWidthInput =
-            document.getElementById('gridMajorWidth') as HTMLInputElement | null;
-        this.minorWidthInput =
-            document.getElementById('gridMinorWidth') as HTMLInputElement | null;
+        this.ticksVisible = ticks.get();
+        this.piUnit = piUnit.get();
+        this.majorWidth = majorWidth.read() ?? RENDER_CONFIG.scene.grid.majorLineWidth;
+        this.minorWidth = minorWidth.read() ?? RENDER_CONFIG.scene.grid.minorLineWidth;
 
-        (['xz', 'xy', 'yz'] as const).forEach((plane) => {
-            const toggle = this.planeToggles[plane];
-            if (toggle) toggle.checked = this.planeVisible[plane];
-        });
-        if (this.ticksToggle) this.ticksToggle.checked = this.ticksVisible;
-        if (this.piUnitToggle) this.piUnitToggle.checked = this.piUnit;
-        if (this.majorWidthInput) this.majorWidthInput.value = String(this.majorWidth);
-        if (this.minorWidthInput) this.minorWidthInput.value = String(this.minorWidth);
-
-        const signal = this._abortController.signal;
-        (['xz', 'xy', 'yz'] as const).forEach((plane) => {
-            const toggle = this.planeToggles[plane];
-            toggle?.addEventListener('change', () => {
-                this.planeVisible[plane] = toggle?.checked ?? true;
+        for (const plane of PLANES) {
+            grids[plane].onChange((visible) => {
+                this.planeVisible[plane] = visible;
                 this._emit();
-            }, { signal });
+            });
+        }
+        ticks.onChange((visible) => {
+            this.ticksVisible = visible;
+            this._emit();
         });
-        this.ticksToggle?.addEventListener('change', () => {
-            this.ticksVisible = this.ticksToggle?.checked ?? true;
+        piUnit.onChange((enabled) => {
+            this.piUnit = enabled;
             this._emit();
-        }, { signal });
-        this.piUnitToggle?.addEventListener('change', () => {
-            this.piUnit = this.piUnitToggle?.checked ?? false;
-            this._emit();
-        }, { signal });
-        this.majorWidthInput?.addEventListener('input', () => this._readWidth('major'), { signal });
-        this.majorWidthInput?.addEventListener('change', () => this._readWidth('major'), { signal });
-        this.minorWidthInput?.addEventListener('input', () => this._readWidth('minor'), { signal });
-        this.minorWidthInput?.addEventListener('change', () => this._readWidth('minor'), { signal });
+        });
+        this._wireWidth(majorWidth, 'major');
+        this._wireWidth(minorWidth, 'minor');
 
-        // 启动时按配置同步一次,保证默认状态进入场景
+        // 启动时按面板初值同步一次,保证默认状态进入场景
         this._emit();
     }
 
     dispose(): void {
-        this._abortController.abort();
+        for (const plane of PLANES) this.controls.grids[plane].dispose();
+        this.controls.ticks.dispose();
+        this.controls.piUnit.dispose();
+        this.controls.majorWidth.dispose();
+        this.controls.minorWidth.dispose();
     }
 
-    private _readWidth(kind: 'major' | 'minor'): void {
-        const input = kind === 'major' ? this.majorWidthInput : this.minorWidthInput;
-        if (!input) return;
+    /** 线宽输入框接线:非法输入回填上一个合法值,合法输入立即广播. */
+    private _wireWidth(field: NumberFieldHandle, kind: 'major' | 'minor'): void {
         const min = kind === 'major' ? 1 : 0.5;
-        const fallback = kind === 'major' ? this.majorWidth : this.minorWidth;
-        const text = input.value.trim();
-        if (text === '') {
-            input.value = String(fallback);
-            return;
-        }
-        const raw = Number(text);
-        if (!Number.isFinite(raw) || raw < min) {
-            input.value = String(fallback);
-            return;
-        }
-        if (kind === 'major') {
-            this.majorWidth = raw;
-        } else {
-            this.minorWidth = raw;
-        }
-        this._emit();
+        const apply = (raw: number | null): void => {
+            const current = kind === 'major' ? this.majorWidth : this.minorWidth;
+            if (raw === null || raw < min) {
+                field.write(current);
+                return;
+            }
+            if (raw === current) return;
+            if (kind === 'major') {
+                this.majorWidth = raw;
+            } else {
+                this.minorWidth = raw;
+            }
+            this._emit();
+        };
+        field.onInput(apply);
+        field.onCommit(apply);
     }
 
     private _emit(): void {

@@ -1,7 +1,7 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
-import { RENDER_CONFIG } from '../../config/renderConfig';
 import type { SurfaceStyle } from '../types';
+import type { SurfaceControls } from '../../ui/view/ViewPanel';
 
 /**
  * 曲面全局样式控制(右侧"视图"面板的"曲面"小节).
@@ -11,40 +11,37 @@ import type { SurfaceStyle } from '../types';
  * - 颜色映射:z->HSL 伪彩色映射开关(关闭后曲面显示自身 color 基色).
  *
  * 变化通过 EventBus 广播 `surface:changed`,由 RenderController 应用到场景.
+ *
+ * 两个开关的初值由面板按 `RENDER_CONFIG.surfaceMesh` 写入,这里从句柄读回,
+ * 不再出现 `getElementById('surfaceWireframeVisible')` 这样的 id 字符串.
  */
 export class SurfaceStyleController {
-    private readonly wireframeToggle: HTMLInputElement | null;
-    private readonly colorMapToggle: HTMLInputElement | null;
-    private readonly _abortController = new AbortController();
+    private wireframeVisible: boolean;
+    private colorMapEnabled: boolean;
 
-    private wireframeVisible = RENDER_CONFIG.surfaceMesh.wireframeVisible;
-    private colorMapEnabled = RENDER_CONFIG.surfaceMesh.colorMapEnabled;
+    constructor(
+        private readonly eventBus: EventBus<GraphCalcEvents>,
+        private readonly controls: SurfaceControls,
+    ) {
+        this.wireframeVisible = controls.wireframe.get();
+        this.colorMapEnabled = controls.colorMap.get();
 
-    constructor(private readonly eventBus: EventBus<GraphCalcEvents>) {
-        this.wireframeToggle =
-            document.getElementById('surfaceWireframeVisible') as HTMLInputElement | null;
-        this.colorMapToggle =
-            document.getElementById('surfaceColorMapEnabled') as HTMLInputElement | null;
-
-        if (this.wireframeToggle) this.wireframeToggle.checked = this.wireframeVisible;
-        if (this.colorMapToggle) this.colorMapToggle.checked = this.colorMapEnabled;
-
-        const signal = this._abortController.signal;
-        this.wireframeToggle?.addEventListener('change', () => {
-            this.wireframeVisible = this.wireframeToggle?.checked ?? true;
+        controls.wireframe.onChange((visible) => {
+            this.wireframeVisible = visible;
             this._emit();
-        }, { signal });
-        this.colorMapToggle?.addEventListener('change', () => {
-            this.colorMapEnabled = this.colorMapToggle?.checked ?? true;
+        });
+        controls.colorMap.onChange((enabled) => {
+            this.colorMapEnabled = enabled;
             this._emit();
-        }, { signal });
+        });
 
-        // 启动时按配置同步一次,保证默认状态进入场景(与点/轴/网格控制器一致)
+        // 启动时按面板初值同步一次,保证默认状态进入场景(与点/轴/网格控制器一致)
         this._emit();
     }
 
     dispose(): void {
-        this._abortController.abort();
+        this.controls.wireframe.dispose();
+        this.controls.colorMap.dispose();
     }
 
     private _emit(): void {

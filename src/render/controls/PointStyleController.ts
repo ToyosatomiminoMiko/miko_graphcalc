@@ -1,13 +1,8 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
-
-type PointMode = 'size' | 'scale';
-
-/** 运行时校验:HTML 的 data-* 是字符串,非法值不能直接当 PointMode 用. */
-function isPointMode(value: unknown): value is PointMode {
-    return value === 'size' || value === 'scale';
-}
+import type { PointMode } from '../../render/types';
+import type { PointControls } from '../../ui/view/ViewPanel';
 
 /**
  * 点样式控制(场景 point 对象与分析测量点共用).
@@ -23,58 +18,46 @@ function isPointMode(value: unknown): value is PointMode {
  * baseRadius 换算而来 -- 因此不存在"配置里的 scale 永远被覆盖"的死配置.
  * 切换模式时会保留当前实际大小.变化通过 EventBus 广播,
  * 由 RenderController 应用到场景.
+ *
+ * 与老写法的差别:开关/分段按钮/数字框都由 `ViewPanel` 建好并按
+ * `PointControls` 交进来,不再有 `getElementById('pointValue')` 与
+ * `querySelectorAll('[data-point-mode]')` 的全局查找;模式值也从按钮组的
+ * 选中态读出,`isPointMode` 那层字符串校验随类型化消失.
  */
 export class PointStyleController {
-    private readonly visibleToggle: HTMLInputElement | null;
-    private readonly valueInput: HTMLInputElement | null;
-    private readonly valueLabel: HTMLLabelElement | null;
-    private readonly modeButtons: NodeListOf<HTMLButtonElement>;
-    private readonly _abortController = new AbortController();
-
     private readonly baseRadius = RENDER_CONFIG.scene.point.radius;
-    private mode: PointMode = 'size';
+    private mode: PointMode;
     /** 唯一状态:点的实际半径(缩放模式只是它的另一种显示方式). */
-    private sizeValue = this.baseRadius;
-    private visible = RENDER_CONFIG.scene.point.visible;
+    private sizeValue: number;
+    private visible: boolean;
 
-    constructor(private readonly eventBus: EventBus<GraphCalcEvents>) {
-        this.visibleToggle =
-            document.getElementById('pointVisible') as HTMLInputElement | null;
-        this.valueInput =
-            document.getElementById('pointValue') as HTMLInputElement | null;
-        this.valueLabel =
-            document.getElementById('pointValueLabel') as HTMLLabelElement | null;
-        this.modeButtons =
-            document.querySelectorAll<HTMLButtonElement>('[data-point-mode]');
+    constructor(
+        private readonly eventBus: EventBus<GraphCalcEvents>,
+        private readonly controls: PointControls,
+    ) {
+        this.visible = controls.visible.get();
+        this.mode = controls.mode.get();
+        this.sizeValue = controls.value.read() ?? this.baseRadius;
 
-        if (this.visibleToggle) {
-            this.visibleToggle.checked = this.visible;
-        }
-
-        const signal = this._abortController.signal;
-        this.visibleToggle?.addEventListener('change', () => {
-            this.visible = this.visibleToggle?.checked ?? true;
+        controls.visible.onChange((visible) => {
+            this.visible = visible;
             this._emit();
-        }, { signal });
-
-        this.modeButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                const mode = button.dataset.pointMode;
-                if (!isPointMode(mode) || mode === this.mode) return;
-                this._switchMode(mode);
-            }, { signal });
         });
+        controls.mode.onChange((mode) => this._switchMode(mode));
 
-        this.valueInput?.addEventListener('input', () => this._readInput(), { signal });
-        this.valueInput?.addEventListener('change', () => this._readInput(), { signal });
+        const apply = (raw: number | null): void => this._applyInput(raw);
+        controls.value.onInput(apply);
+        controls.value.onCommit(apply);
 
         this._syncModeUI();
-        // 启动时按配置同步一次,保证默认状态进入场景
+        // 启动时按面板初值同步一次,保证默认状态进入场景
         this._emit();
     }
 
     dispose(): void {
-        this._abortController.abort();
+        this.controls.visible.dispose();
+        this.controls.mode.dispose();
+        this.controls.value.dispose();
     }
 
     /** 切换显示方式:实际半径(`sizeValue`)不变,只换一种表示. */
@@ -84,42 +67,39 @@ export class PointStyleController {
         this._emit();
     }
 
-    private _readInput(): void {
-        if (!this.valueInput) return;
-        const text = this.valueInput.value.trim();
-        if (text === '') {
-            // 清空时保留上一次合法值,不把空串当成 0
-            this.valueInput.value = this._displayValue();
+    /**
+     * 数字框写值:两种模式写的是同一个状态(实际半径).
+     *
+     * 非法文本(空串/负数/中途态)沿用"即时回退":文本回填成当前显示值,
+     * 不广播.
+     */
+    private _applyInput(raw: number | null): void {
+        if (raw === null || raw < 0) {
+            this.controls.value.write(this._displayValue());
             return;
         }
-        const raw = Number(text);
-        if (!Number.isFinite(raw) || raw < 0) {
-            this.valueInput.value = this._displayValue();
-            return;
-        }
-        // 两种模式写的是同一个状态:实际半径
         this.sizeValue = this.mode === 'size' ? raw : this.baseRadius * raw;
         this._emit();
     }
 
     private _syncModeUI(): void {
-        this.modeButtons.forEach((button) => {
-            button.classList.toggle('active', button.dataset.pointMode === this.mode);
-        });
-        if (this.valueLabel) {
-            this.valueLabel.textContent = this.mode === 'size' ? '大小' : '缩放';
-        }
-        if (this.valueInput) {
-            this.valueInput.step = this.mode === 'size' ? '0.05' : '0.1';
-            this.valueInput.value = this._displayValue();
-        }
+        this.controls.valueLabel.textContent = this.mode === 'size' ? '大小' : '缩放';
+        // 步长随模式变:绝对值步长 0.05,比例步长 0.1(与老面板一致)
+        this.controls.value.input.step = this.mode === 'size' ? '0.05' : '0.1';
+        this.controls.value.write(this._displayValue());
     }
 
-    private _displayValue(): string {
+    /**
+     * 当前显示值:大小模式就是实际半径,比例模式是它相对基准半径的倍数.
+     *
+     * 只做数值口径(保留 4 位小数);"怎么写成文本"由数字框的 `format` 负责,
+     * 所以这里返回 number,不返回字符串.
+     */
+    private _displayValue(): number {
         const value = this.mode === 'size'
             ? this.sizeValue
             : (this.baseRadius > 0 ? this.sizeValue / this.baseRadius : 0);
-        return String(Number(value.toFixed(4)));
+        return Number(value.toFixed(4));
     }
 
     private _emit(): void {

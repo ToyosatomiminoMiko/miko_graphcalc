@@ -41,3 +41,10 @@ sphere ball = [0, 0, 0] {
 
 // 笛卡尔:给空间点,先沿 ∇f 投影到球面,再在投影点取 ∇²f
 laplacian L1 = laplacian(ball) at [1, 2, 1];
+
+
+param px0 = 1 in [-3, 3, 0.1];
+param py0 = 1 in [-3, 3, 0.1];
+param pz0 = 1 in [-3, 3, 0.1];
+implicit shell = x^2 + y^2 + z^2 + 0.5 * z^3 - 36;
+laplacian L2 = laplacian(shell) at [px0, py0, pz0];

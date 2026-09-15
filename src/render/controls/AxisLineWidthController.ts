@@ -1,50 +1,47 @@
 import { EventBus } from '../../service/EventBus';
 import type { GraphCalcEvents } from '../../types';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import type { NumberFieldHandle } from '../../ui/widgets/NumberField';
 
 /**
  * 坐标轴线宽控制.
  *
  * XYZ 轴使用 Line2 绘制,线宽以像素为单位,最小 1px.
  * 变化通过 EventBus 广播,由 RenderController 应用到场景.
+ *
+ * 写回策略:这是"即时回退"型输入框 -- `input` 阶段只要解析不出合法值
+ * (空串/中途态/小于下限/非有限),就把文本回填成上一个合法值,用户打不出
+ * 中途态.需要"保留用户文本,失焦才归一化"的那种(参数面板,UI-P2.1)用同一个
+ * 控件的另一种接线,见 `NumberField` 文件头.
  */
 export class AxisLineWidthController {
-    private readonly input: HTMLInputElement | null;
-    private readonly _abortController = new AbortController();
-    private width = RENDER_CONFIG.scene.axisLineWidth;
+    private width: number;
 
-    constructor(private readonly eventBus: EventBus<GraphCalcEvents>) {
-        this.input =
-            document.getElementById('axisLineWidth') as HTMLInputElement | null;
-        if (this.input) {
-            this.input.value = String(this.width);
-        }
+    constructor(
+        private readonly eventBus: EventBus<GraphCalcEvents>,
+        private readonly field: NumberFieldHandle,
+    ) {
+        this.width = field.read() ?? RENDER_CONFIG.scene.axisLineWidth;
 
-        const signal = this._abortController.signal;
-        this.input?.addEventListener('input', () => this._readInput(), { signal });
-        this.input?.addEventListener('change', () => this._readInput(), { signal });
+        const apply = (raw: number | null): void => this._apply(raw);
+        field.onInput(apply);
+        field.onCommit(apply);
 
-        // 启动时按配置同步一次,保证默认状态进入场景
+        // 启动时按面板初值同步一次,保证默认状态进入场景
         this._emit();
     }
 
     dispose(): void {
-        this._abortController.abort();
+        this.field.dispose();
     }
 
-    private _readInput(): void {
-        if (!this.input) return;
-        const text = this.input.value.trim();
-        if (text === '') {
-            // 清空时保留上一次合法值
-            this.input.value = String(this.width);
+    private _apply(raw: number | null): void {
+        if (raw === null || raw < 1) {
+            // 非法输入:文本回填上一个合法值,不广播
+            this.field.write(this.width);
             return;
         }
-        const raw = Number(text);
-        if (!Number.isFinite(raw) || raw < 1) {
-            this.input.value = String(this.width);
-            return;
-        }
+        if (raw === this.width) return;
         this.width = raw;
         this._emit();
     }

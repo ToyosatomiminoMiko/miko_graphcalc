@@ -1,12 +1,26 @@
 /**
  * 渲染层共享类型.
  *
- * 当前只放相机相关类型,供 `render/core` 与 `render/controls` 共同使用.
+ * 这里放相机/视图控件的**值域**类型,供 `render/core`,`render/controls` 与
+ * 视图面板(`ui/view/ViewPanel`)共同使用:面板用它们给控件定类型,控制器用
+ * 它们解释选中值,两边必须是同一个联合类型 -- 否则又会退化成"从 DOM 的
+ * `data-*` 字符串里还原类型"的那套运行时校验(`isCamMode` / `isViewHome` /
+ * `isPointMode`),那是组件化要消掉的东西.
+ *
  * 注意:这里不要反向依赖 `service` 或 `compiler/dsl`.
  */
 
 export type CamMode = 'perspective' | 'orthographic';
 export type ViewHome = 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'isometric';
+
+/** 点的显示方式(右侧"视图 -> 点"面板的"设定大小 / 按比例缩放"二选一). */
+export type PointMode = 'size' | 'scale';
+
+/** 坐标轴名:各轴标签开关的键.与 `UpAxis` 同形,但语义是"某条轴". */
+export type AxisName = 'x' | 'y' | 'z';
+
+/** 坐标平面网格名:三个平面各自独立显隐. */
+export type GridPlane = 'xz' | 'xy' | 'yz';
 
 /**
  * 曲面全局显示样式(右侧"视图"面板的"曲面"小节统一控制所有曲面).
