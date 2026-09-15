@@ -11,9 +11,11 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { installDomStub, StubElement } from '../../test/domStub';
+import { createButton } from './Button';
 import { createNumberField } from './NumberField';
 import { createInlineToggle, createNumberRow, createSwitchRow } from './Row';
 import { createSegmented } from './Segmented';
+import { createSlider } from './Slider';
 import { createSwitch } from './Switch';
 
 beforeEach(() => {
@@ -211,6 +213,78 @@ describe('createNumberField', () => {
         handle.dispose();
         stub(handle.input).dispatch('input');
         expect(inputs).toEqual([]);
+    });
+});
+
+describe('createSlider', () => {
+    it('写进 min/max/step/id,初值即 value', () => {
+        const handle = createSlider({ value: 1, min: 0, max: 5, step: 0.1 });
+
+        expect(handle.element).toBe(handle.input);
+        expect(handle.input.type).toBe('range');
+        expect(handle.input.min).toBe('0');
+        expect(handle.input.max).toBe('5');
+        expect(handle.input.step).toBe('0.1');
+        expect(handle.input.id).not.toBe('');
+        expect(handle.get()).toBe(1);
+    });
+
+    it('拖动回调收到数值;程序化 set 不回调;dispose 后不再回调', () => {
+        const seen: number[] = [];
+        const handle = createSlider({ value: 1, min: 0, max: 5, step: 0.1 });
+        handle.onInput((value) => seen.push(value));
+
+        handle.input.value = '2.5';
+        stub(handle.input).dispatch('input');
+        expect(seen).toEqual([2.5]);
+
+        handle.set(4);
+        expect(handle.get()).toBe(4);
+        expect(seen).toEqual([2.5]);
+
+        handle.dispose();
+        stub(handle.input).dispatch('input');
+        expect(seen).toEqual([2.5]);
+    });
+});
+
+describe('createButton', () => {
+    it('永远是 type=button,类名/文案/可访问名/标题/禁用态按选项落地', () => {
+        const handle = createButton({
+            class: 'param-reset-btn',
+            text: '↺',
+            ariaLabel: '重置 a 为 1',
+            title: '重置为 1',
+            disabled: true,
+        });
+
+        expect(handle.element.tagName).toBe('button');
+        expect(handle.element.type).toBe('button');
+        expect(handle.element.className).toBe('param-reset-btn');
+        expect(handle.element.textContent).toBe('↺');
+        expect(handle.element.getAttribute('aria-label')).toBe('重置 a 为 1');
+        expect(handle.element.title).toBe('重置为 1');
+        expect(handle.element.disabled).toBe(true);
+    });
+
+    it('点击触发回调;setText/setDisabled 就地更新;dispose 后不再响应', () => {
+        let clicks = 0;
+        const handle = createButton({ text: '隐藏' });
+        handle.onClick(() => {
+            clicks += 1;
+        });
+
+        stub(handle.element).dispatch('click');
+        expect(clicks).toBe(1);
+
+        handle.setText('显示');
+        handle.setDisabled(true);
+        expect(handle.element.textContent).toBe('显示');
+        expect(handle.element.disabled).toBe(true);
+
+        handle.dispose();
+        stub(handle.element).dispatch('click');
+        expect(clicks).toBe(1);
     });
 });
 

@@ -3,13 +3,27 @@
  * 从 DslApp 拆出,负责根据 ParamDeclaration 生成滑块与数字输入,
  * 并维护当前参数值.
  *
+ * DOM 与交互件走 `ui/widgets/`:`createSlider` / `createNumberField` /
+ * `createFieldLabel` / `createButton`,本类只保留**业务语义**--
+ * 取值口径,写回时机,重置目标.产出的行结构与手写 HTML 时一致:
+ *
+ * ```text
+ * <div class="param-row [is-cyclic]">
+ *   <label for=滑块>a</label>   ← 命名滑块(一行里的大热区)
+ *   <input type="range">        ← 粗调入口
+ *   <input type="number">       ← 精调入口,自带 aria-label
+ *   <button class="param-reset-btn">↺</button>
+ * </div>
+ * ```
+ *
  * 循环类系数(`param φ = 0 in cyclic [...]`)的取值在圆周上,越界输入按
  * 区间长度回绕到 `[min, max)`,而不是像普通参数那样夹到端点;回绕口径与
  * 编译期共用 math/paramValue.ts 的 normalizeParamValue,避免"滑块显示 0,
  * 表达式按 2π 求值"的漂移.标签上的 ↻ 只是**显式声明**的可视提示,
  * 不改变任何取值语义.
  *
- * 数字输入框的写回时机(见 UI-P2.1):
+ * 数字输入框的写回时机(见 UI-P2.1),就是数字框"保守策略"的那一种接线
+ * (另一种"即时回退"见 `NumberField` 文件头):
  * - `input` 阶段只把**已能解析**的值同步给滑块/场景,不覆盖用户正在编辑的文本;
  * - 空串与非有限中途态(`-`,`1e`,以及会被浏览器清洗成空串的 `0.`)一律不写回,
  *   否则 `Number('') === 0`,`Number('0.') === 0` 会把输入框改写成 `0`,
@@ -24,11 +38,21 @@
  */
 import type { ParamDeclaration } from '../../ir';
 import { normalizeParamValue } from '../../math/paramValue';
+import { createButton, type ButtonHandle } from '../widgets/Button';
+import { el } from '../widgets/dom';
+import { createNumberField, type NumberFieldHandle } from '../widgets/NumberField';
+import { createFieldLabel } from '../widgets/Row';
+import { createSlider, type SliderHandle } from '../widgets/Slider';
 
 export type ParamChangeHandler = (name: string, value: number) => void;
 
-/** 给 label/id 配对用的实例序号:同一页面上多个面板也不会撞 id. */
-let paramPanelSeq = 0;
+/** 一行参数持有的三个交互件:重建面板时按这个清单统一解绑. */
+interface ParamRow {
+    readonly element: HTMLElement;
+    readonly slider: SliderHandle;
+    readonly number: NumberFieldHandle;
+    readonly reset: ButtonHandle;
+}
 
 export class ParamPanelController {
     /**
@@ -39,9 +63,13 @@ export class ParamPanelController {
      */
     private readonly values = new Map<string, number>();
 
-    /** 行序号:仅用于生成本次 render 内唯一的控件 id(与 <label for> 配对). */
-    private rowSeq = 0;
-    private readonly idPrefix = `param${paramPanelSeq++}`;
+    /**
+     * @cache
+     * 缓存目的:当前这一轮渲染出来的行句柄,重建/销毁时据此解绑 DOM 监听.
+     * 键/失效策略:render 重建时整体替换;dispose 时清空.
+     * 生命周期:跟随 ParamPanelController 实例.
+     */
+    private rows: ParamRow[] = [];
 
     constructor(
         private readonly panel: HTMLElement,
@@ -53,13 +81,15 @@ export class ParamPanelController {
      * 用新参数声明整体重建当前值缓存和面板 DOM.
      */
     render(params: ParamDeclaration[]): void {
+        this._disposeRows();
         this.panel.replaceChildren();
         this.values.clear();
-        this.rowSeq = 0;
 
         for (const param of params) {
             this.values.set(param.name, param.value);
-            this.panel.appendChild(this._createParamRow(param));
+            const row = this._createParamRow(param);
+            this.rows.push(row);
+            this.panel.appendChild(row.element);
         }
     }
 
@@ -76,18 +106,62 @@ export class ParamPanelController {
      * 清空参数面板和当前值缓存.
      */
     dispose(): void {
+        this._disposeRows();
         this.panel.replaceChildren();
         this.values.clear();
     }
 
-    private _createParamRow(param: ParamDeclaration): HTMLElement {
-        const row = document.createElement('div');
-        row.className = 'param-row';
-        row.classList.toggle('is-cyclic', param.cyclic);
+    /** 解绑上一轮行的控件监听(控件自己持有 AbortController). */
+    private _disposeRows(): void {
+        for (const row of this.rows) {
+            row.slider.dispose();
+            row.number.dispose();
+            row.reset.dispose();
+        }
+        this.rows = [];
+    }
 
-        const sliderId = `${this.idPrefix}-${this.rowSeq}-slider`;
-        const numberId = `${this.idPrefix}-${this.rowSeq}-number`;
-        this.rowSeq += 1;
+    private _createParamRow(param: ParamDeclaration): ParamRow {
+        // 先建件(只有外观),再定义互相依赖的写值闭包,最后接线 -- 与
+        // widgets 的约定一致:选项不回调,回调用 onChange/onClick 事后注册.
+        const slider = createSlider({
+            value: param.value,
+            min: param.min,
+            max: param.max,
+            step: param.step,
+        });
+        const number = createNumberField({
+            value: param.value,
+            min: param.min,
+            max: param.max,
+            step: param.step,
+            // 可见 label 关联的是滑块(一行里那个大热区);数字框用 aria-label
+            // 单独命名.aria-label 不画 hover 浮层(title 才会),所以这里可以
+            // 安全地补"数值/循环".
+            ariaLabel: param.cyclic ? `${param.name} 数值(循环)` : `${param.name} 数值`,
+        });
+        const reset = createButton({
+            class: 'param-reset-btn',
+            text: '↺',
+            // 名字进 aria-label(读屏不必靠上下文猜是哪条参数),目标值进
+            // title:重置是"回到某个确定的值",点之前就该能看到它是多少.
+            title: `重置为 ${param.value}`,
+            ariaLabel: `重置 ${param.name} 为 ${param.value}`,
+        });
+        // 循环参数在名字后加 ↻:让"这个量在圆周上"在面板里可见.
+        const label = createFieldLabel(
+            param.cyclic ? `${param.name} ↻` : param.name,
+            slider.input.id,
+        );
+        const row = el(
+            'div',
+            { class: 'param-row' },
+            label,
+            slider.element,
+            number.element,
+            reset.element,
+        );
+        row.classList.toggle('is-cyclic', param.cyclic);
 
         /**
          * "`in` 前定义的值",也就是重置按钮的目标值.
@@ -99,42 +173,6 @@ export class ParamPanelController {
          */
         const declaredValue = param.value;
 
-        const label = document.createElement('label');
-        // 循环参数在名字后加 ↻:让"这个量在圆周上"在面板里可见.
-        label.htmlFor = sliderId;
-        label.textContent = param.cyclic ? `${param.name} ↻` : param.name;
-
-        const slider = document.createElement('input');
-        slider.type = 'range';
-        slider.id = sliderId;
-        slider.min = String(param.min);
-        slider.max = String(param.max);
-        slider.step = String(param.step);
-        slider.value = String(param.value);
-
-        const numberInput = document.createElement('input');
-        numberInput.type = 'number';
-        numberInput.id = numberId;
-        numberInput.min = String(param.min);
-        numberInput.max = String(param.max);
-        numberInput.step = String(param.step);
-        numberInput.value = String(param.value);
-        // 可见 label 关联的是滑块(一行里那个大热区);数字框用 aria-label 单独命名.
-        // aria-label 不画 hover 浮层(title 才会),所以这里可以安全地补"数值/循环".
-        numberInput.setAttribute(
-            'aria-label',
-            param.cyclic ? `${param.name} 数值(循环)` : `${param.name} 数值`,
-        );
-
-        const resetButton = document.createElement('button');
-        resetButton.type = 'button';
-        resetButton.className = 'param-reset-btn';
-        resetButton.textContent = '↺';
-        // 名字进 aria-label(读屏不必靠上下文猜是哪条参数),目标值进 title:
-        // 重置是"回到某个确定的值",点之前就该能看到它是多少.
-        resetButton.title = `重置为 ${declaredValue}`;
-        resetButton.setAttribute('aria-label', `重置 ${param.name} 为 ${declaredValue}`);
-
         /**
          * 是否已停在声明值上:值取自当前值缓存,文本取自数字框.
          *
@@ -143,11 +181,11 @@ export class ParamPanelController {
          */
         const isAtDeclaredValue = (): boolean =>
             this.values.get(param.name) === declaredValue
-            && numberInput.value === String(declaredValue);
+            && number.readText() === String(declaredValue);
 
         /** 按当前值/文本刷新重置按钮的可用态(判据只有 isAtDeclaredValue 一份). */
         const refreshResetAvailability = (): void => {
-            resetButton.disabled = isAtDeclaredValue();
+            reset.setDisabled(isAtDeclaredValue());
         };
 
         /**
@@ -159,21 +197,19 @@ export class ParamPanelController {
          * 用户可能正在编辑中途态(见文件头 UI-P2.1).
          */
         const writeValue = (next: number, writeNumberText: boolean): void => {
-            if (writeNumberText) numberInput.value = String(next);
-            slider.value = String(next);
+            if (writeNumberText) number.write(next);
+            slider.set(next);
             this.values.set(param.name, next);
             refreshResetAvailability();
         };
 
-        const syncFromSlider = (): void => {
-            const next = Number(slider.value);
-            writeValue(next, true);
-            this.onChange(param.name, next);
-        };
+        slider.onInput((value) => {
+            writeValue(value, true);
+            this.onChange(param.name, value);
+        });
 
         /** input 阶段:只同步已能解析的值,不动用户正在编辑的文本. */
-        const previewFromNumber = (): void => {
-            const raw = this._readNumberText(numberInput);
+        number.onInput((raw) => {
             if (raw === null) {
                 // 解析不出值就不写值,但文本已经变了(清空 / `-` / `1e`):
                 // 可用态要跟着文本走,否则用户清空后反而点不了重置来恢复.
@@ -183,45 +219,25 @@ export class ParamPanelController {
             const next = normalizeParamValue(raw, param);
             writeValue(next, false);
             this.onChange(param.name, next);
-        };
+        });
 
         /** change 阶段:归一化后把最终文本写回输入框. */
-        const commitFromNumber = (): void => {
-            const raw = this._readNumberText(numberInput);
+        number.onCommit((raw) => {
             const previous = this.values.get(param.name) ?? declaredValue;
             const next = raw === null ? previous : normalizeParamValue(raw, param);
             writeValue(next, true);
             if (raw !== null) this.onChange(param.name, next);
-        };
+        });
 
         /** 重置:回到声明值;与拖动滑块同一条链路,场景跟着刷新. */
-        const resetToDeclared = (): void => {
+        reset.onClick(() => {
             writeValue(declaredValue, true);
             this.onChange(param.name, declaredValue);
-        };
-
-        slider.addEventListener('input', syncFromSlider);
-        numberInput.addEventListener('input', previewFromNumber);
-        numberInput.addEventListener('change', commitFromNumber);
-        resetButton.addEventListener('click', resetToDeclared);
+        });
 
         // 初值就是声明值,所以重置按钮开局即置灰(判据与写值路径同一份).
         refreshResetAvailability();
 
-        row.append(label, slider, numberInput, resetButton);
-        return row;
-    }
-
-    /**
-     * 读输入框文本 -> 有限数;空串与任何中途态返回 null(调用方据此决定"不写回").
-     *
-     * 显式判空是必需的:`Number('') === 0`,不判就会把"用户清空了输入框"
-     * 当成"用户输入了 0".
-     */
-    private _readNumberText(input: HTMLInputElement): number | null {
-        const text = input.value.trim();
-        if (text === '') return null;
-        const raw = Number(text);
-        return Number.isFinite(raw) ? raw : null;
+        return { element: row, slider, number, reset };
     }
 }

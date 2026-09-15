@@ -32,12 +32,26 @@ export interface ElementOptions {
  *
  * 只接受字符串子节点与真节点:字符串用 `createTextNode` 落地,不用
  * `innerHTML`,避免把源码/公式这类外部文本当 HTML 解析.
+ *
+ * 两个重载:已知标签(`el('span')`)返回具体的 `HTMLSpanElement`,便于取
+ * `input.value` / `label.htmlFor` 这类具体成员;运行时才知道的字符串标签
+ * (`el(tag)`,来自上层参数)退回 `HTMLElement`.
  */
 export function el<K extends keyof HTMLElementTagNameMap>(
     tag: K,
+    options?: ElementOptions,
+    ...children: Child[]
+): HTMLElementTagNameMap[K];
+export function el(
+    tag: string,
+    options?: ElementOptions,
+    ...children: Child[]
+): HTMLElement;
+export function el(
+    tag: string,
     options: ElementOptions = {},
     ...children: Child[]
-): HTMLElementTagNameMap[K] {
+): HTMLElement {
     const element = document.createElement(tag);
     if (options.class !== undefined) element.className = options.class;
     if (options.text !== undefined) element.textContent = options.text;

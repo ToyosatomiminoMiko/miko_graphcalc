@@ -1,8 +1,10 @@
 /**
  * 行 DOM 的通用件:实体列表与求值列表共用的最小词表.
  *
- * 只有几件真正与"哪一栏"无关的东西放这里:
- * - {@link createElement}:轻量建元素,避免每处三行样板;
+ * 建元素本身不在这里了 -- 统一走 `ui/widgets/dom.ts` 的 {@link el},与视图面板
+ * 的控件同一套原语(实体/求值 item 的调用点已直接用 `el`).这里只剩两栏真正
+ * 共用的**行结构**:
+ *
  * - {@link createObjectRow}:行外壳(`<article>` + `.row-main` + 行末显隐按钮),
  *   实体 item 与求值 item 用的是同一个;
  * - {@link createVisibilityButton}:行末**显隐按钮**(业务动作:不渲染 +
@@ -21,18 +23,8 @@
  * 求值行自己的骨架(摘要/细节/结果行怎么拼)不在这里,见
  * `evaluation/evaluationDom.ts`.
  */
-
-/** 轻量建元素:属性只有 class 与文本,避免每处三行样板. */
-export function createElement(
-    tag: string,
-    className?: string,
-    text?: string,
-): HTMLElement {
-    const element = document.createElement(tag);
-    if (className) element.className = className;
-    if (text !== undefined) element.textContent = text;
-    return element;
-}
+import { createButton } from '../widgets/Button';
+import { el } from '../widgets/dom';
 
 /**
  * 行外壳:`<article class="object-row <rowClass>">`,内容分两层.
@@ -59,9 +51,9 @@ export function createObjectRow(
     rowClass: string,
     toggle: HTMLElement | null,
 ): { readonly row: HTMLElement; readonly main: HTMLElement } {
-    const row = createElement('article', `object-row ${rowClass}`);
+    const row = el('article', { class: `object-row ${rowClass}` });
     row.setAttribute('role', 'listitem');
-    const main = createElement('div', 'row-main');
+    const main = el('div', { class: 'row-main' });
     row.append(main);
     if (toggle !== null) row.append(toggle);
     return { row, main };
@@ -76,19 +68,24 @@ export function createObjectRow(
  * - `aria-label` 带上对象名,读屏不必靠上下文猜操作的是哪一条;
  * - 由 {@link createObjectRow} 挂在行(`<article>`)末位,与 `.row-main` 同级,
  *   不在 `<summary>` 里,因此点按钮只切换显隐,不会顺手开合细节.
+ *
+ * 每次重建行都会新建一个按钮(列表按内容键复用/替换整行),它随被丢弃的行
+ * 一起消失,所以这里只返回元素,不返回句柄 -- 生命周期跟行绑定,没有需要
+ * 单独 `dispose` 的持有者.
  */
 export function createVisibilityButton(
     enabled: boolean,
     label: string,
     onToggle: () => void,
 ): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'row-visibility-btn';
-    button.textContent = enabled ? '隐藏' : '显示';
-    button.setAttribute('aria-label', `${enabled ? '隐藏' : '显示'} ${label}`);
-    button.addEventListener('click', onToggle);
-    return button;
+    const action = enabled ? '隐藏' : '显示';
+    const button = createButton({
+        class: 'row-visibility-btn',
+        text: action,
+        ariaLabel: `${action} ${label}`,
+    });
+    button.onClick(onToggle);
+    return button.element;
 }
 
 /**

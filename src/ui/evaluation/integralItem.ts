@@ -24,7 +24,8 @@ import { latexResultNumber } from '../../math/latexNumber';
 import { formatNumber } from '../shared/numberText';
 import { createFormulaElement } from '../formula/FormulaView';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
-import { createElement, createVisibilityButton } from '../shared/rowDom';
+import { createVisibilityButton } from '../shared/rowDom';
+import { el } from '../widgets/dom';
 import {
     createDetailSections,
     createEvaluationRow,
@@ -250,7 +251,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      */
     private ensureStatusRow(): HTMLElement {
         if (this.result !== null) return this.result;
-        const result = createElement('code', 'eval-result is-error', '');
+        const result = el('code', { class: 'eval-result is-error', text: '' });
         const container = this.row.querySelector<HTMLElement>('.eval-detail-body')
             ?? this.main;
         container.append(result);

@@ -326,7 +326,7 @@ src/math/
   math_rs/          Rust 数值内核(表达式求值/采样/积分/求交)
 src/render/         只消费 IR;渲染层不再自行解析表达式
 src/ui/
-  widgets/          声明式控件词表:开关/单选/数字/行(只碰 DOM 与可访问性)
+  widgets/          声明式控件词表:开关/单选/滑块/数字/按钮/行(只碰 DOM 与可访问性)
   view/             右侧"视图"面板的声明式装配(ViewPanel 持布局与初值)
   editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
   panels/           面板几何,参数滑块,诊断提示
@@ -420,11 +420,17 @@ RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初�
 ```
 
 `src/ui/widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /
-`createNumberField` / 行与分组):只负责 DOM 结构与可访问性,不认识 EventBus,
-也不读配置,产出的类名沿用 `css/controls.css`,所以样式与手写 HTML 时一致.
-面板不再自己 `dispose` -- 每个控件恰好交给一个控制器,由它的 `dispose()`
-统一解绑.新增一个视图控件只改 `ViewPanel.ts` 与对应控制器,`index.html`
-里只留一个空的 `#view-controls` 容器.
+`createSlider` / `createNumberField` / `createButton` / 行与分组):只负责 DOM
+结构与可访问性,不认识 EventBus,也不读配置,产出的类名沿用 `css/controls.css`
+与 `css/panels.css`,所以样式与手写 HTML 时一致.参数面板
+(`ParamPanelController`)复用同一批件,只保留取值口径与写回时机这类业务语义;
+对象行/求值行也改用同一个建元素原语 `el`,两栏共用的行外壳与显隐按钮仍在
+`ui/shared/rowDom.ts`.
+
+装配出来的控件不再需要外部 `dispose`:每个控件恰好交给一个持有者(视图面板交
+控制器,参数行交面板控制器),由持有者统一解绑.新增一个视图控件只改
+`ViewPanel.ts` 与对应控制器,`index.html` 里只留一个空的 `#view-controls`
+容器.
 
 另外,曲线/曲面/向量场的 Worker 采样失败现在统一经
 `render/core/samplingErrors.ts` 上报,RenderController 转成诊断区错误;

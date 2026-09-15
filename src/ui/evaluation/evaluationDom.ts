@@ -34,10 +34,12 @@
  * 生成函数决定(`dsl/evaluationLatex.ts`).
  *
  * 本文件是求值 item 子类共用的组装件:谁长什么样由各子类的构造函数决定
- * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素与
- * 显隐按钮这类两栏通用件在 `ui/shared/rowDom.ts`.
+ * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素走
+ * `ui/widgets/dom.ts` 的 `el`,显隐按钮与行外壳这类两栏通用件在
+ * `ui/shared/rowDom.ts`.
  */
-import { createElement, createObjectRow } from '../shared/rowDom';
+import { createObjectRow } from '../shared/rowDom';
+import { el } from '../widgets/dom';
 import { createFormulaElement } from '../formula/FormulaView';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
 
@@ -91,14 +93,14 @@ export function createDetailSections(
     for (const line of lines) {
         if (line.kind === 'latex') {
             if (formulas === null) {
-                formulas = createElement('div', 'eval-detail-body');
+                formulas = el('div', { class: 'eval-detail-body' });
             }
             formulas.append(createFormulaElement(line.latex, 'eval-detail-line'));
         } else {
             if (metadata === null) {
-                metadata = createElement('div', 'eval-detail-meta-block');
+                metadata = el('div', { class: 'eval-detail-meta-block' });
             }
-            metadata.append(createElement('div', 'eval-detail-meta', line.text));
+            metadata.append(el('div', { class: 'eval-detail-meta', text: line.text }));
         }
     }
 
@@ -124,13 +126,13 @@ export function createEvaluationSummary(
 ): HTMLElement {
     const formula = spec.latex !== null
         ? createFormulaElement(spec.latex, 'eval-summary-formula', false)
-        : createElement('code', 'object-expr', spec.text ?? '');
+        : el('code', { class: 'object-expr', text: spec.text ?? '' });
 
     const summary = document.createElement('summary');
     summary.className = 'eval-summary';
     summary.append(
-        createElement('span', `kind-badge ${spec.badgeClass}`, spec.badgeLabel),
-        createElement('strong', 'object-name', name),
+        el('span', { class: `kind-badge ${spec.badgeClass}`, text: spec.badgeLabel }),
+        el('strong', { class: 'object-name', text: name }),
         formula,
     );
     return summary;
@@ -143,7 +145,7 @@ export function createEvaluationSummary(
  * `计算中...`/`已隐藏`/数值文本/错误文本;`className` 决定配色.
  */
 export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
-    return createElement('code', spec.className, spec.text);
+    return el('code', { class: spec.className, text: spec.text });
 }
 
 /**
@@ -180,7 +182,7 @@ export function createEvaluationRow(
     // 单独建一个块,保证结果行不会掉出折叠区.
     if (result !== null) {
         if (detail.formulas === null) {
-            detail.formulas = createElement('div', 'eval-detail-body');
+            detail.formulas = el('div', { class: 'eval-detail-body' });
         }
         detail.formulas.append(result);
     }
