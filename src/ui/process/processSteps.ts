@@ -40,8 +40,7 @@ export interface ProcessStep {
  * 先显示它,读者才知道这一串步骤在解什么.没有题目(或数据源给不出)时省略.
  */
 export interface ProcessDocument {
-    /** 条目名(与求值列表里的变量名一致),用于标题与回链. */
-    readonly name: string;
+    /** 页头标题(如 `梯度 g` / `求解 S`);条目名的信息已经在这里. */
     readonly title: string;
     /** 题目 LaTeX;省略或 null 时不显示题目区. */
     readonly problem?: string | null;
@@ -49,8 +48,8 @@ export interface ProcessDocument {
     readonly droppedSteps: number | null;
 }
 
-/** 规范顺序:分区输出与测试都按它,避免依赖步骤出现顺序. */
-export const PROCESS_STEP_KINDS: readonly ProcessStepKind[] = SOLVE_STEP_KINDS;
+/** 规范顺序:分区输出按它,避免依赖步骤出现顺序.与内核分区同源(不另立别名). */
+const PROCESS_STEP_KINDS: readonly ProcessStepKind[] = SOLVE_STEP_KINDS;
 
 /** 徽章文案(中性词):配色表达"哪一类依据",文案表达"这一类的名字". */
 export const PROCESS_STEP_KIND_LABELS: Record<ProcessStepKind, string> = {
@@ -65,18 +64,21 @@ export const PROCESS_STEP_KIND_LABELS: Record<ProcessStepKind, string> = {
  *
  * 上限非正数时返回空列表并把全部步骤记为丢弃(调用方仍能给出明文),
  * 不抛异常:上限是配置,配置写错不该让列表整块挂掉.
+ *
+ * 上限一律先规范化(`floor` + 夹到 0)再比较,否则 `3.5` 会得到"取 3 步却
+ * 按 3.5 判断"的两种口径;`NaN` 与"上限 0"同义(配置写错不挂列表).
  */
 export function truncateProcessSteps(
     steps: readonly ProcessStep[],
     maxSteps: number,
 ): { readonly steps: readonly ProcessStep[]; readonly droppedSteps: number | null } {
-    if (steps.length <= maxSteps) {
+    const normalized = Number.isNaN(maxSteps) ? 0 : Math.max(0, Math.floor(maxSteps));
+    if (steps.length <= normalized) {
         return { steps, droppedSteps: null };
     }
-    const limit = Math.max(0, Math.floor(maxSteps));
     return {
-        steps: steps.slice(0, limit),
-        droppedSteps: steps.length - limit,
+        steps: steps.slice(0, normalized),
+        droppedSteps: steps.length - normalized,
     };
 }
 

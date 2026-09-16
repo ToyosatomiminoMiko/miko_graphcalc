@@ -518,9 +518,9 @@ export interface SolveStep {
  * 数值回调):步骤链本身就是最终结果.
  *
  * 能力边界错误(多未知量 / 三次以上 / 非多项式)落在 `error`,列表照常保留
- * 占位并给出理由,而不是让整份源码编译失败.隐藏项(`enabled === false`)
- * 按既有约定"先完整校验,后禁用,仅跳过计算":内核不再调用,`equationLatex`
- * 为空串,行内回退显示方程原文.
+ * 占位并给出理由,**题目 LaTeX 仍然有效**(方程已解析成功);隐藏项
+ * (`enabled === false`)按既有约定"先完整校验,后禁用,仅跳过计算":内核不再
+ * 调用,`equationLatex` 为空串,行内回退显示方程原文.
  */
 export interface SolveTask {
     name: string;
@@ -528,11 +528,16 @@ export interface SolveTask {
     equation: string;
     /** 求解变量;隐藏或推断失败时为空串. */
     variable: string;
-    /** 题目 LaTeX(原方程,保留用户写法);隐藏项为空串. */
+    /** 题目 LaTeX(原方程,保留用户写法);隐藏项为空串,内核拒绝的条目仍有值. */
     equationLatex: string;
     /** 解集 LaTeX;无实数解时为 null. */
     solutionLatex: string | null;
-    /** 实数解个数. */
+    /**
+     * 实数解个数.
+     *
+     * 内核的原始结论之一;结果展示走 `solutionLatex`/`identity`,这个计数留给
+     * 测试对拍与后续"解集摘要"展示.
+     */
     realRootCount: number;
     /** 恒等式(任意实数都是解):与"无解"必须区分. */
     identity: boolean;

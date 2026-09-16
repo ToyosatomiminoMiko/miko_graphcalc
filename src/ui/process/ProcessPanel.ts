@@ -6,9 +6,10 @@
  *
  * 几条刻意的不变量:
  * - **状态机是纯的**(`processState.ts`),本类只负责把状态写成 DOM:高亮只改
- *   类名,不重建行(见 `keyedRowList` 的复用约定);
- * - **出口只有一个** `onStepChange(index)`:一期的消费者是高亮,二期把第 k 步
- *   当成虚拟参数驱动几何,前端不必重做(见设计文档第 4.3 节);
+ *   类名,不重建行(见 `keyedRowList` 的复用约定与 `stepRows`);
+ * - **出口只有一个** `onStepChange(index)`:一期没有订阅者(高亮计数由本类
+ *   写),二期把第 k 步当成虚拟参数驱动几何时接在这里,前端不必重做(见设计
+ *   文档第 4.3 节);
  * - **键盘不在这里绑 document**:`keyboardBinding()` 交给全应用唯一的
  *   `KeyboardController` 注册;本类自己只在步骤行上绑点击;
  * - 空过程给一句明文,超长过程截断并注明,隐藏对象不生成过程(入口置灰的理由
@@ -45,8 +46,10 @@ export interface ProcessPanelHandlers {
     /**
      * 当前步变化的唯一出口.
      *
-     * 一期消费者只做高亮与滚动;二期把索引当成虚拟参数走既有参数链路驱动
-     * 几何(割线->切线,黎曼矩形加细),因此这里**只发索引**,不发公式.
+     * **一期没有订阅者**:高亮与计数是面板自己写的,这个出口是二期"把第 k 步
+     * 当成虚拟参数驱动几何"(割线->切线,黎曼矩形加细)的指定接入点,因此这里
+     * **只发索引**,不发公式--二期不必改签名,只加一个消费者.接口按二期需要
+     * 定是一次性决定(见 docs/equation-solving-process.md 4.3 / 6).
      */
     onStepChange?(index: number): void;
 }
@@ -100,6 +103,13 @@ export class ProcessPanel {
     private readonly prevButton: ButtonHandle;
     private readonly nextButton: ButtonHandle;
 
+    /**
+     * 当前步骤行,下标即步骤下标(与文档里的顺序一一对应).
+     *
+     * 高亮是每步都跑的热路径:留一份行引用就不必每次 `querySelectorAll` 全表
+     * 扫描(见 `_applyIndex`);`show()`/`clear()` 是它唯一的重建点.
+     */
+    private stepRows: HTMLElement[] = [];
     private document: ProcessDocument | null = null;
     private state: ProcessState = createProcessState(0);
 
@@ -167,6 +177,7 @@ export class ProcessPanel {
         this.title.textContent = doc.title;
 
         const indexed: IndexedStep[] = doc.steps.map((step, index) => ({ index, step }));
+        this.stepRows = [];
         this.list.sync(indexed, {
             name: (entry) => String(entry.index),
             key: (entry) => `${entry.step.latex}|${entry.step.kind}|${entry.step.reason}`,
@@ -183,6 +194,7 @@ export class ProcessPanel {
     /** 清空过程:回到空状态明文,不留下上一条的步骤与标题. */
     clear(): void {
         this.document = null;
+        this.stepRows = [];
         this.list.clear();
         this.state = createProcessState(0);
         this.title.textContent = '过程';
@@ -267,11 +279,15 @@ export class ProcessPanel {
         );
         // 点击任意行跳转;键盘路径是全局左右方向键(见 keyboardBinding).
         row.addEventListener('click', () => this.goto(entry.index));
+        this.stepRows[entry.index] = row;
         return { row };
     }
 
     /**
      * 当前步的唯一写入点:高亮只改类名/属性,不重建行.
+     *
+     * 行引用由 `_buildStepRow` 填进 `stepRows`(下标即步骤下标),所以这里不查
+     * DOM:翻步是连按/长按路径,每步扫一遍根节点没有必要.
      *
      * 有步骤时一定经出口播报:载入一条过程播报第 0 步(把几何切到起点),
      * 翻步播报新下标.边界上的 no-op 在 next/prev/goto 里就被状态机挡掉了,
@@ -282,13 +298,14 @@ export class ProcessPanel {
         const clamped = stepCount === 0 ? EMPTY_PROCESS_INDEX : clampProcessIndex(index, stepCount);
         this.state = { stepCount, index: clamped };
 
-        const rows = this.root.querySelectorAll<HTMLElement>('.process-step');
-        rows.forEach((row, position) => {
+        for (let position = 0; position < this.stepRows.length; position += 1) {
+            const row = this.stepRows[position];
+            if (row === undefined) continue;
             const current = position === clamped;
             row.classList.toggle('is-current', current);
             if (current) row.setAttribute('aria-current', 'step');
             else row.removeAttribute('aria-current');
-        });
+        }
 
         const hasSteps = stepCount > 0 && clamped >= 0;
         this.counter.textContent = hasSteps ? `${clamped + 1} / ${stepCount}` : '';

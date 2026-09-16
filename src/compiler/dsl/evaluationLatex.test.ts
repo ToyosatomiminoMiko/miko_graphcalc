@@ -23,12 +23,14 @@ vi.mock('../../wasm/math_rs/math_rs', () => ({
 }));
 
 import {
-    analysisLatexDetails,
+    analysisLatexDetailEntries,
     analysisLatexSummary,
-    integralLatexDetails,
+    detailLinesOf,
+    integralLatexDetailEntries,
     integralLatexSummary,
     intersectionLatexDetails,
     intersectionLatexSummary,
+    type EvaluationDetailEntry,
     type EvaluationDetailLine,
 } from './evaluationLatex';
 
@@ -107,13 +109,13 @@ function detailTexts(lines: EvaluationDetailLine[]): string[] {
     return lines.map((line) => (line.kind === 'latex' ? line.latex : line.text));
 }
 
-describe('analysisLatexDetails', () => {
+describe('analysisLatexDetailEntries', () => {
     const symbolic = '\\nabla f=\\left(2 x,\\ 2 y,\\ 2 z\\right)';
 
     it('梯度先展开算子的符号定义,再给该点的数值结果', () => {
-        const lines = detailTexts(analysisLatexDetails(
+        const lines = detailTexts(detailLinesOf(analysisLatexDetailEntries(
             analysis({ symbolic, pointSpherical: [3.741657, 0.640522, 1.107149] }),
-        ));
+        )));
         // 中间步骤:符号定义在前,数值结果紧随其后.
         expect(lines[0]).toBe(symbolic);
         expect(lines[1]).toBe(
@@ -124,26 +126,40 @@ describe('analysisLatexDetails', () => {
         expect(lines.some((line) => line.includes('f\\left(P\\right)=4'))).toBe(true);
     });
 
+    it('每一行都带角色:公式与依据同源,调用方不必按位置猜', () => {
+        const entries = analysisLatexDetailEntries(analysis({ symbolic }));
+
+        expect(entries.map((entry) => entry.role)).toEqual([
+            'symbolic',
+            'value',
+            'point',
+            'scalar',
+        ]);
+        expect(entries[0].line).toEqual({ kind: 'latex', latex: symbolic });
+    });
+
     it('没有符号定义时不编造中间步骤', () => {
-        const lines = detailTexts(analysisLatexDetails(analysis()));
+        const lines = detailTexts(detailLinesOf(analysisLatexDetailEntries(analysis())));
         expect(lines[0]).toContain('\\nabla f\\left(P\\right)=');
         expect(lines.some((line) => line.includes('\\varphi'))).toBe(false);
     });
 
     it('切线只在有值时出', () => {
-        const withTangent = detailTexts(analysisLatexDetails(analysis({ tangent: [1, 2, 0] })));
+        const withTangent = detailTexts(
+            detailLinesOf(analysisLatexDetailEntries(analysis({ tangent: [1, 2, 0] }))),
+        );
         expect(withTangent.some((line) => line.startsWith('\\mathbf{T}='))).toBe(true);
     });
 
     it('拉普拉斯先展开二阶导符号式,再给该点的标量结果', () => {
         const symbolic = '\\nabla^2 f=2+2';
-        const lines = detailTexts(analysisLatexDetails(analysis({
+        const lines = detailTexts(detailLinesOf(analysisLatexDetailEntries(analysis({
             op: 'laplacian',
             symbolic,
             // 标量算子:向量恒零(渲染层据此不画箭矢).
             vector: [0, 0, 0],
             scalar: 4,
-        })));
+        }))));
         expect(lines[0]).toBe(symbolic);
         expect(lines[1]).toBe('\\left(\\nabla^{2}f\\right)\\left(P\\right)=4');
         expect(lines[2]).toBe('P=\\left(1,\\ 2,\\ 3\\right)');
@@ -163,8 +179,20 @@ describe('integralLatex', () => {
         expect(integralLatexSummary(integral({ objectId: 9 }), [curve])).toBeNull();
     });
 
+    it('积分细节带角色(equation/domain/sampling),只有等式进公式块', () => {
+        const entries: EvaluationDetailEntry[] = integralLatexDetailEntries(
+            integral(),
+            [curve],
+            '黎曼和(左端点)',
+        );
+
+        expect(entries.map((entry) => entry.role)).toEqual(['equation', 'domain', 'sampling']);
+    });
+
     it('细节第一行是完整等式,域/方法/分段/分层是纯文本', () => {
-        const pending = integralLatexDetails(integral(), [curve], '黎曼和(左端点)');
+        const pending = detailLinesOf(
+            integralLatexDetailEntries(integral(), [curve], '黎曼和(左端点)'),
+        );
         expect(pending[0]).toEqual({
             kind: 'latex',
             latex: '\\int_{-4}^{4} x^2 \\mathrm{d}x',
@@ -175,12 +203,12 @@ describe('integralLatex', () => {
         expect((pending[1] as { text: string }).text).not.toContain('\\text');
         expect((pending[2] as { text: string }).text).toBe('分段: 32 · 分层: 8');
 
-        const ready = integralLatexDetails(
+        const ready = detailLinesOf(integralLatexDetailEntries(
             integral(),
             [curve],
             '黎曼和(左端点)',
             -2.775558e-17,
-        );
+        ));
         expect(ready[0]).toEqual({
             kind: 'latex',
             latex: '\\int_{-4}^{4} x^2 \\mathrm{d}x=-2.775558\\times10^{-17}',

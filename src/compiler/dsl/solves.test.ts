@@ -74,6 +74,19 @@ describe('compileSolves:声明级求解', () => {
         expect(overridden.solutionLatex).toContain('\\sqrt{32}');
     });
 
+    it('求根公式把系数代进去:步骤里不出现字面 a/b/c', async () => {
+        const task = await solveTask(
+            'param a = 1 in [1, 4, 0.5];\nsolve S = a*x^2 - 2 = 0;',
+            { a: 1 },
+        );
+
+        const formulaStep = task.steps.find((step) => step.reason === '求根公式');
+        expect(formulaStep?.latex).toBe('x = \\frac{+ 0 \\pm \\sqrt{8}}{2}');
+        // 板书要求:公式模板里的字母一律换成当前系数,不能停在 `2a` / `-b`.
+        expect(formulaStep?.latex).not.toContain('2a');
+        expect(formulaStep?.latex).not.toContain('-b');
+    });
+
     it('variable 选项指定未知量', async () => {
         const task = await solveTask('solve S = t^2 - 9 = 0 { variable = t; };');
 
@@ -86,9 +99,12 @@ describe('compileSolves:声明级求解', () => {
         expect(cubic.enabled).toBe(true);
         expect(cubic.error).toContain('只支持一次/二次');
         expect(cubic.steps).toEqual([]);
+        // 方程解析成功过,题目 LaTeX 就该留着:UI 不因为"解不出来"而退回纯文本.
+        expect(cubic.equationLatex).toContain('x^{3}');
 
         const multi = await solveTask('solve S = x + y = 0;');
         expect(multi.error).toContain('多个未知量');
+        expect(multi.equationLatex).toContain('x');
 
         // 显式指定未知量后,剩下的自由符号必须是已声明参数;否则明确报出来,
         // 不静默当成 0.

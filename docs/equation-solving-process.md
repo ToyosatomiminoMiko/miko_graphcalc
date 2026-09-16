@@ -221,8 +221,9 @@ tabindex".语义不同强行复用会把读屏与键盘行为做成四不像.新
 - **状态机**(可单测):`{ steps, index }`,转移函数 `next/prev/goto` 夹取到
   `[0, steps.length-1]`,越界是 no-op 而不是回绕.这条单独放一个纯模块,
   与 DOM 无关.
-- **出口**:视图对外只暴露 `onStepChange(index)`.一期的消费者只做高亮与滚动;
-  二期的消费者换成"把第 k 步写成一个虚拟参数"去驱动几何(见第 6 节).
+- **出口**:视图对外只暴露 `onStepChange(index)`.**一期没有订阅者**(高亮与
+  滚动是面板自己的 DOM 写入);二期的消费者是"把第 k 步写成一个虚拟参数"去
+  驱动几何(见第 6 节),接口因此按二期需要定,只发索引不发公式.
 
 ### 4.4 空状态与上限
 
@@ -266,7 +267,11 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 | --- | --- | --- | --- | --- |
 | **一期** | 右栏标签页 + 过程视图 + 三级披露判据 + 条目"过程"入口 | 现有 `analysisLatexDetails` / 积分与求交的细节行,按递等式口径重组 | 否 | 否(只读现有字段) |
 | **二期** | 步骤索引驱动几何:割线->切线,黎曼矩形加细,交点高亮 | 一期已有的 `onStepChange` 出口 | 否 | **只新增**字段(如 `stepHighlights`),不改既有字段语义 |
-| **三期** | 保守式求解内核:独立步骤产物类型 + WASM 入口 | 内核产物替换一期数据源 | 是 | 只新增 |
+| **三期** | 保守式求解内核:独立步骤产物类型 + WASM 入口 | 内核产物替换一期数据源 | 是 | 只新增(`SolveTask` / `SceneIR.solves` / `SOLVE_STEP_KINDS`) |
+
+> 三期已落地(v1,单变量一次/二次多项式)的**实际 UI 增量**:`SolveItem` 子列表
+> 条目,`solveLatexSummary/solveLatexDetails`,过程页题目区,`buildSolveProcess`.
+> 过程页骨架(标签页/递等式/披露/翻步)确实零改动,这是"展示层先行"成立的部分.
 
 三点说明:
 
@@ -277,8 +282,10 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
    changedParams)`,复用既有的缓存与 latest-only 异步调度.这符合项目的
    "复用,不要重建.缓存,不要重算"口径.
 3. **三期的步骤产物必须是独立类型**,不是 `Expr`(路线图 §7.1 的既有结论:
-   不要把符号引擎内部表示泄漏成项目级 API).三期只换数据源,UI 层零改动--
-   这正是"展示层先行"的价值.
+   不要把符号引擎内部表示泄漏成项目级 API).三期**只换数据源**:过程页的排版,
+   披露,翻步,行缓存都不动;UI 侧的增量只有"求解"子列表条目与过程页的**题目区**
+   (`ProcessDocument.problem`),这一点已在下表中如实修正--"UI 层零改动"只对
+   **过程页骨架**成立,对列表条目不成立.
 
 ---
 

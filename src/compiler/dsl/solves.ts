@@ -10,10 +10,12 @@
  * - 参数系数与积分/分析同一条链路(`buildParamScope`),方程里的参数名按当前
  *   值代入,内核不做符号系数代数;
  * - **能力边界错误不抛**:多未知量 / 三次以上 / 非多项式是"这条方程超出内核",
- *   不是源码写错.它们落在 `SolveTask.error`,列表照常保留占位并给理由;隐藏
- *   与声明类错误(重复名,未知选项)仍按既有约定带语句 span 抛出.
+ *   不是源码写错.内核把它们作为**结果**给回来(Rust `SolveOutcome.error`),
+ *   落在 `SolveTask.error`,列表照常保留占位并给理由,**题目 LaTeX 照给**;
+ *   隐藏与声明类错误(重复名,未知选项)仍按既有约定带语句 span 抛出.
  * - 隐藏语义沿用约定 1("先完整校验,后禁用,仅跳过计算"):选项/重名照常校验,
- *   只是不再调用求解内核,`equationLatex` 留空由 UI 回退成方程原文.
+ *   只是不再调用求解内核,`equationLatex` 留空由 UI 回退成方程原文(纯文本)--
+ *   隐藏项没算过,不该假装有排版产物.
  */
 import type { AstProgram } from '../ast/types';
 import type {
@@ -39,6 +41,8 @@ interface SolveOutcomeJson {
     real_root_count: number;
     identity: boolean;
     steps: Array<{ latex: string; reason: string; kind: string }>;
+    /** 能力边界理由;null 表示求解成功. */
+    error: string | null;
 }
 
 /**
@@ -112,42 +116,28 @@ export function compileSolves(
             }
 
             const variable = findOption(statement.options, 'variable')?.trim() ?? '';
-            try {
-                const outcome = JSON.parse(
-                    wasmSolveEquation(
-                        statement.equation,
-                        variable,
-                        coefficientNames,
-                        coefficientValues,
-                    ),
-                ) as SolveOutcomeJson;
-                solves.push({
-                    name: statement.name,
-                    equation: statement.equation,
-                    variable: outcome.variable,
-                    equationLatex: outcome.equation_latex,
-                    solutionLatex: outcome.solution_latex,
-                    realRootCount: outcome.real_root_count,
-                    identity: outcome.identity,
-                    steps: toSteps(outcome.steps),
-                    error: null,
-                    enabled: true,
-                });
-            } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                solves.push({
-                    name: statement.name,
-                    equation: statement.equation,
+            const outcome = JSON.parse(
+                wasmSolveEquation(
+                    statement.equation,
                     variable,
-                    equationLatex: '',
-                    solutionLatex: null,
-                    realRootCount: 0,
-                    identity: false,
-                    steps: [],
-                    error: message,
-                    enabled: true,
-                });
-            }
+                    coefficientNames,
+                    coefficientValues,
+                ),
+            ) as SolveOutcomeJson;
+            solves.push({
+                name: statement.name,
+                equation: statement.equation,
+                variable: outcome.variable,
+                equationLatex: outcome.equation_latex,
+                solutionLatex: outcome.solution_latex,
+                realRootCount: outcome.real_root_count,
+                identity: outcome.identity,
+                steps: toSteps(outcome.steps),
+                // 能力边界理由由内核作为**结果**给出(不是异常):方程读不出来
+                // 才会抛错(见 Rust `solve_equation` 的说明).
+                error: outcome.error,
+                enabled: true,
+            });
         });
     }
 

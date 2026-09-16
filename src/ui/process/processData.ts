@@ -56,11 +56,10 @@ const ROLE_PRESENTATION: Partial<Record<EvaluationDetailRole, StepPresentation>>
 /**
  * 把带角色的细节行分区成步骤,再按上限截断.
  *
- * `title` 给页头,`problem` 是题目(待处理的式子),`name` 给回链;截断只发生在
- * 这里,视图拿到的一定是最终步骤.
+ * `title` 给页头,`problem` 是题目(待处理的式子);截断只发生在这里,视图拿到
+ * 的一定是最终步骤.
  */
 function buildProcessDocument(
-    name: string,
     title: string,
     problem: string | null,
     entries: readonly EvaluationDetailEntry[],
@@ -79,7 +78,6 @@ function buildProcessDocument(
     }
     const truncated = truncateProcessSteps(steps, maxSteps);
     return {
-        name,
         title,
         problem,
         steps: truncated.steps,
@@ -93,7 +91,6 @@ export function buildGradientProcess(
     maxSteps: number = UI_CONFIG.process.maxSteps,
 ): ProcessDocument {
     return buildProcessDocument(
-        analysis.name,
         `梯度 ${analysis.name}`,
         analysisLatexSummary(analysis),
         analysisLatexDetailEntries(analysis),
@@ -115,7 +112,6 @@ export function buildIntegralProcess(
     maxSteps: number = UI_CONFIG.process.maxSteps,
 ): ProcessDocument {
     return buildProcessDocument(
-        task.name,
         `积分 ${task.name}`,
         integralLatexSummary(task, objects),
         integralLatexDetailEntries(task, objects, methodLabel, value),
@@ -126,20 +122,27 @@ export function buildIntegralProcess(
 /**
  * 方程求解条目的过程:题目就是待求解的方程,步骤由**内核产物**直接给出.
  *
- * 这是"三期只换数据源,UI 层零改动"的落点:步骤的 `kind`/`reason`/`latex` 全部
- * 来自 `math_rs::symbolic::solve`,过程页只是把它排版出来,不再做任何重组或
+ * 这是"三期只换数据源"的落点:步骤的 `kind`/`reason`/`latex` 全部来自
+ * `math_rs::symbolic::solve`,过程页只是把它排版出来,不再做任何重组或
  * 猜测.求解失败时给出空步骤 + 错误理由,过程页仍显示题目.
+ *
+ * 上限同样生效:内核理论上可以给出任意长的步骤链,视图的截断明文不能对
+ * 三期数据源失灵.
  */
-export function buildSolveProcess(task: SolveTask): ProcessDocument {
+export function buildSolveProcess(
+    task: SolveTask,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    const steps: ProcessStep[] = task.steps.map((step) => ({
+        latex: step.latex,
+        kind: step.kind,
+        reason: step.reason,
+    }));
+    const truncated = truncateProcessSteps(steps, maxSteps);
     return {
-        name: task.name,
         title: `求解 ${task.name}`,
         problem: task.equationLatex === '' ? null : task.equationLatex,
-        steps: task.steps.map((step) => ({
-            latex: step.latex,
-            kind: step.kind,
-            reason: step.reason,
-        })),
-        droppedSteps: null,
+        steps: truncated.steps,
+        droppedSteps: truncated.droppedSteps,
     };
 }

@@ -147,7 +147,8 @@ function createController(): {
             toggleIntegral: (name) => calls.integral.push(name),
             toggleIntersection: (name) => calls.intersection.push(name),
             toggleSolve: (name) => calls.solve.push(name),
-            openProcess: (request) => calls.process.push(request.name),
+            // 回调的是过程文档;这里只记题目(内容稳定,不受标题文案改动影响).
+            openProcess: (request) => calls.process.push(request.document.problem ?? ''),
         },
     );
     return {
@@ -556,7 +557,7 @@ describe('三级披露:长过程的 L2 入口', () => {
         tangent: [0, 0, 1],
     };
 
-    it('细节行超过阈值:出现"过程"入口,点击把条目名回调出去', () => {
+    it('细节行超过阈值:出现"过程"入口,点击把过程文档回调出去', () => {
         const { analysisList, calls, controller } = createController();
         controller.renderScene({ ...scene, analyses: [longGradient] } as SceneIR);
 
@@ -566,7 +567,9 @@ describe('三级披露:长过程的 L2 入口', () => {
         expect(entry.disabled).toBe(false);
 
         entry.dispatch('click');
-        expect(calls.process).toEqual(['gs']);
+        // 回调的是过程文档本身:题目(待分析的算子式)+ 步骤.
+        expect(calls.process).toHaveLength(1);
+        expect(calls.process[0]).toBe('\\nabla f\\left(\\left(1,\\ 2,\\ 3\\right)\\right)');
     });
 
     it('短过程(不超过阈值)不出现"过程"入口,继续留在行内 <details>', () => {
@@ -641,7 +644,7 @@ describe('方程求解条目', () => {
             .toBe('x^{2}-5x+6=0');
     });
 
-    it('展开细节给解集与步骤计数', () => {
+    it('展开细节给解集,求解变量与步骤计数', () => {
         const { solveList, controller } = createController();
         controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
 
@@ -649,17 +652,19 @@ describe('方程求解条目', () => {
         const lines = details.querySelectorAll<StubElement>('.eval-detail-line');
         expect(lines[0].textContent).toContain('x = 2');
         const metas = details.querySelectorAll<StubElement>('.eval-detail-meta');
-        expect(metas[0].textContent).toContain('4 步');
+        // 求解变量可能是内核推断的,必须写出来;计数把读者引到过程页.
+        expect(metas[0].textContent).toBe('求解 x: 共 4 步(见右栏"过程")');
     });
 
-    it('过程入口可用并回调条目名;显隐按钮回调 toggleSolve', () => {
+    it('过程入口可用并回调过程文档;显隐按钮回调 toggleSolve', () => {
         const { solveList, calls, controller } = createController();
         controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
 
         const entry = solveList.querySelector<StubElement>('.row-process-btn')!;
         expect(entry.disabled).toBe(false);
         entry.dispatch('click');
-        expect(calls.process).toEqual(['S']);
+        // 题目就是待求解的方程(不是条目名).
+        expect(calls.process).toEqual(['x^{2}-5x+6=0']);
 
         solveList.querySelector<StubElement>('.row-visibility-btn')!.dispatch('click');
         expect(calls.solve).toEqual(['S']);

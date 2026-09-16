@@ -3,9 +3,9 @@
  * (路线图改造原则 4 / 设计文档 P5).
  */
 import { describe, expect, it } from 'vitest';
+import { SOLVE_STEP_KINDS } from '../../ir';
 import {
     PROCESS_STEP_KIND_LABELS,
-    PROCESS_STEP_KINDS,
     partitionStepsByKind,
     truncateProcessSteps,
     type ProcessStep,
@@ -30,6 +30,14 @@ describe('truncateProcessSteps', () => {
         const steps = [step('a', 'rule', 'r'), step('b', 'numeric', 'n')];
 
         expect(truncateProcessSteps(steps, 2).droppedSteps).toBeNull();
+    });
+
+    it('上限先向下取整:3.5 与 3 是同一个口径', () => {
+        const steps = Array.from({ length: 4 }, (_, index) =>
+            step(`x_{${index}}`, 'numeric', '数值代入'));
+
+        expect(truncateProcessSteps(steps, 3.5).droppedSteps).toBe(1);
+        expect(truncateProcessSteps(steps, 3).droppedSteps).toBe(1);
     });
 
     it('超过上限:截断并给出被丢弃的步数', () => {
@@ -75,7 +83,7 @@ describe('partitionStepsByKind', () => {
             step('b', 'definition', '算子定义式'),
         ]);
 
-        // PROCESS_STEP_KINDS 的顺序是 法则 / 定义 / 代数 / 数值.
+        // 规范顺序取内核分区:法则 / 代数 / 定义 / 数值.
         expect(groups.map((group) => group.kind)).toEqual(['definition', 'numeric']);
     });
 
@@ -85,9 +93,11 @@ describe('partitionStepsByKind', () => {
 });
 
 describe('依据文案表', () => {
-    it('四类步骤都有非空的中性名字', () => {
-        expect(PROCESS_STEP_KINDS).toHaveLength(4);
-        for (const kind of PROCESS_STEP_KINDS) {
+    it('内核的每个分区都有中性名字(新增分区会在这里失败,而不是静默无文案)', () => {
+        expect([...SOLVE_STEP_KINDS].sort()).toEqual(
+            Object.keys(PROCESS_STEP_KIND_LABELS).sort(),
+        );
+        for (const kind of SOLVE_STEP_KINDS) {
             expect(PROCESS_STEP_KIND_LABELS[kind].length).toBeGreaterThan(0);
         }
     });

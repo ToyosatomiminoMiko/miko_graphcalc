@@ -158,9 +158,17 @@ export function analysisLatexDetailEntries(
     return entries;
 }
 
-/** 分析结果细节:只要内容的调用方(列表 item)直接用这一份. */
-export function analysisLatexDetails(analysis: AnalysisResult): EvaluationDetailLine[] {
-    return analysisLatexDetailEntries(analysis).map((entry) => entry.line);
+/**
+ * 只取内容行(带角色的细节行去掉角色).
+ *
+ * 列表 item 的展示块要的是"行",而过程视图与披露判据要的是"带角色的行";
+ * 两者同源,所以这里给一个一行的投影,而不是让每个 item 各写一遍
+ * `entries(...).map(entry => entry.line)`.
+ */
+export function detailLinesOf(
+    entries: readonly EvaluationDetailEntry[],
+): EvaluationDetailLine[] {
+    return entries.map((entry) => entry.line);
 }
 
 /**
@@ -223,17 +231,6 @@ export function integralLatexDetailEntries(
     return entries;
 }
 
-/** 积分结果细节:只要内容的调用方(列表 item)直接用这一份. */
-export function integralLatexDetails(
-    task: IntegralTask,
-    objects: readonly SceneObject[],
-    methodLabel: string,
-    result: number | null = null,
-): EvaluationDetailLine[] {
-    return integralLatexDetailEntries(task, objects, methodLabel, result)
-        .map((entry) => entry.line);
-}
-
 /**
  * 求交任务的最小形状.
  *
@@ -288,7 +285,9 @@ export function solveLatexSummary(task: SolveTask): LatexLine | null {
  * - 恒等式 / 无实数解:各给一句明文;
  * - 内核拒绝(多未知量 / 三次以上 / 非多项式):写明"无法求解: 原因".
  *
- * 末尾一律给步骤计数,把读者引到右栏过程页(完整推导在那里逐行展开).
+ * 末尾一律给"求解的是哪个量 + 步骤计数":求解变量可以是内核推断出来的
+ * (DSL 里没写 `variable` 选项),不写出来学生无法确认解的是哪个符号;计数
+ * 把读者引到右栏过程页(完整推导在那里逐行展开).
  */
 export function solveLatexDetails(task: SolveTask): EvaluationDetailLine[] {
     if (task.error !== null) {
@@ -303,9 +302,10 @@ export function solveLatexDetails(task: SolveTask): EvaluationDetailLine[] {
     } else {
         lines.push({ kind: 'text', text: '无实数解' });
     }
+    const about = task.variable === '' ? '' : `求解 ${task.variable}: `;
     lines.push({
         kind: 'text',
-        text: `求解步骤: ${task.steps.length} 步(见右栏"过程")`,
+        text: `${about}共 ${task.steps.length} 步(见右栏"过程")`,
     });
     return lines;
 }

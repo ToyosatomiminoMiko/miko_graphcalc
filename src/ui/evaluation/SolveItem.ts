@@ -34,7 +34,9 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
      * 内容键:直接取会被渲染的题目/解集/步骤/错误与启用态.
      *
      * 不罗列 IR 字段清单:键跟着渲染内容走,内核新增一步求解说明时,
-     * 行也会跟着刷新(与 analysisItem 同一条约定).
+     * 行也会跟着刷新(与 analysisItem 同一条约定).`realRootCount`/`identity`
+     * 不在键里:前者不参与渲染,后者已经由 `solutionLatex` 的有无体现--
+     * 把不渲染的字段算进来只会让行白重建一遍.
      */
     static cacheKey(task: SolveTask): string {
         return JSON.stringify([
@@ -42,8 +44,6 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
             task.equation,
             task.equationLatex,
             task.solutionLatex,
-            task.realRootCount,
-            task.identity,
             task.error,
             task.enabled,
             task.steps,
@@ -83,7 +83,6 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
             name: task.name,
             disabledReason: processDisabledReason,
             onOpen: () => context.openProcess({
-                name: task.name,
                 document: buildSolveProcess(task),
             }),
         });

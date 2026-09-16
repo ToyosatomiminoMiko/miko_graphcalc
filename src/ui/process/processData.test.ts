@@ -52,7 +52,6 @@ describe('buildGradientProcess', () => {
     it('按细节行顺序分区:定义式 / 数值代入 / 取点 / 函数值', () => {
         const process = buildGradientProcess(gradient);
 
-        expect(process.name).toBe('g');
         expect(process.title).toBe('梯度 g');
         expect(process.droppedSteps).toBeNull();
         expect(process.steps.map((step) => step.reason)).toEqual([
@@ -147,7 +146,6 @@ describe('题目(problem)与求解过程', () => {
     it('求解过程:题目就是待求解方程,步骤原样来自内核产物', () => {
         const process = buildSolveProcess(solve);
 
-        expect(process.name).toBe('S');
         expect(process.title).toBe('求解 S');
         expect(process.problem).toBe('x^{2}-5x+6=0');
         expect(process.steps.map((step) => step.reason)).toEqual([
@@ -161,6 +159,13 @@ describe('题目(problem)与求解过程', () => {
             'rule',
         ]);
         expect(process.droppedSteps).toBeNull();
+    });
+
+    it('求解步骤同样受上限约束(三期数据源不绕过截断)', () => {
+        const process = buildSolveProcess(solve, 2);
+
+        expect(process.steps).toHaveLength(2);
+        expect(process.droppedSteps).toBe(1);
     });
 
     it('隐藏/拒绝的求解没有题目,题目区留空而不显示半个式子', () => {

@@ -10,14 +10,12 @@ type WidthPanelId = 'left-panel' | 'right-panel';
  * 宽度组 id.宽度**按组**记:右栏有两个标签页,用户对参数页与过程页各拖一次,
  * 切页 = 切宽度,互不覆盖(见设计文档 3.2 第 3 条).
  *
- * 左栏只有一组;右栏的组名与 `RightPanelTabs` 的 `RightTab` 取值一致
- * (`params` / `process`),由应用层在切页时通过 {@link setWidthGroup} 告知.
+ * 字面量联合而不是 `string`:组名是**闭集合**,写成 `string` 会把"组没登记"
+ * 变成运行期才能发现的静默兜底(见 `_activeWidth`).右栏的组名与
+ * `RightPanelTabs` 的 `RightTab` 取值一致(`params` / `process`),由应用层在
+ * 切页时通过 {@link setWidthGroup} 告知.
  */
-export type WidthGroup = string;
-
-export const WIDTH_GROUP_LEFT = 'left-panel';
-export const WIDTH_GROUP_PARAMS = 'params';
-export const WIDTH_GROUP_PROCESS = 'process';
+export type WidthGroup = 'left-panel' | 'params' | 'process';
 
 // 尺寸的唯一真相源是 UI_CONFIG.panel(见那里的说明):这里只是取个短名字.
 // 默认尺寸/折叠尺寸在 css/base.css 的 :root 里有一份首帧兜底,由
@@ -68,16 +66,19 @@ export class PanelController {
      *
      * 与"哪个组在前"分开:`activeWidthGroup` 是当前页归属,`sideWidths` 是各页
      * 各自的宽度;切页只换前者的指向,不动后者,所以来回切不会丢用户的调整.
+     *
+     * 用 `Record` 而不是 `Map`:组名是闭集合(见 `WidthGroup`),写全三个键就
+     * 不再需要"组没登记"的运行期兜底.
      */
-    private readonly sideWidths = new Map<WidthGroup, number>([
-        [WIDTH_GROUP_LEFT, SIDE_DEFAULT_WIDTH],
-        [WIDTH_GROUP_PARAMS, SIDE_DEFAULT_WIDTH],
-        [WIDTH_GROUP_PROCESS, PROCESS_DEFAULT_WIDTH],
-    ]);
+    private readonly sideWidths: Record<WidthGroup, number> = {
+        'left-panel': SIDE_DEFAULT_WIDTH,
+        params: SIDE_DEFAULT_WIDTH,
+        process: PROCESS_DEFAULT_WIDTH,
+    };
     /** 每个侧栏当前生效的宽度组(右栏随标签页切换). */
     private readonly activeWidthGroup: Record<WidthPanelId, WidthGroup> = {
-        'left-panel': WIDTH_GROUP_LEFT,
-        'right-panel': WIDTH_GROUP_PARAMS,
+        'left-panel': 'left-panel',
+        'right-panel': 'params',
     };
     private footerHeight: number = FOOTER_DEFAULT_HEIGHT;
     private readonly collapsed = new Set<PanelId>();
@@ -100,8 +101,8 @@ export class PanelController {
         // 宽度组归属,若不复位,DOM 上的 .collapsed / display:none / "源码"式
         // 按钮文案,以及过程页那一份宽度,都会留下,之后再次 bind() 就会得到
         // 自相矛盾的面板(见 UI-P3.3).
-        this.activeWidthGroup['left-panel'] = WIDTH_GROUP_LEFT;
-        this.activeWidthGroup['right-panel'] = WIDTH_GROUP_PARAMS;
+        this.activeWidthGroup['left-panel'] = 'left-panel';
+        this.activeWidthGroup['right-panel'] = 'params';
         this.collapsed.clear();
         this._applyLayout();
 
@@ -122,11 +123,6 @@ export class PanelController {
         if (this.activeWidthGroup[panelId] === group) return;
         this.activeWidthGroup[panelId] = group;
         this._applyLayout();
-    }
-
-    /** 当前生效的宽度组(测试与切页逻辑用). */
-    getWidthGroup(panelId: WidthPanelId): WidthGroup {
-        return this.activeWidthGroup[panelId];
     }
 
     /**
@@ -189,10 +185,10 @@ export class PanelController {
                         // (切页 = 换组),不让"哪一页在前"变成第二个写宽度的入口.
                         const group = this.activeWidthGroup[panelId];
                         const sign = panelId === 'left-panel' ? 1 : -1;
-                        const current = this.sideWidths.get(group) ?? SIDE_DEFAULT_WIDTH;
-                        this.sideWidths.set(
-                            group,
-                            clamp(current + sign * deltaX, SIDE_MIN_WIDTH, SIDE_MAX_WIDTH),
+                        this.sideWidths[group] = clamp(
+                            this.sideWidths[group] + sign * deltaX,
+                            SIDE_MIN_WIDTH,
+                            SIDE_MAX_WIDTH,
                         );
                     }
                     this._applyLayout();
@@ -202,9 +198,9 @@ export class PanelController {
         });
     }
 
-    /** 当前生效组的宽度;组未登记时退回默认宽度(不改写映射). */
+    /** 当前生效组的宽度.组名是闭集合,查表一定命中,不需要兜底. */
     private _activeWidth(panelId: WidthPanelId): number {
-        return this.sideWidths.get(this.activeWidthGroup[panelId]) ?? SIDE_DEFAULT_WIDTH;
+        return this.sideWidths[this.activeWidthGroup[panelId]];
     }
 
     /**

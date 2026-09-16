@@ -27,7 +27,7 @@ function step(latex: string, reason: string): ProcessStep {
 }
 
 function document(steps: ProcessStep[], droppedSteps: number | null = null): ProcessDocument {
-    return { name: 'g', title: '梯度 g', steps, droppedSteps };
+    return { title: '梯度 g', steps, droppedSteps };
 }
 
 const THREE_STEPS = [step('a=1', '数值代入'), step('b=2', '代入取点'), step('c=3', '函数值')];
@@ -291,7 +291,6 @@ describe('题目区', () => {
     it('有题目时排在步骤之前显示,可复制 TeX', () => {
         const { root, panel } = setup();
         panel.show({
-            name: 'S',
             title: '求解 S',
             problem: 'x^{2}-5x+6=0',
             steps: THREE_STEPS,
@@ -309,7 +308,6 @@ describe('题目区', () => {
     it('没有题目时整块收起;clear() 后也保持收起', () => {
         const { root, panel } = setup();
         panel.show({
-            name: 'g',
             title: '梯度 g',
             steps: THREE_STEPS,
             droppedSteps: null,
@@ -318,7 +316,6 @@ describe('题目区', () => {
             .toBe('');
 
         panel.show({
-            name: 'S',
             title: '求解 S',
             problem: 'x=1',
             steps: THREE_STEPS,

@@ -12,18 +12,18 @@
 import { UI_CONFIG } from '../../config/uiConfig';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
 
-/** 默认阈值:与 `UI_CONFIG.process.disclosureThreshold` 同一份数据. */
-export const PROCESS_DISCLOSURE_THRESHOLD = UI_CONFIG.process.disclosureThreshold;
-
 /**
  * 细节行数是否超过阈值(严格大于).
  *
  * 恰好等于阈值仍留在 L1:`≤ N 行`是 L1 的长度预算,边界归 L1 才不会让
  * "刚好 N 行"的条目无谓地跳页.
+ *
+ * `threshold` 显式可传是为了实测调参与单测;缺省值直接取 `UI_CONFIG`
+ * (纯数据,不在代码里留第二份字面量),所以不另立导出的常量.
  */
 export function needsProcessPage(
     lines: readonly EvaluationDetailLine[],
-    threshold: number = PROCESS_DISCLOSURE_THRESHOLD,
+    threshold: number = UI_CONFIG.process.disclosureThreshold,
 ): boolean {
     return lines.length > threshold;
 }

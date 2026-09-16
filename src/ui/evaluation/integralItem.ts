@@ -17,7 +17,8 @@
  */
 import type { IntegralTask, SceneObject } from '../../ir';
 import {
-    integralLatexDetails,
+    detailLinesOf,
+    integralLatexDetailEntries,
     integralLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
 import { latexResultNumber } from '../../math/latexNumber';
@@ -84,6 +85,14 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
     private result: HTMLElement | null;
 
     /**
+     * 最近一次已知的数值(构造期的缓存值或异步回填值);出错时为 null.
+     *
+     * 给"过程"入口在**点击时**取用:异步回填只改 DOM,不重建行,闭包捕获的
+     * 构造期 `value` 会过期.
+     */
+    private latestValue: number | null;
+
+    /**
      * 积分条目的内容键:**会被渲染的摘要/细节/元信息**.
      *
      * `integralLatexSummary` 为 null 时列表回退到 `integralSourceLabel` 纯文本,
@@ -97,12 +106,12 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             integralSourceLabel(task, objects),
             task.enabled,
             task.enabled
-                ? integralLatexDetails(
+                ? detailLinesOf(integralLatexDetailEntries(
                     task,
                     objects,
                     INTEGRAL_METHOD_LABELS[task.method],
                     null,
-                )
+                ))
                 : null,
         ]);
     }
@@ -134,7 +143,12 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         // 披露判据与公式块消费同一份.
         const methodLabel = INTEGRAL_METHOD_LABELS[task.method];
         const detailLines = task.enabled
-            ? integralLatexDetails(task, context.objects, methodLabel, value)
+            ? detailLinesOf(integralLatexDetailEntries(
+                task,
+                context.objects,
+                methodLabel,
+                value,
+            ))
             : [];
         const details = task.enabled ? createDetailSections(detailLines) : null;
 
@@ -168,18 +182,21 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
 
         // "过程"入口(三级披露的 L2):积分条目只在细节行超过披露阈值时才给;
         // 隐藏项入口置灰并给理由(不参与计算也就没有过程可展示).
+        //
+        // 数值在点击时**现读** `this.latestValue`,不捕获构造期的 `value`:
+        // 异步结果走 `renderValue` 直接改 DOM(见 EvaluationSection.resolve),
+        // 行不会重建,闭包里的 `value` 会停在构造时那个值(往往是 null).
         const processDisabledReason = task.enabled ? null : '已隐藏,不参与计算';
         const processEntry = (processDisabledReason !== null || needsProcessPage(detailLines))
             ? createProcessEntryButton({
                 name: task.name,
                 disabledReason: processDisabledReason,
                 onOpen: () => context.openProcess({
-                    name: task.name,
                     document: buildIntegralProcess(
                         task,
                         context.objects,
                         methodLabel,
-                        value,
+                        this.latestValue,
                     ),
                 }),
             })
@@ -197,6 +214,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         this.bodyLatex = bodyLatex;
         this.main = main;
         this.result = status;
+        this.latestValue = value;
         // 已有数值时把数值排好(行重建但键一致时走这条路径).
         if (value !== null) this.renderValue(value);
     }
@@ -212,6 +230,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      * 唯一落点,退化成纯文本数值.
      */
     renderValue(value: number): void {
+        this.latestValue = value;
         this.row.classList.remove('has-error');
         if (this.bodyLatex === null) {
             const result = this.result;
@@ -234,6 +253,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      * 会把上一次的等式复制进剪贴板(FormulaCopyController 认 `[data-tex]`).
      */
     renderError(message: string): void {
+        this.latestValue = null;
         this.replaceEquation(null);
         const result = this.ensureStatusRow();
         result.replaceChildren(document.createTextNode(message));

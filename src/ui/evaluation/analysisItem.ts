@@ -13,8 +13,9 @@
  */
 import type { AnalysisResult } from '../../ir';
 import {
-    analysisLatexDetails,
+    analysisLatexDetailEntries,
     analysisLatexSummary,
+    detailLinesOf,
 } from '../../compiler/dsl/evaluationLatex';
 import { createRowActions, createVisibilityButton } from '../shared/rowDom';
 import { buildGradientProcess } from '../process/processData';
@@ -49,7 +50,7 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
         return JSON.stringify([
             analysisLatexSummary(analysis),
             analysis.enabled,
-            analysis.enabled ? analysisLatexDetails(analysis) : null,
+            analysis.enabled ? detailLinesOf(analysisLatexDetailEntries(analysis)) : null,
         ]);
     }
 
@@ -68,7 +69,9 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
         // 展开细节里先给算子的符号展开,再给该点的数值结果;隐藏项不生成
         // 细节(数值在编译期被跳过,只有占位).细节行只算一次,披露判据与
         // 公式块消费同一份.
-        const detailLines = analysis.enabled ? analysisLatexDetails(analysis) : [];
+        const detailLines = analysis.enabled
+            ? detailLinesOf(analysisLatexDetailEntries(analysis))
+            : [];
         const detail = analysis.enabled ? createDetailSections(detailLines) : null;
 
         // 显隐按钮:切换后重新编译,该条目的数值计算随之跳过(隐藏 = 不渲染
@@ -90,7 +93,6 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
                 name: analysis.name,
                 disabledReason: processDisabledReason,
                 onOpen: () => context.openProcess({
-                    name: analysis.name,
                     document: buildGradientProcess(analysis),
                 }),
             })

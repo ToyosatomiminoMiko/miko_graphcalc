@@ -288,11 +288,11 @@
 | --- | --- |
 | 问题 | **G1 的展示侧 + G3 合并成的同一个教学需求**:学生要看到"每一步为什么".现状把过程挤在底栏求值条目的一个 `<details>` 里--底栏高上限 640px,扣掉标题与内边距后可用约 548px,简单递等式一行约 37px(带分式 55–70px),**一屏最多约 14 行**,且与实体清单对半分宽(默认 1920 屏每栏约 646px,长式子必然横滚) |
 | 设计 | 见 [方程求解过程的展示设计](equation-solving-process.md):**不改浮层格局**,把右栏改成标签页(页1 参数/视图,页2 过程);过程页通高(1080p 下约 27 行),一行一步递等式,当前步高亮,左右方向键翻步,条目走三级披露(L0 摘要 / L1 行内短过程 / L2 过程页) |
-| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetails` 与积分/求交的细节行,**不动 Rust,不动 `ir/types.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
+| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `ir/types.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
 | 二期 | 步骤索引驱动几何(割线->切线,黎曼矩形加细,交点高亮):把"第 k 步"当虚拟参数走 `CompileController.refresh` -> `RenderController.applyScene(scene, changedParams)`,复用既有缓存与 latest-only 调度;IR **只新增**字段(如 `stepHighlights`) |
-| 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源,UI 层零改动--这正是展示层先行的价值 |
+| 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源:过程页骨架(标签页/递等式/披露/翻步)零改动;UI 增量只有"求解"子列表条目与过程页**题目区**--这正是展示层先行的价值 |
 | 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.scad`,默认场景也带两条 `solve` |
-| 依赖 | 一期无(可与 T8/B1 并行);二期依赖一期的 `onStepChange` 出口;三期依赖 B1 的产物类型口径 |
+| 依赖 | 一期无(可与 T8/B1 并行);二期接一期预留的 `onStepChange` 出口(一期无订阅者,只发索引);三期依赖 B1 的产物类型口径 |
 | 工作量 | 一期 `3–5d`(跨 HTML/CSS/新控制器/共享行件契约),二期 `3–5d`,三期 `1w+`(需先豁免 §7.1 的禁令) |
 | 验收 | 一期:①标签页切换后折叠/展开与 `dispose()` 复位与现有一致;②过程页激活时 `#params-panel` / `#right-splitter` 不参与布局,切回后分隔比例不变;③长过程条目进过程页后底栏高度不变;④判据/翻步状态机/步骤分区有纯函数测试;⑤`npm test` 与 `npm run typecheck` 全绿;⑥主 chunk 增量实测 < 30KB |
 | 风险 | ①`PanelController._applyLayout()` 的折叠语义是"隐藏除承载按钮的 header 外的全部直接子元素",标签栏必须放进该 header 内部,页内容各包一层;②`RightSplitController.computeSplitRatio()` 以 `#right-panel` 矩形为基准,加标签栏后该前提失效,基准要换成页容器;③`--right-panel-width` 只有 `PanelController._applyLayout` 一个写入点(UI-P3.3 的教训),过程页更宽只能走"宽度组"实现,不能让标签页控制器自己写变量;④右栏默认 300px 对递等式偏窄,需按页记宽(建议过程页默认 420);⑤参数被藏到另一页后用户可能忘了调参,过程页顶部保留只读参数回显 |

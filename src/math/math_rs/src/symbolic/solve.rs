@@ -52,9 +52,12 @@ pub struct SolveStep {
 /// 一条方程的求解结果.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SolveOutcome {
-    /// 求解变量名.
+    /// 求解变量名;推断不出未知量时为空串.
     pub variable: String,
     /// 题目(原方程的 LaTeX,保留用户写法).
+    ///
+    /// **能力边界错误也照给**:方程已经解析成功,题目就该排成公式--调用方
+    /// 不该因为"解不出来"而退回纯文本原文(见 `error`).
     pub equation_latex: String,
     /// 解集 LaTeX;无实数解或恒等式之外没有解时为 `None`.
     pub solution_latex: Option<String>,
@@ -63,6 +66,13 @@ pub struct SolveOutcome {
     /// 恒等式(任意实数都是解)标记:与"无解"必须区分.
     pub identity: bool,
     pub steps: Vec<SolveStep>,
+    /// 能力边界错误(多未知量/三次以上/非多项式/未声明参数);`None` 表示求解成功.
+    ///
+    /// 它是**结果的一部分**,不是调用层的失败:源码没写错,只是这条方程超出
+    /// 内核能力.所以方程能解析时一律走这条通道返回(而不是 `Err`),`Err` 只留给
+    /// "方程文本本身读不出来"(缺等号/多个等号/解析失败)这类真正的输入错误.
+    #[serde(rename = "error")]
+    pub error_message: Option<String>,
 }
 
 fn step(latex: impl Into<String>, reason: &str, kind: &str) -> SolveStep {
@@ -188,6 +198,43 @@ fn gcd(left: u64, right: u64) -> u64 {
     } else {
         gcd(right, left % right)
     }
+}
+
+/// 求根公式里 `\sqrt{...}` 的内容:判别式是完全平方时给**精确的根**,
+/// 否则给判别式本身(与有理根路径同一份"能精确就精确"的口径).
+fn surd_latex(discriminant: f64) -> String {
+    integer_sqrt(discriminant)
+        .map(|value| value as f64)
+        .unwrap_or(discriminant)
+        .to_string()
+}
+
+/// 求根公式分子:普通情况是 `-b \pm \sqrt{\Delta}`;重根(`\Delta = 0`)时只有
+/// 一个值,不写 `\pm \sqrt{0}` 这种装饰性根号(也不留 `+ 0` 的排版噪音).
+fn quadratic_numerator_latex(b: f64, discriminant: f64) -> String {
+    let minus_b = without_negative_zero(-b);
+    if discriminant == 0.0 {
+        return latex_number(minus_b);
+    }
+    let signed = if minus_b < 0.0 {
+        latex_number(minus_b)
+    } else {
+        format!("+ {}", latex_number(minus_b))
+    };
+    format!("{signed} \\pm \\sqrt{{{}}}", surd_latex(discriminant))
+}
+
+/// 已代入系数的求根公式 `x = \frac{-b \pm \sqrt{\Delta}}{2a}` 的 LaTeX.
+///
+/// 板书口径:系数一律换成当前数值,不在换元之后停在 `-b` / `2a` 这样的字母上
+/// (判别式那一步早就这么做了,两处必须同形).
+fn quadratic_formula_latex(variable: &str, a: f64, b: f64, discriminant: f64) -> String {
+    let symbol = super::latex::latex_symbol(variable);
+    format!(
+        "{symbol} = \\frac{{{}}}{{{}}}",
+        quadratic_numerator_latex(b, discriminant),
+        latex_number(2.0 * a),
+    )
 }
 
 /// `(x - root)` 的因式;整数根时系数是整数.
@@ -329,7 +376,10 @@ fn solve_quadratic(variable: &str, poly: &Poly) -> (Vec<SolveStep>, Option<Strin
         let root = without_negative_zero(-b / (2.0 * a));
         let root_latex = rational_latex(-b, 2.0 * a).unwrap_or_else(|| latex_number(root));
         steps.push(step(
-            format!("{variable} = \\frac{{-b}}{{2a}} = {root_latex}"),
+            format!(
+                "{} = {root_latex}",
+                quadratic_formula_latex(variable, a, b, discriminant)
+            ),
             "求根公式(重根)",
             KIND_RULE,
         ));
@@ -343,12 +393,7 @@ fn solve_quadratic(variable: &str, poly: &Poly) -> (Vec<SolveStep>, Option<Strin
         let second = rational_latex(-b + root_of_discriminant as f64, 2.0 * a);
         if let (Some(first), Some(second)) = (first, second) {
             steps.push(step(
-                format!(
-                    "{variable} = \\frac{{{} \\pm {}}}{{{}}}",
-                    latex_number(without_negative_zero(-b)),
-                    latex_number(root_of_discriminant as f64),
-                    latex_number(2.0 * a),
-                ),
+                quadratic_formula_latex(variable, a, b, discriminant),
                 "求根公式",
                 KIND_RULE,
             ));
@@ -359,15 +404,11 @@ fn solve_quadratic(variable: &str, poly: &Poly) -> (Vec<SolveStep>, Option<Strin
         }
     }
 
-    let first = without_negative_zero((-b - discriminant.sqrt()) / (2.0 * a));
-    let second = without_negative_zero((-b + discriminant.sqrt()) / (2.0 * a));
+    let root_of_discriminant = discriminant.sqrt();
+    let first = without_negative_zero((-b - root_of_discriminant) / (2.0 * a));
+    let second = without_negative_zero((-b + root_of_discriminant) / (2.0 * a));
     steps.push(step(
-        format!(
-            "{variable} = \\frac{{{} \\pm \\sqrt{{{}}}}}{{{}}}",
-            latex_number(without_negative_zero(-b)),
-            latex_number(discriminant),
-            latex_number(2.0 * a),
-        ),
+        quadratic_formula_latex(variable, a, b, discriminant),
         "求根公式",
         KIND_RULE,
     ));
@@ -380,12 +421,7 @@ fn solve_quadratic(variable: &str, poly: &Poly) -> (Vec<SolveStep>, Option<Strin
         "数值近似",
         KIND_NUMERIC,
     ));
-    let solution = format!(
-        "{variable} = \\frac{{{} \\pm \\sqrt{{{}}}}}{{{}}}",
-        latex_number(without_negative_zero(-b)),
-        latex_number(discriminant),
-        latex_number(2.0 * a),
-    );
+    let solution = quadratic_formula_latex(variable, a, b, discriminant);
     (steps, Some(solution), 2, false)
 }
 
@@ -431,14 +467,18 @@ fn solve_polynomial(
 /// - `equation`:DSL 里写的方程原文(必须含一个顶层 `=`);
 /// - `variable`:`variable` 选项的值;`None`/空串表示从方程推断;
 /// - `coefficients`:参数名 -> 当前值(与积分/分析同一条链路).
+///
+/// 返回 `Err` 只表示**方程文本读不出来**(缺等号/多个等号/表达式解析失败);
+/// "读出来了但超出内核能力"落在 [`SolveOutcome::error_message`],题目 LaTeX 照给.
 pub fn solve_equation(
     equation: &str,
     variable: Option<&str>,
     coefficients: &[(String, f64)],
 ) -> Result<SolveOutcome, String> {
     let source = equation.trim();
+    // 空方程没有可排的题目:走结构化错误,让调用方拿到与其它能力边界一致的结果.
     if source.is_empty() {
-        return Err("方程不能为空".to_string());
+        return Ok(failure(None, "方程不能为空"));
     }
     let (lhs_text, rhs_text) = split_equation(source)?;
 
@@ -450,6 +490,12 @@ pub fn solve_equation(
     validate_supported(&lhs)?;
     validate_supported(&rhs)?;
 
+    let equation_latex = format!(
+        "{}={}",
+        format_expr(&lhs_parsed, PrintMode::Latex, 0),
+        format_expr(&rhs_parsed, PrintMode::Latex, 0),
+    );
+
     let coefficient_map: HashMap<String, f64> = coefficients.iter().cloned().collect();
     // 右端本来就是 0 时,"移项"这一步没有信息量(原式已经是标准形),不补冗余行.
     let rhs_is_zero = matches!(&rhs, Expr::Num(value) if *value == 0.0);
@@ -457,16 +503,16 @@ pub fn solve_equation(
 
     let variable = match variable {
         Some(name) if !name.trim().is_empty() => name.trim().to_string(),
-        _ => infer_variable(&difference, &coefficient_map)?,
+        _ => match infer_variable(&difference, &coefficient_map) {
+            Ok(name) => name,
+            Err(message) => return Ok(failure(Some(equation_latex), &message)),
+        },
     };
 
-    let poly = Poly::from_expr(&difference, &variable, &coefficient_map)?;
-
-    let equation_latex = format!(
-        "{}={}",
-        format_expr(&lhs_parsed, PrintMode::Latex, 0),
-        format_expr(&rhs_parsed, PrintMode::Latex, 0),
-    );
+    let poly = match Poly::from_expr(&difference, &variable, &coefficient_map) {
+        Ok(poly) => poly,
+        Err(message) => return Ok(failure(Some(equation_latex), &message)),
+    };
 
     let mut steps = vec![step(equation_latex.clone(), "原式", KIND_DEFINITION)];
     if !rhs_is_zero {
@@ -477,7 +523,11 @@ pub fn solve_equation(
         ));
     }
 
-    let (tail, solution_latex, real_root_count, identity) = solve_polynomial(&variable, &poly)?;
+    let (tail, solution_latex, real_root_count, identity) = match solve_polynomial(&variable, &poly)
+    {
+        Ok(solved) => solved,
+        Err(message) => return Ok(failure(Some(equation_latex), &message)),
+    };
     steps.extend(tail);
 
     Ok(SolveOutcome {
@@ -487,7 +537,22 @@ pub fn solve_equation(
         real_root_count,
         identity,
         steps,
+        error_message: None,
     })
+}
+
+/// 能力边界结果:题目 LaTeX 尽可能保留(`equation_latex` 为 `None` 时才留空),
+/// `steps` 为空(没有可展示的推导),`error_message` 给出可读理由.
+fn failure(equation_latex: Option<String>, error_message: &str) -> SolveOutcome {
+    SolveOutcome {
+        variable: String::new(),
+        equation_latex: equation_latex.unwrap_or_default(),
+        solution_latex: None,
+        real_root_count: 0,
+        identity: false,
+        steps: Vec::new(),
+        error_message: Some(error_message.to_string()),
+    }
 }
 
 #[cfg(test)]
@@ -581,6 +646,9 @@ mod tests {
         let solution = outcome.solution_latex.as_deref().expect("有实数解");
         assert!(solution.contains("x = 1"), "{solution}");
         assert_eq!(reasons(&outcome), vec!["原式", "判别式", "求根公式(重根)"]);
+        // 重根只有一个值:公式里的字母要换成数,且不留 `\pm \sqrt{0}` 与 `+ 0`.
+        let formula = &outcome.steps[2].latex;
+        assert_eq!(formula, "x = \\frac{2}{2} = 1");
     }
 
     #[test]
@@ -594,6 +662,13 @@ mod tests {
         assert_eq!(
             reasons(&outcome),
             vec!["原式", "判别式", "求根公式", "化简"]
+        );
+        // 板书口径:系数换元后不留字母,完全平方的判别式给精确根号.
+        let formula = &outcome.steps[2].latex;
+        assert_eq!(formula, "x = \\frac{+ 3 \\pm \\sqrt{1}}{4}");
+        assert!(
+            !formula.contains("2a") && !formula.contains("-b"),
+            "{formula}"
         );
     }
 
@@ -609,6 +684,7 @@ mod tests {
             vec!["原式", "判别式", "求根公式", "数值近似"]
         );
         assert_eq!(outcome.steps[3].kind, KIND_NUMERIC);
+        assert_eq!(outcome.steps[2].latex, "x = \\frac{+ 0 \\pm \\sqrt{8}}{2}");
     }
 
     #[test]
@@ -662,6 +738,26 @@ mod tests {
     }
 
     #[test]
+    fn quadratic_steps_substitute_the_coefficients() {
+        // 题目里的 a 是参数:换元之后公式里必须是当前数值,不能停在字母上.
+        let outcome =
+            solve_equation("a*x^2 - 2 = 0", None, &[("a".to_string(), 1.0)]).expect("可解");
+        let formula = outcome
+            .steps
+            .iter()
+            .find(|entry| entry.reason == "求根公式")
+            .expect("应当有求根公式一步")
+            .latex
+            .clone();
+
+        assert_eq!(formula, "x = \\frac{+ 0 \\pm \\sqrt{8}}{2}");
+        assert!(!formula.contains("2a"), "{formula}");
+        assert!(!formula.contains("-b"), "{formula}");
+        // 判别式那一步早就是代入形式,两步口径必须一致.
+        assert!(outcome.steps[1].latex.contains("4 \\cdot 1 \\cdot (-2)"));
+    }
+
+    #[test]
     fn explicit_variable_selects_the_unknown() {
         let outcome = solve_equation("t^2 - 9 = 0", Some("t"), &[]).expect("可用 t 求解");
         assert_eq!(outcome.variable, "t");
@@ -670,13 +766,24 @@ mod tests {
 
     #[test]
     fn rejects_non_polynomial_and_multi_unknown() {
-        let multiple = solve_equation("x + y = 0", None, &[]).unwrap_err();
+        // 能力边界错误是**结果的一部分**:方程解析成功,所以题目 LaTeX 照给,
+        // 只有"方程文本读不出来"才走 Err.
+        let multiple = solve_equation("x + y = 0", None, &[])
+            .expect("能力边界不抛错")
+            .error_message
+            .expect("多未知量应当给理由");
         assert!(multiple.contains("多个未知量"), "{multiple}");
 
-        let undeclared = solve_equation("x + y = 0", Some("x"), &[]).unwrap_err();
+        let undeclared = solve_equation("x + y = 0", Some("x"), &[])
+            .expect("能力边界不抛错")
+            .error_message
+            .expect("未声明参数应当给理由");
         assert!(undeclared.contains("未声明参数 y"), "{undeclared}");
 
-        let transcendental = solve_equation("sin(x) = 0", None, &[]).unwrap_err();
+        let transcendental = solve_equation("sin(x) = 0", None, &[])
+            .expect("能力边界不抛错")
+            .error_message
+            .expect("非多项式应当给理由");
         assert!(transcendental.contains("非多项式"), "{transcendental}");
 
         let missing_equals = solve_equation("x + 1", None, &[]).unwrap_err();
@@ -684,11 +791,37 @@ mod tests {
     }
 
     #[test]
+    fn failure_keeps_the_equation_latex() {
+        // 内核拒绝也不能把题目弄丢:调用方要能用同一份 LaTeX 排版题目.
+        let outcome = solve_equation("x^3 - 1 = 0", None, &[]).expect("能力边界不抛错");
+
+        assert!(outcome.error_message.is_some());
+        assert!(outcome.steps.is_empty());
+        assert!(outcome.variable.is_empty());
+        assert!(outcome.solution_latex.is_none());
+        assert!(
+            outcome.equation_latex.contains("x^{3}"),
+            "{}",
+            outcome.equation_latex
+        );
+
+        let empty = solve_equation("   ", None, &[]).expect("空方程也是结构化错误");
+        assert!(empty.error_message.is_some());
+        assert_eq!(empty.equation_latex, "");
+    }
+
+    #[test]
     fn rejects_degree_above_two_and_over_cap_degree() {
-        let cubic = solve_equation("x^3 - 1 = 0", None, &[]).unwrap_err();
+        let cubic = solve_equation("x^3 - 1 = 0", None, &[])
+            .expect("能力边界不抛错")
+            .error_message
+            .expect("三次方程应当给理由");
         assert!(cubic.contains("只支持一次/二次"), "{cubic}");
 
-        let too_deep = solve_equation("(x + 1)^20 = 0", None, &[]).unwrap_err();
+        let too_deep = solve_equation("(x + 1)^20 = 0", None, &[])
+            .expect("能力边界不抛错")
+            .error_message
+            .expect("超上限应当给理由");
         assert!(too_deep.contains("上限"), "{too_deep}");
     }
 }

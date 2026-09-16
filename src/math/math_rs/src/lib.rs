@@ -552,9 +552,12 @@ pub fn matrix4_from_expr(expr: &str) -> Result<Vec<f64>, JsValue> {
 /// 方程求解入口(设计文档 `docs/equation-solving-process.md` 的三期内核).
 ///
 /// 返回**独立步骤产物的 JSON**:`{ variable, equation_latex, solution_latex,
-/// real_root_count, identity, steps: [{ latex, reason, kind }] }`.步骤产物类型
-/// (`symbolic::SolveOutcome`)不含 `Expr`,符号引擎内部表示不越过这一层
+/// real_root_count, identity, steps: [{ latex, reason, kind }], error }`.步骤产物
+/// 类型(`symbolic::SolveOutcome`)不含 `Expr`,符号引擎内部表示不越过这一层
 /// (路线图 §7.1).
+///
+/// `error` 是**能力边界**理由(多未知量/三次以上/非多项式),不是调用失败;
+/// 抛出的异常只表示方程文本读不出来或系数表坏掉(见下).
 ///
 /// `coeff_names` / `coeff_values` 与积分/分析同一条"系数"链路:方程里的参数
 /// 由调用方给当前值,内核不做符号系数代数.`variable` 为空串时从方程推断.
@@ -565,6 +568,15 @@ pub fn solve_equation(
     coeff_names: Vec<String>,
     coeff_values: Vec<f64>,
 ) -> Result<String, JsValue> {
+    // 两侧长度不等说明调用方的系数链路已经坏了;静默 zip 截断只会把参数
+    // 悄悄变成 0 或"未声明参数",在这里直接报出来.
+    if coeff_names.len() != coeff_values.len() {
+        return Err(math_error(format!(
+            "求解系数表长度不一致:名字 {} 个,数值 {} 个",
+            coeff_names.len(),
+            coeff_values.len()
+        )));
+    }
     let coefficients: Vec<(String, f64)> = coeff_names.into_iter().zip(coeff_values).collect();
     let variable = if variable.trim().is_empty() {
         None

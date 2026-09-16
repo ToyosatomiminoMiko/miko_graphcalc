@@ -19,13 +19,13 @@ import type { ProcessDocument } from '../process/processSteps';
 import { carryDetailsOpen } from '../shared/rowDom';
 
 /**
- * 打开过程页的请求:条目名 + 已经重组好的过程文档.
+ * 打开过程页的请求:已经重组好的过程文档.
  *
  * 过程数据由条目自己在点击时构建(它知道自己的 IR 字段),应用层只负责切页
- * 与载入,不需要认识"梯度/积分"的差别.
+ * 与载入,不需要认识"梯度/积分"的差别.条目名不单独带一份--文档标题
+ * (`ProcessDocument.title`)已经含它,回链用的也是同一个名字.
  */
 export interface ProcessRequest {
-    readonly name: string;
     readonly document: ProcessDocument;
 }
 

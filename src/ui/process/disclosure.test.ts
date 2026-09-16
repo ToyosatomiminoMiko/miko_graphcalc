@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { UI_CONFIG } from '../../config/uiConfig';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
-import { PROCESS_DISCLOSURE_THRESHOLD, needsProcessPage } from './disclosure';
+import { needsProcessPage } from './disclosure';
 
 function lines(count: number): EvaluationDetailLine[] {
     return Array.from(
@@ -14,16 +14,12 @@ function lines(count: number): EvaluationDetailLine[] {
 }
 
 describe('needsProcessPage', () => {
-    it('默认阈值来自 UI_CONFIG,不在代码里留字面量', () => {
-        expect(PROCESS_DISCLOSURE_THRESHOLD).toBe(UI_CONFIG.process.disclosureThreshold);
+    it('恰好等于默认阈值仍留在 L1(≤ N 行是 L1 的预算)', () => {
+        expect(needsProcessPage(lines(UI_CONFIG.process.disclosureThreshold))).toBe(false);
     });
 
-    it('恰好等于阈值仍留在 L1(≤ N 行是 L1 的预算)', () => {
-        expect(needsProcessPage(lines(PROCESS_DISCLOSURE_THRESHOLD))).toBe(false);
-    });
-
-    it('超过阈值一格就进 L2', () => {
-        expect(needsProcessPage(lines(PROCESS_DISCLOSURE_THRESHOLD + 1))).toBe(true);
+    it('超过默认阈值一格就进 L2', () => {
+        expect(needsProcessPage(lines(UI_CONFIG.process.disclosureThreshold + 1))).toBe(true);
     });
 
     it('空过程留在 L1(短过程零改动)', () => {
