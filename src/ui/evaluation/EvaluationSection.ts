@@ -54,6 +54,13 @@ export class EvaluationSection<
             name: (task) => task.name,
             // 内容键必须在建行之前算出来:先建再比会让每次 sync 都白排一遍 KaTeX.
             key: (task) => this.itemClass.cacheKey(task, context),
+            // 条目从 DSL 里消失(删除或改名)时必须连数值缓存一起删:只删 DOM 行
+            // 会让 `results` 变成只增不减的 Map -- 每个用过的名字都永久留下一份
+            // `IntersectionOutput`/积分值,来回改名就一直涨.这条钩子正是
+            // KeyedRowList 提供给"调用方清自己的缓存"的唯一时机.
+            onRemove: (name) => {
+                this.results.delete(name);
+            },
             build: (task, previous, key) => {
                 // 只认与当前键一致的数值;键不一致时按"尚无结果"重新建行.
                 const cached = this.results.get(task.name);

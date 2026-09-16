@@ -95,8 +95,6 @@ export interface SurfaceControls {
 }
 
 export interface ViewPanel {
-    /** 宿主节点(`#view-controls`),即右面板里可滚动的那一块. */
-    readonly element: HTMLElement;
     readonly camera: CameraControls;
     readonly viewCube: SegmentedHandle<ViewHome>;
     readonly point: PointControls;
@@ -104,7 +102,18 @@ export interface ViewPanel {
     readonly surface: SurfaceControls;
 }
 
-/** 建出整块视图面板并挂进 `host`.`host` 原有内容会被清空. */
+/**
+ * 建出整块视图面板并挂进 `host`;**`host` 原有内容会被清空**,且只装配一次.
+ *
+ * 句柄所有权归控制器:面板本身不 `dispose`,每个控件恰好交给一个控制器,由
+ * `RenderController.dispose()` 那一路统一解绑(见 `wireViewControls`).因此
+ * **不要**用"再调一次"来刷新面板:第二次调用会造出二十个新控件并覆盖旧引用,
+ * 旧那批监听就再也无人能解绑.它只服务启动期的一次装配(测试里重复调用的目的
+ * 是验证宿主被整体替换,不是支持运行期重装配).
+ *
+ * 装配以 `host` 为界,返回的句柄里不再带宿主节点:调用方本来就是拿 `host` 的
+ * 人,再回传一份引用只会让人误以为面板持有可销毁的资源.
+ */
 export function createViewPanel(host: HTMLElement): ViewPanel {
     const config = RENDER_CONFIG;
     const view = UI_CONFIG.view;
@@ -246,7 +255,6 @@ export function createViewPanel(host: HTMLElement): ViewPanel {
     host.replaceChildren(camera, viewCube.element, point, axis, surface);
 
     return {
-        element: host,
         camera: { toggle: cameraToggle, modeLabels, rotationLock },
         viewCube,
         point: { visible: pointVisible, mode: pointMode, value: pointValue, valueLabel: pointValueRow.label },

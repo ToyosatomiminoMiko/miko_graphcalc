@@ -16,10 +16,11 @@ import { UI_CONFIG } from '../../config/uiConfig';
 import { createViewPanel, type ViewPanel } from './ViewPanel';
 
 let panel: ViewPanel;
+let host: HTMLElement;
 
 beforeEach(() => {
     installDomStub();
-    const host = document.createElement('section');
+    host = document.createElement('section');
     host.id = 'view-controls';
     document.body.append(host);
     panel = createViewPanel(host);
@@ -42,7 +43,7 @@ function childClasses(element: unknown): string[] {
 
 /** 第 index 个小节(顺序 相机 / 预置视角 / 点 / 坐标轴 / 曲面). */
 function groupAt(index: number): StubElement {
-    return childrenOf(panel.element)[index];
+    return childrenOf(host)[index];
 }
 
 function descendants(element: unknown, selector: string): StubElement[] {
@@ -60,7 +61,7 @@ function firstInput(element: unknown): StubElement {
 
 describe('createViewPanel 分组结构', () => {
     it('按 相机 / 预置视角 / 点 / 坐标轴 / 曲面 的顺序挂进宿主,且可重复装配', () => {
-        expect(childClasses(panel.element)).toEqual([
+        expect(childClasses(host)).toEqual([
             'control-row',
             'segmented',
             'control-group',
@@ -69,8 +70,8 @@ describe('createViewPanel 分组结构', () => {
         ]);
 
         // 再次装配应整体替换,而不是叠加
-        createViewPanel(panel.element);
-        expect(childClasses(panel.element)).toHaveLength(5);
+        createViewPanel(host);
+        expect(childClasses(host)).toHaveLength(5);
     });
 
     it('每个小节用标题给自己命名(aria-labelledby),标题类名统一', () => {
@@ -137,7 +138,7 @@ describe('createViewPanel 分组结构', () => {
 
         expect(firstInput(panel.point.visible.element).checked)
             .toBe(RENDER_CONFIG.scene.point.visible);
-        const value = firstInput(panel.point.value.element);
+        const value = firstInput(panel.point.value.input);
         expect(value.type).toBe('number');
         expect(value.min).toBe(String(UI_CONFIG.view.point.min));
         expect(value.step).toBe(String(UI_CONFIG.view.point.sizeStep));
@@ -160,25 +161,25 @@ describe('createViewPanel 分组结构', () => {
         expect(activeUp).toHaveLength(1);
         expect(activeUp[0].textContent).toBe(RENDER_CONFIG.scene.upAxis.toUpperCase());
 
-        expect(firstInput(panel.axis.lineWidth.element).value)
+        expect(firstInput(panel.axis.lineWidth.input).value)
             .toBe(String(RENDER_CONFIG.scene.axisLineWidth));
-        expect(firstInput(panel.axis.majorWidth.element).value)
+        expect(firstInput(panel.axis.majorWidth.input).value)
             .toBe(String(RENDER_CONFIG.scene.grid.majorLineWidth));
-        expect(firstInput(panel.axis.minorWidth.element).value)
+        expect(firstInput(panel.axis.minorWidth.input).value)
             .toBe(String(RENDER_CONFIG.scene.grid.minorLineWidth));
 
         // 下限/步长全部来自 UI_CONFIG.view.axis(控制器判非法时读同一份)
-        expect(firstInput(panel.axis.lineWidth.element).min)
+        expect(firstInput(panel.axis.lineWidth.input).min)
             .toBe(String(UI_CONFIG.view.axis.lineWidthMin));
-        expect(firstInput(panel.axis.lineWidth.element).step)
+        expect(firstInput(panel.axis.lineWidth.input).step)
             .toBe(String(UI_CONFIG.view.axis.lineWidthStep));
-        expect(firstInput(panel.axis.majorWidth.element).min)
+        expect(firstInput(panel.axis.majorWidth.input).min)
             .toBe(String(UI_CONFIG.view.axis.gridMajorMin));
-        expect(firstInput(panel.axis.majorWidth.element).step)
+        expect(firstInput(panel.axis.majorWidth.input).step)
             .toBe(String(UI_CONFIG.view.axis.gridMajorStep));
-        expect(firstInput(panel.axis.minorWidth.element).min)
+        expect(firstInput(panel.axis.minorWidth.input).min)
             .toBe(String(UI_CONFIG.view.axis.gridMinorMin));
-        expect(firstInput(panel.axis.minorWidth.element).step)
+        expect(firstInput(panel.axis.minorWidth.input).step)
             .toBe(String(UI_CONFIG.view.axis.gridMinorStep));
 
         expect(firstInput(panel.axis.ticks.element).checked)
@@ -208,7 +209,7 @@ describe('createViewPanel 分组结构', () => {
     });
 
     it('所有开关都是 .switch + .slider 结构(复用 css/controls.css)', () => {
-        const switches = descendants(panel.element, '.switch');
+        const switches = descendants(host, '.switch');
         expect(switches.length).toBeGreaterThanOrEqual(13);
         for (const element of switches) {
             expect(element.querySelector('.slider')).not.toBeNull();

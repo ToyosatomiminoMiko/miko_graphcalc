@@ -490,6 +490,20 @@ describe('列表缓存:内容不变就复用,顺序/展开态/数值都不串', 
             .toBe('计算中...');
     });
 
+    it('条目从场景里消失后数值缓存随行一起失效', () => {
+        const { integralList, controller } = createController();
+        controller.renderScene(scene);
+        controller.setIntegralResult('I', 1.5);
+
+        // 名字离开场景:DOM 行与数值缓存都必须丢掉,否则 EvaluationSection.results
+        // 会变成一个只增不减的 Map(每条历史名字永久留一份数值).
+        controller.renderScene({ ...scene, integrals: [] } as SceneIR);
+        controller.renderScene(scene);
+
+        expect(integralList.querySelector<StubElement>('.eval-result')!.textContent)
+            .toBe('计算中...');
+    });
+
     it('求交结果同时报出交点与交线', () => {
         const { intersectionList, controller } = createController();
         controller.renderScene(scene);

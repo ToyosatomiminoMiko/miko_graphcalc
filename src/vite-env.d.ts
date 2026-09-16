@@ -11,4 +11,12 @@ interface ImportMeta {
         pattern: string,
         options: { query: '?raw'; import: 'default'; eager: true },
     ): Record<string, string>;
+
+    /**
+     * Vite 的 HMR 句柄.同样只声明本项目用到的形态:`main.ts` 用它在热替换前
+     * 拆掉旧 `DslApp` 的监听与动画帧循环.
+     */
+    readonly hot?: {
+        dispose(callback: () => void): void;
+    };
 }

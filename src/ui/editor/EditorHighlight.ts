@@ -49,6 +49,8 @@ export class EditorHighlight {
     private readonly scroller: HTMLElement;
     private readonly code: HTMLElement;
     private readonly resizeObserver: ResizeObserver;
+    /** 待执行的重绘帧(见 `onInput`);null 表示没有排队中的重绘. */
+    private pendingUpdate: number | null = null;
     private disposed = false;
 
     constructor(
@@ -64,10 +66,10 @@ export class EditorHighlight {
         this.scroller = scroller;
         this.code = code;
 
-        // 输入:重新分词并重绘;滚动:只同步偏移.
+        // 输入:重新分词并重绘(合并到帧,见 onInput);滚动:只同步偏移.
         // 组字(IME)期间不做特殊处理:这一层从不写 `editor.value` 或选区,
         // 重绘背景不会打断浏览器自己的组字过程,只是把组字中的文字一并着色.
-        editor.addEventListener('input', this.update);
+        editor.addEventListener('input', this.onInput);
         editor.addEventListener('scroll', this.sync, { passive: true });
 
         // 面板折叠/拖宽会改变编辑器尺寸,滚动位置可能被浏览器夹回去,
@@ -86,10 +88,30 @@ export class EditorHighlight {
         this.update();
     }
 
+    /**
+     * input 事件入口:把整份源码的重分词 + `innerHTML` 重排推到下一帧.
+     *
+     * 为什么必须合并:重绘代价与**全文长度**成正比(见 `highlightDsl`),而对
+     * 2.4kHz 键盘重复率来说"每次 input 都重排"意味着同一帧内可能排队好几次
+     * 全量重排.合并到一帧一次,肉眼等效(浏览器本来也只按帧呈现),省掉的是
+     * 同一帧里的重复分词与重复解析 HTML.
+     *
+     * 与 `sync()` 的分工不变:滚动/尺寸变化仍然即时同步(它只写一个 transform,
+     * 延后反而会看到高亮与文字错位).
+     */
     private readonly update = (): void => {
         if (this.disposed) return;
         this.code.innerHTML = highlightDsl(this.editor.value);
         this.sync();
+    };
+
+    /** 合并后的 input 处理:同一帧内的多次输入只重排一次. */
+    private readonly onInput = (): void => {
+        if (this.disposed || this.pendingUpdate !== null) return;
+        this.pendingUpdate = requestAnimationFrame(() => {
+            this.pendingUpdate = null;
+            this.update();
+        });
     };
 
     /**
@@ -112,9 +134,13 @@ export class EditorHighlight {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
-        this.editor.removeEventListener('input', this.update);
+        this.editor.removeEventListener('input', this.onInput);
         this.editor.removeEventListener('scroll', this.sync);
         this.resizeObserver.disconnect();
+        if (this.pendingUpdate !== null) {
+            cancelAnimationFrame(this.pendingUpdate);
+            this.pendingUpdate = null;
+        }
         this.editor.classList.remove(HIGHLIGHT_ENABLED_CLASS);
     }
 }

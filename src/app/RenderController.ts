@@ -60,6 +60,14 @@ export class RenderController {
     private axisUpController: AxisUpController | null = null;
 
     /**
+     * `wireViewControls` 注册的 EventBus 退订函数.
+     *
+     * 这条链最容易漏:监听注册在别人的对象(EventBus,由 DslApp 持有到页面结束)
+     * 上,不显式退订就永远不会失效,闭包捕获的 `this` 与三个渲染器也就永远活着.
+     */
+    private readonly _viewListeners: Array<() => void> = [];
+
+    /**
      * @cache
      * 缓存目的:保存上一份 SceneIR 的对象快照,用于识别消失对象并移除 renderer.
      * 键/失效策略:applyScene/commitSceneWithoutRedraw 后整体替换.
@@ -117,18 +125,29 @@ export class RenderController {
      *
      * 面板本身由 DslApp 装配(`createViewPanel`),这里只按分组把句柄发给对应
      * 控制器:每个控件恰好一个所有者,`dispose` 时各自解绑自己那几个.
+     *
+     * 这里注册的 EventBus 监听同样有所有者 -- 就是本控制器,退订函数收进
+     * `_viewListeners`,由 `dispose()` 统一释放.漏掉这一步的后果不是"多几条
+     * 无用回调":bus 由 DslApp 持有到页面结束,每个闭包都捕获 `this` 与
+     * cameraManager/plotter/sceneManager,会把整个 WebGL 场景图钉在堆上.
+     *
+     * 重复调用会先释放上一轮监听与控制器:再调一次不该让事件触发两遍.
      */
     wireViewControls(eventBus: EventBus<GraphCalcEvents>, panel: ViewPanel): void {
+        this._unwireViewControls();
+
         // 先注册监听,再创建控制器:控制器启动时会同步一次初始状态
         // (RotationLockController 现在也会),监听晚注册就会丢掉这次同步.
-        eventBus.on('camera:changed', ({ camMode }) =>
-            this.cameraManager.setCameraMode(camMode),
-        );
-        eventBus.on('camera:view', ({ view }) =>
-            this.cameraManager.setView(view),
-        );
-        eventBus.on('camera:rotationLock', ({ locked }) =>
-            this.cameraManager.setRotationLock(locked),
+        this._viewListeners.push(
+            eventBus.on('camera:changed', ({ camMode }) =>
+                this.cameraManager.setCameraMode(camMode),
+            ),
+            eventBus.on('camera:view', ({ view }) =>
+                this.cameraManager.setView(view),
+            ),
+            eventBus.on('camera:rotationLock', ({ locked }) =>
+                this.cameraManager.setRotationLock(locked),
+            ),
         );
 
         this.cameraToggle = new CameraToggle(eventBus, panel.camera);
@@ -139,53 +158,95 @@ export class RenderController {
         );
 
         // OrbitControls 在构造时读取相机 up 向量,真的切换"向上轴"后才需要重建
-        eventBus.on('axis:upChanged', ({ axis }) => {
-            if (this.cameraManager.setUpAxis(axis)) {
-                this._createControls();
-                if (this.rotationLockController) {
-                    this.cameraManager.setRotationLock(
-                        this.rotationLockController.locked,
-                    );
+        this._viewListeners.push(
+            eventBus.on('axis:upChanged', ({ axis }) => {
+                if (this.cameraManager.setUpAxis(axis)) {
+                    this._createControls();
+                    if (this.rotationLockController) {
+                        this.cameraManager.setRotationLock(
+                            this.rotationLockController.locked,
+                        );
+                    }
                 }
-            }
-        });
+            }),
+        );
         this.axisUpController = new AxisUpController(eventBus, panel.axis.up);
 
-        eventBus.on('point:changed', ({ radius, visible }) => {
-            this.plotter.setPointStyle({ radius, visible });
-            this.analysisRenderer.setPointStyle({ radius, visible });
-        });
+        this._viewListeners.push(
+            eventBus.on('point:changed', ({ radius, visible }) => {
+                this.plotter.setPointStyle({ radius, visible });
+                this.analysisRenderer.setPointStyle({ radius, visible });
+            }),
+        );
         this.pointStyleController = new PointStyleController(eventBus, panel.point);
 
-        eventBus.on('surface:changed', ({ wireframeVisible, colorMapEnabled }) => {
-            this.plotter.setSurfaceStyle({ wireframeVisible, colorMapEnabled });
-        });
+        this._viewListeners.push(
+            eventBus.on('surface:changed', ({ wireframeVisible, colorMapEnabled }) => {
+                this.plotter.setSurfaceStyle({ wireframeVisible, colorMapEnabled });
+            }),
+        );
         this.surfaceStyleController = new SurfaceStyleController(eventBus, panel.surface);
 
-        eventBus.on('axis:lineWidthChanged', ({ width }) => {
-            this.sceneManager.setAxisLineWidth(width);
-        });
+        this._viewListeners.push(
+            eventBus.on('axis:lineWidthChanged', ({ width }) => {
+                this.sceneManager.setAxisLineWidth(width);
+            }),
+        );
         this.axisLineWidthController = new AxisLineWidthController(
             eventBus,
             panel.axis.lineWidth,
         );
 
-        eventBus.on('axis:labelVisibility', ({ x, y, z }) => {
-            this.sceneManager.setAxisLabelVisible('x', x);
-            this.sceneManager.setAxisLabelVisible('y', y);
-            this.sceneManager.setAxisLabelVisible('z', z);
-        });
+        this._viewListeners.push(
+            eventBus.on('axis:labelVisibility', ({ x, y, z }) => {
+                this.sceneManager.setAxisLabelVisible('x', x);
+                this.sceneManager.setAxisLabelVisible('y', y);
+                this.sceneManager.setAxisLabelVisible('z', z);
+            }),
+        );
         this.axisLabelController = new AxisLabelController(eventBus, panel.axis.labels);
 
-        eventBus.on('grid:changed', ({ xzVisible, xyVisible, yzVisible, ticksVisible, piUnit, majorWidth, minorWidth }) => {
-            this.sceneManager.setPlaneVisible('xz', xzVisible);
-            this.sceneManager.setPlaneVisible('xy', xyVisible);
-            this.sceneManager.setPlaneVisible('yz', yzVisible);
-            this.sceneManager.setTicksVisible(ticksVisible);
-            this.sceneManager.setTickUnit(piUnit);
-            this.sceneManager.setGridLineWidths(majorWidth, minorWidth);
-        });
+        this._viewListeners.push(
+            eventBus.on('grid:changed', ({ xzVisible, xyVisible, yzVisible, ticksVisible, piUnit, majorWidth, minorWidth }) => {
+                this.sceneManager.setPlaneVisible('xz', xzVisible);
+                this.sceneManager.setPlaneVisible('xy', xyVisible);
+                this.sceneManager.setPlaneVisible('yz', yzVisible);
+                this.sceneManager.setTicksVisible(ticksVisible);
+                this.sceneManager.setTickUnit(piUnit);
+                this.sceneManager.setGridLineWidths(majorWidth, minorWidth);
+            }),
+        );
         this.gridTicksController = new GridTicksController(eventBus, panel.axis);
+    }
+
+    /**
+     * 释放 `wireViewControls` 注册的 EventBus 监听与它创建的控件.
+     *
+     * 幂等:可以重复调用(dispose 之后再 dispose,或 wire 之前先 dispose).
+     */
+    private _unwireViewControls(): void {
+        for (const unsubscribe of this._viewListeners) unsubscribe();
+        this._viewListeners.length = 0;
+
+        this.cameraToggle?.dispose();
+        this.viewCubeController?.dispose();
+        this.rotationLockController?.dispose();
+        this.pointStyleController?.dispose();
+        this.surfaceStyleController?.dispose();
+        this.axisLineWidthController?.dispose();
+        this.gridTicksController?.dispose();
+        this.axisLabelController?.dispose();
+        this.axisUpController?.dispose();
+
+        this.cameraToggle = null;
+        this.viewCubeController = null;
+        this.rotationLockController = null;
+        this.pointStyleController = null;
+        this.surfaceStyleController = null;
+        this.axisLineWidthController = null;
+        this.gridTicksController = null;
+        this.axisLabelController = null;
+        this.axisUpController = null;
     }
 
     private _createControls(): void {
@@ -359,15 +420,8 @@ export class RenderController {
         this.stopSamplingFailureListener();
         this.cameraManager.detachControls();
         this.controls = null;
-        this.cameraToggle?.dispose();
-        this.viewCubeController?.dispose();
-        this.rotationLockController?.dispose();
-        this.pointStyleController?.dispose();
-        this.surfaceStyleController?.dispose();
-        this.axisLineWidthController?.dispose();
-        this.gridTicksController?.dispose();
-        this.axisLabelController?.dispose();
-        this.axisUpController?.dispose();
+        // EventBus 监听 + 视图控件统一释放:漏掉退订会把整个场景图钉在堆上.
+        this._unwireViewControls();
         this.cameraManager.dispose();
         this.integralRenderer.dispose();
         this.analysisRenderer.dispose();

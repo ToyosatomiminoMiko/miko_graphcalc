@@ -33,9 +33,8 @@ export interface NumberFieldOptions {
     parse?(text: string): number | null;
 }
 
-/** 数字框句柄:行里插入 `element`(就是那个 `<input>`). */
+/** 数字框句柄:行里插入 `input`(它就是那个 `<input>`). */
 export interface NumberFieldHandle {
-    readonly element: HTMLInputElement;
     readonly input: HTMLInputElement;
     /** 当前文本解析出的值;空串/中途态(`-` / `1e` / `0.`)为 null. */
     read(): number | null;
@@ -94,7 +93,6 @@ export function createNumberField(options: NumberFieldOptions): NumberFieldHandl
     }, { signal: abort.signal });
 
     return {
-        element: input,
         input,
         read: () => parse(input.value),
         readText: () => input.value,

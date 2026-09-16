@@ -45,14 +45,13 @@ export interface KeyedRowHooks<TItem, THandles extends KeyedRowHandles> {
     onRemove?(name: string): void;
 }
 
-interface KeyedRowEntry<TItem, THandles> {
+interface KeyedRowEntry<THandles> {
     handles: THandles;
     key: string;
-    item: TItem;
 }
 
 export class KeyedRowList<TItem, THandles extends KeyedRowHandles> {
-    private readonly rows = new Map<string, KeyedRowEntry<TItem, THandles>>();
+    private readonly rows = new Map<string, KeyedRowEntry<THandles>>();
 
     constructor(private readonly container: HTMLElement) {
         // 容器在 DOM 里只是普通 <div>;显式给列表语义,读屏才会报"列表/列表项",
@@ -84,7 +83,7 @@ export class KeyedRowList<TItem, THandles extends KeyedRowHandles> {
 
             const handles = hooks.build(item, existing?.handles ?? null, key);
             if (existing) existing.handles.row.remove();
-            this.rows.set(name, { handles, key, item });
+            this.rows.set(name, { handles, key });
             ordered.push(handles.row);
         }
 
@@ -95,7 +94,7 @@ export class KeyedRowList<TItem, THandles extends KeyedRowHandles> {
      * 取当前同名条目的行对象/键/条目(异步回填用):`handles` 就是行对象,
      * 回填直接调它的方法(见 `EvaluationSection.resolve`).
      */
-    entry(name: string): KeyedRowEntry<TItem, THandles> | undefined {
+    entry(name: string): KeyedRowEntry<THandles> | undefined {
         return this.rows.get(name);
     }
 
@@ -114,7 +113,7 @@ export class KeyedRowList<TItem, THandles extends KeyedRowHandles> {
  * 跳位.这里只在顺序确实不一致时才按顺序 append 一遍(对已有子节点来说 append 是
  * "搬移"),顺序一致时一次 DOM 都不动.
  */
-export function appendInOrder(
+function appendInOrder(
     container: HTMLElement,
     rows: readonly HTMLElement[],
 ): void {

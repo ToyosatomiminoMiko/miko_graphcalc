@@ -140,7 +140,7 @@ describe('createSegmented', () => {
         expect(seen).toEqual(['scale']);
     });
 
-    it('set() 只改高亮,不回调;dispose 后不再响应点击', () => {
+    it('初值即选中态;dispose 后不再响应点击', () => {
         const seen: Mode[] = [];
         const handle = createSegmented<Mode>({
             columns: 2,
@@ -151,10 +151,9 @@ describe('createSegmented', () => {
         handle.onChange((value) => seen.push(value));
         const buttons = stub(handle.element).children as StubElement[];
 
-        handle.set('scale');
-        expect(handle.get()).toBe('scale');
-        expect(buttons[1].classList.contains('active')).toBe(true);
-        expect(seen).toEqual([]);
+        expect(handle.get()).toBe('size');
+        expect(buttons[0].classList.contains('active')).toBe(true);
+        expect(buttons[1].classList.contains('active')).toBe(false);
 
         handle.dispose();
         buttons[0].dispatch('click');
@@ -171,7 +170,6 @@ describe('createNumberField', () => {
             format: (value) => String(Number(value.toFixed(4))),
         });
 
-        expect(handle.element).toBe(handle.input);
         expect(handle.input.type).toBe('number');
         expect(handle.input.min).toBe('0');
         expect(handle.input.step).toBe('0.05');
@@ -242,7 +240,6 @@ describe('createSlider', () => {
     it('写进 min/max/step/id,初值即 value', () => {
         const handle = createSlider({ value: 1, min: 0, max: 5, step: 0.1 });
 
-        expect(handle.element).toBe(handle.input);
         expect(handle.input.type).toBe('range');
         expect(handle.input.min).toBe('0');
         expect(handle.input.max).toBe('5');

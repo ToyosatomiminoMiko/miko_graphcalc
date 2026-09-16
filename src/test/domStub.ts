@@ -507,6 +507,15 @@ export interface DomStub {
      * 以及可改写的返回值(测试用它模拟命令被拒绝).
      */
     readonly execCommand: { calls: string[]; args: unknown[][]; result: boolean };
+    /**
+     * 排队中的 `requestAnimationFrame` 回调数(测试用).
+     *
+     * rAF 在 Node 里不存在,但"把重绘合并到一帧"这类行为必须能断言 -- 只看
+     * 排队数就能分辨"每次 input 都重排"与"同一帧只重排一次".
+     */
+    readonly pendingFrameCount: () => number;
+    /** 执行当前排队的全部 rAF 回调(测试用;回调里新排的帧不在本次内). */
+    flushFrames(): void;
 }
 
 export interface StubWindow {
@@ -648,10 +657,26 @@ export function installDomStub(): DomStub {
         clearTimeout: (id: number) => clearTimeout(id),
     };
 
+    // Node 没有 requestAnimationFrame;DslApp 的渲染循环与 EditorHighlight 的
+    // 重绘合并都依赖它,所以桩里必须有一份可控实现:注册即排队,由测试显式
+    // flush,这样"合帧"是可断言的而不是靠时序猜.
+    const frames = new Map<number, () => void>();
+    let nextFrameId = 1;
+    const requestFrame = (callback: () => void): number => {
+        const id = nextFrameId;
+        nextFrameId += 1;
+        frames.set(id, callback);
+        return id;
+    };
+
     const globals = globalThis as unknown as Record<string, unknown>;
     globals.document = document;
     globals.Element = StubElement;
     globals.window = window;
+    globals.requestAnimationFrame = requestFrame;
+    globals.cancelAnimationFrame = (id: number): void => {
+        frames.delete(id);
+    };
     globals.getComputedStyle = () => ({
         fontSize: '16px',
         fontFamily: 'monospace',
@@ -678,5 +703,18 @@ export function installDomStub(): DomStub {
         return execCommand.result;
     };
 
-    return { document, window, resizeObservers, rootVariables, execCommand };
+    return {
+        document,
+        window,
+        resizeObservers,
+        rootVariables,
+        execCommand,
+        pendingFrameCount: () => frames.size,
+        flushFrames: () => {
+            // 先取出再执行:回调里新排的帧留到下一次 flush,与浏览器"一帧一次"一致.
+            const due = [...frames.entries()];
+            frames.clear();
+            for (const [, callback] of due) callback();
+        },
+    };
 }

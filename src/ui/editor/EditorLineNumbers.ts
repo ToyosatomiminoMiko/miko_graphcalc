@@ -47,6 +47,14 @@ export class EditorLineNumbers {
     private readonly resizeObserver: ResizeObserver;
     /** 度量数字宽度用的离屏 2D context;取不到时为 null,保持 CSS 兜底宽度 */
     private readonly measureContext: CanvasRenderingContext2D | null;
+    /**
+     * 上次量槽宽时用的"最大行号位数".
+     *
+     * 缓存的**不是宽度而是触发条件**:字体变化由 CSS/applyUiConfig 在启动期
+     * 一次性注入,之后槽宽只随位数进位而变.所以只要位数没变就跳过度量,
+     * 避免每次按键都 getComputedStyle(强制样式解析 + 同步布局).
+     */
+    private gutterDigits = 0;
     private disposed = false;
 
     constructor(
@@ -88,7 +96,13 @@ export class EditorLineNumbers {
         const buffer: string[] = [];
         for (let i = 1; i <= lineCount; i += 1) buffer.push(String(i));
         this.numbers.textContent = buffer.join('\n');
-        this._syncGutterWidth(lineCount);
+        // 槽宽只取决于字体与"最大行号位数",与具体文本无关:位数没变就不重量.
+        // 每次按键都走 _measureGutterWidth 会强制一次样式解析 -> 同步布局.
+        const digits = String(Math.max(2, lineCount)).length;
+        if (digits !== this.gutterDigits) {
+            this.gutterDigits = digits;
+            this._measureGutterWidth(digits);
+        }
         this.sync();
     };
 
@@ -98,14 +112,12 @@ export class EditorLineNumbers {
      * 字体取自编辑器自身的计算样式,不读 `UI_CONFIG`:这样 CSS 兜底值与
      * applyUiConfig 覆盖两条路径都能自动对齐,少一处需要手工同步的常量.
      */
-    private _syncGutterWidth(lineCount: number): void {
+    private _measureGutterWidth(digits: number): void {
         const context = this.measureContext;
         if (!context) return;
 
         const style = getComputedStyle(this.editor);
         context.font = `${style.fontSize} ${style.fontFamily}`;
-        // 至少按 2 位数留宽,避免个位数行数时槽宽跳变.
-        const digits = Math.max(2, String(lineCount).length);
         const digitWidth = context.measureText('0'.repeat(digits)).width;
         const width = Math.max(
             GUTTER_MIN_WIDTH_PX,

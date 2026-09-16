@@ -158,7 +158,7 @@ export class ParamPanelController {
             { class: 'param-row' },
             label,
             slider.element,
-            number.element,
+            number.input,
             reset.element,
         );
         row.classList.toggle('is-cyclic', param.cyclic);
@@ -221,12 +221,22 @@ export class ParamPanelController {
             this.onChange(param.name, next);
         });
 
-        /** change 阶段:归一化后把最终文本写回输入框. */
+        /**
+         * change 阶段:归一化后把最终文本写回输入框.
+         *
+         * 两条路径分工不同,不是同一条的装饰:
+         * - 解析成功:归一化(夹取/回绕)后的值写回,并广播给场景;
+         * - 解析失败(清空 / `-` / `1e`):把文本恢复成当前值,不广播 -- 值本身
+         *   没变,input 阶段也没有广播过,没有需要通知下游的变化.
+         */
         number.onCommit((raw) => {
-            const previous = this.values.get(param.name) ?? declaredValue;
-            const next = raw === null ? previous : normalizeParamValue(raw, param);
+            if (raw === null) {
+                writeValue(this.values.get(param.name) ?? declaredValue, true);
+                return;
+            }
+            const next = normalizeParamValue(raw, param);
             writeValue(next, true);
-            if (raw !== null) this.onChange(param.name, next);
+            this.onChange(param.name, next);
         });
 
         /** 重置:回到声明值;与拖动滑块同一条链路,场景跟着刷新. */

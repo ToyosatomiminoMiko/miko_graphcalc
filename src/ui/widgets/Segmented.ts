@@ -53,8 +53,6 @@ export interface SegmentedHandle<T extends string> {
     /** 根节点,插到行/分组里用这个. */
     readonly element: HTMLDivElement;
     get(): T;
-    /** 程序化选中;只改高亮,不触发 `onChange`. */
-    set(value: T): void;
     /** 注册选中回调;返回退订函数.命中已选项时不回调. */
     onChange(listener: (value: T) => void): () => void;
     /** 解绑 DOM 监听并清空订阅者. */
@@ -107,10 +105,6 @@ export function createSegmented<T extends string>(
     return {
         element,
         get: () => current,
-        set: (value) => {
-            current = value;
-            sync();
-        },
         onChange(listener) {
             listeners.add(listener);
             return () => listeners.delete(listener);

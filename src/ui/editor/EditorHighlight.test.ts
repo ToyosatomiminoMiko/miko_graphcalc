@@ -50,13 +50,36 @@ describe('高亮渲染', () => {
         expect(editor.classList.contains(HIGHLIGHT_ENABLED_CLASS)).toBe(true);
     });
 
-    it('input 事件重绘', () => {
-        const { editor, code } = setup('curve c1 = 1;');
+    it('input 事件重绘(合并到下一帧执行)', () => {
+        const { editor, code, stub } = setup('curve c1 = 1;');
 
         editor.value = '// 注释';
         editor.dispatch('input');
+        // 重排推到下一帧:还没 flush 时高亮仍是旧内容
+        expect(code.innerHTML).toContain('curve');
+        expect(stub.pendingFrameCount()).toBe(1);
+
+        stub.flushFrames();
 
         expect(code.innerHTML).toContain('<span class="dsl-comment">// 注释</span>');
+    });
+
+    it('同一帧内的多次 input 只重排一次', () => {
+        const { editor, code, stub } = setup('curve c1 = 1;');
+
+        editor.value = '// 一';
+        editor.dispatch('input');
+        editor.value = '// 二';
+        editor.dispatch('input');
+        editor.value = '// 三';
+        editor.dispatch('input');
+
+        // 三次输入只排一个帧:否则每次按键都会全量重分词 + 重排 innerHTML
+        expect(stub.pendingFrameCount()).toBe(1);
+
+        stub.flushFrames();
+
+        expect(code.innerHTML).toContain('<span class="dsl-comment">// 三</span>');
     });
 });
 

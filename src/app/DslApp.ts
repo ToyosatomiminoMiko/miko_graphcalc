@@ -67,6 +67,8 @@ export class DslApp {
      */
     private readonly pendingParamChanges = new Set<string>();
     private disposed = false;
+    /** `start()` 只允许生效一次(见该方法的说明). */
+    private started = false;
 
     private readonly onResize = (): void => {
         this.renderController.resize();
@@ -138,7 +140,18 @@ export class DslApp {
         );
     }
 
+    /**
+     * 装配并启动:绑定全局监听,起 rAF 循环,编译一次当前源码.
+     *
+     * 幂等:重复调用直接返回.这里的每一步都会**覆盖**字段引用(panelController /
+     * rightSplitController / keyboardController / animationFrameId),再跑一次会
+     * 让第一套对象失去引用却又继续监听 window/document,并多出一个永不取消的
+     * 动画帧循环 -- 静默的双份键鼠通道.有 dispose() 就该有配对的一次性启动.
+     */
     start(): void {
+        if (this.started) return;
+        this.started = true;
+
         this.renderController.setupControls();
         this.renderController.wireViewControls(this.eventBus, this.viewPanel);
         this._wireEditor();
@@ -172,7 +185,9 @@ export class DslApp {
         void this.run();
     }
 
+    /** 拆掉全部监听/循环/Worker;幂等,重复调用不重复拆解. */
     dispose(): void {
+        if (this.disposed) return;
         this.disposed = true;
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
