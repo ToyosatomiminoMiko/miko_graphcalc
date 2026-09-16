@@ -1,5 +1,5 @@
 /**
- * 求值列表条目结构单测(最小 DOM 桩,见 test/domStub.ts,不引入 jsdom).
+ * 求值列表条目结构单测(最小 DOM 桩,见 testing/domStub.ts,不引入 jsdom).
  *
  * 锁的是几条来自实际反馈的约束:
  * 1. 行里**没有自建的开合按钮**:开合交给 <details>/<summary> 原生行为
@@ -11,7 +11,7 @@
  * 4. 展开细节逐行分块(.eval-details 下每行一个 .eval-detail-line),不是
  *    一堆 inline 公式挤成一行;结果行在 <details> 内,跟着一起开合.
  *
- * DOM 桩与其它 ui 控制器测试共用一份(`test/domStub.ts`);KaTeX 用
+ * DOM 桩与其它 ui 控制器测试共用一份(`testing/domStub.ts`);KaTeX 用
  * render(tex, el) 写回 textContent 的假实现,断言只看结构与 LaTeX 文本,
  * 不看排版.
  */
@@ -22,8 +22,8 @@ import type {
     SceneIR,
     SceneObject,
     SolveTask,
-} from '../../ir';
-import { installDomStub, StubElement } from '../../test/domStub';
+} from '../../contract/ir';
+import { installDomStub, StubElement } from '../../testing/domStub';
 
 vi.mock('katex', () => ({
     default: {

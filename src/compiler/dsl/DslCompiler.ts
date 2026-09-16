@@ -1,11 +1,11 @@
-import type { AstProgram } from '../ast/types';
+import type { AstProgram } from '../../contract/ast';
 import type {
     AntiderivativeTask,
     IntegralTask,
     OdeTask,
     SceneIR,
     SceneObject,
-} from '../../ir';
+} from '../../contract/ir';
 import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { withStatementSpan } from '../errors';
 import { materializeObject } from './objects/materialize';
@@ -90,7 +90,7 @@ export function compileScene(
         .filter((blueprint) => {
             if (blueprint.kind !== 'curve' && blueprint.kind !== 'surface') return true;
             // 隐藏的 ode 语句要滤掉**它的全部实体**(斜率场 + 特解 + 解族):
-            // 靠 `odeOrigin.statement` 认领,不靠名字前缀猜(见 ir/types.ts).
+            // 靠 `odeOrigin.statement` 认领,不靠名字前缀猜(见 contract/ir.ts).
             if (blueprint.odeOrigin !== undefined && hiddenOdeNames.has(blueprint.odeOrigin.statement)) {
                 return false;
             }

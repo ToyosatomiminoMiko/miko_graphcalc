@@ -12,13 +12,13 @@ import type {
     IntersectionOutput,
     IntersectionTask,
     SceneObject,
-} from '../../../ir';
+} from '../../../contract/ir';
 import type { Mat4 } from '../../../math/matrix/rowMajorMatrix';
 import {
     buildIntersectionInput,
     decodeIntersectionOutput,
 } from '../../../math/adapters/IntersectionMath';
-import { requestIntersection } from '../../../math/compute';
+import { requestIntersection } from '../../../compute';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 
 export type IntersectionResultCallback = (

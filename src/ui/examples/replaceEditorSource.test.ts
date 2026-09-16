@@ -10,7 +10,7 @@
  * 本模块存在的理由.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
 import { replaceTextareaSource } from './replaceEditorSource';
 
 interface Harness {

@@ -10,8 +10,8 @@
 
 | 层 | 文件 | 职责 |
 | --- | --- | --- |
-| 调度 | `math/compute/domain/integral/IntegralCompute.ts` | 每任务一个 latest-only executor,payload 组装 |
-| Worker | `math/compute/domain/integral/IntegralWorker.ts` | 调 WASM 入口,回传样本 |
+| 调度 | `compute/domain/integral/IntegralCompute.ts` | 每任务一个 latest-only executor,payload 组装 |
+| Worker | `compute/domain/integral/IntegralWorker.ts` | 调 WASM 入口,回传样本 |
 | WASM | `math/math_rs/src/lib.rs` | `integrate1d` / `integrate2d` / `integrate_region` / `integrate_solid` |
 | 内核 | `math_rs/src/{sampling,integral,domain_integral}_core.rs` | 采样 + 求积 |
 

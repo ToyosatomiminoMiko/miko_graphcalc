@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PointRenderer } from './PointRenderer';
-import type { PointObject } from '../../../ir';
+import type { PointObject } from '../../../contract/ir';
 
 function pointObject(overrides: Partial<PointObject> = {}): PointObject {
     return {

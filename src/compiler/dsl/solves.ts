@@ -17,15 +17,15 @@
  *   只是不再调用求解内核,`equationLatex` 留空由 UI 回退成方程原文(纯文本)--
  *   隐藏项没算过,不该假装有排版产物.
  */
-import type { AstProgram } from '../ast/types';
+import type { AstProgram } from '../../contract/ast';
 import type {
     ParamDeclaration,
     SolveStep,
     SolveStepKind,
     SolveTask,
-} from '../../ir';
-import { SOLVE_STEP_KINDS } from '../../ir';
-import { solve_equation as wasmSolveEquation } from '../../wasm/math_rs/math_rs';
+} from '../../contract/ir';
+import { SOLVE_STEP_KINDS } from '../../contract/ir';
+import { solve_equation as wasmSolveEquation } from '../../generated/math_rs/math_rs';
 import { withStatementSpan } from '../errors';
 import { assertKnownOptions, findOption } from './options';
 import { buildParamScope } from './params';

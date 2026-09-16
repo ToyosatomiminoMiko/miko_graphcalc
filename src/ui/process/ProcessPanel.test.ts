@@ -8,7 +8,7 @@
  * - 键盘绑定只在过程页激活时命中,焦点在编辑器/标签栏里时让位.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type StubElement } from '../../testing/domStub';
 
 vi.mock('katex', () => ({
     default: {

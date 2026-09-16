@@ -11,16 +11,16 @@ import { WebGLGeometries } from 'three/src/renderers/webgl/WebGLGeometries.js';
  * 是否让线框失效 / 索引对象是否稳定 / 包围体是否重算",因此把共享 client
  * 换成假实现.
  */
-vi.mock('../../math/compute/domain/surface/SurfaceComputeClient', () => ({
+vi.mock('../../compute/domain/surface/SurfaceComputeClient', () => ({
     surfaceComputeClient: {
         request: vi.fn(),
         dispose: vi.fn(),
     },
 }));
 
-import { surfaceComputeClient } from '../../math/compute/domain/surface/SurfaceComputeClient';
+import { surfaceComputeClient } from '../../compute/domain/surface/SurfaceComputeClient';
 import { SurfaceMesh } from './SurfaceMesh';
-import type { SurfaceWorkerResponse } from '../../math/compute/domain/surface/SurfaceWorker';
+import type { SurfaceWorkerResponse } from '../../compute/domain/surface/SurfaceWorker';
 
 const COLS = 2;
 const ROWS = 2;

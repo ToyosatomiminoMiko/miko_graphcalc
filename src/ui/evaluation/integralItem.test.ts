@@ -6,7 +6,7 @@
  * 构造期的 `value` 会永远停在 `null`,过程页就会缺一个右端.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type StubElement } from '../../testing/domStub';
 
 vi.mock('katex', () => ({
     default: {
@@ -24,7 +24,7 @@ vi.mock('../process/disclosure', async (importOriginal) => ({
     needsProcessPage: () => true,
 }));
 
-import type { IntegralTask, SceneObject } from '../../ir';
+import type { IntegralTask, SceneObject } from '../../contract/ir';
 import type { ProcessDocument } from '../process/processSteps';
 import { IntegralItem } from './integralItem';
 import type { EvaluationContext } from './EvaluationItem';

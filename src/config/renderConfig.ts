@@ -3,10 +3,9 @@
  *
  * 这里只放静态默认值,不包含几何体实例或 Three.js 对象.
  * 相机与视图默认值统一放在 `camera`,场景(坐标轴/网格/点)放在 `scene`.
+ * 值域类型(UpAxis 等)在 `contract/view`,本模块只提供默认值.
  */
-
-/** 坐标轴向上:正方向朝上的轴,兼容不同学科/工具习惯. */
-export type UpAxis = 'x' | 'y' | 'z';
+import type { UpAxis } from '../contract/view';
 
 export const RENDER_CONFIG = {
     integralVisualizer: {

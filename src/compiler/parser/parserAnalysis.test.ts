@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parseMiko } from '../parser';
-import type { AnalysisStatement } from '../ast/types';
+import type { AnalysisStatement } from '../../contract/ast';
 
 describe('parseMiko 分析语句', () => {
     it('接受 laplacian 作用于 sphere(笛卡尔 at)', async () => {

@@ -11,8 +11,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseMiko } from '../parser';
 import { compileScene } from './DslCompiler';
-import { testMatrixOps } from '../../test/matrixOps';
-import type { CurveObject, SurfaceObject } from '../../ir';
+import { testMatrixOps } from '../../testing/matrixOps';
+import type { CurveObject, SurfaceObject } from '../../contract/ir';
 
 async function compile(source: string) {
     return compileScene(await parseMiko(source), {}, testMatrixOps);

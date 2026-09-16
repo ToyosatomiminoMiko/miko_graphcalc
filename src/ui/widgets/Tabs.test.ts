@@ -7,7 +7,7 @@
  * `hidden` 归持有"当前页"状态的控制器(见 RightPanelTabs.test.ts).
  */
 import { describe, expect, it } from 'vitest';
-import { installDomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type StubElement } from '../../testing/domStub';
 import { createTabs } from './Tabs';
 
 type Tab = 'params' | 'process';

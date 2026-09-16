@@ -231,18 +231,23 @@ npm run build
 
 该命令会依次执行:
 
-一. `npm run clean`:清空旧的 `dist/` 与 `src/wasm/`
+一. `npm run clean`:清空旧的 `dist/` 与 `src/generated/`
 
 二. `npm run build:wasm`:分别重建 `src/math/math_rs`/
 `src/compiler/compiler_rs`/`src/render/render_rs`
-三个 Rust crate,并把产物输出到对应的 `src/wasm/*` 目录
+三个 Rust crate,并把产物输出到对应的 `src/generated/*` 目录
 
 > **源码 vs 产物的对应关系**:`src/*/{math_rs,compiler_rs,render_rs}` 是 Rust
-> **源码**(唯一权威,含数值/编译/渲染内核);`src/wasm/*` 是它们 `wasm-pack`
-> 构建后生成的 JS/TS 绑定与 `.wasm` **产物**,且整个目录在 `.gitignore` 中
-> 被忽略(`*`),不提交进仓库.两者同名同树,但**不要手工修改或直接搜索/导入
-> `src/wasm/*` 里的生成文件**;改内核只改 `src/*_rs`,再跑 `npm run build:wasm`
-> 重新生成.前端代码统一从 `wasm/*` 的绑定入口导入.
+> **源码**(唯一权威,含数值/编译/渲染内核);`src/generated/*` 是它们
+> `wasm-pack` 构建后生成的 JS/TS 绑定与 `.wasm` **产物**,且整个目录在
+> `.gitignore` 中被忽略(`*`),不提交进仓库.两者同名同树,但**不要手工修改或
+> 直接搜索/导入 `src/generated/*` 里的生成文件**(唯一例外是手写粘合层
+> `src/wasm/`,见下节);改内核只改 `src/*_rs`,再跑 `npm run build:wasm`
+> 重新生成.
+>
+> 手写代码统一从 `src/wasm/` 的粘合入口导入:`wasm/init.ts`(主线程
+> 初始化),`wasm/workerRuntime.ts`(Worker 侧消息壳),`wasm/matrixOps.ts`
+> (矩阵后端);生成产物只被这三个文件与各 `*Worker` 直接引用.
 
 `npm run typecheck`:执行 `tsc --noEmit`
 `vite build`
@@ -295,49 +300,60 @@ SceneIR(纯数据,不含 three.js/DOM)
 
 关键边界文件:
 
-- [compiler/ast/types.ts](src/compiler/ast/types.ts):解析结果 `AstProgram`
-- [ir/types.ts](src/ir/types.ts):编译结果 `SceneIR`
+- [contract/ast.ts](src/contract/ast.ts):解析结果 `AstProgram`
+- [contract/ir.ts](src/contract/ir.ts):编译结果 `SceneIR`
 - [DslCompiler.ts](src/compiler/dsl/DslCompiler.ts):AST 到 SceneIR 的编排入口
 - [SceneStore.ts](src/app/SceneStore.ts):当前会话的 AST/显隐/动画起点等状态
 - [CompileController.ts](src/app/CompileController.ts):解析与重新编译的调度
 - [RenderController.ts](src/app/RenderController.ts):场景/相机/异步采样编排
 - [DslApp.ts](src/app/DslApp.ts):装配层 + rAF 主循环 + 参数刷新入口
 - [Plotter.ts](src/render/core/Plotter.ts):对象 id 到渲染器的路由门面
-- [ComputeFacade.ts](src/math/compute/ComputeFacade.ts):数值计算门面
-  (曲线采样/积分);`math/compute/index.ts` 是 compute 层统一入口
+- [ComputeFacade.ts](src/compute/ComputeFacade.ts):数值计算门面
+  (曲线采样/积分);`compute/index.ts` 是 compute 层统一入口
 
 ### 目录分层(202609 重构后)
 
-202609 架构重构完成的四批改动(另有两项可选项--IR 再切 5 个文件,统一 client
-形状--当时按建议砍掉):
+依赖严格单向:`main -> app -> ui -> render -> compute/compiler -> math/wasm -> contract/config/core`,
+同层之间只允许向后引用,全仓库无环(测试文件引用 `testing/` 不计入生产依赖).
 
 ```text
-src/ir/             零依赖叶子:SceneIR 等纯数据契约(index.ts 统一入口)
+src/contract/       零依赖叶子:跨层数据契约(ast.ts 解析产物 / ir.ts 编译产物 /
+                    view.ts 视图值域 / events.ts 视图事件映射)
 src/config/         零依赖叶子:数值/渲染/UI 默认值(含 SphericalAngleConvention)
-src/compiler/       AST -> IR;矩阵后端 matrixOps.ts
-src/math/
+src/core/           零依赖通用原语:EventBus,LatestRequestExecutor(+RequestClient)
+src/math/           纯数学(同步,无 DOM,无 Worker)
+  CoordinateSystem / latexNumber / paramValue
   adapters/         系数/求交的纯数据转换
   matrix/           行主序 Mat4 与矩阵运算接口(原 tensor/,无张量)
-  compute/
-    scheduling/     与领域无关的调度原语(ComputeWorkerClient/LatestRequestExecutor)
-    wasm/           WASM 粘合(wasmWorkerRuntime)
-    domain/         curve / surface / vectorField / integral / intersection 编组
-    ComputeFacade   曲线采样 + 积分门面;dispose() 收口 5 个领域 dispose*
   math_rs/          Rust 数值内核(表达式求值/采样/积分/求交)
+src/wasm/           手写 WASM 粘合层:init(主线程)/ workerRuntime(Worker 壳)/ matrixOps(矩阵后端)
+src/generated/      wasm-pack 产物(被 .gitignore 忽略,勿手改)
+src/compute/        AST/IR 表达式 -> Worker + Rust/WASM 的数值结果
+  scheduling/       与领域无关的 Worker 调度(ComputeWorkerClient)
+  domain/           curve / surface / vectorField / integral / intersection 编组
+  index.ts          compute 层公共面(只导出跨层需要的东西,内部调度不外泄)
+  ComputeFacade     曲线采样 + 积分门面;dispose() 收口 5 个领域 dispose*
+src/compiler/       AST -> IR(dsl/ 编译管线,parser/ WASM 解析,errors/text 纯工具)
 src/render/         只消费 IR;渲染层不再自行解析表达式
+  core/             场景/相机/动画/渲染器与轴刻度
+  visualization/    网格与积分可视化
 src/ui/
   widgets/          声明式控件词表:开关/单选/滑块/数字/按钮/浮层/行(只碰 DOM 与可访问性)
-  view/             右侧"视图"面板的声明式装配(ViewPanel 持布局与初值)
-  editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
-  panels/           面板几何,参数滑块,诊断提示
-  formula/          KaTeX 排版与点击复制
-  objects/          对象列表装配(左实体栏 + 右求值栏)
-  shared/           两栏共用的行 DOM/行缓存/数值文本
   theme/            UI_CONFIG -> CSS 变量与配色契约
-  entity/           实体列表(左栏)
-  evaluation/       求值列表(右栏:分析/积分/求交)
+  shared/           跨控件共用件:行 DOM/行缓存/数值文本/拖动/全应用键盘出口
+  editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
+  formula/          KaTeX 排版与点击复制
   examples/         示例目录与载入
+  view/             右侧"视图"面板装配;view/controls/ 视图控件控制器(状态 + 校验 + 广播)
+  objects/          对象列表装配(左实体栏 + 右求值栏)
+  entity/           实体列表(左栏)
+  evaluation/       求值列表(右栏:分析/积分/求交/不定积分/ODE)
+  process/          过程页与步骤数据
+  panels/           面板外壳:几何拖拽/分栏/标签页
+  params/           参数面板(滑块取值口径与写回时机)
+  diagnostics/      诊断提示列表
 src/app/            控制与编排
+src/testing/        测试基建(domStub / setupWasm / matrixOps),不被生产代码引用
 ```
 
 数值求值链路(`math_rs::eval_core::CompiledEvaluator`)在构造期把符号解析成
@@ -407,7 +423,7 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 - **视图控件(相机/坐标轴/网格/点样式)**:控件 emit `EventBus` 事件,
   RenderController 统一订阅并落到 SceneManager/CameraManager/Plotter.
 
-`service/events.ts` 只保留有真实 emit 点的视图事件键,不再允许
+`contract/events.ts` 只保留有真实 emit 点的视图事件键,不再允许
 "先声明后接线"的 dead event keys.
 
 右侧"视图"面板(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
@@ -416,7 +432,7 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初值(唯一读配置的视图代码)
                         │ handles
                         ▼
-                  src/render/controls/*      状态 + 校验 + EventBus 广播(不再碰 document)
+                  src/ui/view/controls/*      状态 + 校验 + EventBus 广播(不再碰 document)
 ```
 
 `src/ui/widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /

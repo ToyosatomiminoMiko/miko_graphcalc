@@ -14,8 +14,8 @@
  * 求交名在 compileIntersections 循环内查重,与 param/object/animation 的
  * "重复声明"契约一致.
  */
-import type { AstProgram, IntersectionStatement } from '../ast/types';
-import type { IntersectionTask, SceneObject } from '../../ir';
+import type { AstProgram, IntersectionStatement } from '../../contract/ast';
+import type { IntersectionTask, SceneObject } from '../../contract/ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { withStatementSpan } from '../errors';
 import {

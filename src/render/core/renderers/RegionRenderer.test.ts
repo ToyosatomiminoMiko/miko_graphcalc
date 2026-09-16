@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { RegionRenderer } from './RegionRenderer';
-import { sharedComputeFacade } from '../../../math/compute/ComputeFacade';
-import type { CurveSampleResult } from '../../../math/compute/domain/curve/CurveComputeClient';
-import type { CurveObject, RegionObject } from '../../../ir';
+import { sharedComputeFacade } from '../../../compute/ComputeFacade';
+import type { CurveSampleResult } from '../../../compute/domain/curve/CurveComputeClient';
+import type { CurveObject, RegionObject } from '../../../contract/ir';
 
 function boundary(id: number, name: string): CurveObject {
     return {

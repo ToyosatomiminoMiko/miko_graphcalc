@@ -46,8 +46,8 @@ export default defineConfig({
         // 初始化在 Node 里走 `fetch(new URL(..., import.meta.url))`,Node 的
         // fetch 不认 file://,会直接 "fetch failed".setup 文件用 initSync
         // 从磁盘读 .wasm 字节先完成初始化,后续 ensureWasmReady 的懒加载
-        // 见到实例已存在就跳过(见 src/runtime/wasmRuntime.ts).
-        setupFiles: ['./src/test/setupWasm.ts'],
+        // 见到实例已存在就跳过(见 src/wasm/init.ts).
+        setupFiles: ['./src/testing/setupWasm.ts'],
     },
     plugins: [
         injectChromeColor(),

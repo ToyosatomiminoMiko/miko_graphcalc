@@ -127,7 +127,7 @@ f′ 曲线可视化,应在 DSL/IR 层增加显式语义(参考 §5 的未实现
 | 文件 | 改动 |
 | --- | --- |
 | `src/compiler/dsl/analyses.ts` | gradient 结果新增 `tangent`;curve 求导缺省 show 改为 `[point, normal, tangent]` |
-| `src/ir/types.ts` | `AnalysisShow` 新增 `tangent`;`AnalysisResult.tangent` 字段 |
+| `src/contract/ir.ts` | `AnalysisShow` 新增 `tangent`;`AnalysisResult.tangent` 字段 |
 | `src/compiler/dsl/options.ts` | show 白名单加 `tangent`,解析带缺省项 |
 | `src/render/core/renderers/AnalysisRenderer.ts` | 渲染切线(绿色直线) |
 | `src/config/renderConfig.ts` | `analysis.tangentHalfLength` |

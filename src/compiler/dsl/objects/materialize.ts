@@ -5,7 +5,7 @@
  * 选项/自由系数解析;本文件只在每次参数刷新时做数值求值:建参数 scope,
  * 把三元坐标/尺寸表达式与单值(radius/base/height/top/angle)求成数值,
  * 并执行各对象几何约束(正值/夹逼,cylinder 与 cone 的缺省 top,top|angle
- * 二选一),输出渲染层直接消费的 ir/types.ts 对象.三元求值收口见
+ * 二选一),输出渲染层直接消费的 contract/ir.ts 对象.三元求值收口见
  * evaluateRequiredTriple 注释(202609 review 第 3 项).
  */
 import type {
@@ -21,7 +21,7 @@ import type {
     SurfaceObject,
     VectorFieldObject,
     VectorObject,
-} from '../../../ir';
+} from '../../../contract/ir';
 import { evaluateRequiredNumber } from '../expression';
 import { buildParamScope, materializeCoefficient } from '../params';
 import type { ObjectBlueprint } from './types';

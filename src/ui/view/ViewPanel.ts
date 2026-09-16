@@ -28,9 +28,9 @@
  * 由 `<span>` 变成 `<label for>`(见 `widgets/Row.ts`),以及去掉了那些只给
  * `getElementById` 用的 id.
  */
-import { RENDER_CONFIG, type UpAxis } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '../../config/renderConfig';
 import { UI_CONFIG } from '../../config/uiConfig';
-import type { AxisName, CamMode, GridPlane, PointMode, ViewHome } from '../../render/types';
+import type { AxisName, CamMode, GridPlane, PointMode, UpAxis, ViewHome } from '../../contract/view';
 import { el } from '../widgets/dom';
 import { createNumberField, type NumberFieldHandle } from '../widgets/NumberField';
 import {

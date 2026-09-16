@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { ANALYSIS_OP_KINDS, OBJECT_KINDS, TENSOR_KINDS } from '../ast/types';
+import { ANALYSIS_OP_KINDS, OBJECT_KINDS, TENSOR_KINDS } from '../../contract/ast';
 import { DSL_KEYWORD_GROUPS, DSL_KEYWORDS, extractKeywordGroups } from './keywords';
 
 const PEST_URL = new URL('../compiler_rs/src/miko.pest', import.meta.url);

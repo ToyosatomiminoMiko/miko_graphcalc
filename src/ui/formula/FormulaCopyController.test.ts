@@ -9,7 +9,7 @@
  * 剪贴板走 legacy 回退(`window.isSecureContext = false` + `document.execCommand`).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
 import { FormulaCopyController } from './FormulaCopyController';
 
 interface Harness {

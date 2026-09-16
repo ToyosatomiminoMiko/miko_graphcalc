@@ -9,7 +9,7 @@
  * Rust `math_rs::transform_core::Mat4` 是扁平 `[f64; 16]`,与 WASM 边界一致,
  * 同样不是本文件类型.
  *
- * 矩阵"运算"由运行时注入的 WASM 后端提供(`compiler/matrixOps.ts`),公式真值
+ * 矩阵"运算"由运行时注入的 WASM 后端提供(`wasm/matrixOps.ts`),公式真值
  * 在 Rust `math_rs::transform_core`;这里只放表示层共用的基础操作(克隆/校验/
  * 求逆/扁平转换),避免每个调用方各自定义一套 `type Mat4 = number[][]`.
  */

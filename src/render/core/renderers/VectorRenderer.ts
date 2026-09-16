@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { IRenderer } from './IRenderer';
-import type { VectorObject } from '../../../ir';
+import type { VectorObject } from '../../../contract/ir';
 import { ArrowMesh } from '../../visualization/ArrowMesh';
 
 /**

@@ -12,8 +12,8 @@
  * 写入 AST 和 matrixOps,RenderController 负责写入场景快照并读取显隐状态.
  * 把状态从 DslApp 抽出来,是为了让 DslApp 只做装配和事件编排.
  */
-import type { AstProgram } from '../compiler/ast/types';
-import type { SceneIR, SceneObject } from '../ir';
+import type { AstProgram } from '../contract/ast';
+import type { SceneIR, SceneObject } from '../contract/ir';
 import type { MatrixOps } from '../math/matrix/MatrixOps';
 
 export class SceneStore {

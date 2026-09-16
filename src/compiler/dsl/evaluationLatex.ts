@@ -24,7 +24,7 @@ import type {
     OdeTask,
     SceneObject,
     SolveTask,
-} from '../../ir';
+} from '../../contract/ir';
 import { latexResultNumber } from '../../math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
 

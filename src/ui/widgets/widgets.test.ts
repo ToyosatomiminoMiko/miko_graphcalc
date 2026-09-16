@@ -1,5 +1,5 @@
 /**
- * 控件词表的单测(最小 DOM 桩,见 `test/domStub.ts`,不引入 jsdom).
+ * 控件词表的单测(最小 DOM 桩,见 `testing/domStub.ts`,不引入 jsdom).
  *
  * 锁三件事:
  * 1. **DOM 与手写 HTML 同构** -- 类名/结构是 CSS 的公开契约,控件一旦改了
@@ -10,7 +10,7 @@
  *    会让"dispose 后仍响应事件"的回归暴露出来.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, StubElement } from '../../test/domStub';
+import { installDomStub, StubElement } from '../../testing/domStub';
 import { createButton } from './Button';
 import { el } from './dom';
 import { createNumberField } from './NumberField';

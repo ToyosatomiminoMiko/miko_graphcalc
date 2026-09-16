@@ -12,8 +12,8 @@
  * 表达式工具(坐标轴重命名/常数符号替换/解族取值)在叶子模块
  * odeExpressions.ts,本模块与求值层共用它,避免互相 import 成环.
  */
-import type { OdeStatement, OptionPair } from '../ast/types';
-import type { ParamDeclaration, SolveStepKind } from '../../ir';
+import type { OdeStatement, OptionPair } from '../../contract/ast';
+import type { ParamDeclaration, SolveStepKind } from '../../contract/ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import {
     assertKnownOptions,
@@ -32,7 +32,7 @@ import {
     renameCoordinateSymbols,
     substituteConstantSymbols,
 } from './odeExpressions';
-import { solve_ode as wasmSolveOde } from '../../wasm/math_rs/math_rs';
+import { solve_ode as wasmSolveOde } from '../../generated/math_rs/math_rs';
 import { toSolveStepKind } from './stepKinds';
 import type { CurveBlueprint, SurfaceBlueprint } from './objects/types';
 
@@ -277,7 +277,7 @@ function buildOdeSlopeBlueprint(
  * 解曲线:特解在前,随后按 `curves = N` 给解族(常数取值见 familyConstants).
  *
  * id 从 `firstCurveId` 连续分配,名字同步写回 `fact.curveNames`(隐藏整条
- * 语句时按名字前缀过滤实体,见 ir/types.ts 的 OdeOrigin).
+ * 语句时按名字前缀过滤实体,见 contract/ir.ts 的 OdeOrigin).
  */
 function buildOdeCurveBlueprints(
     statement: OdeStatement,

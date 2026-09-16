@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { compileScene as compileSceneWithOps } from './DslCompiler';
 import type { CompileSceneOptions } from './DslCompiler';
-import { testMatrixOps } from '../../test/matrixOps';
+import { testMatrixOps } from '../../testing/matrixOps';
 import {
     evaluate_curl_point,
     evaluate_divergence_point,
@@ -9,16 +9,16 @@ import {
     evaluate_laplacian_point,
     evaluate_scalar,
     symbolic_derivative,
-} from '../../wasm/math_rs/math_rs';
-import type { AstProgram } from '../ast/types';
+} from '../../generated/math_rs/math_rs';
+import type { AstProgram } from '../../contract/ast';
 import { normalizeExpression } from './expression';
 import { CompileError, formatLocatedError } from '../errors';
 
-vi.mock('../../wasm/math_rs/math_rs', async (importOriginal) => {
+vi.mock('../../generated/math_rs/math_rs', async (importOriginal) => {
     // 本文件只 mock 符号求值/打印相关函数;矩阵运算保留真实 Rust 实现,因为
-    // 注入的 MatrixOps 就是生产 WASM 后端(test/matrixOps.ts).若把 mat4_* 也
+    // 注入的 MatrixOps 就是生产 WASM 后端(testing/matrixOps.ts).若把 mat4_* 也
     // mock 掉,测试就会依赖另一份 JS 公式,正是本次清理要消掉的东西.
-    const actual = await importOriginal<typeof import('../../wasm/math_rs/math_rs')>();
+    const actual = await importOriginal<typeof import('../../generated/math_rs/math_rs')>();
 
     return {
         mat4_identity: actual.mat4_identity,

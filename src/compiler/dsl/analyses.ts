@@ -25,20 +25,20 @@ import type {
     AnalysisOpKind,
     AnalysisStatement,
     AstProgram,
-} from '../ast/types';
+} from '../../contract/ast';
 import type {
     AnalysisResult,
     AnalysisShow,
     ParamDeclaration,
     SceneObject,
-} from '../../ir';
+} from '../../contract/ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import {
     evaluate_curl_point as wasmEvaluateCurlPoint,
     evaluate_divergence_point as wasmEvaluateDivergencePoint,
     evaluate_gradient_point as wasmEvaluateGradientPoint,
     evaluate_laplacian_point as wasmEvaluateLaplacianPoint,
-} from '../../wasm/math_rs/math_rs';
+} from '../../generated/math_rs/math_rs';
 import { splitCoefficients } from '../../math/adapters/coefficientUtils';
 import {
     CoordinateSystem,

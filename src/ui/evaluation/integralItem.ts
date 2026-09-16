@@ -15,7 +15,7 @@
  * `bodyLatex` 与当前状态行 `result`:异步回填是 `renderValue`/`renderError`
  * 两个实例方法,不再需要一份与行为分离的句柄数据.
  */
-import type { IntegralTask, SceneObject } from '../../ir';
+import type { IntegralTask, SceneObject } from '../../contract/ir';
 import {
     detailLinesOf,
     integralLatexDetailEntries,

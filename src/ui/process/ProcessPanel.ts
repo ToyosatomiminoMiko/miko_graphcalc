@@ -19,8 +19,8 @@
  * 不在这里扩:步骤 LaTeX 键是"表达式签名 × 步数",是有限集合.
  */
 import { UI_CONFIG } from '../../config/uiConfig';
-import type { KeyboardBinding } from '../../service/KeyboardController';
-import { isTypingTarget } from '../../service/KeyboardController';
+import type { KeyboardBinding } from '../shared/KeyboardController';
+import { isTypingTarget } from '../shared/KeyboardController';
 import { createFormulaElement } from '../formula/FormulaView';
 import { KeyedRowList, type KeyedRowHandles } from '../shared/keyedRowList';
 import { createButton, type ButtonHandle } from '../widgets/Button';

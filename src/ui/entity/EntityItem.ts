@@ -37,7 +37,7 @@
  * 内容**走(徽章文案 + 颜色定义 + 公式/文本 + 显隐态),列表引擎据此决定整行复用
  * 还是重建--颜色已经画在行上,所以它必须进键,否则改颜色不会刷新.
  */
-import type { SceneObject } from '../../ir';
+import type { SceneObject } from '../../contract/ir';
 import { createFormulaElement } from '../formula/FormulaView';
 import { createObjectRow, createRowActions, createVisibilityButton } from '../shared/rowDom';
 import { el } from '../widgets/dom';

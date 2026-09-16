@@ -6,7 +6,7 @@
  * {@link KeyedRowList} 承担--与求值的三个子列表共用同一份实现(见 UI-P3.8),
  * 因此"顺序/缓存"策略只有一处.
  */
-import type { SceneObject } from '../../ir';
+import type { SceneObject } from '../../contract/ir';
 import { KeyedRowList } from '../shared/keyedRowList';
 import { EntityItem } from './EntityItem';
 

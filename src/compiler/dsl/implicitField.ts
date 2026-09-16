@@ -22,7 +22,7 @@
  */
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { splitCoefficients } from '../../math/adapters/coefficientUtils';
-import type { ImplicitObject, SceneObject, SphereObject } from '../../ir';
+import type { ImplicitObject, SceneObject, SphereObject } from '../../contract/ir';
 import { cachedDerivativeExpression, evaluateExpressionAt } from './expression';
 
 /** 隐式场的点求值器;返回 null 表示该点不可求值(定义域外/符号未声明). */

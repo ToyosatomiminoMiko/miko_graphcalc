@@ -1,12 +1,12 @@
 /**
  * 系数形态转换工具.
  *
- * IR 里系数是对象数组 `Coefficient[]`(`ir/types`),而 wasm/Worker
+  * IR 里系数是对象数组 `Coefficient[]`(`contract/ir`),而 wasm/Worker
  * 各入口期望的是平行的 `names[]/values[]` 或 `Record<name, value>`.
  * 此前各渲染器/求交/计算门面各自写一份 `.map(c => c.name)` 转换,这里收口
  * 成一套工具,避免同一语义在多处各写一遍.
  */
-import type { Coefficient } from '../../ir';
+import type { Coefficient } from '../../contract/ir';
 
 export type CoefficientNamesAndValues = {
     names: string[];

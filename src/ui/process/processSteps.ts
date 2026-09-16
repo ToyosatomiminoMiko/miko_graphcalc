@@ -9,13 +9,13 @@
  * 概念,混在一起学生会把前者当成求导法则.`kind` 因此是步骤的一等字段,
  * 一期由数据源标注,三期由内核产物给出,UI 不变.
  */
-import { SOLVE_STEP_KINDS, type SolveStepKind } from '../../ir';
+import { SOLVE_STEP_KINDS, type SolveStepKind } from '../../contract/ir';
 
 /**
  * 步骤类型:决定依据徽章的视觉分区(样式归 CSS,见 css/process.css).
  *
  * 与内核产物 `SolveStep.kind` **同域**:它现在是求解内核与 UI 之间的契约
- * (取值定义在 `ir/types.ts` 的 `SOLVE_STEP_KINDS`),UI 不再自己维护第二份
+ * (取值定义在 `contract/ir.ts` 的 `SOLVE_STEP_KINDS`),UI 不再自己维护第二份
  * 字面量联合--内核新增一个分区时,这里要么跟着加文案,要么在 `processData`
  * 里退化处理,不会悄悄漂移.
  */
@@ -57,7 +57,7 @@ export const PROCESS_STEP_KIND_LABELS: Record<ProcessStepKind, string> = {
     algebra: '代数',
     definition: '定义',
     numeric: '数值',
-    // 不定积分与微分方程内核引入的三类依据(见 ir/types.ts 的 SOLVE_STEP_KINDS).
+    // 不定积分与微分方程内核引入的三类依据(见 contract/ir.ts 的 SOLVE_STEP_KINDS).
     table: '查表',
     substitute: '换元',
     check: '验证',

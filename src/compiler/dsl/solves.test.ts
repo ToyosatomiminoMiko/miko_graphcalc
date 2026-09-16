@@ -11,10 +11,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import type { SceneIR, SolveTask } from '../../ir';
+import type { SceneIR, SolveTask } from '../../contract/ir';
 import { parseMiko } from '../parser';
 import { compileScene } from './DslCompiler';
-import { testMatrixOps } from '../../test/matrixOps';
+import { testMatrixOps } from '../../testing/matrixOps';
 
 async function compile(
     source: string,

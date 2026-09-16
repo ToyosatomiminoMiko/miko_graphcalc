@@ -1,6 +1,6 @@
 node_modules/
 target/
-src/wasm/
+src/generated/
 dist/
 .vscode
 __pycache__/

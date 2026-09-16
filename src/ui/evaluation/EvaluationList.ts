@@ -22,7 +22,7 @@ import type {
     OdeTask,
     SceneIR,
     SolveTask,
-} from '../../ir';
+} from '../../contract/ir';
 import { AnalysisItem } from './analysisItem';
 import { EvaluationSection } from './EvaluationSection';
 import { IntegralItem } from './integralItem';

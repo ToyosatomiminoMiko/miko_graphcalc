@@ -3,10 +3,10 @@
  *
  * blueprint 由静态场景层在编译缓存命中前一次性构建(见 ./build.ts),携带
  * 归一化后的表达式与解析好的选项;物化层(./materialize.ts)每次参数刷新时
- * 把 blueprint 求值成 ir/types.ts 的 SceneObject.静态场景/构建/物化三处
+ * 把 blueprint 求值成 contract/ir.ts 的 SceneObject.静态场景/构建/物化三处
  * 都只经由这里共享类型与 type guard.
  */
-import type { AntiderivativeOrigin, DerivativeOrigin, OdeOrigin } from '../../../ir';
+import type { AntiderivativeOrigin, DerivativeOrigin, OdeOrigin } from '../../../contract/ir';
 
 export type CurveBlueprint = {
     name: string;
@@ -17,11 +17,11 @@ export type CurveBlueprint = {
     color: string;
     range?: [number, number];
     segments?: number;
-    /** 求导产物专用:见 ir/types.ts 的 DerivativeOrigin. */
+    /** 求导产物专用:见 contract/ir.ts 的 DerivativeOrigin. */
     derivativeOrigin?: DerivativeOrigin;
-    /** 不定积分产物专用:见 ir/types.ts 的 AntiderivativeOrigin. */
+    /** 不定积分产物专用:见 contract/ir.ts 的 AntiderivativeOrigin. */
     antiderivativeOrigin?: AntiderivativeOrigin;
-    /** 微分方程产物专用:见 ir/types.ts 的 OdeOrigin. */
+    /** 微分方程产物专用:见 contract/ir.ts 的 OdeOrigin. */
     odeOrigin?: OdeOrigin;
 };
 
@@ -34,11 +34,11 @@ export type SurfaceBlueprint = {
     color: string;
     range: [number, number, number, number];
     segments?: number;
-    /** 求导产物专用:见 ir/types.ts 的 DerivativeOrigin. */
+    /** 求导产物专用:见 contract/ir.ts 的 DerivativeOrigin. */
     derivativeOrigin?: DerivativeOrigin;
-    /** 不定积分产物专用:见 ir/types.ts 的 AntiderivativeOrigin. */
+    /** 不定积分产物专用:见 contract/ir.ts 的 AntiderivativeOrigin. */
     antiderivativeOrigin?: AntiderivativeOrigin;
-    /** 微分方程产物专用:见 ir/types.ts 的 OdeOrigin. */
+    /** 微分方程产物专用:见 contract/ir.ts 的 OdeOrigin. */
     odeOrigin?: OdeOrigin;
 };
 
@@ -58,7 +58,7 @@ export type VectorFieldBlueprint = {
         z: [number, number];
     };
     glyphScale: number;
-    /** 梯度型求导产物专用:见 ir/types.ts 的 VectorFieldObject.gradientOrigin. */
+    /** 梯度型求导产物专用:见 contract/ir.ts 的 VectorFieldObject.gradientOrigin. */
     gradientOrigin?: { sourceExpr: string };
 };
 

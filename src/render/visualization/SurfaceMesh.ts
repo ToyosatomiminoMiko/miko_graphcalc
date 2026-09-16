@@ -1,19 +1,19 @@
 import * as THREE from 'three';
-import type { Coefficient } from '../../ir';
+import type { Coefficient } from '../../contract/ir';
 import { splitCoefficients } from '../../math/adapters/coefficientUtils';
 import { RENDER_CONFIG } from '../../config/renderConfig';
+import { LatestRequestExecutor } from '../../core/LatestRequestExecutor';
 import {
     surfaceComputeClient,
-    LatestRequestExecutor,
     type SurfaceWorkerRequest,
     type SurfaceWorkerResponse,
-} from '../../math/compute';
+} from '../../compute';
 import { reportSamplingFailure } from '../core/samplingErrors';
 import {
     installSurfaceVertexColor,
     type SurfaceColorHandle,
 } from './surfaceColorMap';
-import type { SurfaceStyle } from '../types';
+import type { SurfaceStyle } from '../../contract/view';
 
 // ============================================================
 // SurfaceMesh - 可复用的 3D 曲面网格封装

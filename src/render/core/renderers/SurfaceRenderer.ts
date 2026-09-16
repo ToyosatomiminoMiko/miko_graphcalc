@@ -3,8 +3,8 @@ import { NUMERIC_CONFIG } from '../../../config/numericConfig';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
 import { SurfaceMesh } from '../../visualization/SurfaceMesh';
 import type { IRenderer } from './IRenderer';
-import type { SurfaceObject } from '../../../ir';
-import type { SurfaceStyle } from '../../types';
+import type { SurfaceObject } from '../../../contract/ir';
+import type { SurfaceStyle } from '../../../contract/view';
 
 /**
  * 曲面渲染器

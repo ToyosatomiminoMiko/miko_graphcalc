@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeFn1D, makeFn2D } from './sampleLookup';
-import type { IntegralResult } from '../../../math/compute/domain/integral/IntegralCompute';
+import type { IntegralResult } from '../../../compute/domain/integral/IntegralCompute';
 
 /** 单元采样结果:samples[i] = i,便于直接看出取到的是哪个单元. */
 function cellResult(n: number, m: number = n): IntegralResult {

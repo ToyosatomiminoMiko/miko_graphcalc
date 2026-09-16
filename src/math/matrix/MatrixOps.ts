@@ -3,8 +3,8 @@
  *
  * 编译层与渲染层都只通过 `MatrixOps` 调用外部注入的矩阵后端,不直接 import
  * 任何具体实现,避免模块级可变全局状态:
- * - 唯一的实现是 `compiler/matrixOps.ts` 的 `createWasmMatrixOps`(生产);
- * - 测试注入的也是同一个 WASM 后端(`test/matrixOps.ts`),矩阵公式只有 Rust
+ * - 唯一的实现是 `wasm/matrixOps.ts` 的 `createWasmMatrixOps`(生产);
+ * - 测试注入的也是同一个 WASM 后端(`testing/matrixOps.ts`),矩阵公式只有 Rust
  *   `math_rs::transform_core` 一份真值,单测在 `transform_core.rs` 内.
  *   202609 删除了纯 JS 参考实现 `math/matrix/testBackend.ts`:JS/Rust 两套
  *   公式都要维护,还有悄悄分叉的风险.

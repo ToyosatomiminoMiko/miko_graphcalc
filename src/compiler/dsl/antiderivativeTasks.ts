@@ -15,8 +15,8 @@
  * 隐藏语义沿用约定 1("先完整校验,后禁用,仅跳过计算"):选项/重名/源对象
  * 照常校验,只是不再调内核,也不下发对象.
  */
-import type { AstProgram } from '../ast/types';
-import type { AntiderivativeTask, SceneObject } from '../../ir';
+import type { AstProgram } from '../../contract/ast';
+import type { AntiderivativeTask, SceneObject } from '../../contract/ir';
 import { withStatementSpan } from '../errors';
 import { assertKnownOptions } from './options';
 import {

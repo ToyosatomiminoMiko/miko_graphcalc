@@ -10,14 +10,13 @@
 import * as THREE from 'three';
 import { NUMERIC_CONFIG } from '../../../config/numericConfig';
 import type { IRenderer } from './IRenderer';
-import type { CurveObject } from '../../../ir';
+import type { CurveObject } from '../../../contract/ir';
 import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
+import { LatestRequestExecutor, type RequestClient } from '../../../core/LatestRequestExecutor';
 import {
     sharedComputeFacade as curveComputeEngine,
-    LatestRequestExecutor,
     type CurveSampleResult,
-    type RequestClient,
-} from '../../../math/compute';
+} from '../../../compute';
 import { reportSamplingFailure } from '../samplingErrors';
 
 type CurveRendererRequest = {

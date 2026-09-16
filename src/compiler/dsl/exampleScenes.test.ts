@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile, readdir } from 'node:fs/promises';
 import { parseMiko } from '../parser';
 import { compileScene } from './DslCompiler';
-import { testMatrixOps } from '../../test/matrixOps';
+import { testMatrixOps } from '../../testing/matrixOps';
 
 describe('仓库自带 DSL 源码', () => {
     it('example/ 下每个示例都能编译出 SceneIR', async () => {

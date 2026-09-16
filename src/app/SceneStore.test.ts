@@ -8,7 +8,7 @@
  * 2. 只有源码内容真的变了才清空.
  */
 import { describe, expect, it } from 'vitest';
-import type { AstProgram } from '../compiler/ast/types';
+import type { AstProgram } from '../contract/ast';
 import type { MatrixOps } from '../math/matrix/MatrixOps';
 import { SceneStore } from './SceneStore';
 

@@ -18,7 +18,7 @@
 import type {
     IntersectionOutput,
     SceneIR,
-} from '../../ir';
+} from '../../contract/ir';
 import { EntityList } from '../entity/EntityList';
 import { EvaluationList } from '../evaluation/EvaluationList';
 import type { ProcessRequest } from '../evaluation/EvaluationItem';

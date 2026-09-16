@@ -3,7 +3,7 @@
  * (路线图改造原则 4 / 设计文档 P5).
  */
 import { describe, expect, it } from 'vitest';
-import { SOLVE_STEP_KINDS } from '../../ir';
+import { SOLVE_STEP_KINDS } from '../../contract/ir';
 import {
     PROCESS_STEP_KIND_LABELS,
     partitionStepsByKind,

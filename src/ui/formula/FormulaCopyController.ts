@@ -21,7 +21,7 @@
  * keydown,本控制器用 `keyboardBinding()` 把"Enter/Space + 目标是可复制公式"
  * 这条规则注册进去,由它统一分发.
  */
-import type { KeyboardBinding } from '../../service/KeyboardController';
+import type { KeyboardBinding } from '../shared/KeyboardController';
 import { runLegacyEditorCommand } from '../editor/legacyEditorCommand';
 
 const HINT_RESET_DELAY = 1200;

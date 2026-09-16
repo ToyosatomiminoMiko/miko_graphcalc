@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UI_CONFIG } from '../../config/uiConfig';
-import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
 import { PanelController } from './PanelController';
 
 interface FakePanel {

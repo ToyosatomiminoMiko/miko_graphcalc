@@ -10,7 +10,7 @@
 import type {
     IntersectionOutput,
     IntersectionTask,
-} from '../../ir';
+} from '../../contract/ir';
 import {
     intersectionLatexDetails,
     intersectionLatexSummary,

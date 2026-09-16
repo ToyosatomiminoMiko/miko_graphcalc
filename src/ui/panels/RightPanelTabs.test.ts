@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { installDomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type StubElement } from '../../testing/domStub';
 import { RightPanelTabs, type RightTab } from './RightPanelTabs';
 
 function setup(): {

@@ -7,7 +7,7 @@
 //!
 //! 这里收口成一份共享枚举与一份共享"方法 -> 单元采样端"映射:
 //! - 方法名 parse 只有一份,与 TS 侧名单 `INTEGRAL_METHOD_NAMES`
-//!   (src/ir/types.ts)保持同一套语义名--Rust parse 表与 TS 名单是
+//!   (src/contract/ir.ts)保持同一套语义名--Rust parse 表与 TS 名单是
 //!   唯二的事实来源,加方法必须两处同步;
 //! - `cell_end` 是方法在网格单元上的采样端语义(region/solid 网格,
 //!   2D 端点黎曼,lebesgue 左端点格子都用它);

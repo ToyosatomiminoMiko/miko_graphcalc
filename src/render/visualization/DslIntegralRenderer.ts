@@ -3,11 +3,11 @@ import type {
     IntegralTask,
     RiemannSide,
     SceneObject,
-} from '../../ir';
+} from '../../contract/ir';
 import type { Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { IntegralVisualizer } from './integral/IntegralVisualizer';
 import { makeFn1D, makeFn2D } from './integral/sampleLookup';
-import type { ComputeFacade, IntegralResult } from '../../math/compute';
+import type { ComputeFacade, IntegralResult } from '../../compute';
 import {
     clampIntegral1DVisualization,
     clampIntegral2DVisualization,

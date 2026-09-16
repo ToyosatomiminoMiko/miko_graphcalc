@@ -41,7 +41,7 @@
  * ../staticScene.ts).
  */
 import { NUMERIC_CONFIG } from '../../../config/numericConfig';
-import type { ObjectStatement } from '../../ast/types';
+import type { ObjectStatement } from '../../../contract/ast';
 import { extractSymbolNames, normalizeExpression } from '../expression';
 import { findOption, parseNumberListOfSize } from '../options';
 

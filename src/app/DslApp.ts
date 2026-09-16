@@ -12,15 +12,15 @@
  * 源码仍然是唯一真相源:
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
-import type { SceneIR } from '../ir';
-import { EventBus } from '../service/EventBus';
-import { KeyboardController } from '../service/KeyboardController';
-import type { GraphCalcEvents } from '../types';
+import type { SceneIR } from '../contract/ir';
+import { EventBus } from '../core/EventBus';
+import { KeyboardController } from '../ui/shared/KeyboardController';
+import type { GraphCalcEvents } from '../contract/events';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
 import { RenderController } from './RenderController';
-import { ParamPanelController } from '../ui/panels/ParamPanelController';
-import { DiagnosticsController } from '../ui/panels/DiagnosticsController';
+import { ParamPanelController } from '../ui/params/ParamPanelController';
+import { DiagnosticsController } from '../ui/diagnostics/DiagnosticsController';
 import { EditorLineNumbers } from '../ui/editor/EditorLineNumbers';
 import { EditorHighlight } from '../ui/editor/EditorHighlight';
 import { FormulaCopyController } from '../ui/formula/FormulaCopyController';

@@ -10,7 +10,7 @@
  * - curve/surface:`cachedDerivativeExpression` 求偏导 -> 同 kind 对象;
  * - implicit/sphere:梯度 ∇f -> vector_field(见 buildFieldDerivativeBlueprint).
  */
-import type { DerivativeStatement, ObjectStatement, OptionPair } from '../ast/types';
+import type { DerivativeStatement, ObjectStatement, OptionPair } from '../../contract/ast';
 import { assertKnownOptions } from './options';
 import { cachedDerivativeExpression } from './expression';
 import {

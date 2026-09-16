@@ -4,7 +4,7 @@
  * 从 `ObjectListController` 搬出来的纯函数,只依赖 IR(`SceneObject`)与数字排版
  * (`numberText`):实体行结构在 `EntityItem`,这里只管"这一条显示成什么字".
  */
-import type { SceneObject } from '../../ir';
+import type { SceneObject } from '../../contract/ir';
 import { formatNumber, formatVector } from '../shared/numberText';
 
 const ENTITY_KIND_LABELS: Record<SceneObject['kind'], string> = {

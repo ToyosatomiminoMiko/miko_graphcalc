@@ -22,7 +22,7 @@
  * 菜单项点击用**事件委托**绑在菜单节点上(项是动态渲染的),它与浮层的开合
  * 监听分别由本控制器与 Popover 持有,各自的 `dispose()` 负责解绑.
  */
-import type { KeyboardBinding } from '../../service/KeyboardController';
+import type { KeyboardBinding } from '../shared/KeyboardController';
 import { el } from '../widgets/dom';
 import { createPopover, type PopoverHandle } from '../widgets/Popover';
 import { EXAMPLE_CATALOG, groupedExamples, type ExampleEntry } from './exampleCatalog';

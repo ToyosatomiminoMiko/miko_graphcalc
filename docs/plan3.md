@@ -190,7 +190,7 @@ pub fn solve_ode(
 
 ### 1.4 IR 与展示
 
-`OdeTask` 的形状二期已经定在 `ir/types.ts`(见该文件注释),三期按它填值即可;
+`OdeTask` 的形状二期已经定在 `contract/ir.ts`(见该文件注释),三期按它填值即可;
 展示侧需要新增的只有:
 
 - `compiler/dsl/evaluationLatex.ts`:`odeLatexSummary`(题目 = 原方程),

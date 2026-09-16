@@ -74,7 +74,7 @@
 | D2 | **默认场景是杂物间** | `index.html` 的 textarea 混了 `param/point/vector/matrix/curve×2/integral/intersection`,还留着注释"临时示例,后续统一加入文档" | 首次打开认知过载,不知道从哪里开始 |
 | D3 | **无练习模式** | 无题面/答案/判定机制 | 只能演示,不能练 |
 | D4 | **无进度与引导** | 无课程入口,无步骤状态 | 学生不知道"下一步学什么" |
-| D5 | **诊断只报错不解释** | `src/ui/panels/DiagnosticsController.ts` 显示编译器错误 | 新手看到"引用不存在的对象"仍不知道改哪 |
+| D5 | **诊断只报错不解释** | `src/ui/diagnostics/DiagnosticsController.ts` 显示编译器错误 | 新手看到"引用不存在的对象"仍不知道改哪 |
 
 ---
 
@@ -85,7 +85,7 @@
 1. **不碰编排层.** `src/app/DslApp.ts` 是编译/渲染/异步计算/UI 四条线的
    交汇点.教学改动一律走"新增示例素材 + 新增 UI 叶子组件 + 新增文档",
    不从编排层长出新分支.
-2. **不改 `ir/types.ts` 的既有字段语义.** 它是语言层与渲染层的唯一稳定
+2. **不改 `contract/ir.ts` 的既有字段语义.** 它是语言层与渲染层的唯一稳定
    契约.新增字段可以(如 A3 需要补充展示数据),改旧字段语义不行.
 3. **不改 `src/wasm/*`.** 那是 `wasm-pack` 产物且被 `.gitignore` 忽略.
    内核行为变更一律改 `src/*_rs` 源码后重跑 `npm run build:wasm`.
@@ -197,7 +197,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | **D5**:错误只说"不合法",不说"怎么改" |
-| 改动 | 在 `src/ui/panels/DiagnosticsController.ts` 展示层增"常见原因 + 修法"映射表(纯数据模块),针对高频错误:引用不存在的对象,选项名拼错,`range` 参数个数与维度不符,`at` 坐标个数不对,`in cyclic` 写成 `in [..] cyclic`,`derivative` 引用了产物而非对象声明. |
+| 改动 | 在 `src/ui/diagnostics/DiagnosticsController.ts` 展示层增"常见原因 + 修法"映射表(纯数据模块),针对高频错误:引用不存在的对象,选项名拼错,`range` 参数个数与维度不符,`at` 坐标个数不对,`in cyclic` 写成 `in [..] cyclic`,`derivative` 引用了产物而非对象声明. |
 | 依赖 | 无(可与 T2 并行) |
 | 工作量 | `1–2d` |
 | 验收 | 上述 6 类错误都能在诊断区看到修法提示;映射表有单测(输入错误消息 -> 期望提示) |
@@ -251,7 +251,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | G2.导数定义式与收敛概念没有载体 |
-| 改动 | 不新增语法.用现有 `param n` / `param h` + 结果列表 + `integral` 可视化组合出"分割加细 -> 积分"的演示;若要更直观,可在 `src/render/controls/` 增一个"序列播放"控件,用 `AnimationPlayer` 已有的时间轴驱动参数变化(`src/render/core/AnimationPlayer.ts`) |
+| 改动 | 不新增语法.用现有 `param n` / `param h` + 结果列表 + `integral` 可视化组合出"分割加细 -> 积分"的演示;若要更直观,可在 `src/ui/view/controls/` 增一个"序列播放"控件,用 `AnimationPlayer` 已有的时间轴驱动参数变化(`src/render/core/AnimationPlayer.ts`) |
 | 依赖 | T3(`limit_sequence.scad` 先证明可行) |
 | 工作量 | `2–3d`(若只做示例 + 参数联动则 `0.5d`) |
 | 验收 | 拖动参数时结果列表单调收敛且可停止;动画播放可暂停/重播 |
@@ -266,7 +266,7 @@
 | 改动 | 见 `src/compiler/dsl/objects/build.ts` 与 `src/render/core/renderers/RegionRenderer.ts` 文件头已写明的 roadmap:y 型区域 / 极坐标 r-θ 区域 / 多曲线边界 |
 | 依赖 | 无,但**改动面涉及 IR 与渲染器** |
 | 工作量 | `3–5d` |
-| 验收 | 新增区域形态有单测;`ir/types.ts` 的既有字段语义未变(只增枚举值/新字段) |
+| 验收 | 新增区域形态有单测;`contract/ir.ts` 的既有字段语义未变(只增枚举值/新字段) |
 | 风险 | 这是**语言层扩展**,不是教学改造.只有在课程确实需要时才做.建议放在阶段 A/B 全部落地,确认真实需求后再评估 |
 | 降级 | 暂不做,课程中回避极坐标区域 |
 
@@ -288,7 +288,7 @@
 | --- | --- |
 | 问题 | **G1 的展示侧 + G3 合并成的同一个教学需求**:学生要看到"每一步为什么".现状把过程挤在底栏求值条目的一个 `<details>` 里--底栏高上限 640px,扣掉标题与内边距后可用约 548px,简单递等式一行约 37px(带分式 55–70px),**一屏最多约 14 行**,且与实体清单对半分宽(默认 1920 屏每栏约 646px,长式子必然横滚) |
 | 设计 | 见 [方程求解过程的展示设计](equation-solving-process.md):**不改浮层格局**,把右栏改成标签页(页1 参数/视图,页2 过程);过程页通高(1080p 下约 27 行),一行一步递等式,当前步高亮,左右方向键翻步,条目走三级披露(L0 摘要 / L1 行内短过程 / L2 过程页) |
-| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `ir/types.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
+| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
 | 二期 | 步骤索引驱动几何(割线->切线,黎曼矩形加细,交点高亮):把"第 k 步"当虚拟参数走 `CompileController.refresh` -> `RenderController.applyScene(scene, changedParams)`,复用既有缓存与 latest-only 调度;IR **只新增**字段(如 `stepHighlights`) |
 | 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源:过程页骨架(标签页/递等式/披露/翻步)零改动;UI 增量只有"求解"子列表条目与过程页**题目区**--这正是展示层先行的价值 |
 | 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.scad`,默认场景也带两条 `solve` |
@@ -423,7 +423,7 @@
 - `src/wasm/*` 是产物,`grep` 到它不代表可以用它(根 README 有强警告)
 - 本地 dev 与 `dist` 的差异:`base: '/miko_graphcalc/'` 是唯一路径开关
 - 测试环境里 wasm-bindgen 默认初始化走 `fetch(file://)` 会失败,故
-  `vite.config.ts` 配了 `setupFiles: ['./src/test/setupWasm.ts']` 用
+  `vite.config.ts` 配了 `setupFiles: ['./src/testing/setupWasm.ts']` 用
   `initSync` 从磁盘读 `.wasm`
 - 全角标点被 `.githooks/pre-commit` 自动转半角;hook 自身必须用半角书写
   (否则每次提交都产生无意义 diff)
@@ -442,7 +442,7 @@
 354 + 129 个测试是活的规格说明.建议以"新增一个对象类型"为主线写
 `docs/contributing-tour.md`:先写 `DslCompiler.test.ts` 的失败用例,再依次
 补 `ast/types.ts` -> `miko.pest` -> `parser_wasm.rs` -> `build.ts` ->
-`ir/types.ts` -> `renderers/` -> `Plotter.ts`.这条主线走完一遍,就把整个
+`contract/ir.ts` -> `renderers/` -> `Plotter.ts`.这条主线走完一遍,就把整个
 编译链路走通了.
 
 | 项 | 工作量 | 前置 |
@@ -488,7 +488,7 @@
 | **新增 `limit` 语句** | 是完整 CAS 的入口.数值演示(阶段 B2)已满足课堂教学 |
 | **改 `src/wasm/*`** | 产物且被 gitignore;改动会被下次构建覆盖 |
 | **在 `DslApp` 上继续长功能** | 它是四条线的交汇点,教学特性在此堆积会重现项目早期"看不懂"的问题 |
-| **改 `ir/types.ts` 既有字段语义** | 语言层↔渲染层的唯一稳定契约,语义漂移会同时影响所有渲染器与测试 |
+| **改 `contract/ir.ts` 既有字段语义** | 语言层↔渲染层的唯一稳定契约,语义漂移会同时影响所有渲染器与测试 |
 | **为教学给 `Expr` 加公开 API** | 会把符号引擎内部表示泄漏成项目级 API(B1 的步骤产物应是独立类型,不是 `Expr`) |
 | **做"二值"练习判定** | 数值对拍必然有边界情况,必须留"判定不确定"第三态 |
 | **未经测量就把计算迁进 Rust** | 口径见 `docs/wasm-boundary-cost.md`;边界固定开销 ~1.1 µs 在逐点调用场景会主导成本 |
@@ -566,7 +566,7 @@
       `npm run lint:rs` 通过
 - [ ] 若动了 Rust 源码:已重跑 `npm run build:wasm` 并验证页面实际生效
 - [ ] 新增逻辑有对应单测,或说明了为何不可测
-- [ ] 未修改 `src/wasm/*`,未改 `ir/types.ts` 既有字段语义
+- [ ] 未修改 `src/wasm/*`,未改 `contract/ir.ts` 既有字段语义
 - [ ] 中文文案提交后标点为半角(由 pre-commit hook 自动处理)
 
 ---

@@ -14,7 +14,7 @@
  * 与求解的唯一差别在下发对象:原函数同时是一条 curve/surface,所以隐藏它
  * 会连实体一起消失(编译期就不生成对象,见 `compileAntiderivatives`).
  */
-import type { AntiderivativeTask } from '../../ir';
+import type { AntiderivativeTask } from '../../contract/ir';
 import {
     antiderivativeLatexDetailEntries,
     detailLinesOf,

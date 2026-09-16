@@ -19,7 +19,7 @@
  *
  * region(面积图形)实体:V1 只支持 x 型带状区域,不持有曲线几何拷贝,只按
  * 名引用两条边界 `curve`;后续规划(y 型 / 极坐标 r-θ / 多曲线边界 /
- * region 参与求交 / region 作为曲面底域)见 `ir/types.ts` 的
+ * region 参与求交 / region 作为曲面底域)见 `contract/ir.ts` 的
  * `RegionObject` 注释与 `prompt/feature.md`.
  *
  * 物化阶段(blueprint + 参数值 -> 数值 IR)见同目录 ./materialize.ts;本文件与
@@ -28,7 +28,7 @@
  */
 import { NUMERIC_CONFIG } from '../../../config/numericConfig';
 import { RENDER_CONFIG } from '../../../config/renderConfig';
-import type { ObjectStatement } from '../../ast/types';
+import type { ObjectStatement } from '../../../contract/ast';
 import {
     assertKnownOptions,
     findOption,

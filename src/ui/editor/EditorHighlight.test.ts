@@ -6,11 +6,11 @@
  * 否则靠近底部时会被夹住而错位);`refresh()` 覆盖程序化改值;缺结构时构造即报错.
  * 另外锁"开关类名"跟着生命周期走:dispose 后文字必须回到可见状态.
  *
- * 这里不断言浏览器排版(项目没有 jsdom/浏览器,见 src/test/domStub.ts):
+ * 这里不断言浏览器排版(项目没有 jsdom/浏览器,见 src/testing/domStub.ts):
  * 对齐靠 CSS 常量与同源字体变量保证,像素级验证留给真机.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
+import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
 import { EditorHighlight, HIGHLIGHT_ENABLED_CLASS } from './EditorHighlight';
 
 interface Harness {

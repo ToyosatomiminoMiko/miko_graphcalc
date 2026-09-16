@@ -8,7 +8,7 @@ import { VectorFieldRenderer } from './renderers/VectorFieldRenderer';
 import { SolidRenderer } from './renderers/SolidRenderer';
 import { RegionRenderer } from './renderers/RegionRenderer';
 import { RENDER_CONFIG } from '../../config/renderConfig';
-import type { SurfaceStyle } from '../types';
+import type { SurfaceStyle } from '../../contract/view';
 import type {
     BoxObject,
     ConicSolidObject,
@@ -20,7 +20,7 @@ import type {
     SurfaceObject,
     VectorFieldObject,
     VectorObject,
-} from '../../ir';
+} from '../../contract/ir';
 
 /**
  * 扩展的渲染器接口 -- 在 IRenderer 基础上增加可选能力

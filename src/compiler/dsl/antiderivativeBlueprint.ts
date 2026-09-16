@@ -11,8 +11,8 @@
  * 只消费那份事实,不再自己调内核--两处各调一次会在改内核时留下漂移风险
  * (同款口径见 solves.ts).
  */
-import type { AntiderivativeStatement } from '../ast/types';
-import type { AntiderivativeOrigin, SolveStepKind } from '../../ir';
+import type { AntiderivativeStatement } from '../../contract/ast';
+import type { AntiderivativeOrigin, SolveStepKind } from '../../contract/ir';
 import {
     assertKnownOptions,
     findOption,
@@ -20,7 +20,7 @@ import {
     parseOptionalSegments,
 } from './options';
 import { extractSymbolNames } from './expression';
-import { antiderivative as wasmAntiderivative } from '../../wasm/math_rs/math_rs';
+import { antiderivative as wasmAntiderivative } from '../../generated/math_rs/math_rs';
 import { toSolveStepKind } from './stepKinds';
 import type {
     CurveBlueprint,

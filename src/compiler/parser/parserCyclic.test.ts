@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parseMiko } from '../parser';
-import type { ParamStatement } from '../ast/types';
+import type { ParamStatement } from '../../contract/ast';
 
 /** 只取 param 语句,便于按位置断言. */
 function paramsOf(

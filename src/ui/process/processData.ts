@@ -20,7 +20,7 @@ import type {
     OdeTask,
     SceneObject,
     SolveTask,
-} from '../../ir';
+} from '../../contract/ir';
 import { UI_CONFIG } from '../../config/uiConfig';
 import {
     analysisLatexDetailEntries,

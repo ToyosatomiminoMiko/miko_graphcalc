@@ -1,5 +1,5 @@
 /**
- * 视图面板装配的结构契约(最小 DOM 桩,见 `test/domStub.ts`).
+ * 视图面板装配的结构契约(最小 DOM 桩,见 `testing/domStub.ts`).
  *
  * 这份测试锁的是**样式契约**:`ViewPanel` 把原来 `index.html` 里的手写标记
  * 搬进了 TS,类名就是 `css/controls.css` 的选择器.少一个类名不会报错,只会
@@ -10,7 +10,7 @@
  * 所以配置错了会在这一层先暴露.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, StubElement } from '../../test/domStub';
+import { installDomStub, StubElement } from '../../testing/domStub';
 import { RENDER_CONFIG } from '../../config/renderConfig';
 import { UI_CONFIG } from '../../config/uiConfig';
 import { createViewPanel, type ViewPanel } from './ViewPanel';

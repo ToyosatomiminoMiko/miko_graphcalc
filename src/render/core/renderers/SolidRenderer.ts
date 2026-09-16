@@ -4,7 +4,7 @@ import type {
     BoxObject,
     ConicSolidObject,
     SphereObject,
-} from '../../../ir';
+} from '../../../contract/ir';
 import {
     buildBoxGeometry,
     buildConicGeometry,

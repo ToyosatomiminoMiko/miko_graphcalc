@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parseMiko } from '../parser';
-import type { SolveStatement } from '../ast/types';
+import type { SolveStatement } from '../../contract/ast';
 
 function findSolve(program: Awaited<ReturnType<typeof parseMiko>>): SolveStatement | undefined {
     return program.statements.find(

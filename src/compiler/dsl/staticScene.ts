@@ -15,8 +15,8 @@
  * 每个 region 里重建一次全对象索引.已上收到 buildStaticScene 末尾一次性
  * 执行(见 finalizeRegionBlueprints),编译缓存命中后不再重复.
  */
-import type { AstProgram, ObjectStatement } from '../ast/types';
-import type { AnimationClip, ParamDeclaration } from '../../ir';
+import type { AstProgram, ObjectStatement } from '../../contract/ast';
+import type { AnimationClip, ParamDeclaration } from '../../contract/ir';
 import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { withStatementSpan } from '../errors';
@@ -458,7 +458,7 @@ function registerCoefficientParams(draft: SceneDraft): void {
 }
 
 /**
- * region 面积图形的运行时约束(V1 x 型带,见 objects/build.ts / ir/types.ts):
+ * region 面积图形的运行时约束(V1 x 型带,见 objects/build.ts / contract/ir.ts):
  * - 两条边界曲线必须已在对象列表声明且是 curve(buildObjectBlueprint 已按
  *   ObjectStatement 校验,这里对 blueprint 结果做同源复查);
  * - 边界曲线不得带静态变换或动画--否则 y=f(x) 的带状语义(曲线必须保持在

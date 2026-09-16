@@ -160,12 +160,12 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
 | 层 | 新增项 |
 | --- | --- |
 | `compiler_rs/src/miko.pest` | `antiderivative_stmt`,`ode_stmt` + `statement` 分支 |
-| `compiler/ast/types.ts` | `AntiderivativeStatement`,`OdeStatement` |
+| `contract/ast.ts` | `AntiderivativeStatement`,`OdeStatement` |
 | `math_rs/src/symbolic/mod.rs` | `mod integral; mod ode;` + 产物类型 |
 | `math_rs/src/symbolic/poly.rs` | `divmod`/`gcd`/因式分解辅助 |
 | `math_rs/src/lib.rs` | `antiderivative`,`solve_ode` 两个 WASM 入口(+ 重建产物) |
 | `compiler/dsl/antiderivatives.ts` / `odes.ts` | 声明级编译 |
-| `ir/types.ts` | `SceneIR.antiderivatives`,`SceneIR.odes`;`SOLVE_STEP_KINDS` 追加 `table`/`substitute`/`check` |
+| `contract/ir.ts` | `SceneIR.antiderivatives`,`SceneIR.odes`;`SOLVE_STEP_KINDS` 追加 `table`/`substitute`/`check` |
 | `compiler/dsl/evaluationLatex.ts` | 两个摘要 + 两个细节函数 |
 | `ui/evaluation/AntiderivativeItem.ts` / `OdeItem.ts` 等 | 子列表挂载与过程入口 |
 | `app/SceneStore.ts`,`CompileController.ts`,`DslApp.ts`,`index.html`,`css/panels.css` | hidden 集合,回调,容器,徽章样式 |
@@ -195,7 +195,7 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
 
 ### 一期 骨架对齐(零内核风险)
 
-`ir/types.ts` 追加字段与 step kind;`SceneStore`/`CompileController`/`DslApp`/
+`contract/ir.ts` 追加字段与 step kind;`SceneStore`/`CompileController`/`DslApp`/
 `index.html`/CSS 挂两个子列表;`processData.ts` 两个 builder;新示例文件名先
 登记.**验收**:空语句占位不报错;隐藏/过程入口/翻步与求解条目完全同构;
 `npm test` + `npm run typecheck` 全绿.
