@@ -94,7 +94,7 @@
   <div id="right-page-params" role="tabpanel" data-tab="params">   ← 新增:页1
      <section id="params-panel"></section>       (现有)
      <section id="diagnostics"></section>        (现有)
-     <div id="right-splitter"></div>             (现有)
+     <div id="right-splitter" data-split-page="right-page-params"></div>  (现有;数据属性为本次新增)
      <header class="panel-header">视图</header>  (现有)
      <section id="view-controls"></section>      (现有)
   </div>
@@ -141,6 +141,12 @@ tabindex".语义不同强行复用会把读屏与键盘行为做成四不像.新
    (`#params-panel { flex: 0 0 var(--right-split-basis) }` 的参照系随之从
    "右栏高度"变成"页高度",语义更准确).同时过程页激活时,`#right-splitter`
    与 `#params-panel` 整组退出布局,不能让 `flex-basis` 参与计算.
+
+   跟进(实现后):这条"基准换成页容器"的连接不再由控制器按 id 找元素,而是
+   分隔条自己带 `data-split-page="right-page-params"`.与 `PanelController` 的
+   `[data-resize-panel]` 统一到同一约定--**数据属性负责连接,id 只留给锚点与
+   无障碍**;`id="right-splitter"` 保留(样式,无障碍与 `RightSplitController`
+   的样式契约测试仍按它定位),但删掉它不再影响控制器能否绑上.
 
 3. **宽度的唯一写入点**.`--right-panel-width` 只有 `PanelController._applyLayout`
    一个写入点,这条不变量不能破(UI-P3.3 的教训).因此**过程页需要更宽的栏宽**

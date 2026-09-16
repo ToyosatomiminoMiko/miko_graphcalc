@@ -42,8 +42,14 @@ function setup(): SplitFixture {
     page.className = 'right-page';
 
     const handle = stub.document.createElement('div');
+    // id 与类名照着真标记写(桩不解析 HTML,fixture 就是标记的替身),但控制器
+    // 两样都不看--下面这条数据属性才是它唯一的入口.
     handle.id = 'right-splitter';
     handle.className = 'right-splitter';
+    // 控制器按 `data-split-page` 找分隔条,按它的值找比例基准页容器(与
+    // PanelController 的 `data-resize-panel` 同一约定);桩不解析样式表,也不看
+    // 类名是否"长得像"分隔条,所以这条属性必须真写上.
+    handle.dataset.splitPage = 'right-page-params';
     // 真标记里这条光标来自 css/panels.css 的 .right-splitter 规则;DOM 桩不解析
     // 样式表,所以把"分隔条自带光标"写在元素上,拖动时读的就是它(见 dragGesture).
     handle.style.cursor = 'ns-resize';
@@ -95,6 +101,27 @@ describe('bind 与拖动', () => {
         const stub = installDomStub();
         const root = stub.document.createElement('div');
         root.id = 'app';
+
+        new RightSplitController().bind(root as unknown as HTMLElement);
+
+        expect(readBasis(root)).toBe('');
+    });
+
+    it('分隔条的 data-split-page 指向不存在的页容器时同样安静返回', () => {
+        const { root, handle } = setup();
+        // 指向一个没有对应元素的 id:与"根本没有分隔条"走同一条分支,而不是
+        // 抛错或在拖动时才发现基准量不到.
+        handle.dataset.splitPage = 'right-page-nonexistent';
+
+        new RightSplitController().bind(root as unknown as HTMLElement);
+
+        expect(readBasis(root)).toBe('');
+    });
+
+    it('分隔条没有 data-split-page 时不被绑定', () => {
+        const { root, handle } = setup();
+        // 类名/位置都不参与寻址:去掉连接用的数据属性就等于"这根条子没接线".
+        delete handle.dataset.splitPage;
 
         new RightSplitController().bind(root as unknown as HTMLElement);
 
@@ -261,5 +288,20 @@ describe('样式契约', () => {
 
         expect(rule?.[1]).toMatch(/cursor:\s*ns-resize/);
         expect(rule?.[1]).toMatch(/touch-action:\s*none/);
+    });
+
+    /**
+     * 控制器与标记之间只剩 `data-split-page` 这一条线:标记里漏写/写错,拖动
+     * 就静默失效(结构与控制器各自的单测都还是绿的).这条读真 `index.html`
+     * 兜住它,顺带锁住"属性值必须是存在的页容器 id".
+     */
+    it('index.html 的分隔条带 data-split-page,且指向存在的页容器', () => {
+        const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+        const handle = /<div[^>]*\bid="right-splitter"[^>]*>/.exec(html)?.[0];
+        const target = new RegExp(`data-split-page="([^"]+)"`).exec(handle ?? '');
+
+        expect(handle).toBeDefined();
+        expect(target?.[1]).toBe('right-page-params');
+        expect(html).toContain(`id="${target?.[1]}"`);
     });
 });

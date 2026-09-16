@@ -8,8 +8,8 @@
  * - 页宽**不归本控制器管**:参数页与过程页共用侧栏那一份宽度(右栏宽度的
  *   唯一写入点仍是 `PanelController._applyLayout`),切页不改宽度;
  * - 分隔条比例归 `RightSplitController`,切页不动它(过程页激活时整个参数页
- *   容器被隐藏,`#params-panel`/`#right-splitter` 自然退出布局,切回后比例
- *   与切走前一致).
+ *   容器被隐藏,`#params-panel` 与那根带 `data-split-page` 的分隔条一起自然
+ *   退出布局,切回后比例与切走前一致).
  *
  * `dispose()` 把页归属复位成参数页:否则再次 `bind()` 会得到一个"模型在参数
  * 页,DOM 停在过程页"的自相矛盾面板(与 `PanelController` 的复位同一条理由).
