@@ -2,6 +2,17 @@ declare module '*.css';
 declare module '*.js';
 
 /**
+ * Vite 的 `?raw` 后缀导入:构建期把文件原文内联成字符串常量.
+ *
+ * 唯一使用者是 `compiler/dsl/keywords.ts`(读 `miko.pest` 派生关键字表);
+ * 同样不引 `vite/client` 全量类型,只声明用到的这一个形态.
+ */
+declare module '*.pest?raw' {
+    const source: string;
+    export default source;
+}
+
+/**
  * Vite 的 `import.meta.glob`.只声明本项目用到的形态(`?raw` + `eager`,
  * 返回 `{ [路径]: 原始文本 }`),不引入 `vite/client` 全量类型:它自带
  * `*.css` 等资源模块声明,会与本文件上面的同名声明重复.

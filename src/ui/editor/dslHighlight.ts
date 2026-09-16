@@ -10,9 +10,14 @@
  * 这里只做**逐行**的词法着色,不做语法分析--着色错一格不影响编译,
  * 但要把注释,字符串,关键字,选项键这几类最影响阅读的部分区分出来.
  *
- * 关键字表与 `.pest` 的漂移由 `dslHighlight.test.ts` 直接读语法文件守住:
- * 语法里新增一个 `object_kind` 却忘了加进这里,测试会红.
+ * 关键字表不再手写:`compiler/dsl/keywords.ts` 在模块加载时直接从 `.pest`
+ * 派生,语法里新增一个 `object_kind` 分支会自动出现在高亮里,不存在
+ * "语法改了忘了同步"这回事(派生规则见 `extractKeywordGroups`).
  */
+import { DSL_KEYWORDS } from '../../compiler/dsl/keywords';
+
+/** 关键字表仍以 `miko.pest` 为源;这里转出,保持既有的导入路径可用. */
+export { DSL_KEYWORDS };
 
 /** 一棵源码里各词法类别对应的 span 类名后缀(`dsl-<kind>`),配色在 editor.css. */
 export type DslTokenKind =
@@ -42,44 +47,11 @@ export interface DslScanState {
 }
 
 /**
- * DSL 保留字,与 `miko.pest` 一一对应:
- * - `tensor_kind` / `object_kind` / `analysis_op` / `intersection_kind` 四个规则的全部字面量;
- * - `param` / `in` / `cyclic` / `animation` / `at` / `spherical` / `integral` / `derivative`
- *   这些直接写在规则里的字面量.
+ * DSL 保留字,由 `miko.pest` 派生(见文件头).语法的四个枚举规则
+ * (`tensor_kind` / `object_kind` / `analysis_op` / `intersection_kind`)与
+ * `param` / `in` / `cyclic` / `animation` / `at` / `spherical` / `integral` /
+ * `derivative` 这些内联字面量都在里面.
  */
-export const DSL_KEYWORDS: readonly string[] = [
-    'animation',
-    'at',
-    'box',
-    'cone',
-    'curl',
-    'curve',
-    'cyclic',
-    'cylinder',
-    'derivative',
-    'divergence',
-    'frustum',
-    'gradient',
-    'implicit',
-    'in',
-    'integral',
-    'intersect',
-    'intersection',
-    'jacobian',
-    'laplacian',
-    'matrix',
-    'param',
-    'point',
-    'region',
-    'scalar',
-    'sphere',
-    'spherical',
-    'surface',
-    'transform',
-    'vector',
-    'vector_field',
-];
-
 const KEYWORDS = new Set(DSL_KEYWORDS);
 
 /** 归入 `operator` 的符号:赋值/分隔与表达式里的算术,比较,逻辑符. */

@@ -18,23 +18,36 @@ export interface SourceSpan {
 }
 
 /**
- * DSL 分析算子.
+ * DSL 分析算子的运行期常量.
  *
- * `jacobian`/`laplacian` 由 pest 语法接受,编译器目前给出"暂未实现";
- * 修改这里时必须同步 `compiler_rs/src/miko.pest` 的 `analysis_op`.
+ * 顺序与 `miko.pest` 的 `analysis_op` 分支顺序一致,由
+ * `compiler/dsl/keywords.test.ts` 与语法对账(派生逻辑见 `compiler/dsl/keywords.ts`).
+ *
+ * 为什么保留这份 `as const` 而不是像关键字表那样运行期派生:类型要在编译期
+ * 是字面量联合,而运行期派生的数组只能给出 `string`(`typeof X[number]` 会退化),
+ * 那会让 `analyses.ts` 的 `Record<AnalysisOpKind, AnalysisCallName>` 与各处
+ * `switch (kind)` 的穷尽校验一起失效.所以这里留一份常量,由测试挡住漂移.
  */
-export type AnalysisOpKind =
-    | 'gradient'
-    | 'divergence'
-    | 'curl'
-    | 'jacobian'
-    | 'laplacian';
+export const ANALYSIS_OP_KINDS = [
+    'gradient',
+    'divergence',
+    'curl',
+    'jacobian',
+    'laplacian',
+] as const;
+
+/** `analysis_op` 对应的字面量联合(由数组派生,不要单独维护). */
+export type AnalysisOpKind = (typeof ANALYSIS_OP_KINDS)[number];
 
 /**
  * `analysis` 语句等号右侧的函数名.
  *
  * 每个算子有唯一规范函数名,AST 中保留它用于编译期校验,防止
  * `gradient g = curl(s1)` 这类写法被静默当成 gradient 处理.
+ *
+ * 注意它**无法从 `miko.pest` 派生**:语法里 `op_call = { ident ~ "(" ~ ... }`
+ * 收的是任意标识符,`grad` / `div` 是编译器侧的命名约定(映射见
+ * `dsl/analyses.ts` 的 ANALYSIS_CALL_NAMES).所以这条联合只能手写.
  */
 export type AnalysisCallName =
     | 'grad'
@@ -67,7 +80,11 @@ export interface ParamStatement {
     span: SourceSpan;
 }
 
-export type TensorKind = 'scalar' | 'vector' | 'matrix' | 'transform';
+/** DSL 张量种类的运行期常量;顺序与 `miko.pest` 的 `tensor_kind` 分支一致(测试对账). */
+export const TENSOR_KINDS = ['scalar', 'vector', 'matrix', 'transform'] as const;
+
+/** `tensor_kind` 对应的字面量联合(由数组派生,不要单独维护). */
+export type TensorKind = (typeof TENSOR_KINDS)[number];
 
 export interface TensorStatement {
     type: 'tensor';
@@ -85,18 +102,25 @@ export interface AnimationStatement {
     span: SourceSpan;
 }
 
-export type ObjectKind =
-    | 'curve'
-    | 'surface'
-    | 'vector_field'
-    | 'point'
-    | 'vector'
-    | 'sphere'
-    | 'box'
-    | 'cylinder'
-    | 'cone'
-    | 'frustum'
-    | 'region'
+/**
+ * DSL 对象种类的运行期常量.
+ *
+ * 顺序与 `miko.pest` 的 `object_kind` 分支顺序一致,由
+ * `compiler/dsl/keywords.test.ts` 与语法对账;类型由数组派生,避免"类型和常量
+ * 各写一份".要新增对象种类,先在 `.pest` 里加分支,再补到这里并跑测试.
+ */
+export const OBJECT_KINDS = [
+    'curve',
+    'surface',
+    'vector_field',
+    'point',
+    'vector',
+    'sphere',
+    'box',
+    'cylinder',
+    'cone',
+    'frustum',
+    'region',
     /**
      * 隐式标量场:`f(x,y)=0` 或 `f(x,y,z)=0`.
      *
@@ -105,7 +129,11 @@ export type ObjectKind =
      * 曲面,只含 x/y 即二维隐式曲线.它没有显式 `y=`/`z=` 左端,故与
      * curve/surface 并列,不塞进它们的 expr.
      */
-    | 'implicit';
+    'implicit',
+] as const;
+
+/** `object_kind` 对应的字面量联合(由数组派生,不要单独维护). */
+export type ObjectKind = (typeof OBJECT_KINDS)[number];
 
 export interface ObjectStatement {
     type: 'object';

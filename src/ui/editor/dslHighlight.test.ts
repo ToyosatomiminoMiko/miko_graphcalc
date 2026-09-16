@@ -5,12 +5,14 @@
  * 1. `//` 注释与字符串的优先级(`color = "#6dd5ff";` 不能被当成注释);
  * 2. 选项键只在 `{}` 选项块里着色(`color =` 是属性名,`curve c =` 里的 `c` 不是);
  * 3. 生成的 HTML 去掉标签后与源码逐字相同(高亮层是背景层,错一个字就是错位);
- * 4. 关键字表与 `miko.pest` 不漂移--语法文件是唯一真相源,这里直接读它.
+ * 4. 语法里的关键字真的落到关键字类名上.
+ *
+ * 关键字表本身不再在这里对账:它由 `compiler/dsl/keywords.ts` 从 `miko.pest`
+ * 派生,不存在第二份列表;抽取规则与 AST 种类常量的对账见
+ * `compiler/dsl/keywords.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
 import {
-    DSL_KEYWORDS,
     highlightDsl,
     tokenizeDslLine,
     type DslToken,
@@ -78,6 +80,26 @@ describe('关键字 / 数字 / 选项键', () => {
         expect(textsOfKind('curve c1 = sin(x * a);', 'keyword')).toEqual(['curve']);
     });
 
+    it('只写在语句规则里的关键字也落到关键字类名', () => {
+        // 这些字面量内联在 param_stmt / param_ui / cyclic / animation_stmt / at /
+        // spherical_at / integral_stmt / derivative_stmt 里,以前靠手写表维持;
+        // 现在由语法派生,这里守的是"派生出来的表真的被着色用了".
+        for (const keyword of [
+            'param',
+            'in',
+            'cyclic',
+            'animation',
+            'at',
+            'spherical',
+            'integral',
+            'derivative',
+        ]) {
+            expect(highlightDsl(`${keyword} x = 1;`), keyword).toContain(
+                `<span class="dsl-keyword">${keyword}</span>`,
+            );
+        }
+    });
+
     it('选项键只在花括号里着色', () => {
         // 对象声明行:花括号之前深度仍是 0,`c1` 不是选项名
         expect(kindsOf('curve c1 = 1 {').filter(([kind]) => kind === 'property')).toEqual([]);
@@ -134,36 +156,3 @@ describe('高亮 HTML', () => {
     });
 });
 
-/** 取出 `rule = { "a" | "b" }` 这类枚举规则里的全部字面量. */
-function ruleLiterals(pest: string, rule: string): string[] {
-    const match = new RegExp(`^${rule}\\s*=\\s*\\{([^}]*)\\}`, 'm').exec(pest);
-    expect(match, `miko.pest 里找不到规则 ${rule}`).not.toBeNull();
-    return [...match![1].matchAll(/"([^"]*)"/g)].map((literal) => literal[1]);
-}
-
-describe('关键字表与 miko.pest 同步', () => {
-    it('四个枚举规则里的字面量都在 DSL_KEYWORDS 里', async () => {
-        const pest = await readFile(
-            new URL('../../compiler/compiler_rs/src/miko.pest', import.meta.url),
-            'utf8',
-        );
-        const keywords = new Set(DSL_KEYWORDS);
-        for (const rule of ['tensor_kind', 'object_kind', 'analysis_op', 'intersection_kind']) {
-            const literals = ruleLiterals(pest, rule);
-            expect(literals.length).toBeGreaterThan(0);
-            for (const literal of literals) {
-                expect(keywords.has(literal), `${rule} 的 "${literal}" 未进 DSL_KEYWORDS`).toBe(true);
-            }
-        }
-    });
-
-    it('DSL_KEYWORDS 每一条都能在语法文件里找到', async () => {
-        const pest = await readFile(
-            new URL('../../compiler/compiler_rs/src/miko.pest', import.meta.url),
-            'utf8',
-        );
-        for (const keyword of DSL_KEYWORDS) {
-            expect(pest, `${keyword} 已不在 miko.pest 里`).toContain(`"${keyword}"`);
-        }
-    });
-});
