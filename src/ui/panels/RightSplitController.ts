@@ -19,14 +19,7 @@
  */
 
 import { UI_CONFIG } from '../../config/uiConfig';
-
-/** 分隔条 DOM 契约. */
-export interface RightSplitBinding {
-    /** 分隔条本身(拖动与键盘的落点). */
-    readonly handle: HTMLElement;
-    /** 右面板:量高度与顶边用. */
-    readonly panel: HTMLElement;
-}
+import { bindDragGesture } from '../shared/dragGesture';
 
 /**
  * 参数区占右面板高度的比例边界:两边都必须留出可点可看的一块.
@@ -77,12 +70,15 @@ export function computeSplitRatio(
 
 export class RightSplitController {
     private root: HTMLElement | null = null;
-    private binding: RightSplitBinding | null = null;
     private abortController: AbortController | null = null;
-    private dragging = false;
     private ratio: number = SPLIT_DEFAULT_RATIO;
-    /** 上一次指针的 y;拖动中每次移动都把它当作新的基准点(见 _onPointerMove). */
-    private lastPointerY: number | null = null;
+    /**
+     * 右面板节点:拖动时每次移动都要量它的高度.
+     *
+     * 缓存而不是每帧 `querySelector`:拖动是每帧路径,不该在热路径上查 DOM.
+     * 只持有这一个节点(分隔条由共用拖动件自己管),`dispose` 时一并清掉.
+     */
+    private panel: HTMLElement | null = null;
 
     bind(root: HTMLElement): void {
         this.root = root;
@@ -92,65 +88,41 @@ export class RightSplitController {
         const handle = root.querySelector<HTMLElement>('#right-splitter');
         const panel = root.querySelector<HTMLElement>('#right-panel');
         if (!handle || !panel) {
-            this.binding = null;
+            // 结构缺失就是结构缺失:不写变量,也不装作绑好了.
+            this.panel = null;
             return;
         }
 
-        this.binding = { handle, panel };
+        this.panel = panel;
         const signal = this.abortController.signal;
 
-        handle.addEventListener('pointerdown', this._onPointerDown, { signal });
-        handle.addEventListener('pointermove', this._onPointerMove, { signal });
-        handle.addEventListener('pointerup', this._onPointerUp, { signal });
-        handle.addEventListener('pointercancel', this._onPointerUp, { signal });
+        // 拖动本身(起手/累计/收尾/光标/指针捕获)走共用件;本控制器只解释
+        // "向上拖 = 参数区变小"这一条业务规则.
+        bindDragGesture(handle, signal, {
+            onStart: () => {},
+            onDelta: (_deltaX, deltaY) => {
+                this._shift(deltaY);
+            },
+            onEnd: () => {},
+        });
         handle.addEventListener('keydown', this._onKeyDown, { signal });
 
-        this.lastPointerY = null;
         this._applySplit();
     }
 
     dispose(): void {
+        // 先 abort 再清引用:共用拖动件会在 abort 时收尾(复位光标/拖动类名),
+        // 这一步必须发生在 root 被丢掉之前.
         this.abortController?.abort();
         this.abortController = null;
-        this._endDrag();
-        this.binding = null;
         this.root = null;
-        this.lastPointerY = null;
+        this.panel = null;
     }
 
     /** 比例的唯一写入点:写成 CSS 变量,由面板样式消费. */
     private _applySplit(): void {
         this.root?.style.setProperty('--right-split-basis', `${this.ratio * 100}%`);
     }
-
-    private _onPointerDown = (event: PointerEvent): void => {
-        if (!this.binding) return;
-        event.preventDefault();
-        this.dragging = true;
-        this.lastPointerY = event.clientY;
-        // 指针捕获:拖出分隔条(甚至拖出窗口)仍能收到 pointermove,
-        // 触屏/触控笔也不会被浏览器的手势识别抢走.
-        this.binding.handle.setPointerCapture?.(event.pointerId);
-        this.binding.handle.classList.add('is-dragging');
-        document.body.style.cursor = 'ns-resize';
-    };
-
-    private _onPointerMove = (event: PointerEvent): void => {
-        if (!this.dragging || !this.binding) return;
-        const previousY = this.lastPointerY ?? event.clientY;
-        this.lastPointerY = event.clientY;
-        // 相对上一次落点累计,而不是"起点 + 总位移":比例被上下限夹住后,
-        // 指针回退一小段就能立刻重新跟手,不会出现一段"死区".
-        this._shift(event.clientY - previousY);
-    };
-
-    private _onPointerUp = (event: PointerEvent): void => {
-        const handle = this.binding?.handle;
-        if (handle?.hasPointerCapture?.(event.pointerId)) {
-            handle.releasePointerCapture(event.pointerId);
-        }
-        this._endDrag();
-    };
 
     private _onKeyDown = (event: KeyboardEvent): void => {
         // 分隔条是水平的一条:向上/向左 = 参数区变小,向下/向右 = 变大.
@@ -167,7 +139,7 @@ export class RightSplitController {
 
     /** 按指针位移调整比例;面板高度为 0 时(未布局)忽略这一帧. */
     private _shift(deltaPixels: number): void {
-        const panel = this.binding?.panel;
+        const panel = this.panel;
         if (!panel) return;
         const height = panel.clientHeight;
         if (height <= 0) return;
@@ -177,12 +149,5 @@ export class RightSplitController {
             SPLIT_MAX_RATIO,
         ));
         this._applySplit();
-    }
-
-    private _endDrag(): void {
-        if (!this.dragging) return;
-        this.dragging = false;
-        this.binding?.handle.classList.remove('is-dragging');
-        document.body.style.cursor = '';
     }
 }

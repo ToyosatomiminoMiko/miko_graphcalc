@@ -37,6 +37,9 @@ function setup(): SplitFixture {
     const handle = stub.document.createElement('div');
     handle.id = 'right-splitter';
     handle.className = 'right-splitter';
+    // 真标记里这条光标来自 css/panels.css 的 .right-splitter 规则;DOM 桩不解析
+    // 样式表,所以把"分隔条自带光标"写在元素上,拖动时读的就是它(见 dragGesture).
+    handle.style.cursor = 'ns-resize';
 
     panel.append(handle);
     root.append(panel);

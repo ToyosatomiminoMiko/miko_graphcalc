@@ -677,10 +677,20 @@ export function installDomStub(): DomStub {
     globals.cancelAnimationFrame = (id: number): void => {
         frames.delete(id);
     };
-    globals.getComputedStyle = () => ({
+    /**
+     * 计算样式桩:只认**写在元素上的行内样式**.
+     *
+     * `fontSize`/`fontFamily` 给固定值(行号栏量槽宽用,不关心具体字号);
+     * `cursor` 优先取元素自己的行内值 -- 真实标记里分隔条靠 CSS 类给出
+     * `cursor: ns-resize` / `ew-resize`(见 css/layout.css),桩不解析样式表,
+     * 所以需要断言光标的测试要像真标记那样把光标写在元素上(见
+     * `RightSplitController.test.ts` 的 fixture).没有行内值时退回 `ew-resize`,
+     * 与"面板宽度分隔条"这一默认场景一致.
+     */
+    globals.getComputedStyle = (element?: { style?: { cursor?: string } }) => ({
         fontSize: '16px',
         fontFamily: 'monospace',
-        cursor: 'ew-resize',
+        cursor: element?.style?.cursor || 'ew-resize',
     });
     globals.ResizeObserver = class extends StubResizeObserver {
         constructor(callback: () => void) {

@@ -7,7 +7,9 @@
  * - 折叠态只有一个状态源与一个写入点:`dispose()` 先把 DOM 复位成展开,
  *   再次 `bind()` 不会得到"模型展开 / DOM 折叠"的自相矛盾面板.
  *
- * 拖拽尺寸路径需要 `getComputedStyle` 与 window 指针事件,不在本文件覆盖.
+ * 拖拽尺寸路径现在也覆盖:`bindDragGesture` 把拖动收成一份共用实现,桩又实现了
+ * `setPointerCapture` 的重定向语义(move/up 只在捕获元素上触发),所以"拖宽度"
+ * 与"拖高度"可以在单测里完整走一遍,不必再依赖真机.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UI_CONFIG } from '../../config/uiConfig';
@@ -48,6 +50,10 @@ function createPanel(
     const handle = stub.document.createElement('div');
     handle.className = 'resize-handle';
     handle.dataset.resizePanel = id;
+    // 真标记里三根分隔条的光标由 css/layout.css 给出(layout.css 的
+    // .resize-handle-top 是 ns-resize,左右两根是 ew-resize);DOM 桩不解析
+    // 样式表,所以拖动读到的光标要像真标记那样写在元素上.
+    handle.style.cursor = id === 'bottom-panel' ? 'ns-resize' : 'ew-resize';
 
     panel.append(header, body, handle);
     return { panel, header, button, body, handle };
@@ -122,6 +128,99 @@ describe('折叠态的可访问语义(UI-P3.2)', () => {
         expect(bottom.body.style.display).toBe('');
         expect(root.style.getPropertyValue('--footer-height')).toBe(
             `${UI_CONFIG.panel.footerDefaultHeight}px`,
+        );
+    });
+});
+
+describe('拖拽尺寸(共用拖动件)', () => {
+    it('左面板向右拖变宽:按位移累计并写进 CSS 变量', () => {
+        const { stub, root, left } = setup();
+        new PanelController().bind(root as unknown as HTMLElement);
+        const start = UI_CONFIG.panel.sideDefaultWidth;
+
+        left.handle.dispatch('pointerdown', { clientX: 100, clientY: 0, pointerId: 1 });
+        expect(left.handle.classList.contains('is-dragging')).toBe(true);
+        expect(stub.document.body.style.cursor).toBe('ew-resize');
+        expect(left.handle.hasPointerCapture(1)).toBe(true);
+
+        left.handle.dispatch('pointermove', { clientX: 140, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(`${start + 40}px`);
+
+        // 增量语义:第二次移动是相对上一次落点累计,不是相对起点.
+        left.handle.dispatch('pointermove', { clientX: 160, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(`${start + 60}px`);
+
+        left.handle.dispatch('pointerup', { clientX: 160, clientY: 0, pointerId: 1 });
+        expect(left.handle.classList.contains('is-dragging')).toBe(false);
+        expect(stub.document.body.style.cursor).toBe('');
+        expect(left.handle.hasPointerCapture(1)).toBe(false);
+        // 收尾不改值,停在落点.
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(`${start + 60}px`);
+    });
+
+    it('右面板向左拖才是变宽,底部面板向上拖才是变高', () => {
+        const stub = installDomStub();
+        const root = stub.document.createElement('div');
+        root.id = 'app';
+        const right = createPanel(stub, 'right-panel', '视图', 'aside');
+        const bottom = createPanel(stub, 'bottom-panel', '对象', 'footer');
+        root.append(right.panel, bottom.panel);
+        stub.document.body.append(root);
+        new PanelController().bind(root as unknown as HTMLElement);
+
+        const sideStart = UI_CONFIG.panel.sideDefaultWidth;
+        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 1 });
+        right.handle.dispatch('pointermove', { clientX: 450, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${sideStart + 50}px`);
+
+        const footerStart = UI_CONFIG.panel.footerDefaultHeight;
+        bottom.handle.dispatch('pointerdown', { clientX: 0, clientY: 500, pointerId: 2 });
+        bottom.handle.dispatch('pointermove', { clientX: 0, clientY: 460, pointerId: 2 });
+        expect(root.style.getPropertyValue('--footer-height')).toBe(`${footerStart + 40}px`);
+        expect(stub.document.body.style.cursor).toBe('ns-resize');
+    });
+
+    it('折叠状态下的分隔条不可拖:不起手,也不改宽度', () => {
+        const { stub, root, left } = setup();
+        new PanelController().bind(root as unknown as HTMLElement);
+        left.button.dispatch('click');
+
+        const collapsed = root.style.getPropertyValue('--left-panel-width');
+        left.handle.dispatch('pointerdown', { clientX: 100, clientY: 0, pointerId: 1 });
+        left.handle.dispatch('pointermove', { clientX: 200, clientY: 0, pointerId: 1 });
+
+        // 展开态宽度没被写进去(collapsed 分支仍写 COLLAPSED_SIDE_WIDTH).
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(collapsed);
+        expect(left.handle.classList.contains('is-dragging')).toBe(false);
+        expect(stub.document.body.style.cursor).toBe('');
+    });
+
+    it('拖动中 dispose:监听摘掉,光标与拖动标记复位', () => {
+        const { stub, root, left } = setup();
+        const controller = new PanelController();
+        controller.bind(root as unknown as HTMLElement);
+
+        left.handle.dispatch('pointerdown', { clientX: 100, clientY: 0, pointerId: 1 });
+        controller.dispose();
+
+        expect(stub.document.body.style.cursor).toBe('');
+        expect(left.handle.classList.contains('is-dragging')).toBe(false);
+        expect(left.handle.hasPointerCapture(1)).toBe(false);
+    });
+
+    it('被夹在上下限之间:拖到极端不会把面板拖没', () => {
+        const { root, left } = setup();
+        new PanelController().bind(root as unknown as HTMLElement);
+
+        left.handle.dispatch('pointerdown', { clientX: 0, clientY: 0, pointerId: 1 });
+        left.handle.dispatch('pointermove', { clientX: -10_000, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideMinWidth}px`,
+        );
+
+        left.handle.dispatch('pointermove', { clientX: 10_000, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideMaxWidth}px`,
         );
     });
 });

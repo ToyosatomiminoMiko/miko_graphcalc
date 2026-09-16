@@ -1,4 +1,5 @@
 import { UI_CONFIG } from '../../config/uiConfig';
+import { bindDragGesture } from '../shared/dragGesture';
 
 type PanelId = 'left-panel' | 'right-panel' | 'bottom-panel';
 
@@ -118,53 +119,37 @@ export class PanelController {
             const panelId = handle.dataset.resizePanel as PanelId | undefined;
             if (!panelId) return;
 
-            handle.addEventListener('pointerdown', (event: PointerEvent) => {
-                if (this.collapsed.has(panelId)) return;
-                event.preventDefault();
-
-                const startX = event.clientX;
-                const startY = event.clientY;
-                const startLeftWidth = this.sideWidths['left-panel'];
-                const startRightWidth = this.sideWidths['right-panel'];
-                const startFooterHeight = this.footerHeight;
-                const cursor = getComputedStyle(handle).cursor;
-                document.body.style.cursor = cursor;
-
-                const onPointerMove = (moveEvent: PointerEvent): void => {
+            bindDragGesture(handle, signal, {
+                // 折叠时分隔条不可拖:面板已经收窄到 COLLAPSED_SIDE_WIDTH,
+                // 再拖宽度只会写出一个展开后立刻跳变的值.
+                canStart: () => !this.collapsed.has(panelId),
+                onStart: () => {},
+                onDelta: (deltaX, deltaY) => {
                     if (panelId === 'left-panel') {
                         this.sideWidths['left-panel'] = clamp(
-                            startLeftWidth + (moveEvent.clientX - startX),
+                            this.sideWidths['left-panel'] + deltaX,
                             SIDE_MIN_WIDTH,
                             SIDE_MAX_WIDTH,
                         );
                     } else if (panelId === 'right-panel') {
+                        // 右面板向左拖(负位移)才是变宽.
                         this.sideWidths['right-panel'] = clamp(
-                            startRightWidth + (startX - moveEvent.clientX),
+                            this.sideWidths['right-panel'] - deltaX,
                             SIDE_MIN_WIDTH,
                             SIDE_MAX_WIDTH,
                         );
                     } else {
+                        // 底部面板向上拖(负位移)才是变高.
                         this.footerHeight = clamp(
-                            startFooterHeight + (startY - moveEvent.clientY),
+                            this.footerHeight - deltaY,
                             FOOTER_MIN_HEIGHT,
                             FOOTER_MAX_HEIGHT,
                         );
                     }
-
                     this._applyLayout();
-                };
-
-                const onPointerUp = (): void => {
-                    window.removeEventListener('pointermove', onPointerMove);
-                    window.removeEventListener('pointerup', onPointerUp);
-                    window.removeEventListener('pointercancel', onPointerUp);
-                    document.body.style.cursor = '';
-                };
-
-                window.addEventListener('pointermove', onPointerMove, { signal });
-                window.addEventListener('pointerup', onPointerUp, { signal });
-                window.addEventListener('pointercancel', onPointerUp, { signal });
-            }, { signal });
+                },
+                onEnd: () => {},
+            });
         });
     }
 
