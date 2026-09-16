@@ -617,6 +617,12 @@
     background: var(--kind-antiderivative);
 }
 
+/* 微分方程条目:第 6 类求值对象,与求解同类,只换色相. */
+.kind-ode {
+    color: var(--color-badge-ink);
+    background: var(--kind-ode);
+}
+
 /* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 entity/EntityItem 的
    `.object-head`),公式另起一行--状态不落单占一行.
    它是 `.row-main` 第一行的内容块,与徽章/颜色同为直接子节点,占满第一行

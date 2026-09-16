@@ -6,8 +6,19 @@
  * 快照,公式调整时这里不该失败).
  */
 import { describe, expect, it } from 'vitest';
-import type { AnalysisResult, IntegralTask, SceneObject, SolveTask } from '../../ir';
-import { buildGradientProcess, buildIntegralProcess, buildSolveProcess } from './processData';
+import type {
+    AnalysisResult,
+    IntegralTask,
+    OdeTask,
+    SceneObject,
+    SolveTask,
+} from '../../ir';
+import {
+    buildGradientProcess,
+    buildIntegralProcess,
+    buildOdeProcess,
+    buildSolveProcess,
+} from './processData';
 
 const curve: SceneObject = {
     kind: 'curve',
@@ -170,6 +181,71 @@ describe('题目(problem)与求解过程', () => {
 
     it('隐藏/拒绝的求解没有题目,题目区留空而不显示半个式子', () => {
         const hidden = buildSolveProcess({ ...solve, enabled: false, equationLatex: '', steps: [] });
+
+        expect(hidden.problem).toBeNull();
+        expect(hidden.steps).toEqual([]);
+    });
+
+    const ode: OdeTask = {
+        name: 'O1',
+        equation: "y' = x*y",
+        independent: 'x',
+        dependent: 'y',
+        order: 1,
+        equationLatex: "y'=x\\,y",
+        generalLatex: 'y=C\\,e^{x^{2}/2}',
+        particularLatex: null,
+        initialConditions: [],
+        implicit: false,
+        slopeLatex: 'x\\,y',
+        slopeObjectId: 2,
+        curveNames: ['O1_c1'],
+        notes: [],
+        arbitraryConstantCount: 1,
+        verified: true,
+        steps: [
+            { latex: '\\frac{1}{y}\\,\\mathrm{d}y=x\\,\\mathrm{d}x', reason: '分离变量', kind: 'algebra' },
+            { latex: 'y=C\\,e^{x^{2}/2}', reason: '解出通解', kind: 'algebra' },
+            { latex: "y'=x\\,y", reason: '回代验证:代回原方程', kind: 'check' },
+        ],
+        error: null,
+        enabled: true,
+    };
+
+    it('微分方程过程:题目是原方程,步骤原样来自 ODE 内核产物', () => {
+        const process = buildOdeProcess(ode);
+
+        expect(process.title).toBe('微分方程 O1');
+        expect(process.problem).toBe("y'=x\\,y");
+        expect(process.steps.map((step) => step.reason)).toEqual([
+            '分离变量',
+            '解出通解',
+            '回代验证:代回原方程',
+        ]);
+        expect(process.steps.map((step) => step.kind)).toEqual([
+            'algebra',
+            'algebra',
+            'check',
+        ]);
+        expect(process.droppedSteps).toBeNull();
+    });
+
+    it('微分方程步骤同样受上限约束(长步骤链不绕过截断)', () => {
+        const process = buildOdeProcess(ode, 2);
+
+        expect(process.steps).toHaveLength(2);
+        expect(process.droppedSteps).toBe(1);
+        // 最后一步(回代验证)是凭据:默认上限下必须在场.
+        expect(buildOdeProcess(ode).steps[2].reason).toBe('回代验证:代回原方程');
+    });
+
+    it('隐藏/拒绝的微分方程没有题目,题目区留空', () => {
+        const hidden = buildOdeProcess({
+            ...ode,
+            enabled: false,
+            equationLatex: '',
+            steps: [],
+        });
 
         expect(hidden.problem).toBeNull();
         expect(hidden.steps).toEqual([]);

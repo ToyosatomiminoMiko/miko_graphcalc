@@ -30,6 +30,7 @@ mod derivative;
 mod eval;
 mod integral;
 mod latex;
+mod ode;
 mod parser;
 mod poly;
 mod printing;
@@ -47,6 +48,8 @@ pub use integral::{
     AntiderivativeOutcome, AntiderivativeStep,
 };
 pub use latex::latex_expression;
+/// 微分方程内核入口(产物类型见 `ode.rs`,不含 `Expr`).
+pub use ode::{solve_ode as solve_ode_outcome, OdeOutcome, OdeStep};
 // 方程求解内核:步骤产物是独立类型(`SolveOutcome`/`SolveStep`),不含 `Expr`.
 pub use solve::{solve_equation, SolveOutcome, SolveStep};
 

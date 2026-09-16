@@ -13,7 +13,14 @@
  * - `processSteps.ts` 只管上限与分区.
  * 因此"公式怎么排"与"这一步算什么依据"各自只有一个改动点.
  */
-import type { AnalysisResult, AntiderivativeTask, IntegralTask, SceneObject, SolveTask } from '../../ir';
+import type {
+    AnalysisResult,
+    AntiderivativeTask,
+    IntegralTask,
+    OdeTask,
+    SceneObject,
+    SolveTask,
+} from '../../ir';
 import { UI_CONFIG } from '../../config/uiConfig';
 import {
     analysisLatexDetailEntries,
@@ -51,6 +58,8 @@ const ROLE_PRESENTATION: Partial<Record<EvaluationDetailRole, StepPresentation>>
     scalar: { kind: 'numeric', reason: '函数值' },
     tangent: { kind: 'numeric', reason: '切向量' },
     equation: { kind: 'definition', reason: '积分定义式' },
+    general: { kind: 'definition', reason: '通解' },
+    particular: { kind: 'algebra', reason: '特解' },
 };
 
 /**
@@ -141,6 +150,34 @@ export function buildSolveProcess(
     const truncated = truncateProcessSteps(steps, maxSteps);
     return {
         title: `求解 ${task.name}`,
+        problem: task.equationLatex === '' ? null : task.equationLatex,
+        steps: truncated.steps,
+        droppedSteps: truncated.droppedSteps,
+    };
+}
+
+/**
+ * 微分方程条目的过程:题目是原方程,步骤由**内核产物**直接给出.
+ *
+ * 与求解/不定积分同一条"只换数据源"的口径:`kind` / `reason` / `latex` 全部
+ * 来自 `math_rs::symbolic::ode`,过程页只负责排版.最后一步固定是回代验证
+ * (显式解对自变量求导代回;隐式解走隐函数全导),它是"这个解对不对"的凭据.
+ *
+ * 上限同样生效:分类 + 标准形 + 积分因子 + 两侧积分 + 初值代入 + 验证很容易
+ * 超过默认步数上限,截断必须带明文(见 `truncateProcessSteps`).
+ */
+export function buildOdeProcess(
+    task: OdeTask,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    const steps: ProcessStep[] = task.steps.map((step) => ({
+        latex: step.latex,
+        kind: step.kind,
+        reason: step.reason,
+    }));
+    const truncated = truncateProcessSteps(steps, maxSteps);
+    return {
+        title: `微分方程 ${task.name}`,
         problem: task.equationLatex === '' ? null : task.equationLatex,
         steps: truncated.steps,
         droppedSteps: truncated.droppedSteps,

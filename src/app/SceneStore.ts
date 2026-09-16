@@ -5,7 +5,7 @@
  * - 最近一次成功解析的 AST
  * - 当前矩阵运算后端
  * - 最近一次编译出的场景对象快照
- * - 实体/分析/积分/求交/求解的显隐状态
+ * - 实体/分析/积分/求交/求解/原函数/微分方程的显隐状态
  * - 动画计时起点
  *
  * 它不负责解析/编译/渲染,也不直接操作 DOM.CompileController 负责
@@ -33,6 +33,7 @@ export class SceneStore {
     private readonly _hiddenIntersectionNames = new Set<string>();
     private readonly _hiddenSolveNames = new Set<string>();
     private readonly _hiddenAntiderivativeNames = new Set<string>();
+    private readonly _hiddenOdeNames = new Set<string>();
 
     get ast(): AstProgram | null {
         return this._currentAst;
@@ -79,6 +80,10 @@ export class SceneStore {
         return this._hiddenAntiderivativeNames;
     }
 
+    get hiddenOdeNames(): ReadonlySet<string> {
+        return this._hiddenOdeNames;
+    }
+
     /**
      * @cache_access
      * 在一次源码解析成功后提交新的 AST 和矩阵后端.
@@ -97,7 +102,8 @@ export class SceneStore {
             this._hiddenIntegralNames.clear();
             this._hiddenIntersectionNames.clear();
             this._hiddenSolveNames.clear();
-        this._hiddenAntiderivativeNames.clear();
+            this._hiddenAntiderivativeNames.clear();
+            this._hiddenOdeNames.clear();
         }
 
         this._lastRunSource = source;
@@ -192,6 +198,19 @@ export class SceneStore {
             this._hiddenAntiderivativeNames.delete(name);
         } else {
             this._hiddenAntiderivativeNames.add(name);
+        }
+    }
+
+    /**
+     * @cache_access
+     * 更新微分方程条目显隐缓存(与不定积分同一条路径:隐藏 = 不调内核产物
+     * 的下发,也不画它下发的斜率场/解曲线).
+     */
+    toggleOdeHidden(name: string): void {
+        if (this._hiddenOdeNames.has(name)) {
+            this._hiddenOdeNames.delete(name);
+        } else {
+            this._hiddenOdeNames.add(name);
         }
     }
 

@@ -1,16 +1,17 @@
 /**
- * 求值列表(footer 右栏):分析/积分/求交/求解四个子列表的集合.
+ * 求值列表(footer 右栏):分析/积分/求交/求解/原函数/微分方程子列表的集合.
  *
  * 这里只做"右栏"这一层的事:
- * 1. 四个 kind 各挂一个 {@link EvaluationSection}(DOM 行缓存/顺序/展开态/
+ * 1. 每个 kind 各挂一个 {@link EvaluationSection}(DOM 行缓存/顺序/展开态/
  *    数值缓存/异步回填的统一实现);
- * 2. 把场景里的四类任务分别渲染进各自的容器,显隐回调接到对应的切换入口;
- * 3. 对外转发渲染层的异步结果回调(积分/求交;分析/求解是编译期同步值,
- *    没有异步回填入口).
+ * 2. 把场景里的各类任务分别渲染进各自的容器,显隐回调接到对应的切换入口;
+ * 3. 对外转发渲染层的异步结果回调(积分/求交;分析/求解/原函数/微分方程是
+ *    编译期同步值,没有异步回填入口).
  *
  * 行内结构完全不在这里:每类条目长什么样由各自的 item 类决定
  * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts` /
- * `SolveItem.ts`),新增一类求值对象 = 写一个 item 类 + 这里挂一个 Section.
+ * `SolveItem.ts` / `AntiderivativeItem.ts` / `OdeItem.ts`),
+ * 新增一类求值对象 = 写一个 item 类 + 这里挂一个 Section.
  */
 import type {
     AntiderivativeTask,
@@ -18,6 +19,7 @@ import type {
     IntegralTask,
     IntersectionOutput,
     IntersectionTask,
+    OdeTask,
     SceneIR,
     SolveTask,
 } from '../../ir';
@@ -27,6 +29,7 @@ import { IntegralItem } from './integralItem';
 import { IntersectionItem } from './intersectionItem';
 import { SolveItem } from './SolveItem';
 import { AntiderivativeItem } from './AntiderivativeItem';
+import { OdeItem } from './OdeItem';
 import type { ProcessRequest } from './EvaluationItem';
 
 /** 右栏子列表容器;用具名对象而不是同类型的 HTMLElement 位置参数. */
@@ -36,6 +39,7 @@ export interface EvaluationListContainers {
     readonly intersection: HTMLElement;
     readonly solve: HTMLElement;
     readonly antiderivative: HTMLElement;
+    readonly ode: HTMLElement;
 }
 
 /**
@@ -48,6 +52,8 @@ export interface EvaluationListHandlers {
     toggleIntersection(name: string): void;
     toggleSolve(name: string): void;
     toggleAntiderivative(name: string): void;
+    /** 微分方程条目:隐藏 = 不下发斜率场与解曲线. */
+    toggleOde(name: string): void;
     /** 打开条目过程页(三级披露的 L2):切页与载入由应用层做. */
     openProcess(request: ProcessRequest): void;
 }
@@ -84,6 +90,9 @@ export class EvaluationList {
         AntiderivativeItem
     >;
 
+    /** 微分方程子列表:结构定义见 `evaluation/OdeItem.ts`. */
+    private readonly ode: EvaluationSection<OdeTask, void, OdeItem>;
+
     constructor(
         containers: EvaluationListContainers,
         private readonly handlers: EvaluationListHandlers,
@@ -101,6 +110,7 @@ export class EvaluationList {
             containers.antiderivative,
             AntiderivativeItem,
         );
+        this.ode = new EvaluationSection(containers.ode, OdeItem);
     }
 
     render(scene: SceneIR): void {
@@ -129,6 +139,11 @@ export class EvaluationList {
         this.antiderivative.render(scene.antiderivatives, {
             objects: scene.objects,
             toggleHidden: (name) => this.handlers.toggleAntiderivative(name),
+            openProcess: (request) => this.handlers.openProcess(request),
+        });
+        this.ode.render(scene.odes, {
+            objects: scene.objects,
+            toggleHidden: (name) => this.handlers.toggleOde(name),
             openProcess: (request) => this.handlers.openProcess(request),
         });
     }
@@ -168,7 +183,7 @@ export class EvaluationList {
 
     /**
      * @cache_access
-     * 清空五个子列表及其全部 DOM 行缓存与数值缓存.
+     * 清空全部子列表及其全部 DOM 行缓存与数值缓存.
      */
     clear(): void {
         this.analysis.clear();
@@ -176,5 +191,6 @@ export class EvaluationList {
         this.intersection.clear();
         this.solve.clear();
         this.antiderivative.clear();
+        this.ode.clear();
     }
 }

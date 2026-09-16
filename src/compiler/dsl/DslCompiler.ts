@@ -2,6 +2,7 @@ import type { AstProgram } from '../ast/types';
 import type {
     AntiderivativeTask,
     IntegralTask,
+    OdeTask,
     SceneIR,
     SceneObject,
 } from '../../ir';
@@ -14,6 +15,7 @@ import { compileAnalyses } from './analyses';
 import { compileIntersections } from './intersections';
 import { compileSolves } from './solves';
 import { collectAntiderivativeTasks } from './antiderivativeTasks';
+import { collectOdeTasks } from './odeTasks';
 import { integralLatex, sceneObjectLatex } from './latex';
 import {
     cloneAnimations,
@@ -35,7 +37,12 @@ import {
  * - transforms.ts  矩阵/变换求值(统一因子语法见该文件头注释)
  * - integrals.ts   积分任务编译(dim/domainKind/integrand 语义)
  * - analyses.ts    微分分析编译
- * - staticScene.ts 静态场景构建与缓存(含 region 边界静态约束的一次性校验)
+ * - staticScene.ts 静态场景构建与缓存(= 各声明级 pass 的编排入口,含 region
+ *                   边界静态约束的一次性校验)
+ * - sceneDeclarations.ts matrix/transform/animation 语句求值与对象名索引
+ * - antiderivativeBlueprint.ts / odeBlueprint.ts / derivativeBlueprint.ts
+ *                   antiderivative/ode/derivative 三条派生语句的实体 blueprint
+ *                   与展示事实(内核在这些模块里各调一次)
  *
  * ## 跨模块约定(202609 review 结论,修改涉及模块时保持同步)
  * 1. hidden 语义统一为"先完整校验,后禁用,仅跳过计算":analysis/intersection/
@@ -59,6 +66,7 @@ export interface CompileSceneOptions {
     hiddenIntersectionNames?: ReadonlySet<string>;
     hiddenSolveNames?: ReadonlySet<string>;
     hiddenAntiderivativeNames?: ReadonlySet<string>;
+    hiddenOdeNames?: ReadonlySet<string>;
 }
 
 export function compileScene(
@@ -77,14 +85,20 @@ export function compileScene(
     // 隐藏的原函数语句既不下发对象,也不进后续引用解析(与"隐藏=不参与计算"
     // 同一语义);静态场景里仍保留 blueprint,这样切回显示不需要重新解析.
     const hiddenAntiderivativeNames = options.hiddenAntiderivativeNames ?? new Set<string>();
+    const hiddenOdeNames = options.hiddenOdeNames ?? new Set<string>();
     const objects = staticScene.objectBlueprints
-        .filter(
-            (blueprint) =>
-                blueprint.kind !== 'curve' && blueprint.kind !== 'surface'
-                    ? true
-                    : blueprint.antiderivativeOrigin === undefined
-                        || !hiddenAntiderivativeNames.has(blueprint.name),
-        )
+        .filter((blueprint) => {
+            if (blueprint.kind !== 'curve' && blueprint.kind !== 'surface') return true;
+            // 隐藏的 ode 语句要滤掉**它的全部实体**(斜率场 + 特解 + 解族):
+            // 靠 `odeOrigin.statement` 认领,不靠名字前缀猜(见 ir/types.ts).
+            if (blueprint.odeOrigin !== undefined && hiddenOdeNames.has(blueprint.odeOrigin.statement)) {
+                return false;
+            }
+            return (
+                blueprint.antiderivativeOrigin === undefined
+                || !hiddenAntiderivativeNames.has(blueprint.name)
+            );
+        })
         .map((blueprint) => materializeObject(blueprint, params, paramOverrides));
     // 仅用于让 IR scene.params 反映当前滑块值(见文件头约定 4).
     applyParamOverrides(params, paramOverrides);
@@ -116,6 +130,13 @@ export function compileScene(
     for (const entry of compiledAntiderivatives) {
         antiderivatives.push(entry.task);
     }
+
+    // 微分方程:与不定积分同一档(声明级编译,内核产物一次算完).
+    const odeTasks: OdeTask[] = collectOdeTasks(
+        ast,
+        staticScene.odeFacts,
+        hiddenOdeNames,
+    ).map((entry) => entry.task);
 
     // integral 名称查重(约定 2);隐藏积分同样先完整编译校验,再置
     // enabled=false(约定 1),占位仍进入列表.
@@ -176,8 +197,8 @@ export function compileScene(
         solves: compileSolves(ast, params, paramOverrides, hiddenSolveNames),
         // 不定积分同为声明级编译;实体侧的新对象已并入上面的 `objects`/`objectByName`.
         antiderivatives,
-        // 微分方程(设计文档 docs/calculus-suite-plan.md 第 4 节)按三期实现:
-        // 先固定空表,让 IR 契约与渲染层一次到位(与求解内核当年的分期口径一致).
-        odes: [],
+        // 微分方程(设计文档 docs/plan3.md 第 1.3 节):同为声明级编译;实体侧的
+        // 斜率场与解曲线已并入上面的 `objects`/`objectByName`.
+        odes: odeTasks,
     };
 }

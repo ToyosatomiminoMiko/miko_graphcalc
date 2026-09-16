@@ -17,7 +17,14 @@
  * 没有中间步骤可看的(散度,旋度)直接把结果排进摘要.同一列表里两类条目
  * 折叠态的信息量因此不同,这是设计选择而不是漏排.
  */
-import type { AnalysisResult, AntiderivativeTask, IntegralTask, SceneObject, SolveTask } from '../../ir';
+import type {
+    AnalysisResult,
+    AntiderivativeTask,
+    IntegralTask,
+    OdeTask,
+    SceneObject,
+    SolveTask,
+} from '../../ir';
 import { latexResultNumber } from '../../math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
 
@@ -90,7 +97,11 @@ export type EvaluationDetailRole =
     /** 不定积分:原函数结果(带积分常数). */
     | 'antiderivative'
     /** 不定积分:回代验证结论. */
-    | 'verified';
+    | 'verified'
+    /** 微分方程:通解. */
+    | 'general'
+    /** 微分方程:特解(初值定出常数之后). */
+    | 'particular';
 
 /** 带角色的细节行:角色与内容一起产出,调用方不必按位置猜. */
 export interface EvaluationDetailEntry {
@@ -394,4 +405,76 @@ export function antiderivativeLatexDetailEntries(
  */
 export function antiderivativeLatexDetails(task: AntiderivativeTask): EvaluationDetailLine[] {
     return detailLinesOf(antiderivativeLatexDetailEntries(task));
+}
+
+/**
+ * 微分方程摘要:默认可见的一行,即**题目**(原方程).
+ *
+ * 与求解/不定积分同口径:折叠态放"在解什么",通解/特解/验证放展开细节与
+ * 过程页.题目排不出来(隐藏项)时返回 null,调用方回退到方程原文.
+ */
+export function odeLatexSummary(task: OdeTask): LatexLine | null {
+    return task.equationLatex === '' ? null : task.equationLatex;
+}
+
+/**
+ * 微分方程细节(带角色):展开后逐行排版.
+ *
+ * 顺序按学生的阅读顺序:方程 -> 通解 -> 特解 -> 斜率场 -> 回代验证 ->
+ * 元信息与内核的如实说明.隐式解必须**明确标注**(P3-A):右边那一坨不是
+ * `y = ...`,不说清学生会读错.
+ */
+export function odeLatexDetailEntries(task: OdeTask): EvaluationDetailEntry[] {
+    const entries: EvaluationDetailEntry[] = [];
+    const pushLatex = (role: EvaluationDetailRole, latex: LatexLine): void => {
+        entries.push({ role, line: { kind: 'latex', latex } });
+    };
+    const pushText = (role: EvaluationDetailRole, text: string): void => {
+        entries.push({ role, line: { kind: 'text', text } });
+    };
+
+    if (task.equationLatex !== '') {
+        pushLatex('equation', task.equationLatex);
+    }
+    if (task.error !== null) {
+        pushText('domain', `无法求解: ${task.error}`);
+        return entries;
+    }
+
+    if (task.generalLatex !== null) {
+        pushLatex('general', task.generalLatex);
+    }
+    if (task.particularLatex !== null) {
+        pushLatex('particular', task.particularLatex);
+    } else if (task.initialConditions.length > 0) {
+        pushText('domain', '初值未能定出积分常数,只给通解');
+    }
+    if (task.implicit) {
+        pushText('domain', '通解是隐式解(Φ(x,y) = C),不是 y = ... 的显式形式');
+    }
+    if (task.slopeLatex !== null) {
+        pushLatex('symbolic', `z=${task.slopeLatex}`);
+    }
+    if (task.initialConditions.length > 0) {
+        // 初值原文是用户写的文本(`y(0) = 1`),不是内核排好的公式,按纯文本行排;
+        // 角色借用 `value`(数值代入)这一档,过程页不消费它(步骤由内核给出).
+        pushText('value', `初值: ${task.initialConditions.join(' , ')}`);
+    }
+    if (task.verified) {
+        pushText('verified', '回代验证:解代回原方程成立');
+    }
+    for (const note of task.notes) {
+        pushText('domain', note);
+    }
+    const curves = task.curveNames.length === 0 ? '未下发解曲线' : `解曲线 ${task.curveNames.length} 条`;
+    pushText(
+        'sampling',
+        `因变量 ${task.dependent} · 自变量 ${task.independent} · 任意常数 ${task.arbitraryConstantCount} 个 · ${curves} · 共 ${task.steps.length} 步(见右栏"过程")`,
+    );
+    return entries;
+}
+
+/** 微分方程细节(不带角色):列表 item 的展示块用. */
+export function odeLatexDetails(task: OdeTask): EvaluationDetailLine[] {
+    return detailLinesOf(odeLatexDetailEntries(task));
 }

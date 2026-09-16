@@ -16,7 +16,13 @@
  * 不看排版.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AnalysisResult, SceneIR, SceneObject, SolveTask } from '../../ir';
+import type {
+    AnalysisResult,
+    OdeTask,
+    SceneIR,
+    SceneObject,
+    SolveTask,
+} from '../../ir';
 import { installDomStub, StubElement } from '../../test/domStub';
 
 vi.mock('katex', () => ({
@@ -110,6 +116,7 @@ interface ToggleCalls {
     intersection: string[];
     solve: string[];
     antiderivative: string[];
+    ode: string[];
     /** 点过"过程"入口的条目名(过程文档内容另有用例断言). */
     process: string[];
 }
@@ -120,6 +127,8 @@ function createController(): {
     integralList: StubElement;
     intersectionList: StubElement;
     solveList: StubElement;
+    antiderivativeList: StubElement;
+    odeList: StubElement;
     calls: ToggleCalls;
     controller: ObjectListController;
 } {
@@ -129,6 +138,7 @@ function createController(): {
     const intersectionList = new StubElement('div');
     const solveList = new StubElement('div');
     const antiderivativeList = new StubElement('div');
+    const odeList = new StubElement('div');
     const calls: ToggleCalls = {
         entity: [],
         analysis: [],
@@ -136,6 +146,7 @@ function createController(): {
         intersection: [],
         solve: [],
         antiderivative: [],
+        ode: [],
         process: [],
     };
     const controller = new ObjectListController(
@@ -146,6 +157,7 @@ function createController(): {
             intersection: intersectionList as unknown as HTMLElement,
             solve: solveList as unknown as HTMLElement,
             antiderivative: antiderivativeList as unknown as HTMLElement,
+            ode: odeList as unknown as HTMLElement,
         },
         {
             toggleEntity: (id) => calls.entity.push(id),
@@ -154,6 +166,7 @@ function createController(): {
             toggleIntersection: (name) => calls.intersection.push(name),
             toggleSolve: (name) => calls.solve.push(name),
             toggleAntiderivative: (name) => calls.antiderivative.push(name),
+            toggleOde: (name) => calls.ode.push(name),
             // 回调的是过程文档;这里只记题目(内容稳定,不受标题文案改动影响).
             openProcess: (request) => calls.process.push(request.document.problem ?? ''),
         },
@@ -164,6 +177,8 @@ function createController(): {
         integralList,
         intersectionList,
         solveList,
+        antiderivativeList,
+        odeList,
         calls,
         controller,
     };
@@ -721,5 +736,114 @@ describe('方程求解条目', () => {
         const entry = row.querySelector<StubElement>('.row-process-btn')!;
         expect(entry.disabled).toBe(true);
         expect(entry.getAttribute('aria-label')).toContain('无法求解');
+    });
+});
+
+describe('微分方程条目', () => {
+    const ode: OdeTask = {
+        name: 'O1',
+        equation: "y' = x*y",
+        independent: 'x',
+        dependent: 'y',
+        order: 1,
+        equationLatex: "y'=x\\,y",
+        generalLatex: 'y=C\\,e^{x^{2}/2}',
+        particularLatex: null,
+        initialConditions: [],
+        implicit: false,
+        slopeLatex: 'x\\,y',
+        slopeObjectId: 2,
+        curveNames: ['O1_c1', 'O1_c2'],
+        notes: [],
+        arbitraryConstantCount: 1,
+        verified: true,
+        steps: [
+            { latex: '\\frac{1}{y}\\,\\mathrm{d}y=x\\,\\mathrm{d}x', reason: '分离变量', kind: 'algebra' },
+            { latex: 'y=C\\,e^{x^{2}/2}', reason: '解出通解', kind: 'algebra' },
+            { latex: "y'=x\\,y", reason: '回代验证:代回原方程', kind: 'check' },
+        ],
+        error: null,
+        enabled: true,
+    };
+
+    it('摘要 = 题目:微分方程标签 + 名称 + 原方程', () => {
+        const { odeList, controller } = createController();
+        controller.renderScene({ ...scene, odes: [ode] } as SceneIR);
+
+        const row = odeList.querySelector<StubElement>('.evaluation-row')!;
+        const badge = row.querySelector<StubElement>('.kind-badge')!;
+        expect(badge.className).toBe('kind-badge kind-ode');
+        expect(badge.textContent).toBe('微分方程');
+        expect(row.querySelector<StubElement>('.object-name')!.textContent).toBe('O1');
+        expect(row.querySelector<StubElement>('.eval-summary-formula')!.textContent)
+            .toBe("y'=x\\,y");
+    });
+
+    it('展开细节给通解,斜率场与元信息', () => {
+        const { odeList, controller } = createController();
+        controller.renderScene({ ...scene, odes: [ode] } as SceneIR);
+
+        const details = odeList.querySelector<StubElement>('.eval-details')!;
+        const lines = details.querySelectorAll<StubElement>('.eval-detail-line');
+        // 第 1 行是方程,第 2 行通解,第 3 行斜率场.
+        expect(lines[0].textContent).toContain("y'=x");
+        expect(lines[1].textContent).toContain('y=C');
+        expect(lines[2].textContent).toContain('z=x');
+        // 纯文本行(验证结论/元信息)都落在 .eval-detail-meta;最后一行是元信息.
+        const metas = details.querySelectorAll<StubElement>('.eval-detail-meta');
+        const last = metas[metas.length - 1].textContent ?? '';
+        expect(last).toContain('解曲线 2 条');
+        expect(last).toContain('共 3 步');
+    });
+
+    it('过程入口回调过程文档;显隐按钮回调 toggleOde', () => {
+        const { odeList, calls, controller } = createController();
+        controller.renderScene({ ...scene, odes: [ode] } as SceneIR);
+
+        const entry = odeList.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(false);
+        entry.dispatch('click');
+        expect(calls.process).toEqual(["y'=x\\,y"]);
+
+        odeList.querySelector<StubElement>('.row-visibility-btn')!.dispatch('click');
+        expect(calls.ode).toEqual(['O1']);
+    });
+
+    it('隐藏项:摘要回退方程原文,入口置灰并给理由', () => {
+        const { odeList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            odes: [{ ...ode, enabled: false, equationLatex: '', steps: [] }],
+        } as SceneIR);
+
+        const row = odeList.querySelector<StubElement>('.evaluation-row')!;
+        // 摘要回退成方程原文(纯文本 <code class="object-expr">).
+        expect(row.querySelector<StubElement>('.object-expr')!.textContent)
+            .toBe("y' = x*y");
+        const entry = row.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(true);
+        expect(entry.getAttribute('aria-label')).toContain('已隐藏');
+    });
+
+    it('能力边界:细节写明理由,过程入口置灰', () => {
+        const { odeList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            odes: [{
+                ...ode,
+                error: '超出内核能力:不在可解清单内',
+                generalLatex: null,
+                slopeLatex: null,
+                curveNames: [],
+                verified: false,
+                steps: [],
+            }],
+        } as SceneIR);
+
+        const row = odeList.querySelector<StubElement>('.evaluation-row')!;
+        expect(row.querySelector<StubElement>('.eval-detail-meta')!.textContent)
+            .toContain('无法求解');
+        const entry = row.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(true);
     });
 });

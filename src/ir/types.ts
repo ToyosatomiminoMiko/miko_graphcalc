@@ -75,6 +75,32 @@ export interface AntiderivativeOrigin {
     constant: number;
 }
 
+/**
+ * 微分方程来源:只有 `ode` 语句下发的 surface/curve 才携带(设计文档
+ * `docs/plan3.md` 的 P1/P2:斜率场复用 `surface z = f(x,y)`,解族按常数取值
+ * 各下发一条 `curve`).
+ *
+ * 与 `DerivativeOrigin`/`AntiderivativeOrigin` 同样的存在意义:产物在数值/
+ * 渲染上与手写对象完全同构,但公式展示要说清"这条曲线是哪个方程的解".
+ * 渲染/求值路径不读这个字段,它只服务于 `sceneObjectLatex` 的公式拼装.
+ */
+export interface OdeOrigin {
+    /** 该实体在微分方程里的角色. */
+    role: 'slope' | 'particular' | 'family';
+    /**
+     * `ode` 语句名.
+     *
+     * 实体名是 `<语句名>`(斜率场)/`<语句名>_p`(特解)/`<语句名>_c1...`(解族),
+     * 隐藏整条语句时要按这个名字过滤**它的全部实体**,靠名字前缀猜是脆的
+     * (别的对象也可能长成那个样子),所以原点里显式带上来源语句名.
+     */
+    statement: string;
+    /** 方程原文(展示用,如 `y' = x*y`). */
+    equation: string;
+    /** 积分常数取值;斜率场为 null,解曲线为定出/指定的数值. */
+    constant: number | null;
+}
+
 /** 曲线对象:y = f(x),渲染在 z=0 平面. */
 export interface CurveObject {
     kind: 'curve';
@@ -91,6 +117,8 @@ export interface CurveObject {
     derivativeOrigin?: DerivativeOrigin;
     /** 该 curve 由 `antiderivative` 下发时给出被积函数与积分常数. */
     antiderivativeOrigin?: AntiderivativeOrigin;
+    /** 该 curve 由 `ode` 下发时给出方程与常数取值. */
+    odeOrigin?: OdeOrigin;
 }
 
 /** 曲面对象:z = f(x, y). */
@@ -109,6 +137,8 @@ export interface SurfaceObject {
     derivativeOrigin?: DerivativeOrigin;
     /** 该 surface 由 `antiderivative` 下发时给出被积函数与积分常数. */
     antiderivativeOrigin?: AntiderivativeOrigin;
+    /** 该 surface 由 `ode` 下发时是方程的斜率场 `z = f(x,y)`. */
+    odeOrigin?: OdeOrigin;
 }
 
 /** 向量场对象:F(x, y, z) = [P, Q, R]. */
@@ -668,6 +698,21 @@ export interface OdeTask {
     particularLatex: string | null;
     /** 初值条件原文(回显用),无初值时为空数组. */
     initialConditions: string[];
+    /**
+     * 通解是不是隐式形式(`Φ(x,y) = C`).
+     *
+     * 隐式解必须在细节里明确标注"隐式解":右边那一坨不是 `y = ...`,不说清
+     * 学生会读错(设计文档 P3-A).
+     */
+    implicit: boolean;
+    /** 斜率场 `f(x,y)` 的 LaTeX;没有斜率场(二阶/能力边界)时为 null. */
+    slopeLatex: string | null;
+    /** 斜率场实体对象 id;0 表示没有下发斜率场. */
+    slopeObjectId: number;
+    /** 解曲线实体对象名(特解与解族);没有时为 空数组. */
+    curveNames: string[];
+    /** 内核如实说明的补充信息(隐式解未显式化 / 未定出常数 / 缺省自变量). */
+    notes: string[];
     /** 任意常数个数(= 阶数,特解时为 0). */
     arbitraryConstantCount: number;
     /** 解是否回代验证通过. */

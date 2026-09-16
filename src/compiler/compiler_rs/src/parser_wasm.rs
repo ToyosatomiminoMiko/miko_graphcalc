@@ -543,6 +543,68 @@ fn antiderivative_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     statement
 }
 
+/// 把 `ode` 语句捕获的整段文本按**首个顶层逗号**切成"方程 + 各条初值".
+///
+/// 语法层 `expr` 的停止集是 `;`/`{`/`}`,不含逗号,所以
+/// `y' + p*y = q, y(0) = 1` 会整段落在 `expr` 里;这里按括号深度切出方程
+/// (第一段)与初值原文(其余各段).括号内的逗号(函数实参)不会误切.
+fn split_ode_conditions(text: &str) -> (String, Vec<String>) {
+    let mut depth = 0i32;
+    let mut parts: Vec<String> = Vec::new();
+    let mut start = 0usize;
+    for (index, ch) in text.char_indices() {
+        match ch {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(text[start..index].trim().to_string());
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(text[start..].trim().to_string());
+    let mut iter = parts.into_iter();
+    let equation = iter.next().unwrap_or_default();
+    let conditions: Vec<String> = iter.filter(|part| !part.is_empty()).collect();
+    (equation, conditions)
+}
+
+/// 将微分方程语句(ode_stmt)转换为 JSON AST 节点.
+///
+/// 形状:`{ type, name, equation, initialConditions, options, span }`.
+/// `equation` 是首个顶层逗号之前的原文(含顶层 `=`),`initialConditions` 是
+/// 其余各段原文(如 `y(0) = 1` / `y'(0) = 1`)--内核负责解析与校验,
+/// AST 只负责如实切分(见 compiler/ast/types.ts 的 OdeStatement).
+fn ode_to_stmt(pair: &Pair<'_, Rule>) -> Value {
+    let mut name = String::new();
+    let mut equation = String::new();
+    let mut initial_conditions: Vec<String> = Vec::new();
+    let mut options: Vec<Value> = Vec::new();
+
+    for child in pair.clone().into_inner() {
+        match child.as_rule() {
+            Rule::ident => name = child.as_str().to_string(),
+            Rule::expr => {
+                let (split_equation, conditions) = split_ode_conditions(child.as_str());
+                equation = split_equation;
+                initial_conditions = conditions;
+            }
+            Rule::stmt_end => options = options_from_end(&child),
+            _ => {}
+        }
+    }
+
+    json!({
+        "type": "ode",
+        "name": name,
+        "equation": equation,
+        "initialConditions": initial_conditions,
+        "options": options,
+        "span": span_of(pair),
+    })
+}
+
 /// 根据语法规则将单个语句节点(Pair)转换为对应的 AST JSON 节点.
 /// 若规则未知,则返回错误信息.
 fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
@@ -557,6 +619,7 @@ fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
         Rule::derivative_stmt => Ok(derivative_to_stmt(&pair)),
         Rule::solve_stmt => Ok(solve_to_stmt(&pair)),
         Rule::antiderivative_stmt => Ok(antiderivative_to_stmt(&pair)),
+        Rule::ode_stmt => Ok(ode_to_stmt(&pair)),
         _ => Err(format!("未知语句规则: {:?}", pair.as_rule())),
     }
 }
@@ -883,5 +946,50 @@ gradient g = grad(s) at spherical(phi, phi);
         assert!(result.is_err());
         let error = result.err().unwrap();
         assert!(error.contains("未知语句规则"));
+    }
+
+    #[test]
+    fn parses_ode_with_initial_conditions_and_options() {
+        let src = r##"
+ode O1 = y' = x*y;
+ode O2 = y' + p*y = q, y(0) = 1;
+ode O3 = y'' - 3*y' + 2*y = 0, y(0) = 0, y'(0) = 1;
+ode O6 = y' = x*y {
+    curves = 3;
+    range = [-2, 2, -2, 2];
+};
+"##;
+        let json = parse_to_json(src).unwrap();
+        let ast: Value = serde_json::from_str(&json).unwrap();
+        let statements = ast["statements"].as_array().unwrap();
+        assert_eq!(statements.len(), 4);
+
+        assert_eq!(statements[0]["type"], "ode");
+        assert_eq!(statements[0]["equation"], "y' = x*y");
+        assert_eq!(
+            statements[0]["initialConditions"].as_array().unwrap().len(),
+            0
+        );
+
+        // 首个顶层逗号是方程与初值的分界;初值里的括号/逗号不影响切分.
+        assert_eq!(statements[1]["equation"], "y' + p*y = q");
+        assert_eq!(statements[1]["initialConditions"][0], "y(0) = 1");
+
+        assert_eq!(statements[2]["equation"], "y'' - 3*y' + 2*y = 0");
+        assert_eq!(statements[2]["initialConditions"][0], "y(0) = 0");
+        assert_eq!(statements[2]["initialConditions"][1], "y'(0) = 1");
+
+        let options = statements[3]["options"].as_array().unwrap();
+        assert_eq!(options.len(), 2);
+        assert_eq!(options[0]["name"], "curves");
+        assert_eq!(options[1]["value"], "[-2, 2, -2, 2]");
+    }
+
+    #[test]
+    fn splits_ode_conditions_on_top_level_commas_only() {
+        // 括号内的逗号(函数实参)不是分界.
+        let (equation, conditions) = split_ode_conditions("y' = f(x, y), y(0) = 1");
+        assert_eq!(equation, "y' = f(x, y)");
+        assert_eq!(conditions, vec!["y(0) = 1".to_string()]);
     }
 }

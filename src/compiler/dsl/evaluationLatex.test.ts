@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
     AnalysisResult,
     IntegralTask,
+    OdeTask,
     SceneObject,
 } from '../../ir';
 
@@ -30,6 +31,8 @@ import {
     integralLatexSummary,
     intersectionLatexDetails,
     intersectionLatexSummary,
+    odeLatexDetailEntries,
+    odeLatexSummary,
     type EvaluationDetailEntry,
     type EvaluationDetailLine,
 } from './evaluationLatex';
@@ -237,5 +240,98 @@ describe('intersectionLatex', () => {
             latex: 'A=c1\\ \\left(\\#1\\right)\\quad B=s1\\ \\left(\\#2\\right)',
         });
         expect(lines[1]).toEqual({ kind: 'text', text: '采样分段: 128' });
+    });
+});
+
+/** 微分方程条目工厂:默认是一条解出显式通解的一阶方程. */
+function ode(overrides: Partial<OdeTask> = {}): OdeTask {
+    return {
+        name: 'O1',
+        equation: "y' = x*y",
+        independent: 'x',
+        dependent: 'y',
+        order: 1,
+        equationLatex: "y'=x\\,y",
+        generalLatex: 'y=C\\,e^{x^{2}/2}',
+        particularLatex: null,
+        initialConditions: [],
+        implicit: false,
+        slopeLatex: 'x\\,y',
+        slopeObjectId: 2,
+        curveNames: ['O1_c1'],
+        notes: [],
+        arbitraryConstantCount: 1,
+        verified: true,
+        steps: [
+            { latex: 'y=C\\,e^{x^{2}/2}', reason: '解出通解', kind: 'algebra' },
+            { latex: "y'=x\\,y", reason: '回代验证:代回原方程', kind: 'check' },
+        ],
+        error: null,
+        enabled: true,
+        ...overrides,
+    };
+}
+
+describe('odeLatex', () => {
+    it('摘要就是原方程,隐藏项回退纯文本由调用方处理', () => {
+        expect(odeLatexSummary(ode())).toBe("y'=x\\,y");
+        expect(odeLatexSummary(ode({ equationLatex: '' }))).toBeNull();
+    });
+
+    it('细节按"方程 -> 通解 -> 斜率场 -> 验证 -> 元信息"排列', () => {
+        const entries = odeLatexDetailEntries(ode());
+        expect(entries.map((entry) => entry.role)).toEqual([
+            'equation',
+            'general',
+            'symbolic',
+            'verified',
+            'sampling',
+        ]);
+        expect(entries[1].line).toEqual({ kind: 'latex', latex: 'y=C\\,e^{x^{2}/2}' });
+        // 斜率场写成 `z = f(x,y)`,与下发的 surface 实体同源.
+        expect(entries[2].line).toEqual({ kind: 'latex', latex: 'z=x\\,y' });
+        expect((entries[4].line as { text: string }).text).toContain('解曲线 1 条');
+    });
+
+    it('隐式解必须明确标注,并如实给出内核的说明', () => {
+        const task = ode({
+            implicit: true,
+            generalLatex: '\\ln\\left|y\\right|=x+C',
+            curveNames: [],
+            notes: ['通解是隐式解(Φ(x,y) = C),不是 y = ... 的显式形式'],
+        });
+        const entries = odeLatexDetailEntries(task);
+        const texts = entries
+            .filter((entry) => entry.line.kind === 'text')
+            .map((entry) => (entry.line as { text: string }).text);
+        expect(texts.some((text) => text.includes('隐式解'))).toBe(true);
+        expect(texts).toContain('通解是隐式解(Φ(x,y) = C),不是 y = ... 的显式形式');
+        expect(texts.some((text) => text.includes('未下发解曲线'))).toBe(true);
+    });
+
+    it('能力边界:只给理由,不给半个通解', () => {
+        const task = ode({
+            error: '超出内核能力',
+            generalLatex: null,
+            slopeLatex: null,
+            curveNames: [],
+            verified: false,
+        });
+        const entries = odeLatexDetailEntries(task);
+        expect(entries.map((entry) => entry.role)).toEqual(['equation', 'domain']);
+        expect((entries[1].line as { text: string }).text).toBe('无法求解: 超出内核能力');
+    });
+
+    it('初值与特解:特解一行 + 初值回显一行', () => {
+        const task = ode({
+            initialConditions: ['y(0) = 1'],
+            particularLatex: 'y=e^{x^{2}/2}',
+        });
+        const entries = odeLatexDetailEntries(task);
+        expect(entries.some((entry) => entry.role === 'particular')).toBe(true);
+        const texts = entries
+            .filter((entry) => entry.line.kind === 'text')
+            .map((entry) => (entry.line as { text: string }).text);
+        expect(texts).toContain('初值: y(0) = 1');
     });
 });

@@ -90,6 +90,8 @@ describe('真实 miko.pest', () => {
             'intersect',
             'derivative',
             'solve',
+            'antiderivative',
+            'ode',
         ]) {
             expect(DSL_KEYWORDS, keyword).toContain(keyword);
         }

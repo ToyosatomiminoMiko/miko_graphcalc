@@ -6,7 +6,7 @@
  * 把 blueprint 求值成 ir/types.ts 的 SceneObject.静态场景/构建/物化三处
  * 都只经由这里共享类型与 type guard.
  */
-import type { AntiderivativeOrigin, DerivativeOrigin } from '../../../ir';
+import type { AntiderivativeOrigin, DerivativeOrigin, OdeOrigin } from '../../../ir';
 
 export type CurveBlueprint = {
     name: string;
@@ -21,6 +21,8 @@ export type CurveBlueprint = {
     derivativeOrigin?: DerivativeOrigin;
     /** 不定积分产物专用:见 ir/types.ts 的 AntiderivativeOrigin. */
     antiderivativeOrigin?: AntiderivativeOrigin;
+    /** 微分方程产物专用:见 ir/types.ts 的 OdeOrigin. */
+    odeOrigin?: OdeOrigin;
 };
 
 export type SurfaceBlueprint = {
@@ -36,6 +38,8 @@ export type SurfaceBlueprint = {
     derivativeOrigin?: DerivativeOrigin;
     /** 不定积分产物专用:见 ir/types.ts 的 AntiderivativeOrigin. */
     antiderivativeOrigin?: AntiderivativeOrigin;
+    /** 微分方程产物专用:见 ir/types.ts 的 OdeOrigin. */
+    odeOrigin?: OdeOrigin;
 };
 
 export type VectorFieldBlueprint = {

@@ -34,6 +34,9 @@
 - [不定积分使用指南](antiderivative-guide.md) -- DSL 用户文档:怎么用
   `antiderivative` 求原函数(它同时是求值条目与可渲染对象),选项,参数与曲面
   积分,当前能算的范围与明确算不出来的形状,以及"回代验证"这条凭据怎么读.
+- [微分方程使用指南](ode-guide.md) -- DSL 用户文档:怎么用 `ode` 解微分方程
+  (斜率场/特解/解族的命名与引用),选项,可解类型清单与明确的能力边界,隐式解
+  的标注口径,参数保持符号,过程页步骤链与回代验证,以及常见报错排查.
 
 配套示例见 [`../example/README.md`](../example/README.md)(求导/偏导
 示例为 `derivative_curve.scad`,`derivative_rules.scad`,

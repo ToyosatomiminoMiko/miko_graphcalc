@@ -239,6 +239,30 @@ export interface AntiderivativeStatement {
     span: SourceSpan;
 }
 
+/**
+ * `ode 名称 = 方程[, 初值...] [选项];` 微分方程语句(设计文档 `docs/plan3.md`
+ * 第 1.1 节).
+ *
+ * 整段方程(含导数记号与初值)由 pest 的 `expr` 捕获,Rust 解析器按**首个顶层
+ * 逗号**切成"方程 + 各条初值":`equation` 是第一段(含顶层 `=`),
+ * `initialConditions` 是其余各段原文(`y(0) = 1` / `y'(0) = 1`).
+ *
+ * 自变量与因变量缺省从方程推断(坐标变量 x/t;因变量取带导数记号的符号),
+ * 也可用 `independent`/`dependent` 选项显式指定;推断不出时由内核给出可读错误
+ * (见 `math_rs::symbolic::ode`).产物既进求值列表,也按 P1/P2 下发实体对象
+ * (斜率场 surface + 解曲线 curve).
+ */
+export interface OdeStatement {
+    type: 'ode';
+    name: string;
+    /** 方程原文(首个顶层逗号之前,含顶层 `=`,如 `y' + p*y = q`). */
+    equation: string;
+    /** 初值原文(其余各段;无初值时为空数组). */
+    initialConditions: string[];
+    options: OptionPair[];
+    span: SourceSpan;
+}
+
 export type AstStatement =
     | ParamStatement
     | TensorStatement
@@ -249,7 +273,8 @@ export type AstStatement =
     | IntersectionStatement
     | DerivativeStatement
     | SolveStatement
-    | AntiderivativeStatement;
+    | AntiderivativeStatement
+    | OdeStatement;
 
 export interface AstProgram {
     statements: AstStatement[];

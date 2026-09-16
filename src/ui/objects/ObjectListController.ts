@@ -4,8 +4,8 @@
  * 本体只有装配与转发,两栏各自的类负责其余的事:
  * - {@link EntityList}(`ui/entity/EntityList.ts`):左栏,行结构在
  *   `ui/entity/EntityItem.ts`;
- * - {@link EvaluationList}(`ui/evaluation/EvaluationList.ts`):右栏,分析/积分/求交/求解
- *   四个子列表,行结构在 `ui/evaluation/*Item.ts`.
+ * - {@link EvaluationList}(`ui/evaluation/EvaluationList.ts`):右栏,分析/积分/求交/求解/
+ *   原函数/微分方程子列表,行结构在 `ui/evaluation/*Item.ts`.
  *
  * 控制器对外的面孔保持不变(渲染层只认 `renderScene` 与四个异步回填入口),
  * 于是"列表怎么分,行怎么建"的改动不外溢到 `RenderController`/`DslApp`.
@@ -36,6 +36,7 @@ export interface ObjectListContainers {
     readonly intersection: HTMLElement;
     readonly solve: HTMLElement;
     readonly antiderivative: HTMLElement;
+    readonly ode: HTMLElement;
 }
 
 /**
@@ -53,6 +54,8 @@ export interface ObjectListHandlers {
     toggleSolve(name: string): void;
     /** 原函数条目:隐藏 = 不调积分内核,也不下发实体对象. */
     toggleAntiderivative(name: string): void;
+    /** 微分方程条目:隐藏 = 不下发斜率场与解曲线. */
+    toggleOde(name: string): void;
     /**
      * 打开某条求值对象的过程页(三级披露的 L2).
      *
@@ -66,7 +69,7 @@ export class ObjectListController {
     /** 左栏:实体列表(行结构在 `entity/EntityItem`). */
     private readonly entities: EntityList;
 
-    /** 右栏:求值列表(四个 kind 子列表的集合). */
+    /** 右栏:求值列表(各类 kind 子列表的集合). */
     private readonly evaluations: EvaluationList;
 
     constructor(
@@ -83,6 +86,7 @@ export class ObjectListController {
                 intersection: containers.intersection,
                 solve: containers.solve,
                 antiderivative: containers.antiderivative,
+                ode: containers.ode,
             },
             {
                 toggleAnalysis: (name) => handlers.toggleAnalysis(name),
@@ -90,6 +94,7 @@ export class ObjectListController {
                 toggleIntersection: (name) => handlers.toggleIntersection(name),
                 toggleSolve: (name) => handlers.toggleSolve(name),
                 toggleAntiderivative: (name) => handlers.toggleAntiderivative(name),
+                toggleOde: (name) => handlers.toggleOde(name),
                 openProcess: (request) => handlers.openProcess(request),
             },
         );

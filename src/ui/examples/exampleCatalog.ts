@@ -60,6 +60,10 @@ export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'antiderivative_rational.scad', title: '有理函数部分分式', group: _orther },
     { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: _orther },
     { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: _orther },
+    { file: 'ode_separable.scad', title: '微分方程:可分离', group: _orther },
+    { file: 'ode_linear_first_order.scad', title: '微分方程:一阶线性', group: _orther },
+    { file: 'ode_second_order.scad', title: '微分方程:二阶常系数', group: _orther },
+    { file: 'ode_with_initial.scad', title: '微分方程:初值', group: _orther },
 ];
 
 /**

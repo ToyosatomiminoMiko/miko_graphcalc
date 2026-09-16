@@ -101,5 +101,18 @@ solve_stmt = { "solve" ~ ident ~ "=" ~ expr ~ stmt_end }
 antiderivative_stmt = { "antiderivative" ~ ident ~ "=" ~ antiderivative_call ~ stmt_end }
 antiderivative_call = { "antiderivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 
-statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt | antiderivative_stmt }
+// 微分方程语句:`ode 名称 = 方程[, 初值...] [选项];`(设计文档 docs/plan3.md 1.1).
+//
+// 整段方程(含导数记号与初值)由 `expr` 捕获:它的停止集是 `;`/`{`/`}`,不含
+// 逗号,所以初值原样落在文本里,由 Rust 侧按**首个顶层逗号**切成"方程 + 各条
+// 初值"(见 parser_wasm.rs 的 split_ode_conditions).
+//
+// 自变量/因变量缺省从方程推断(坐标变量 x/t;因变量取带导数记号的符号),
+// 也可用 `independent`/`dependent` 选项显式指定:
+//     ode O1 = y' = x*y;
+//     ode O2 = y' + p*y = q, y(0) = 1;
+//     ode O3 = y'' - 3*y' + 2*y = 0, y(0) = 0, y'(0) = 1;
+ode_stmt = { "ode" ~ ident ~ "=" ~ expr ~ stmt_end }
+
+statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt | antiderivative_stmt | ode_stmt }
 program = { SOI ~ statement* ~ EOI }

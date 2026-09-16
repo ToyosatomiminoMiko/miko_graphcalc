@@ -4,6 +4,7 @@
  */
 import type { OptionPair } from '../ast/types';
 import type { AnalysisShow } from '../../ir';
+import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { evaluateNumber, extractSymbolNames } from './expression';
 
 const SHOW_KINDS = new Set<AnalysisShow>(['point', 'normal', 'tangent', 'tangent_plane']);
@@ -116,6 +117,21 @@ export function parseCappedPositiveInteger(
         throw new Error(`${context} 不能超过 ${max},当前为 ${raw}`);
     }
     return value;
+}
+
+/**
+ * `segments` 选项;缺省 undefined(由调用方决定继承源对象还是用默认值).
+ *
+ * 收成一个入口的原因:curve/surface 与派生对象(不定积分/微分方程)都要按
+ * `NUMERIC_CONFIG.limits.curve.maxSegments` 设上限,避免各处裸写上限值而漂移.
+ */
+export function parseOptionalSegments(
+    options: OptionPair[],
+    context: string,
+): number | undefined {
+    const raw = findOption(options, 'segments');
+    if (raw === undefined) return undefined;
+    return parseCappedPositiveInteger(raw, context, NUMERIC_CONFIG.limits.curve.maxSegments);
 }
 
 /**

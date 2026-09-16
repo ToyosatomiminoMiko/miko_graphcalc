@@ -7,7 +7,13 @@
  * d/dx(源函数)=导函数 或 ∂/∂y(源函数)=导函数,region 是不等式带,
  * 积分是 ∫/∬/∭...).
  */
-import type { AntiderivativeOrigin, DerivativeOrigin, IntegralTask, SceneObject } from '../../ir';
+import type {
+    AntiderivativeOrigin,
+    DerivativeOrigin,
+    IntegralTask,
+    OdeOrigin,
+    SceneObject,
+} from '../../ir';
 import { cachedLatexExpression } from './expression';
 
 function latexNumber(value: number): string {
@@ -24,7 +30,7 @@ export function latexNumberText(value: number): string {
  * 求导算子:curve 用常导 d/dx,surface 用偏导 ∂/∂x 或 ∂/∂y.
  *
  * 分母必须带求导变量,否则公式只是无意义的 "d/d";括号里放源函数,使公式
- * 读作"对该函数求导",与 derivative 语句语义一致(见 staticScene.ts 的
+ * 读作"对该函数求导",与 derivative 语句语义一致(见 derivativeBlueprint.ts 的
  * buildDerivativeObjectBlueprint).
  */
 function derivativeOperatorLatex(origin: DerivativeOrigin, partial: boolean): string {
@@ -77,6 +83,27 @@ function antiderivativeLatex(
 }
 
 /**
+ * 微分方程对象的公式.
+ *
+ * - 斜率场(surface,`z = f(x,y)` 的复用):排成 `y' = f(x,y)`,因为对学生来说
+ *   这一项的含义是"方程右端",不是一条普通曲面;`z=` 会让"斜率场"这个身份
+ *   完全看不出来(设计文档 P1-A 的配色/说明引导就靠这一行文字);
+ * - 解曲线:`y = 解式 (特解)` 或 `y = 解式 (C = 数值)`--把常数取值写在括号里,
+ *   否则一族曲线在列表里长得一模一样,分不清哪条是哪条.
+ */
+function odeLatex(target: 'y' | 'z', origin: OdeOrigin, resultExpr: string): string {
+    if (origin.role === 'slope') {
+        return `y'=${cachedLatexExpression(resultExpr)}`;
+    }
+    const label = origin.role === 'particular'
+        ? '特解'
+        : origin.constant === null
+            ? '解族'
+            : `解族 C=${latexNumberText(origin.constant)}`;
+    return `${target}=${cachedLatexExpression(resultExpr)}\quad\left(\text{${label}}\right)`;
+}
+
+/**
  * 实体对象表达式行对应的 LaTeX.
  *
  * 目前只对真正"携带表达式/可展示"的对象生成公式:
@@ -96,6 +123,9 @@ export function sceneObjectLatex(
     try {
         switch (object.kind) {
             case 'curve':
+                if (object.odeOrigin) {
+                    return odeLatex('y', object.odeOrigin, object.expr);
+                }
                 if (object.antiderivativeOrigin) {
                     return antiderivativeLatex('y', object.antiderivativeOrigin, object.antiderivativeOrigin.constant);
                 }
@@ -103,6 +133,9 @@ export function sceneObjectLatex(
                     ? derivativeLatex('y', object.derivativeOrigin, object.expr, false)
                     : `y=${cachedLatexExpression(object.expr)}`;
             case 'surface':
+                if (object.odeOrigin) {
+                    return odeLatex('z', object.odeOrigin, object.expr);
+                }
                 if (object.antiderivativeOrigin) {
                     return antiderivativeLatex('z', object.antiderivativeOrigin, object.antiderivativeOrigin.constant);
                 }

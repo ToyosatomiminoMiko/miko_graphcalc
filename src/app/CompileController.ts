@@ -5,7 +5,7 @@
  * 完成三件事:
  * 1. `run(source)`:解析新源码并生成一份完整 SceneIR;
  * 2. `refresh(paramOverrides)`:复用当前 AST,只按新参数重新编译;
- * 3. `toggleAnalysis/toggleIntegral/toggleIntersection/toggleSolve/toggleAntiderivative`:切换求值对象显隐后重新编译.
+ * 3. `toggleAnalysis/toggleIntegral/toggleIntersection/toggleSolve/toggleAntiderivative/toggleOde`:切换求值对象显隐后重新编译.
  *
  * 实体显隐不经过这里:它只改 Plotter 可见性,不需要重新编译
  * (见 RenderController.toggleObject).
@@ -96,6 +96,18 @@ export class CompileController {
         return this.recompileForVisibilityChange(paramOverrides);
     }
 
+    /**
+     * 切换微分方程条目显隐:隐藏会同时跳过实体下发(斜率场与解曲线),所以必须
+     * 重编译(与不定积分同一条路径).
+     */
+    toggleOde(
+        name: string,
+        paramOverrides: Record<string, number>,
+    ): SceneIR | null {
+        this.store.toggleOdeHidden(name);
+        return this.recompileForVisibilityChange(paramOverrides);
+    }
+
     dispose(): void {
         this.disposed = true;
         this.runSequence += 1;
@@ -132,6 +144,7 @@ export class CompileController {
                 hiddenIntersectionNames: this.store.hiddenIntersectionNames,
                 hiddenSolveNames: this.store.hiddenSolveNames,
                 hiddenAntiderivativeNames: this.store.hiddenAntiderivativeNames,
+                hiddenOdeNames: this.store.hiddenOdeNames,
             });
         } catch (error) {
             throw this.locate(error);

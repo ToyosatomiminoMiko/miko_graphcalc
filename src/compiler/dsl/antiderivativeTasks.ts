@@ -2,9 +2,9 @@
  * 不定积分(原函数)编译:设计文档 `docs/calculus-suite-plan.md` 第 3 节.
  *
  * 分工与既有模块一致,**两层都不重复调内核**:
- * - 实体层(`staticScene.ts` 的 `buildAntiderivativeBlueprint`)调一次内核,
- *   把原函数表达式物化成普通 curve/surface,并登记 `antiderivativeFacts`
- *   (题目/原函数 LaTeX/验证结论/步骤链);
+ * - 实体层(`antiderivativeBlueprint.ts` 的 `buildAntiderivativeBlueprint`)
+ *   调一次内核,把原函数表达式物化成普通 curve/surface,并登记
+ *   `antiderivativeFacts`(题目/原函数 LaTeX/验证结论/步骤链);
  * - 本文件把那份事实转成 `AntiderivativeTask`,只做选项校验,隐藏语义与
  *   IR 组装.
  *
@@ -19,10 +19,10 @@ import type { AstProgram } from '../ast/types';
 import type { AntiderivativeTask, SceneObject } from '../../ir';
 import { withStatementSpan } from '../errors';
 import { assertKnownOptions } from './options';
-import type { AntiderivativeFact } from './staticScene';
-
-/** 不定积分语句允许的选项(与静态场景层的白名单同源). */
-const ANTIDERIVATIVE_OPTION_NAMES = ['color', 'range', 'segments', 'constant', 'variable'] as const;
+import {
+    ANTIDERIVATIVE_OPTION_NAMES,
+    type AntiderivativeFact,
+} from './antiderivativeBlueprint';
 
 /** 一条不定积分的编译结果:求值条目 + 下发的实体对象(失败/隐藏时为 null). */
 export interface CompiledAntiderivative {

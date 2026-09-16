@@ -59,6 +59,14 @@ pub(crate) fn latex_symbol(name: &str) -> String {
         return rendered.to_string();
     }
 
+    // 导数记号的展示名(`y'` / `y''` / `y_1'`):`'` 不是合法标识符字符,所以
+    // 正常输入永远不会走到这里,不存在与用户符号冲突(见 symbolic/ode.rs 的
+    // `prime_view_inner`,归一化阶段的撞名检查另有一道).
+    if let Some(index) = name.find('\'') {
+        let (base, primes) = name.split_at(index);
+        return format!("{}{}", latex_symbol(base), primes);
+    }
+
     if let Some((head, tail)) = name.split_once('_') {
         return format!("{}_{{{}}}", latex_symbol(head), tail.replace('_', "\\_"));
     }

@@ -635,6 +635,51 @@ pub fn antiderivative(
         .map_err(|error| math_error(format!("积分结果序列化失败: {error}")))
 }
 
+/// 微分方程求解入口(设计文档 `docs/plan3.md` 第 1.2 节).
+///
+/// 返回**独立步骤产物的 JSON**:`{ equation_latex, independent, dependent,
+/// order, general_latex, particular_latex, general_text, particular_text,
+/// implicit, arbitrary_constants, constant_symbols, slope_text, slope_latex,
+/// verified, steps: [{ latex, reason, kind }], error, notes }`.
+/// 步骤产物类型(`symbolic::OdeOutcome`)不含 `Expr`(路线图 §7.1).
+///
+/// - `initial_conditions` 是初值**原文**(`y(0) = 1` / `y'(0) = 1`),由语法层在
+///   首个顶层逗号处切好;
+/// - `dependent`/`independent` 为空串时从方程推断;
+/// - `coeff_names` 是**已声明参数名**(不带值):参数保持符号,数值由 TS 侧
+///   物化层按当前滑块折叠;
+/// - `error` 是**能力边界**理由(超出清单/符号系数/未通过回代验证),不是调用
+///   失败;`Err` 只留给"方程读不出来 / 初值写错 / 含未声明符号"这类输入错误.
+#[wasm_bindgen]
+pub fn solve_ode(
+    equation: &str,
+    initial_conditions: Vec<String>,
+    dependent: &str,
+    independent: &str,
+    coeff_names: Vec<String>,
+) -> Result<String, JsValue> {
+    let dependent = if dependent.trim().is_empty() {
+        None
+    } else {
+        Some(dependent)
+    };
+    let independent = if independent.trim().is_empty() {
+        None
+    } else {
+        Some(independent)
+    };
+    let outcome = symbolic::solve_ode_outcome(
+        equation,
+        &initial_conditions,
+        dependent,
+        independent,
+        &coeff_names,
+    )
+    .map_err(math_error)?;
+    serde_json::to_string(&outcome)
+        .map_err(|error| math_error(format!("微分方程结果序列化失败: {error}")))
+}
+
 /// 梯度数值求值入口;参数走 JSON 请求(见 `wasm_payloads`).
 #[wasm_bindgen]
 pub fn evaluate_gradient_point(payload: &str) -> Result<GradientPointResult, JsValue> {

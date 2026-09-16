@@ -93,6 +93,7 @@ export class DslApp {
         const intersectionList = document.getElementById('intersection-object-list')!;
         const solveList = document.getElementById('solve-object-list')!;
         const antiderivativeList = document.getElementById('antiderivative-object-list')!;
+        const odeList = document.getElementById('ode-object-list')!;
         const formulaCopyHint = document.getElementById('formula-copy-hint')!;
 
         this.editor = document.getElementById('dsl-editor') as HTMLTextAreaElement;
@@ -120,6 +121,7 @@ export class DslApp {
                 intersection: intersectionList,
                 solve: solveList,
                 antiderivative: antiderivativeList,
+                ode: odeList,
             },
             {
                 // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要
@@ -130,6 +132,7 @@ export class DslApp {
                 toggleIntersection: (name) => this._toggleIntersection(name),
                 toggleSolve: (name) => this._toggleSolve(name),
                 toggleAntiderivative: (name) => this._toggleAntiderivative(name),
+                toggleOde: (name) => this._toggleOde(name),
                 // 三级披露的 L2 入口:条目已把过程文档建好,这里只负责切页与载入.
                 openProcess: (request) => this._openProcess(request),
             },
@@ -437,6 +440,18 @@ export class DslApp {
      */
     private _toggleAntiderivative(name: string): void {
         const scene = this.compileController.toggleAntiderivative(
+            name,
+            this.paramPanelController.getValues(),
+        );
+        if (scene) this.renderController.commitSceneWithoutRedraw(scene);
+    }
+
+    /**
+     * 切换微分方程条目的显隐:隐藏 = 列表保留占位,同时滤掉它下发的斜率场与
+     * 解曲线,所以必须重新编译(与不定积分同一条路径,见 buildOdeBlueprints).
+     */
+    private _toggleOde(name: string): void {
+        const scene = this.compileController.toggleOde(
             name,
             this.paramPanelController.getValues(),
         );

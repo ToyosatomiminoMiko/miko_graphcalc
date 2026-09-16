@@ -1,6 +1,13 @@
 /**
- * 静态场景构建与缓存.
- * 负责 params/matrix/transform 和对象 blueprint 的声明级建模.
+ * 静态场景构建与缓存:本文件只保留**编排,缓存与公共导出**.
+ *
+ * 声明级建模按语句种类拆到相邻模块(202609 拆分,原为 1210 行单文件):
+ * - sceneDeclarations.ts       matrix/transform/animation 三类语句的求值,
+ *                              以及对象名/已声明值名索引与 animation 选项解析;
+ * - antiderivativeBlueprint.ts `antiderivative` 的 blueprint + 展示事实;
+ * - odeBlueprint.ts            `ode` 的斜率场/解曲线 blueprint + 展示事实;
+ * - derivativeBlueprint.ts     `derivative` 的 curve/surface/vector_field 产物.
+ * 各模块都只经由本文件按固定顺序调用(顺序本身有语义,见 buildStaticScene).
  *
  * 202609 review 结论:region 面积图形的"边界曲线必须存在且为 curve,不得带
  * animation/静态 transform"约束只依赖声明级数据(blueprint 与两张 map),
@@ -8,242 +15,42 @@
  * 每个 region 里重建一次全对象索引.已上收到 buildStaticScene 末尾一次性
  * 执行(见 finalizeRegionBlueprints),编译缓存命中后不再重复.
  */
-import type {
-    AntiderivativeStatement,
-    AstProgram,
-    DerivativeStatement,
-    ObjectStatement,
-    OptionPair,
-} from '../ast/types';
-import { SOLVE_STEP_KINDS, type AnimationClip, type ParamDeclaration, type SolveStepKind } from '../../ir';
+import type { AstProgram, ObjectStatement } from '../ast/types';
+import type { AnimationClip, ParamDeclaration } from '../../ir';
 import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { withStatementSpan } from '../errors';
 import { buildObjectBlueprint } from './objects/build';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
-import { createObjectReferenceResolver } from './objects/references';
 import {
     blueprintHasCoefficients,
     type CurveBlueprint,
     type ObjectBlueprint,
     type SurfaceBlueprint,
 } from './objects/types';
-import { assertKnownOptions, findOption, parseCappedPositiveInteger, parseNumberListOfSize, toFiniteNumber } from './options';
-import { cachedDerivativeExpression, extractSymbolNames } from './expression';
-import { antiderivative as wasmAntiderivative } from '../../wasm/math_rs/math_rs';
 import {
-    sphereGradientExpressions,
-    sphereImplicitExpression,
-} from './implicitField';
+    createObjectReferenceResolver,
+    type ObjectReferenceResolver,
+} from './objects/references';
+import { findOption } from './options';
 import { collectParams, createDefaultParam } from './params';
+import { resolveObjectTransform } from './transforms';
 import {
-    evaluateMatrix,
-    parseSingleTransformExpression,
-    parseTransformExpression,
-    resolveObjectTransform,
-} from './transforms';
-
-/**
- * 一条不定积分的编译事实:实体 blueprint + 求值条目要用的展示数据.
- *
- * 为什么把两者一起返回:内核只调**一次**,表达式(实体侧)与步骤链(展示侧)
- * 天然同源;分两处各调一次会在改内核时留下漂移风险(见 `antiderivativeTasks.ts`
- * 文件头).
- */
-export interface AntiderivativeFact {
-    sourceKind: 'curve' | 'surface';
-    variable: string;
-    integrand: string;
-    integrandLatex: string;
-    antiderivativeText: string;
-    antiderivativeLatex: string;
-    constant: number;
-    constantSymbol: string;
-    verified: boolean;
-    steps: Array<{ latex: string; reason: string; kind: SolveStepKind }>;
-    error: string | null;
-}
-
-/** 内核 `antiderivative` 返回的 JSON 形状(与 Rust `AntiderivativeOutcome` 对齐). */
-interface AntiderivativeOutcomeJson {
-    integrand_latex: string;
-    antiderivative_latex: string;
-    antiderivative_text: string;
-    verified: boolean;
-    steps: Array<{ latex: string; reason: string; kind: string }>;
-    error: string | null;
-}
-
-/** 内核给的分区字符串 -> IR 字面量联合(未登记退化成中性色 `algebra`). */
-function toAntiderivativeStepKind(raw: string): SolveStepKind {
-    return (SOLVE_STEP_KINDS as readonly string[]).includes(raw)
-        ? (raw as SolveStepKind)
-        : 'algebra';
-}
-
-/**
- * 把 `antiderivative 名称 = antiderivative(源对象 [, 变量])` 编译成一个新对象
- * (设计文档 `docs/calculus-suite-plan.md` 第 3 节),并带回展示事实.
- *
- * 口径:
- * 1. **表达式来自内核**:`math_rs::symbolic::integral` 给出原函数文本(参数按
- *    声明值折叠)与步骤链;
- * 2. **积分常数并入表达式**:`constant` 选项(缺省 0)直接加在表达式上,对象
- *    因此可求值,展示层仍写 `+C`;
- * 3. **定义域/外观继承源对象**:颜色与 range 缺省取源对象,显式选项优先;
- * 4. **能力边界不是源码错误**:非初等/超出规则时返回 `blueprint: null` +
- *    `fact.error`,调用方保留占位条目而不是抛异常.
- */
-function buildAntiderivativeBlueprint(
-    statement: AntiderivativeStatement,
-    id: number,
-    blueprintByName: Map<string, ObjectBlueprint>,
-): { blueprint: CurveBlueprint | SurfaceBlueprint | null; fact: AntiderivativeFact } {
-    const sourceBlueprint = blueprintByName.get(statement.source.trim());
-    if (sourceBlueprint === undefined) {
-        throw new Error(
-            `不定积分 ${statement.name} 引用了不存在的对象 ${statement.source}`,
-        );
-    }
-    if (sourceBlueprint.kind !== 'curve' && sourceBlueprint.kind !== 'surface') {
-        throw new Error(`不定积分 ${statement.name} 只能应用于 curve 或 surface`);
-    }
-    const planeSource = sourceBlueprint;
-    assertKnownOptions(statement.options, ANTIDERIVATIVE_OPTION_NAMES, `不定积分 ${statement.name}`);
-    const variable = (statement.variable ?? 'x').trim();
-    if (planeSource.kind === 'curve' && variable !== 'x') {
-        throw new Error(`不定积分 ${statement.name} 的 curve 源只支持对 x 积分`);
-    }
-    if (planeSource.kind === 'surface' && variable !== 'x' && variable !== 'y') {
-        throw new Error(`不定积分 ${statement.name} 的曲面源只能对 x 或 y 积分`);
-    }
-
-    // 系数表**故意留空**:内核把除积分变量以外的符号当常数,原函数里因此
-    // 保留参数名(`a*x^3/3 - cos(x)`),参数值由物化层按当前滑块折叠.
-    // 若在这里传 `buildParamScope(params, {})`,得到的表达式会把参数冻在
-    // 声明默认值上:静态场景按 AST 缓存,拖滑块只重物化不重解析,曲线就再也
-    // 不跟手了(这正是原函数必须挂在静态场景 blueprint 上的代价,已实测).
-    // 只给**名字**不给值:内核据此把这些符号当已声明,保留在结果里
-    // (`a*x^3/3 - cos(x)`),数值由物化层按当前滑块折叠.
-    //
-    // 名单必须同时包含:
-    // - 源对象的参数(`a`):原函数里保持符号,拖滑块才跟手;
-    // - 源表达式里出现的**另一个坐标**(对 y 积分时的 x):它对积分是常数,
-    //   内核只认"已声明"的符号,漏掉就会报"未声明符号 x"(实测踩过).
-    const declaredSymbols = new Set<string>(planeSource.coefficientNames);
-    for (const name of extractSymbolNames(planeSource.expr, new Set())) {
-        if (name !== variable) declaredSymbols.add(name);
-    }
-    const outcome = JSON.parse(
-        wasmAntiderivative(
-            planeSource.expr,
-            variable,
-            [...declaredSymbols],
-            new Float64Array(),
-        ),
-    ) as AntiderivativeOutcomeJson;
-
-    const rawConstant = findOption(statement.options, 'constant');
-    const parsedConstant = rawConstant === undefined ? 0 : Number(rawConstant);
-    const constant = Number.isFinite(parsedConstant) ? parsedConstant : 0;
-    const baseFact = {
-        sourceKind: planeSource.kind,
-        variable,
-        integrand: planeSource.expr,
-        constant,
-        constantSymbol: 'C',
-    } as const;
-
-    if (outcome.error !== null) {
-        return {
-            blueprint: null,
-            fact: {
-                ...baseFact,
-                integrandLatex: outcome.integrand_latex,
-                antiderivativeText: '',
-                antiderivativeLatex: '',
-                verified: false,
-                steps: [],
-                error: outcome.error,
-            },
-        };
-    }
-
-    const expr = constant === 0
-        ? outcome.antiderivative_text
-        : `(${outcome.antiderivative_text}) + (${constant})`;
-
-    const origin = {
-        integrandExpr: planeSource.expr,
-        variable: (variable === 'y' ? 'y' : 'x') as 'x' | 'y',
-        constant,
-    } as const;
-
-    const fact: AntiderivativeFact = {
-        ...baseFact,
-        integrandLatex: outcome.integrand_latex,
-        antiderivativeText: outcome.antiderivative_text,
-        antiderivativeLatex: outcome.antiderivative_latex,
-        verified: outcome.verified,
-        steps: outcome.steps.map((entry) => ({
-            latex: entry.latex,
-            reason: entry.reason,
-            kind: toAntiderivativeStepKind(entry.kind),
-        })),
-        error: null,
-    };
-
-    if (planeSource.kind === 'curve') {
-        const range = findOption(statement.options, 'range');
-        return {
-            blueprint: {
-                kind: 'curve',
-                id,
-                name: statement.name,
-                expr,
-                // 依赖继承源对象的系数:参数变化要让这条对象重新物化.
-                coefficientNames: [...planeSource.coefficientNames],
-                color: findOption(statement.options, 'color') ?? planeSource.color,
-                range: range
-                    ? (parseNumberListOfSize(range, 2, `不定积分 ${statement.name} 的 range`) as [number, number])
-                    : planeSource.range,
-                segments: parseOptionalSegments(statement.options, `不定积分 ${statement.name} 的 segments`) ?? planeSource.segments,
-                antiderivativeOrigin: origin,
-            },
-            fact,
-        };
-    }
-
-    const range = findOption(statement.options, 'range');
-    return {
-        blueprint: {
-            kind: 'surface',
-            id,
-            name: statement.name,
-            expr,
-            coefficientNames: [...planeSource.coefficientNames],
-            color: findOption(statement.options, 'color') ?? planeSource.color,
-            range: range
-                ? (parseNumberListOfSize(range, 4, `不定积分 ${statement.name} 的 range`) as [
-                    number,
-                    number,
-                    number,
-                    number,
-                ])
-                : planeSource.range,
-            segments: parseOptionalSegments(statement.options, `不定积分 ${statement.name} 的 segments`) ?? planeSource.segments,
-            antiderivativeOrigin: origin,
-        },
-        fact,
-    };
-}
-
-/** `segments` 选项;缺省 undefined(由 blueprint 继承源对象). */
-function parseOptionalSegments(options: OptionPair[], context: string): number | undefined {
-    const raw = findOption(options, 'segments');
-    if (raw === undefined) return undefined;
-    return parseCappedPositiveInteger(raw, context, NUMERIC_CONFIG.limits.curve.maxSegments);
-}
+    collectAnimationDeclarations,
+    collectDeclaredValueNames,
+    collectTensorDeclarations,
+    collectTransformDeclarations,
+    objectStatementsByName,
+    parseAnimationNames,
+} from './sceneDeclarations';
+import {
+    buildAntiderivativeBlueprint,
+    type AntiderivativeFact,
+} from './antiderivativeBlueprint';
+import { buildOdeBlueprints, type OdeFact } from './odeBlueprint';
+import {
+    buildDerivativeObjectBlueprint,
+    type DerivativeSource,
+} from './derivativeBlueprint';
 
 export type StaticScene = {
     params: Map<string, ParamDeclaration>;
@@ -251,260 +58,11 @@ export type StaticScene = {
     objectTransforms: Map<number, Mat4>;
     animations: Map<string, AnimationClip>;
     objectAnimations: Map<number, string[]>;
-    /** 不定积分的展示事实(内核产物一次算完,求值层只消费);见本文件同名接口. */
+    /** 不定积分的展示事实(内核产物一次算完,求值层只消费);见 antiderivativeBlueprint.ts. */
     antiderivativeFacts: Map<string, AntiderivativeFact>;
+    /** 微分方程的展示事实(同一条"内核一次算完"的口径);见 odeBlueprint.ts. */
+    odeFacts: Map<string, OdeFact>;
 };
-
-/**
- * 场景对象声明按名索引.
- *
- * region 按名引用两条边界 curve,允许引用声明在区域之后的对象,
- * 因此必须先建这份 名字 -> ObjectStatement 的索引(编译期与运行时
- * DslCompiler 的 region 校验共用,避免各写一遍遍历).
- */
-export function objectStatementsByName(ast: AstProgram): Map<string, ObjectStatement> {
-    const map = new Map<string, ObjectStatement>();
-    for (const statement of ast.statements) {
-        if (statement.type !== 'object' || statement.name === undefined) continue;
-        map.set(statement.name, statement);
-    }
-    return map;
-}
-
-/**
- * 所有"已声明的值名" -> 类型说明(供对象相加的引用解析报错).
- *
- * 对象相加的引用解析用它把"引用了一个不是 curve/surface 的已声明名字"
- * 识别成错误,而不是当成自由参数凭空多出一个滑块(见 objects/references.ts).
- * 说明文字进报错文案:`sphere 对象` 与 `derivative 产物` 对用户是两种不同的
- * 误解,分开写才能给出可操作的提示.
- *
- * param 不在此列(参数名在引用解析里优先,保持既有语义);
- * matrix/transform/animation 也不参与函数表达式,同样不计入.
- */
-function collectDeclaredValueNames(ast: AstProgram): Map<string, string> {
-    const names = new Map<string, string>();
-    for (const statement of ast.statements) {
-        switch (statement.type) {
-            case 'object':
-                names.set(statement.name, `${statement.kind} 对象`);
-                break;
-            case 'derivative':
-                names.set(statement.name, 'derivative 产物');
-                break;
-            case 'antiderivative':
-                names.set(statement.name, 'antiderivative 产物');
-                break;
-            case 'analysis':
-                names.set(statement.name, '分析产物');
-                break;
-            case 'integral':
-                names.set(statement.name, '积分产物');
-                break;
-            case 'intersection':
-                names.set(statement.name, '求交产物');
-                break;
-            default:
-                break;
-        }
-    }
-    return names;
-}
-
-/** `antiderivative` 语句允许的选项(外观与 range 继承源对象,可选覆盖). */
-const ANTIDERIVATIVE_OPTION_NAMES = ['color', 'range', 'segments', 'constant', 'variable'] as const;
-
-/** `derivative` 求导语句允许的选项(与对象外观一致,transform/animation 不继承). */
-const DERIVATIVE_OPTION_NAMES = ['color', 'range', 'segments'] as const;
-/**
- * 隐式场求导(--> ∇f 向量场)允许的选项.
- *
- * 产物是 vector_field,所以收的是向量场自己的外观/采样选项;`segments`
- * 在这里不适用(vector_field 用 `grid`),出现在隐式场求导里会直接报错.
- */
-const FIELD_DERIVATIVE_OPTION_NAMES = ['color', 'range', 'grid', 'scale'] as const;
-
-/**
- * 可被求导引用的源:
- * - `curve` / `surface`:显式因变量,生成整条导数曲线/曲面;
- * - `implicit`:隐式标量场 `f=level`,求导 = 梯度 ∇f,生成向量场;
- * - `sphere`:内置隐式场 `|p−c|²−r²`,同样生成 ∇f 向量场.
- *
- * 存储归一化表达式,使链式求导(d²f 等)与单层求导共用同一解析结果.
- */
-type DerivativeSource =
-    | { kind: 'curve' | 'surface'; expr: string }
-    | { kind: 'implicit'; expr: string; dim: 2 | 3 }
-    | { kind: 'sphere'; positionExprs: [string, string, string]; radiusExpr: string };
-
-/**
- * 隐式场求导源(implicit / sphere)-> `∇f` 向量场 blueprint.
- *
- * 三分量就是 f 对 x/y/z 的符号偏导:implicit 走 Rust 符号引擎(带缓存),
- * 球体因为 ∇f = 2(p−c) 有闭式,直接用解析表达式,既省一次符号求导,也让
- * 结果不依赖符号引擎的化简风格.产物复用 vector_field 的归一化/系数提取/
- * 采样/渲染管线,只是额外挂一份 `gradientOrigin` 供公式层写成 `∇(f)`.
- */
-function buildFieldDerivativeBlueprint(
-    statement: DerivativeStatement,
-    nextId: number,
-    statementsByName: Map<string, ObjectStatement>,
-    source: Extract<DerivativeSource, { kind: 'implicit' | 'sphere' }>,
-): ObjectBlueprint {
-    assertKnownOptions(
-        statement.options,
-        FIELD_DERIVATIVE_OPTION_NAMES,
-        `求导 ${statement.name}`,
-    );
-
-    let components: [string, string, string];
-    let sourceExpr: string;
-    if (source.kind === 'implicit') {
-        const gx = cachedDerivativeExpression(source.expr, 'x');
-        const gy = cachedDerivativeExpression(source.expr, 'y');
-        // 2D 隐式曲线不含 z:显式补 0,保持 vector_field 的三分量形状.
-        const gz = source.dim === 3
-            ? cachedDerivativeExpression(source.expr, 'z')
-            : '0';
-        components = [gx, gy, gz];
-        sourceExpr = source.expr;
-    } else {
-        components = sphereGradientExpressions(source.positionExprs);
-        sourceExpr = sphereImplicitExpression(source.positionExprs, source.radiusExpr);
-    }
-
-    const synthetic: ObjectStatement = {
-        type: 'object',
-        kind: 'vector_field',
-        name: statement.name,
-        expr: `[${components.join(', ')}]`,
-        // 选项已按 vector_field 白名单校验,直接透传;不像 curve/surface
-        // 求导那样继承源对象的 range/segments--隐式场没有这些外观选项.
-        options: statement.options,
-        span: statement.span,
-    };
-    const blueprint = buildObjectBlueprint(synthetic, nextId, statementsByName);
-    if (!blueprint || blueprint.kind !== 'vector_field') {
-        throw new Error(`求导 ${statement.name} 无法生成梯度向量场`);
-    }
-    blueprint.gradientOrigin = { sourceExpr };
-    return blueprint;
-}
-
-/**
- * 把 `derivative 名称 = derivative(源对象 [, 变量])` 编译成一个新对象
- * blueprint(curve -> curve 求 x 导,surface -> surface 需指定 x|y;
- * implicit / sphere -> vector_field,即 ∇f).
- *
- * 产物复用 `buildObjectBlueprint` 的归一化/系数提取/选项校验,因此导数对象
- * 与手写 curve/surface/vector_field 完全同构,之后照常进入物化与渲染管线;
- * color 缺省用调色板(每个新对象一个),range/segments 缺省继承源对象
- * (与源画在同一区间).
- *
- * 求导函数名为全名 `derivative`(项目约定不缩写,见 miko.pest).
- *
- * ── 审查记录(202609,供后续审查参考) ────────────────────────────
- * 1) 类型推断:结果 kind 由源对象决定(curve->curve,surface->surface,
- *    implicit/sphere->vector_field),求导变量 curve 缺省 'x',surface
- *    必填 x|y,隐式场是对整个 f 求梯度(无变量参数).这与 gradient 按
- *    源对象分派,integral 按 sourceKind 推 dim/domainKind 的推断风格一致,
- *    不是新引入的约定.
- * 2) 两条有意为之的边界(审查时请保留,勿当作缺陷"修复"):
- *    a. 链式求导按源码顺序处理:`derivative d2 = derivative(d1)` 要求 d1
- *       声明在前;直接引用 curve/surface 源则允许前向引用(见调用处
- *       resolvable 的预填).若希望链式也支持乱序,需改成两阶段解析.
- *    b. 产物 kind 与手写对象相同(选项只收对应对象自己的外观项,
- *       transform/animation 刻意不继承--导数是独立函数图形,与源对象的
- *       平移/动画无关);唯一例外是 derivativeOrigin/gradientOrigin 这两块
- *       展示元数据:公式要写成 d/dx(源函数)=导函数 或 ∇(源函数)=∇f,
- *       而不是看不出求导的 y=f(x)(见 dsl/latex.ts),数值与渲染路径不读它.
- * ──────────────────────────────────────────────────────────────
- */
-function buildDerivativeObjectBlueprint(
-    statement: DerivativeStatement,
-    nextId: number,
-    statementsByName: Map<string, ObjectStatement>,
-    resolvable: Map<string, DerivativeSource>,
-    declaredObjectNames: ReadonlySet<string>,
-): ObjectBlueprint {
-    const source = statement.source.trim();
-    const sourceInfo = resolvable.get(source);
-    if (!sourceInfo) {
-        if (declaredObjectNames.has(source)) {
-            throw new Error(
-                `求导 ${statement.name} 只能应用于 curve/surface/implicit/sphere 类型对象`,
-            );
-        }
-        throw new Error(`求导 ${statement.name} 引用了不存在的对象 ${source}`);
-    }
-
-    // 隐式场源(implicit / sphere)求导 = 梯度,直接产出向量场.
-    if (sourceInfo.kind === 'implicit' || sourceInfo.kind === 'sphere') {
-        return buildFieldDerivativeBlueprint(
-            statement,
-            nextId,
-            statementsByName,
-            sourceInfo,
-        );
-    }
-
-    assertKnownOptions(statement.options, DERIVATIVE_OPTION_NAMES, `求导 ${statement.name}`);
-
-    let variable = statement.variable;
-    if (sourceInfo.kind === 'curve') {
-        if (variable === undefined) variable = 'x';
-        if (variable !== 'x') {
-            throw new Error(`曲线 ${statement.name} 的求导变量只能是 x`);
-        }
-    } else {
-        if (variable === undefined) {
-            throw new Error(`曲面求导 ${statement.name} 需要指定变量 x 或 y`);
-        }
-        if (variable !== 'x' && variable !== 'y') {
-            throw new Error(`曲面求导 ${statement.name} 的变量只能是 x 或 y`);
-        }
-    }
-
-    const derivExpr = cachedDerivativeExpression(sourceInfo.expr, variable);
-
-    // 从源对象继承 range/segments(否则用各自默认),并允许求导语句覆盖.
-    const sourceStmt = statementsByName.get(source);
-    const inheritedRange = sourceStmt?.options.find((option) => option.name === 'range');
-    const inheritedSegments = sourceStmt?.options.find((option) => option.name === 'segments');
-    const ownColor = statement.options.find((option) => option.name === 'color');
-    const ownRange = statement.options.find((option) => option.name === 'range');
-    const ownSegments = statement.options.find((option) => option.name === 'segments');
-
-    const options: OptionPair[] = [];
-    if (inheritedRange && !ownRange) options.push(inheritedRange);
-    if (inheritedSegments && !ownSegments) options.push(inheritedSegments);
-    if (ownColor) options.push(ownColor);
-    if (ownRange) options.push(ownRange);
-    if (ownSegments) options.push(ownSegments);
-
-    const synthetic: ObjectStatement = {
-        type: 'object',
-        kind: sourceInfo.kind,
-        name: statement.name,
-        expr: derivExpr,
-        options,
-        span: statement.span,
-    };
-    const blueprint = buildObjectBlueprint(synthetic, nextId, statementsByName);
-    if (!blueprint) {
-        throw new Error(`求导 ${statement.name} 无法生成对象`);
-    }
-
-    // 只挂展示元数据:导出的对象本身仍是普通 curve/surface,数值/渲染不变;
-    // 公式层据此写成 d/dx(源函数)=导函数 或 ∂/∂y(源函数)=导函数.
-    if (blueprint.kind === 'curve' || blueprint.kind === 'surface') {
-        blueprint.derivativeOrigin = {
-            sourceExpr: sourceInfo.expr,
-            variable,
-        };
-    }
-    return blueprint;
-}
 
 /**
  * 静态场景缓存必须和 matrixOps 绑定.
@@ -566,139 +124,131 @@ export function cloneObjectAnimations(
     return clone;
 }
 
-function parseAnimationNames(raw: string | undefined, context: string): string[] {
-    if (raw === undefined) return [];
-
-    const body = raw.trim();
-    if (body.length === 0) return [];
-
-    if (body.startsWith('[') || body.endsWith(']')) {
-        const inner = body.slice(1, -1).trim();
-        if (inner.length === 0) return [];
-        const names = inner.split(',').map((item) => item.trim());
-        if (names.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
-            throw new Error(`${context} 包含无效动画名: ${raw}`);
-        }
-        return names;
-    }
-
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(body)) {
-        throw new Error(`${context} 包含无效动画名: ${raw}`);
-    }
-    return [body];
+/**
+ * 声明级建模的共享可变状态.
+ *
+ * 各 pass 按固定顺序执行,只写自己那部分(与拆分前的局部变量一一对应);
+ * 串成一份 draft 只是为了避免每个 pass 各传/回 8 张表.顺序有语义:
+ * object -> 可求导源预填 -> antiderivative -> ode -> derivative,
+ * 后一个 pass 能引用前一个登记的 resolvable(见各 pass 注释).
+ */
+interface SceneDraft {
+    params: Map<string, ParamDeclaration>;
+    objectBlueprints: ObjectBlueprint[];
+    /** 已登记对象名:基础对象与三条派生语句共用命名空间,跨 pass 查重. */
+    objectNames: Set<string>;
+    objectTransforms: Map<number, Mat4>;
+    objectAnimations: Map<number, string[]>;
+    /** 求导入口:curve/surface/implicit/sphere 的归一化表达式(见 collectDerivativeSources). */
+    resolvable: Map<string, DerivativeSource>;
+    antiderivativeFacts: Map<string, AntiderivativeFact>;
+    odeFacts: Map<string, OdeFact>;
+    /** 下一个可用对象 id;跨 pass 单调递增. */
+    nextId: number;
 }
 
 function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
-    const params = collectParams(ast);
+    // 1) 三类声明式语句先各自成型:matrix -> transform -> animation.
     const matrices = new Map<string, Mat4>();
     const transforms = new Map<string, Mat4>();
     const animations = new Map<string, AnimationClip>();
-    const objectAnimations = new Map<number, string[]>();
-    const objectBlueprints: ObjectBlueprint[] = [];
-    const objectTransforms = new Map<number, Mat4>();
-    const antiderivativeFacts = new Map<string, AntiderivativeFact>();
+    collectTensorDeclarations(ast, matrices);
+    collectTransformDeclarations(ast, matrices, transforms, matrixOps);
+    collectAnimationDeclarations(ast, matrices, transforms, matrixOps, animations);
 
-    for (const statement of ast.statements) {
-        if (statement.type !== 'tensor') continue;
-        // 语句级错误定位:tensor 声明校验失败时携带本语句 span.
-        withStatementSpan(statement.span, () => {
-            if (statement.kind === 'matrix') {
-                const matrix = evaluateMatrix(statement.expr);
-                if (matrix) matrices.set(statement.name, matrix);
-                else throw new Error(`矩阵 ${statement.name} 无法求值`);
-            } else if (statement.kind === 'scalar') {
-                throw new Error(`标量声明 ${statement.name} 暂未实现`);
-            } else if (statement.kind === 'vector') {
-                throw new Error(`向量声明 ${statement.name} 暂未实现`);
-            }
-            // transform 语句在下一轮单独处理.
-        });
-    }
-
-    for (const statement of ast.statements) {
-        if (statement.type !== 'tensor' || statement.kind !== 'transform') continue;
-        withStatementSpan(statement.span, () => {
-            // transforms 表按声明顺序边解析边写入,因此 transform 声明体可以
-            // 引用"此前已声明"的 matrix/transform(见 transforms.ts 语法表).
-            const transform = parseTransformExpression(
-                statement.expr,
-                matrices,
-                transforms,
-                matrixOps,
-            );
-            if (transform) transforms.set(statement.name, transform);
-            else throw new Error(`变换 ${statement.name} 无法求值`);
-        });
-    }
-
-    for (const statement of ast.statements) {
-        if (statement.type !== 'animation') continue;
-        withStatementSpan(statement.span, () => {
-            if (animations.has(statement.name)) {
-                throw new Error(`动画 ${statement.name} 重复声明`);
-            }
-
-            assertKnownOptions(statement.options, ['duration'], `动画 ${statement.name}`);
-            const matrix = parseSingleTransformExpression(
-                statement.expr,
-                matrices,
-                transforms,
-                matrixOps,
-            );
-            if (!matrix) {
-                throw new Error(`动画 ${statement.name} 只能包含一个矩阵变换`);
-            }
-
-            const duration = toFiniteNumber(
-                findOption(statement.options, 'duration') ?? '',
-                `动画 ${statement.name} 的 duration`,
-            );
-            if (duration <= 0) {
-                throw new Error(`动画 ${statement.name} 的 duration 必须大于 0`);
-            }
-
-            animations.set(statement.name, {
-                name: statement.name,
-                duration,
-                matrix,
-            });
-        });
-    }
-
-    let nextId = 1;
-    const objectNames = new Set<string>();
-    // "region" 声明按名引用两条边界 curve(允许引用声明在区域之后的对象),
-    // 索引构建复用 objectStatementsByName.
+    // 2) 对象 blueprint 建模.region 按名引用两条边界 curve,允许引用声明在
+    //    区域之后的对象,索引构建复用 objectStatementsByName.
     const statementsByName = objectStatementsByName(ast);
+    const draft: SceneDraft = {
+        params: collectParams(ast),
+        objectBlueprints: [],
+        objectNames: new Set<string>(),
+        objectTransforms: new Map<number, Mat4>(),
+        objectAnimations: new Map<number, string[]>(),
+        resolvable: new Map<string, DerivativeSource>(),
+        antiderivativeFacts: new Map<string, AntiderivativeFact>(),
+        odeFacts: new Map<string, OdeFact>(),
+        nextId: 1,
+    };
     // 对象相加(curve/surface 表达式按名引用同类对象)的引用解析器:
     // 参数名优先于对象名,已声明但不是 curve/surface 的名字报错而不是
     // 静默变成自由参数(见 objects/references.ts).
     const references = createObjectReferenceResolver(
         statementsByName,
         collectDeclaredValueNames(ast),
-        new Set(params.keys()),
+        new Set(draft.params.keys()),
     );
+
+    collectObjectBlueprints(
+        ast,
+        draft,
+        references,
+        statementsByName,
+        transforms,
+        matrices,
+        animations,
+    );
+    // 3) 预填"可求导源";返回的声明名集合供 derivative pass 区分"存在但类型
+    //    不对"与"根本不存在"两种报错.
+    const declaredObjectNames = collectDerivativeSources(ast, draft);
+    // 4) 三条派生语句:顺序 antiderivative -> ode -> derivative(见各函数注释).
+    collectAntiderivativeObjects(ast, draft);
+    collectOdeObjects(ast, draft);
+    collectDerivativeObjects(ast, draft, statementsByName, declaredObjectNames);
+
+    // 5) region 边界约束是纯声明级检查,放在这里一次性执行(见文件头结论).
+    finalizeRegionBlueprints(
+        draft.objectBlueprints,
+        statementsByName,
+        draft.objectTransforms,
+        draft.objectAnimations,
+    );
+
+    // 6) 自由参数补默认值(必须在全部 pass 之后:派生对象的系数也要计入).
+    registerCoefficientParams(draft);
+
+    return {
+        params: draft.params,
+        objectBlueprints: draft.objectBlueprints,
+        objectTransforms: draft.objectTransforms,
+        animations,
+        objectAnimations: draft.objectAnimations,
+        antiderivativeFacts: draft.antiderivativeFacts,
+        odeFacts: draft.odeFacts,
+    };
+}
+
+/** object 语句 -> blueprint,并解析其 transform/animation 选项. */
+function collectObjectBlueprints(
+    ast: AstProgram,
+    draft: SceneDraft,
+    references: ObjectReferenceResolver,
+    statementsByName: Map<string, ObjectStatement>,
+    transforms: Map<string, Mat4>,
+    matrices: Map<string, Mat4>,
+    animations: Map<string, AnimationClip>,
+): void {
     for (const statement of ast.statements) {
         if (statement.type !== 'object') continue;
         withStatementSpan(statement.span, () => {
             const blueprint = buildObjectBlueprint(
                 statement,
-                nextId,
+                draft.nextId,
                 statementsByName,
                 references,
             );
             if (blueprint) {
-                if (objectNames.has(blueprint.name)) {
+                if (draft.objectNames.has(blueprint.name)) {
                     throw new Error(`对象 ${blueprint.name} 重复声明`);
                 }
-                objectNames.add(blueprint.name);
-                objectBlueprints.push(blueprint);
+                draft.objectNames.add(blueprint.name);
+                draft.objectBlueprints.push(blueprint);
                 const transform = resolveObjectTransform(
                     findOption(statement.options, 'transform'),
                     transforms,
                     matrices,
                 );
-                if (transform) objectTransforms.set(blueprint.id, transform);
+                if (transform) draft.objectTransforms.set(blueprint.id, transform);
                 const animationNames = parseAnimationNames(
                     findOption(statement.options, 'animation'),
                     `对象 ${blueprint.name} 的 animation`,
@@ -711,146 +261,200 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
                     }
                 }
                 if (animationNames.length > 0) {
-                    objectAnimations.set(blueprint.id, animationNames);
+                    draft.objectAnimations.set(blueprint.id, animationNames);
                 }
-                nextId += 1;
+                draft.nextId += 1;
             }
         });
     }
+}
 
-    // 求导语句:生成一个新 curve/surface 对象(全名 derivative,见 miko.pest).
-    // 先建立"可求导源"(curve/surface 对象 + 先前求导结果,按归一化表达式),
-    // 再按源码顺序处理 derivative,使链式求导(d²f)与单层求导共用同一入口.
-    //
-    // 审查记录(202609):前向引用不对称--curve/surface 源在此处先预填
-    // resolvable,所以"derivative 写在源对象之前"也成立;但链式求导的结果
-    // 只在轮到它时才写入 resolvable,因此 `derivative d2 = derivative(d1)`
-    // 要求 d1 在之前声明(否则报"引用了不存在的对象 d1").若需链式也支持
-    // 乱序,改为两阶段解析(先求依赖序再生成 blueprint).
-    const resolvable = new Map<string, DerivativeSource>();
+/** 把 curve/surface blueprint 登记为可继续求导的源(见 collectDerivativeSources). */
+function registerResolvable(
+    resolvable: Map<string, DerivativeSource>,
+    blueprint: CurveBlueprint | SurfaceBlueprint,
+): void {
+    resolvable.set(blueprint.name, { kind: blueprint.kind, expr: blueprint.expr });
+}
+
+/**
+ * 预填"可求导源"(curve/surface/implicit/sphere),并收集全部对象声明名.
+ *
+ * 直接读已经建好的 blueprint:curve/surface 的归一化表达式,implicit 的表达式
+ * 与维度,sphere 的符号位置/半径都在里面,避免在这里再解析一遍语句(球体的
+ * radius 还有默认值,重复实现会漂移).
+ *
+ * 审查记录(202609):前向引用不对称--curve/surface 源在此处先预填
+ * resolvable,所以"derivative 写在源对象之前"也成立;但链式求导的结果
+ * 只在轮到它时才写入 resolvable,因此 `derivative d2 = derivative(d1)`
+ * 要求 d1 在之前声明(否则报"引用了不存在的对象 d1").若需链式也支持
+ * 乱序,改为两阶段解析(先求依赖序再生成 blueprint).
+ *
+ * 返回的是**全部**对象声明名(即使 blueprint 缺失或类型不可求导),供
+ * derivative pass 报出"类型不对"而不是"不存在".
+ */
+function collectDerivativeSources(ast: AstProgram, draft: SceneDraft): ReadonlySet<string> {
     const declaredObjectNames = new Set<string>();
-    // 预填"可求导源"时直接读已经建好的 blueprint:curve/surface 的归一化
-    // 表达式,implicit 的表达式与维度,sphere 的符号位置/半径都在里面,
-    // 避免在这里再解析一遍语句(球体的 radius 还有默认值,重复实现会漂移).
     const blueprintByName = new Map(
-        objectBlueprints.map((item) => [item.name, item] as const),
+        draft.objectBlueprints.map((item) => [item.name, item] as const),
     );
     for (const statement of ast.statements) {
         if (statement.type !== 'object' || statement.name === undefined) continue;
         declaredObjectNames.add(statement.name);
         const blueprint = blueprintByName.get(statement.name);
         if (blueprint?.kind === 'curve' || blueprint?.kind === 'surface') {
-            resolvable.set(statement.name, {
-                kind: blueprint.kind,
-                expr: blueprint.expr,
-            });
+            registerResolvable(draft.resolvable, blueprint);
         } else if (blueprint?.kind === 'implicit') {
-            resolvable.set(statement.name, {
+            draft.resolvable.set(statement.name, {
                 kind: 'implicit',
                 expr: blueprint.expr,
                 dim: blueprint.dim,
             });
         } else if (blueprint?.kind === 'sphere') {
-            resolvable.set(statement.name, {
+            draft.resolvable.set(statement.name, {
                 kind: 'sphere',
                 positionExprs: blueprint.positionExprs,
                 radiusExpr: blueprint.radiusExpr,
             });
         }
     }
-    // 不定积分语句:同样生成一个新 curve/surface 对象(设计文档
-    // docs/calculus-suite-plan.md 第 3 节"作为可渲染对象下发").
-    //
-    // 为什么必须在静态场景里建 blueprint(而不是在 compileScene 之后补一个
-    // 对象):后面的 `derivative F2 = derivative(F1)` 等引用走的是这里的
-    // `resolvable`;产物只在 compileScene 之后追加,链式引用就找不到它
-    // (实测踩过:`derivative back = derivative(F)` 报"引用了不存在的对象 F").
-    //
-    // 参数按当前值折叠进表达式(与求解/分析同口径):`paramScope` 只用声明里的
-    // 默认值,滑块值经 `paramOverrides` 在物化时生效;因此这里必须把源对象解析
-    // 出的"依赖了哪些参数"原样带到 blueprint,参数变化时物化才会重算.
+    return declaredObjectNames;
+}
+
+/**
+ * 不定积分语句:生成一个新 curve/surface 对象(设计文档
+ * docs/calculus-suite-plan.md 第 3 节"作为可渲染对象下发").
+ *
+ * 为什么必须在静态场景里建 blueprint(而不是在 compileScene 之后补一个
+ * 对象):后面的 `derivative F2 = derivative(F1)` 等引用走的是
+ * draft.resolvable;产物只在 compileScene 之后追加,链式引用就找不到它
+ * (实测踩过:`derivative back = derivative(F)` 报"引用了不存在的对象 F").
+ *
+ * 参数按当前值折叠进表达式(与求解/分析同口径):`paramScope` 只用声明里的
+ * 默认值,滑块值经 `paramOverrides` 在物化时生效;因此"源对象依赖了哪些
+ * 参数"必须原样带到产物 blueprint,参数变化时物化才会重算
+ * (buildAntiderivativeBlueprint 里"系数表故意留空"那段注释).
+ */
+function collectAntiderivativeObjects(ast: AstProgram, draft: SceneDraft): void {
+    // 源查询只认**此 pass 之前**的 blueprint:原函数暂不能再被另一条
+    // antiderivative 引用(与拆分前一致,蓝图索引在此处一次成型).
+    const blueprintByName = new Map(
+        draft.objectBlueprints.map((item) => [item.name, item] as const),
+    );
     for (const statement of ast.statements) {
         if (statement.type !== 'antiderivative') continue;
         withStatementSpan(statement.span, () => {
-            if (objectNames.has(statement.name)) {
+            if (draft.objectNames.has(statement.name)) {
                 throw new Error(`对象 ${statement.name} 重复声明`);
             }
             const { blueprint, fact } = buildAntiderivativeBlueprint(
                 statement,
-                nextId,
+                draft.nextId,
                 blueprintByName,
             );
-            antiderivativeFacts.set(statement.name, fact);
+            draft.antiderivativeFacts.set(statement.name, fact);
             if (blueprint === null) {
                 // 能力边界(非初等/超出规则):不下发对象,也不登记 resolvable;
                 // 求值条目由 fact.error 给出理由(与求解内核同口径).
                 return;
             }
-            objectNames.add(blueprint.name);
-            objectBlueprints.push(blueprint);
-            resolvable.set(blueprint.name, {
-                kind: blueprint.kind,
-                expr: blueprint.expr,
-            });
-            nextId += 1;
+            draft.objectNames.add(blueprint.name);
+            draft.objectBlueprints.push(blueprint);
+            registerResolvable(draft.resolvable, blueprint);
+            draft.nextId += 1;
         });
     }
+}
 
+/**
+ * 微分方程语句(设计文档 docs/plan3.md 第 1.3 节):放在 antiderivative
+ * pass **之后**,derivative pass **之前**--这样 ode 下发的解曲线也能被
+ * 后面的 `derivative D = derivative(O1_c1)` 引用(靠 draft.resolvable).
+ *
+ * id 与 OdeFact 里的 slopeObjectId/curveNames 由 buildOdeBlueprints 按传入的
+ * 起始 id 填写,这里按返回顺序登记并递增,保证实体 id 与事实一致.
+ */
+function collectOdeObjects(ast: AstProgram, draft: SceneDraft): void {
+    for (const statement of ast.statements) {
+        if (statement.type !== 'ode') continue;
+        withStatementSpan(statement.span, () => {
+            if (draft.objectNames.has(statement.name)) {
+                throw new Error(`对象 ${statement.name} 重复声明`);
+            }
+            const { blueprints, fact } = buildOdeBlueprints(
+                statement,
+                draft.nextId,
+                draft.params,
+            );
+            draft.odeFacts.set(statement.name, fact);
+            for (const blueprint of blueprints) {
+                if (draft.objectNames.has(blueprint.name)) {
+                    throw new Error(`对象 ${blueprint.name} 重复声明`);
+                }
+                draft.objectNames.add(blueprint.name);
+                draft.objectBlueprints.push(blueprint);
+                registerResolvable(draft.resolvable, blueprint);
+                draft.nextId += 1;
+            }
+        });
+    }
+}
+
+/**
+ * 求导语句:生成一个新 curve/surface/vector_field(全名 derivative,见
+ * miko.pest).
+ *
+ * 只有 curve/surface 求导产物还能继续求导(高阶导数);隐式场求导产物是
+ * vector_field,暂不支持对向量场求导,故不写入 resolvable,后续引用会得到
+ * 明确的"只能应用于 ..."错误.
+ *
+ * 求导产物是独立对象,不继承源对象的 transform/animation,故无需登记
+ * objectTransforms/objectAnimations.
+ */
+function collectDerivativeObjects(
+    ast: AstProgram,
+    draft: SceneDraft,
+    statementsByName: Map<string, ObjectStatement>,
+    declaredObjectNames: ReadonlySet<string>,
+): void {
     for (const statement of ast.statements) {
         if (statement.type !== 'derivative') continue;
         withStatementSpan(statement.span, () => {
-            if (objectNames.has(statement.name)) {
+            if (draft.objectNames.has(statement.name)) {
                 throw new Error(`对象 ${statement.name} 重复声明`);
             }
             const blueprint = buildDerivativeObjectBlueprint(
                 statement,
-                nextId,
+                draft.nextId,
                 statementsByName,
-                resolvable,
+                draft.resolvable,
                 declaredObjectNames,
             );
-            objectNames.add(blueprint.name);
-            objectBlueprints.push(blueprint);
-            // 只有 curve/surface 求导产物还能继续求导(高阶导数);隐式场
-            // 求导产物是 vector_field,暂不支持对向量场求导,故不写入
-            // resolvable,后续引用会得到明确的"只能应用于 ..."错误.
+            draft.objectNames.add(blueprint.name);
+            draft.objectBlueprints.push(blueprint);
             if (blueprint.kind === 'curve' || blueprint.kind === 'surface') {
-                resolvable.set(blueprint.name, {
-                    kind: blueprint.kind,
-                    expr: blueprint.expr,
-                });
+                registerResolvable(draft.resolvable, blueprint);
             }
-            // 求导产物是独立对象,不继承源对象的 transform/animation,故无需
-            // 登记 objectTransforms/objectAnimations.
-            nextId += 1;
+            draft.nextId += 1;
         });
     }
+}
 
-    // "region" 边界约束是纯声明级检查,放在这里一次性执行(见文件头结论).
-    finalizeRegionBlueprints(
-        objectBlueprints,
-        statementsByName,
-        objectTransforms,
-        objectAnimations,
-    );
-
-    for (const blueprint of objectBlueprints) {
+/**
+ * 没在任何声明里出现过的系数名补一个默认参数(自由符号 -> 滑块).
+ *
+ * 必须等全部 blueprint 建完:派生对象(不定积分/微分方程/求导)的系数由各自
+ * 构建器带回,漏掉就会出现"表达式引用了未知符号"的物化期错误.
+ */
+function registerCoefficientParams(draft: SceneDraft): void {
+    for (const blueprint of draft.objectBlueprints) {
         if (!blueprintHasCoefficients(blueprint)) continue;
         for (const name of blueprint.coefficientNames) {
-            if (!params.has(name)) {
-                params.set(name, createDefaultParam(name));
+            if (!draft.params.has(name)) {
+                draft.params.set(name, createDefaultParam(name));
             }
         }
     }
-
-    return {
-        params,
-        objectBlueprints,
-        objectTransforms,
-        animations,
-        objectAnimations,
-        antiderivativeFacts,
-    };
 }
 
 /**
