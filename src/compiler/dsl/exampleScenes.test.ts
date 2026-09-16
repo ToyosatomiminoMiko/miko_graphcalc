@@ -1,7 +1,7 @@
 /**
  * 随仓库分发的 DSL 源码整体编译回归.
  *
- * `example/*.scad` 与 `index.html` 里 `<textarea id="dsl-editor">` 的默认源码
+ * `example/*.miko` 与 `index.html` 里 `<textarea id="dsl-editor">` 的默认源码
  * 是用户第一眼会跑的东西,也是 DSL 语义(尤其编译期校验)回归时最先被打破的
  * 地方:编译器新增一条"报错而不是静默当自由参数"的规则,就可能让既有示例
  * 直接编译失败.这里用真实 Rust 解析器 + 真实符号引擎把两份内容全量跑一遍,
@@ -19,7 +19,7 @@ import { testMatrixOps } from '../../testing/matrixOps';
 describe('仓库自带 DSL 源码', () => {
     it('example/ 下每个示例都能编译出 SceneIR', async () => {
         const dir = new URL('../../../example/', import.meta.url);
-        const files = (await readdir(dir)).filter((name) => name.endsWith('.scad'));
+        const files = (await readdir(dir)).filter((name) => name.endsWith('.miko'));
         expect(files.length).toBeGreaterThan(0);
 
         const failures: string[] = [];

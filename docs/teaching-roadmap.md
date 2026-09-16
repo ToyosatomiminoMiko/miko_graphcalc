@@ -35,12 +35,12 @@
 
 | 资产 | 位置 | 教学价值 |
 | --- | --- | --- |
-| 11 个可运行场景 | `example/*.scad` | 直接可用,文件头注释已是教学级 |
+| 11 个可运行场景 | `example/*.miko` | 直接可用,文件头注释已是教学级 |
 | 场景功能对照表 | `example/README.md` | 已按"求导/偏导"与"其他主题"分类 |
 | 求导用户文档 | `docs/derivatives-guide.md` | 8 节,含算子×对象可用矩阵 |
 | 五种积分法可视化 | `src/render/visualization/integral/` | 黎曼(左/右/中)/梯形/辛普森/勒贝格 |
 | 切线与切平面 | `src/render/core/renderers/AnalysisRenderer.ts` | 一阶导的几何意义直接可见 |
-| 隐式场梯度 | `example/sphere_gradient.scad` | 梯度垂直于等值面,难得的直观演示 |
+| 隐式场梯度 | `example/sphere_gradient.miko` | 梯度垂直于等值面,难得的直观演示 |
 | 参数实时联动 | `src/compiler/dsl/params.ts` | 滑块驱动,适合课堂逐步演示 |
 | 公式 KaTeX + 点击复制 | `src/ui/formula/FormulaView.ts` | 可做"结论对答案"环节 |
 | 54 项自动化测试 | 354 (TS) + 129 (Rust) | 改坏的立刻知道,教学改造的安全网 |
@@ -51,7 +51,7 @@
 
 | # | 缺口 | 现状证据 | 教学影响 |
 | --- | --- | --- | --- |
-| G1 | **求导过程不可见** | `math_rs::symbolic_derivative(expr, var)` 只返回化简后的字符串 | 只能讲"结果是",讲不了"为什么";`derivative_rules.scad` 只能用并列对照代替推导 |
+| G1 | **求导过程不可见** | `math_rs::symbolic_derivative(expr, var)` 只返回化简后的字符串 | 只能讲"结果是",讲不了"为什么";`derivative_rules.miko` 只能用并列对照代替推导 |
 | G2 | **无极限 / ε-δ** | 语法与内核均无 `limit` 概念 | 导数的定义式,连续性,收敛都讲不了 |
 | G3 | **无方程/不等式求解** | 无对应语句;`implicit` 只画等值线,不解 | 无法出"解不等式"类习题.求解的**过程展示**由 B5 先行,内核按保守式新增分期引入 |
 | G4 | **函数族偏窄** | `src/math/math_rs/src/builtins.rs` 无 `floor`/`ceil`/`min`/`max`,无分段 | 分段函数,取整,最值问题全是盲区 |
@@ -70,7 +70,7 @@
 
 | # | 缺口 | 现状证据 | 影响 |
 | --- | --- | --- | --- |
-| D1 | **`example/` 没有加载器** | 全仓库 `grep` 不到任何 `.scad` 读取代码;`dist/assets` 里无 `.scad` | 学生必须手抄文件内容,离线状态下更是只能靠记忆 |
+| D1 | **`example/` 没有加载器** | 全仓库 `grep` 不到任何 `.miko` 读取代码;`dist/assets` 里无 `.miko` | 学生必须手抄文件内容,离线状态下更是只能靠记忆 |
 | D2 | **默认场景是杂物间** | `index.html` 的 textarea 混了 `param/point/vector/matrix/curve×2/integral/intersection`,还留着注释"临时示例,后续统一加入文档" | 首次打开认知过载,不知道从哪里开始 |
 | D3 | **无练习模式** | 无题面/答案/判定机制 | 只能演示,不能练 |
 | D4 | **无进度与引导** | 无课程入口,无步骤状态 | 学生不知道"下一步学什么" |
@@ -124,7 +124,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | 示例是"能跑"的素材,不是"能教"的教案:没有学习目标,没有观察指引,没有思考题 |
-| 改动 | 为每个 `.scad` 统一文件头五段式:**学习目标 / 前置 / 操作 / 观察 / 思考**.现状文件头已含"本例演示什么"与部分数学解释,补齐"操作""观察""思考"即可.同步更新 `example/README.md` 的对照表,补一列"学习目标". |
+| 改动 | 为每个 `.miko` 统一文件头五段式:**学习目标 / 前置 / 操作 / 观察 / 思考**.现状文件头已含"本例演示什么"与部分数学解释,补齐"操作""观察""思考"即可.同步更新 `example/README.md` 的对照表,补一列"学习目标". |
 | 依赖 | 无 |
 | 工作量 | `2–3d`(11 个文件,每个 1–2 小时) |
 | 验收 | 每个示例文件头五段齐全;`example/README.md` 表格与文件实际内容一致;所有示例仍能在页面里粘贴运行通过 |
@@ -141,20 +141,20 @@
 
 | 建议新增文件 | 覆盖概念 | 靠现有能力能否实现 |
 | --- | --- | --- |
-| `secant_to_tangent.scad` | 导数定义:割线->切线 | **能**.一个 `param h`滑块 + 点分析,拖动 h->0 |
-| `limit_sequence.scad` | 极限的数值收敛 | **能**.`param n` 驱动表达式,观察结果列表逼近 |
-| `direction_derivative.scad` | 方向导数 | **能**.`gradient` + `vector` 点积对比 |
-| `gradient_ascent.scad` | 梯度上升/下降路径 | **能**.多点 + 向量场 |
-| `implicit_contour.scad` | 二维隐式曲线 | 部分能.`implicit` 的 marching 渲染在 README 中标注为"留到后续",当前只有方程本体参与分析 |
-| `taylor_approximation.scad` | 泰勒展开逐阶逼近 | **能**.多个 `derivative` 语句组合 |
-| `polar_curve.scad` | 极坐标曲线 | **不能**(G6 / `curve` 是 y=f(x) 形式) |
+| `secant_to_tangent.miko` | 导数定义:割线->切线 | **能**.一个 `param h`滑块 + 点分析,拖动 h->0 |
+| `limit_sequence.miko` | 极限的数值收敛 | **能**.`param n` 驱动表达式,观察结果列表逼近 |
+| `direction_derivative.miko` | 方向导数 | **能**.`gradient` + `vector` 点积对比 |
+| `gradient_ascent.miko` | 梯度上升/下降路径 | **能**.多点 + 向量场 |
+| `implicit_contour.miko` | 二维隐式曲线 | 部分能.`implicit` 的 marching 渲染在 README 中标注为"留到后续",当前只有方程本体参与分析 |
+| `taylor_approximation.miko` | 泰勒展开逐阶逼近 | **能**.多个 `derivative` 语句组合 |
+| `polar_curve.miko` | 极坐标曲线 | **不能**(G6 / `curve` 是 y=f(x) 形式) |
 
 | 项 | 内容 |
 | --- | --- |
 | 工作量 | `2–3d`(每个新增文件含调试) |
 | 验收 | 新增文件均通过"粘贴到编辑器点运行"验证;数学结论与文件头注释一致(用 `integral`/结果列表交叉验证) |
 | 风险 | **先验证再写注释**.项目内已有教训:注释里的数学结论错得比代码更隐蔽.每个新增示例的注释结论都应用符号求导或数值对拍确认 |
-| 降级 | 只做 `secant_to_tangent.scad`.它是"导数定义"的唯一入口,单点收益最高 |
+| 降级 | 只做 `secant_to_tangent.miko`.它是"导数定义"的唯一入口,单点收益最高 |
 
 ### T4 习题册
 
@@ -173,7 +173,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | **D1,当前最硬的缺口**:`example/` 根本没进构建产物,学生只能手抄 |
-| 改动 | ① `vite.config.ts` 增 `import.meta.glob('../example/*.scad', { query: '?raw' })` 或专用插件,把示例作为**字符串资源**打进产物;② 左面板 `index.html` 的 `panel-header` 增一个 `<select>`(或复用现有按钮样式);③ 新增 `src/ui/ExamplePicker.ts` 纯逻辑组件,选中后写入 `#dsl-editor` 并触发 `run-btn` 的等价路径. |
+| 改动 | ① `vite.config.ts` 增 `import.meta.glob('../example/*.miko', { query: '?raw' })` 或专用插件,把示例作为**字符串资源**打进产物;② 左面板 `index.html` 的 `panel-header` 增一个 `<select>`(或复用现有按钮样式);③ 新增 `src/ui/ExamplePicker.ts` 纯逻辑组件,选中后写入 `#dsl-editor` 并触发 `run-btn` 的等价路径. |
 | 依赖 | T2(需要示例带上标题元信息才能生成下拉项) |
 | 工作量 | `2–3d` |
 | 验收 | 下拉列出全部示例;选择后编辑器内容与文件一致;点击运行后场景正确;刷新页面后默认仍是原默认场景(不隐式改变启动行为) |
@@ -185,7 +185,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | **D2**:首次打开认知过载 |
-| 改动 | 把 `index.html` 里 textarea 的内容换成最小可教场景(建议:单条 `curve` + 一个 `param` + 一个 `gradient` 点分析),原内容转为 T5 示例库中的一个条目(可命名 `tour.scad`). |
+| 改动 | 把 `index.html` 里 textarea 的内容换成最小可教场景(建议:单条 `curve` + 一个 `param` + 一个 `gradient` 点分析),原内容转为 T5 示例库中的一个条目(可命名 `tour.miko`). |
 | 依赖 | T5(原内容必须有去处,否则等于删除功能) |
 | 工作量 | `0.5d` |
 | 验收 | 首次打开看到最小场景且一眼能懂;原默认场景可在示例库中找到并运行 |
@@ -212,7 +212,7 @@
 | 改动 | 在分析结果区除最终导数外,补一行**导数的定义式**(`f'(x₀) = lim_{h->0} [f(x₀+h) − f(x₀)]/h`)与**数值差商估算值**.数据来源:已有的 `evaluate_scalar` WASM 入口(两次求值),不新增内核接口 |
 | 依赖 | 无 |
 | 工作量 | `1–2d` |
-| 验收 | 对 `example/derivative_curve.scad`,结果列表同时显示符号导数与 h 取小值时的差商,两者数值在容差内一致 |
+| 验收 | 对 `example/derivative_curve.miko`,结果列表同时显示符号导数与 h 取小值时的差商,两者数值在容差内一致 |
 | 风险 | **这只是"数值验证",不是"推导过程"**.不要把它宣传成步骤化求导,否则学生会以为看到了法则推导.命名上要区分清楚(建议 UI 文案写"差商校验") |
 | 降级 | 不做.它价值有限,存在的意义主要是为 B1 探路 |
 
@@ -252,7 +252,7 @@
 | --- | --- |
 | 问题 | G2.导数定义式与收敛概念没有载体 |
 | 改动 | 不新增语法.用现有 `param n` / `param h` + 结果列表 + `integral` 可视化组合出"分割加细 -> 积分"的演示;若要更直观,可在 `src/ui/view/controls/` 增一个"序列播放"控件,用 `AnimationPlayer` 已有的时间轴驱动参数变化(`src/render/core/AnimationPlayer.ts`) |
-| 依赖 | T3(`limit_sequence.scad` 先证明可行) |
+| 依赖 | T3(`limit_sequence.miko` 先证明可行) |
 | 工作量 | `2–3d`(若只做示例 + 参数联动则 `0.5d`) |
 | 验收 | 拖动参数时结果列表单调收敛且可停止;动画播放可暂停/重播 |
 | 风险 | **不要新增 `limit` 语句**.符号极限需要级数/洛必达等一整套能力,是完整 CAS 的入口,会把项目拖进 G1 之外的深水区.数值演示已经够课堂教学用 |
@@ -291,7 +291,7 @@
 | 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
 | 二期 | 步骤索引驱动几何(割线->切线,黎曼矩形加细,交点高亮):把"第 k 步"当虚拟参数走 `CompileController.refresh` -> `RenderController.applyScene(scene, changedParams)`,复用既有缓存与 latest-only 调度;IR **只新增**字段(如 `stepHighlights`) |
 | 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源:过程页骨架(标签页/递等式/披露/翻步)零改动;UI 增量只有"求解"子列表条目与过程页**题目区**--这正是展示层先行的价值 |
-| 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.scad`,默认场景也带两条 `solve` |
+| 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.miko`,默认场景也带两条 `solve` |
 | 依赖 | 一期无(可与 T8/B1 并行);二期接一期预留的 `onStepChange` 出口(一期无订阅者,只发索引);三期依赖 B1 的产物类型口径 |
 | 工作量 | 一期 `3–5d`(跨 HTML/CSS/新控制器/共享行件契约),二期 `3–5d`,三期 `1w+`(需先豁免 §7.1 的禁令) |
 | 验收 | 一期:①标签页切换后折叠/展开与 `dispose()` 复位与现有一致;②过程页激活时 `#params-panel` / `#right-splitter` 不参与布局,切回后分隔比例不变;③长过程条目进过程页后底栏高度不变;④判据/翻步状态机/步骤分区有纯函数测试;⑤`npm test` 与 `npm run typecheck` 全绿;⑥主 chunk 增量实测 < 30KB |
@@ -350,18 +350,18 @@
 
 | 序 | 主题 | 现有/新增文件 | 核心结论 |
 | --- | --- | --- | --- |
-| 1 | 函数与参数 | `object_addition.scad` + 新增最小场景 | 表达式即图形,参数即滑块 |
-| 2 | 导数定义 | 新 `secant_to_tangent.scad` | 割线极限 = 切线斜率 |
-| 3 | 求导法则 | `derivative_rules.scad` | 积/商/链式的对照 |
-| 4 | 导数函数图像 | `derivative_graph.scad` | f' 本身是函数 |
-| 5 | 一元点分析 | `derivative_curve.scad` | 切线/法向的几何意义 |
-| 6 | 偏导与切平面 | `partial_derivative_surface.scad` | 临界点处切平面水平 |
-| 7 | 梯度与隐式场 | `sphere_gradient.scad` | 梯度垂直等值面 |
-| 8 | 散度与旋度 | `divergence_vector_field.scad`,`curl_vector_field.scad` | 源汇 / 旋转 |
+| 1 | 函数与参数 | `object_addition.miko` + 新增最小场景 | 表达式即图形,参数即滑块 |
+| 2 | 导数定义 | 新 `secant_to_tangent.miko` | 割线极限 = 切线斜率 |
+| 3 | 求导法则 | `derivative_rules.miko` | 积/商/链式的对照 |
+| 4 | 导数函数图像 | `derivative_graph.miko` | f' 本身是函数 |
+| 5 | 一元点分析 | `derivative_curve.miko` | 切线/法向的几何意义 |
+| 6 | 偏导与切平面 | `partial_derivative_surface.miko` | 临界点处切平面水平 |
+| 7 | 梯度与隐式场 | `sphere_gradient.miko` | 梯度垂直等值面 |
+| 8 | 散度与旋度 | `divergence_vector_field.miko`,`curl_vector_field.miko` | 源汇 / 旋转 |
 | 9 | 定积分与黎曼和 | 现有 `integral` 示例 + 五种方法对照 | 分割加细取极限 |
-| 10 | 重积分与区域 | `double_integral_region.scad` | 积分域是平面区域 |
-| 11 | 求交 | `intersection_line_curves.scad`,`intersection_surfaces.scad` | 方程的几何解 |
-| 12 | 变换与动画 | `animation_box_rotations.scad` | 矩阵即变换 |
+| 10 | 重积分与区域 | `double_integral_region.miko` | 积分域是平面区域 |
+| 11 | 求交 | `intersection_line_curves.miko`,`intersection_surfaces.miko` | 方程的几何解 |
+| 12 | 变换与动画 | `animation_box_rotations.miko` | 矩阵即变换 |
 
 > 第 9 课是本项目**最有教学差异化优势**的一课:五种积分法的可视化在同类
 > 工具里并不常见(`riemann:left/right/mid`,`trapezoid`,`simpson`,

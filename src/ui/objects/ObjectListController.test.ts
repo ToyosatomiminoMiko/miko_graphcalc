@@ -570,7 +570,7 @@ describe('三级披露:长过程的 L2 入口', () => {
     /**
      * 带球坐标回显 + 切向量的梯度 = 6 行细节(符号展开 / 数值 / 取点 / 球坐标 /
      * 函数值 / 切向量),超过 UI_CONFIG.process.disclosureThreshold(5).
-     * 这是 `example/sphere_gradient.scad` 里 `at spherical` 那条梯度的形状.
+     * 这是 `example/sphere_gradient.miko` 里 `at spherical` 那条梯度的形状.
      */
     const longGradient: AnalysisResult = {
         ...analysis,

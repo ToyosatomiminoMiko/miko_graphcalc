@@ -2,7 +2,7 @@
  * 示例目录一致性.
  *
  * 锁的是"菜单能选到的示例"与"仓库里真实存在的示例文件"不许分叉:
- * - 新增 `example/*.scad` 忘了登记 -> 文件多出来,失败;
+ * - 新增 `example/*.miko` 忘了登记 -> 文件多出来,失败;
  * - 清单里写了不存在的文件,或 glob 没内联到文本 -> 取不到源码,失败.
  *
  * 与 compiler/dsl/exampleScenes.test.ts 的分工:那个文件锁"示例在当下编译器里
@@ -23,7 +23,7 @@ const EXAMPLE_DIR = new URL('../../../example/', import.meta.url);
 describe('示例目录', () => {
     it('example/ 下的文件与清单一一对应', async () => {
         const files = (await readdir(EXAMPLE_DIR))
-            .filter((name) => name.endsWith('.scad'))
+            .filter((name) => name.endsWith('.miko'))
             .sort();
         const listed = EXAMPLE_CATALOG.map((entry) => entry.file).sort();
 
@@ -54,6 +54,6 @@ describe('示例目录', () => {
     });
 
     it('清单之外的文件名取不到源码,返回 null 而不是空串', () => {
-        expect(exampleSource('no_such_example.scad')).toBeNull();
+        expect(exampleSource('no_such_example.miko')).toBeNull();
     });
 });

@@ -28,7 +28,7 @@ gradient g = grad(F) at [1, 0];           // 原函数在某点的切线斜率 =
 integral I = integral(F) { range = [-1, 2]; };  // 原函数的定积分
 ```
 
-`example/antiderivative_basic.scad` 就是"求原函数 -> 再求导 -> 与源曲线重合"
+`example/antiderivative_basic.miko` 就是"求原函数 -> 再求导 -> 与源曲线重合"
 的最小闭环(微积分基本定理的图形版).
 
 ---
@@ -133,5 +133,5 @@ d/dx [ F ] = f
 
 - 设计计划(能力边界,分期,体积实测):[calculus-suite-plan.md](calculus-suite-plan.md)
 - 求导与偏导:[derivatives-guide.md](derivatives-guide.md)
-- 示例:`example/antiderivative_basic.scad`(原函数 + 求导验算),
-  `example/antiderivative_rational.scad`(有理函数与部分分式)
+- 示例:`example/antiderivative_basic.miko`(原函数 + 求导验算),
+  `example/antiderivative_rational.miko`(有理函数与部分分式)

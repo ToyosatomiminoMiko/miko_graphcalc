@@ -284,10 +284,10 @@ ode T = y' = y { independent = t; };
 
 ## 相关文档与示例
 
-- 示例:`example/ode_separable.scad`(可分离:斜率场 + 解族 + 特解),
-  `example/ode_linear_first_order.scad`(一阶线性 + 参数联动),
-  `example/ode_second_order.scad`(二阶常系数三种特征根型),
-  `example/ode_with_initial.scad`(初值把族收成一条 + 隐式解)
+- 示例:`example/ode_separable.miko`(可分离:斜率场 + 解族 + 特解),
+  `example/ode_linear_first_order.miko`(一阶线性 + 参数联动),
+  `example/ode_second_order.miko`(二阶常系数三种特征根型),
+  `example/ode_with_initial.miko`(初值把族收成一条 + 隐式解)
 - [三期完整规划与设置](plan3.md):DSL,内核支持清单与步法,两层编译,验收口径,
   §7 的实测坑
 - [不定积分与微分方程:设计计划](calculus-suite-plan.md):总口径与分期

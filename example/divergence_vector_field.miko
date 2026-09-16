@@ -2,7 +2,7 @@
 // 向量场的散度 div F = ∂P/∂x + ∂Q/∂y + ∂R/∂z
 //
 // 向量场 vector_field F = [P, Q, R] 的三个分量在编译期被符号引擎
-// 逐项对 x/y/z 求偏导(见 derivative_rules.scad 的法则),散度分析
+// 逐项对 x/y/z 求偏导(见 derivative_rules.miko 的法则),散度分析
 // 在测量点处把它们组合成标量:
 //     divergence d = div(F) at [px, py, pz];
 // 结果以数字形式打印在右侧"结果"列表;散度是"净流出量"的度量,

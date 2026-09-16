@@ -552,7 +552,7 @@ mod tests {
         // `x * e^{-(x²+y²)}` 在 x=0 一整列光滑穿过零.变号边的跳变远超全局
         // 中位跳变(中位数被大片平坦区拉低),若只看"跳变 > 16×中位跳变"就会
         // 把这一列误判成渐近线,在曲面上切出一条方形空洞.
-        // 回归来源:example/gauss_surface.scad 里 `derivative dx =
+        // 回归来源:example/gauss_surface.miko 里 `derivative dx =
         // derivative(s1, x)` 生成的曲面 dx = ∂/∂x[j·e^{-a(x²+y²)}] 同样是
         // 关于 x 的奇函数,默认 a=0.1 时在 x=0 附近丢过一条方形空洞.
         let result = run("x * exp(-(x ^ 2 + y ^ 2))", &[]);
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn gaussian_derivative_surface_keeps_all_cells() {
-        // 原始报告用例(example/gauss_surface.scad):偏导曲面
+        // 原始报告用例(example/gauss_surface.miko):偏导曲面
         // dx = ∂/∂x[3·e^{-0.1(x²+y²)}],range=[-8,8]² / segments=96.
         // 旧判据只按"跳变 > 16×中位跳变"就会在 x∈[0, 1/6],y∈[-2.5, 2.33]
         // 丢掉 30 个单元,渲染成一条方形空洞.表达式取编译器展开后的原样.

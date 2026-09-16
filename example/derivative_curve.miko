@@ -14,7 +14,7 @@
 //              f' < 0 时斜向右上,f' = 0 时竖直向上.
 //
 // 一元 curve 求导不写 show 时默认画 [point, normal, tangent];
-// 想只看部分元素时再显式写 show(见 derivative_rules.scad 里
+// 想只看部分元素时再显式写 show(见 derivative_rules.miko 里
 // show = [point, tangent] 的用法).
 //
 // 本例 f(x) = sin(a * x):

@@ -171,7 +171,7 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
 | `app/SceneStore.ts`,`CompileController.ts`,`DslApp.ts`,`index.html`,`css/panels.css` | hidden 集合,回调,容器,徽章样式 |
 | `ui/process/processData.ts` | `buildAntiderivativeProcess`,`buildOdeProcess` |
 | `config/uiConfig.ts` | 新环节上限(原函数步数/ODE 步数)与披露阈值 |
-| `example/` | `antiderivative_basic.scad`,`antiderivative_rational.scad`,`ode_separable.scad`,`ode_second_order.scad`(+`exampleCatalog` 登记) |
+| `example/` | `antiderivative_basic.miko`,`antiderivative_rational.miko`,`ode_separable.miko`,`ode_second_order.miko`(+`exampleCatalog` 登记) |
 | `docs/` | 本文件 + `docs/integration-ode-guide.md`(用户指南)+ 索引 |
 
 ---
@@ -215,7 +215,7 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
   把事实转成 IR 条目并处理隐藏与占位;
 - 展示:`evaluationLatex.ts` 的摘要/细节,`processData.ts` 的
   `buildAntiderivativeProcess`,"原函数"子列表 + `kind-antiderivative` 徽章;
-- 示例:`example/antiderivative_basic.scad`,`example/antiderivative_rational.scad`.
+- 示例:`example/antiderivative_basic.miko`,`example/antiderivative_rational.miko`.
 
 **实现中踩到并写进注释的坑**(后来者不必重踩):
 1. `linear_parts` 会产出 `2 * 1` 这种未折叠的系数,斜率判定必须先求值再比,
@@ -257,7 +257,7 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
   非初等识别;空变量/错元数错误文案;
 - **TS**:`DslCompiler.test.ts`(IR 形状/系数/隐藏/重名/未知选项/span),
   `evaluationLatex.test.ts`,`processData.test.ts`,`exampleScenes.test.ts`;
-- **集成**:新 `.scad` 全部可解析编译;`exampleCatalog.test.ts` 守住文件集;
+- **集成**:新 `.miko` 全部可解析编译;`exampleCatalog.test.ts` 守住文件集;
 - **门禁**:`npm test`,`npm run typecheck`,`npm run lint:rs`,
   `cargo test --workspace`;动 Rust 后重跑 `npm run build:wasm` 并验证页面.
 

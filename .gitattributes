@@ -1,0 +1,24 @@
+# =============================================================
+# GitHub 语言统计(Linguist)归属
+# -------------------------------------------------------------
+# GitHub 的语言栏只统计 Linguist 的 languages.yml 里登记过的语言,而
+# .gitattributes 只能把文件"改判"成已登记的语言,不能新建语言:官方文档
+# (docs/overrides.md)写明,尚未写进 languages.yml 的语言即使写成
+# `*.mycola linguist-language=MyCoolLang linguist-detectable` 也不会进入
+# 统计.
+#
+# 本仓库的 DSL 叫 Miko,`.miko`(example/ 下的示例场景)与 `.pest`
+# (compiler_rs 用它解析 .miko 的外层文法)目前都没有被 Linguist 收录,
+# 所以下面两条现在不会在语言栏里产生任何色块:这里先把归属写对,等上游
+# 收录之后无需再改仓库即可生效.本地核对:`github-linguist --breakdown`.
+#
+# 想让示例在收录前仍然出现在语言栏,把第一条临时改成下面这样即可,代价是
+# 色块名字显示为 OpenSCAD(这正是改名前的显示,颜色 #e5cd45):
+#     *.miko linguist-language=OpenSCAD
+# =============================================================
+
+# DSL 源码:example/ 下的场景文件
+*.miko linguist-language=Miko linguist-detectable=true
+
+# DSL 文法:pest 语法,负责把 .miko 切成一条条声明
+*.pest linguist-language=Pest linguist-detectable=true

@@ -159,7 +159,7 @@ export class ExampleLoaderController {
             el('span', { class: 'example-menu-label', text: entry.title }),
             el('span', {
                 class: 'example-menu-file',
-                text: entry.file.replace(/\.scad$/, ''),
+                text: entry.file.replace(/\.miko$/, ''),
             }),
         );
         return item;

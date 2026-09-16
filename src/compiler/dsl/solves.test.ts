@@ -164,9 +164,9 @@ describe('compileSolves:声明级求解', () => {
 });
 
 describe('随仓库分发的求解示例', () => {
-    it('example/solve_equations.scad 的四条方程各给出预期结果', async () => {
+    it('example/solve_equations.miko 的四条方程各给出预期结果', async () => {
         const source = await readFile(
-            new URL('../../../example/solve_equations.scad', import.meta.url),
+            new URL('../../../example/solve_equations.miko', import.meta.url),
             'utf8',
         );
         const scene = await compile(source);

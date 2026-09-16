@@ -39,6 +39,6 @@
   的标注口径,参数保持符号,过程页步骤链与回代验证,以及常见报错排查.
 
 配套示例见 [`../example/README.md`](../example/README.md)(求导/偏导
-示例为 `derivative_curve.scad`,`derivative_rules.scad`,
-`partial_derivative_surface.scad`,`divergence_vector_field.scad`,
-`curl_vector_field.scad`;隐式场梯度为 `sphere_gradient.scad`).
+示例为 `derivative_curve.miko`,`derivative_rules.miko`,
+`partial_derivative_surface.miko`,`divergence_vector_field.miko`,
+`curl_vector_field.miko`;隐式场梯度为 `sphere_gradient.miko`).

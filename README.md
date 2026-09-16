@@ -25,7 +25,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 - 内置示例菜单:左侧「源码」面板标题栏的"示例"按钮打开分组清单
   (求导 / 偏导 与 其他主题),选中即整段替换编辑器源码并立即运行.
   示例文本在构建期由 `import.meta.glob(..., { query: '?raw' })` 从
-  `example/*.scad` 内联进 bundle(运行时不 fetch,离线可用),`example/`
+  `example/*.miko` 内联进 bundle(运行时不 fetch,离线可用),`example/`
   仍是唯一真相源;清单与文件集的一一对应由
   `src/ui/examples/exampleCatalog.test.ts` 守住.载入走"全选 +
   `execCommand('insertText')`"覆盖而不是直接赋值,浏览器原生撤销栈得以
@@ -45,7 +45,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   对象区间的交集(x 区间 / x-y 矩形,交集为空报错),显式 `range` 优先;
   curve 只能引用 curve,surface 只能引用 surface,引用体积/点/向量/implicit
   对象或 `derivative` 等产物会报错而不是悄悄变成自由参数.相加结果照常参与
-  `region` / `integral` / `derivative`;示例 `example/object_addition.scad`
+  `region` / `integral` / `derivative`;示例 `example/object_addition.miko`
 - `region`:面积图形(两条曲线围成的 x 型带状区域,绘制在 z=0 平面),可
   作为二重积分的积分域;边界曲线只允许不带静态变换/动画的纯函数曲线
 - `matrix` / `transform`:对象场景变换
@@ -53,7 +53,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 - `derivative`:求导语句,把符号求导结果做成一个新对象并画出整条导数
   函数曲线/曲面(curve -> curve 求 x 导,surface -> surface 求 x/y 偏导);
   语法 `derivative 名称 = derivative(源对象 [, 变量])`,函数名用全名不缩写;
-  示例 `example/derivative_graph.scad`
+  示例 `example/derivative_graph.miko`
 - `implicit`:`f(x,y)=0`(二维等值线)或 `f(x,y,z)=0`(三维等值面)的隐式
   标量场,dim 由表达式里出现的坐标变量推断,`level` 选项给出方程右端
   (缺省 0).V1 只有方程本体参与 `gradient` / `derivative` 分析,本体的
@@ -66,7 +66,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   分析点也可显式写球坐标 `at spherical(θ, φ)`(r 取球体半径)或
   `at spherical(r, θ, φ)`;θ/φ 约定由 `numericConfig.analysis.
   sphericalAngleConvention` 全局配置(默认 physics:θ 从 +Z 量起;可切
-  math),结果列表同时回显 `[r, θ, φ]`.示例 `example/sphere_gradient.scad`
+  math),结果列表同时回显 `[r, θ, φ]`.示例 `example/sphere_gradient.miko`
 - `gradient` / `divergence` / `curl` / `laplacian`:点分析(求导/偏导经这些
   微分分析算子暴露:一元求导 = curve 的 gradient,偏导 = surface 的
   gradient,div/curl = 向量场的一阶偏导组合,laplacian = 标量场的
@@ -76,11 +76,11 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
   `tangent` 画切线;曲线求导与二维隐式曲线不写 `show` 时默认画
   `[point, normal, tangent]`,让切线始终可见,其余分析默认
   `[point, normal]`.示例集见 `example/README.md`:
-  一元求导 `example/derivative_curve.scad` 与求导法则对照
-  `example/derivative_rules.scad`,偏导 `example/partial_derivative_surface.scad`,
-  散度/旋度 `example/divergence_vector_field.scad` 与 `example/curl_vector_field.scad`,
-  拉普拉斯 `example/laplacian_scalar_field.scad` 与调和场对照
-  `example/laplacian_harmonic.scad`
+  一元求导 `example/derivative_curve.miko` 与求导法则对照
+  `example/derivative_rules.miko`,偏导 `example/partial_derivative_surface.miko`,
+  散度/旋度 `example/divergence_vector_field.miko` 与 `example/curl_vector_field.miko`,
+  拉普拉斯 `example/laplacian_scalar_field.miko` 与调和场对照
+  `example/laplacian_harmonic.miko`
 - `integral`:数值积分 + 黎曼/梯形/辛普森/勒贝格可视化,方法为
   `trapezoid`/`simpson`/`lebesgue`,以及黎曼系列 `riemann:left`/
   `riemann:right`/`riemann:mid`;裸写 `riemann` 等价于 `riemann:left`.

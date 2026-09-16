@@ -48,7 +48,7 @@ derivative dc = derivative(c);      // dc = a * cos(a * x),一条新曲线
 derivative d2c = derivative(dc);    // (可选)二阶导数 -a²·sin(a·x)
 ```
 
-示例文件 `example/derivative_graph.scad`.若只想在某一点看切线/法向,
+示例文件 `example/derivative_graph.miko`.若只想在某一点看切线/法向,
 用下面的微分分析(`gradient`)而不是 `derivative`(§2).
 
 ## 2. 一元函数求导:curve 上的 gradient
@@ -73,9 +73,9 @@ gradient 名称 = grad(曲线名) at [px, 0] {
 `at` 在语法上至少要两个数;曲线求导只需 x 坐标,惯例写 `[px, 0]`
 (第二个数对曲线不参与求值).
 
-示例:`example/derivative_curve.scad`
+示例:`example/derivative_curve.miko`
 (`f(x) = sin(a*x)`,f′ = a·cos(a·x));求导法则对照(积/商/幂/对数/
-三角复合)见 `example/derivative_rules.scad`.
+三角复合)见 `example/derivative_rules.miko`.
 
 ## 3. 二元函数偏导:surface 上的 gradient
 
@@ -98,7 +98,7 @@ fx = ∂f/∂x ,  fy = ∂f/∂y
 - **tangent_plane**:过分析点的切平面(半透明蓝色四边形),法向即上面的
   曲面法向.当 fx = fy = 0(如鞍面/极值点处)时法向竖直向上,切平面水平.
 
-示例:`example/partial_derivative_surface.scad`(正弦波面 +
+示例:`example/partial_derivative_surface.miko`(正弦波面 +
 鞍面,并演示 fx=fy=0 时切平面水平的直观情形).
 
 ## 3.1 隐式场:球体与 implicit 对象的梯度
@@ -129,7 +129,7 @@ x/y 是二维等值线.
 `[x, y, z]`).若点落在 ∇f = 0 的临界点(例如球心),法向没有定义,编译期
 直接报错,而不是画一个错误方向.
 
-示例:`example/sphere_gradient.scad`.
+示例:`example/sphere_gradient.miko`.
 
 ### 球坐标写法:`at spherical(...)`
 
@@ -208,8 +208,8 @@ curl      名称 = curl(F) at [px, py, pz];
 - **旋度**(向量,结果面板打印向量;为零时只保留测量点,不画箭矢):
   `curl F = (∂R/∂y − ∂Q/∂z, ∂P/∂z − ∂R/∂x, ∂Q/∂x − ∂P/∂y)`.
 
-示例:`example/divergence_vector_field.scad`(有源场与无源
-旋转场对照),`example/curl_vector_field.scad`(有旋旋转场
+示例:`example/divergence_vector_field.miko`(有源场与无源
+旋转场对照),`example/curl_vector_field.miko`(有旋旋转场
 与无旋梯度场对照).注意"无旋"与"无散"是彼此独立的两个性质:线性
 源/汇场 `[a*x, b*y, c*z]` 无旋但有散.
 
@@ -249,9 +249,9 @@ laplacian 名称 = laplacian(源对象) at [px, py, pz] {
 处处为正,是"处处有源"的场(注意:水平集 `x² + y² = R²` 本身是圆,
 但水平集函数并不调和,两者不要混为一谈).
 
-示例:`example/laplacian_scalar_field.scad`(抛物面 `z = a*x² + b*y²`,
+示例:`example/laplacian_scalar_field.miko`(抛物面 `z = a*x² + b*y²`,
 `∇²f = 2a + 2b` 处处常数,拖动滑块直接改变数值),
-`example/laplacian_harmonic.scad`(curve / surface / 二维与三维 implicit
+`example/laplacian_harmonic.miko`(curve / surface / 二维与三维 implicit
 四类源对照,含调和场数值恒为 0).
 
 **暂不实现**:向量场的**逐分量拉普拉斯**

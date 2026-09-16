@@ -123,7 +123,7 @@ describe('开合', () => {
 
     it('点浮层外部关闭,点浮层内部不关闭', () => {
         const h = setup();
-        const item = itemOf(h.menu, 'derivative_graph.scad');
+        const item = itemOf(h.menu, 'derivative_graph.miko');
 
         h.button.dispatch('click');
         h.root.dispatch('click', { target: item });
@@ -139,11 +139,11 @@ describe('选中示例', () => {
         const h = setup();
         h.button.dispatch('click');
 
-        h.menu.dispatch('click', { target: itemOf(h.menu, 'sphere_gradient.scad') });
+        h.menu.dispatch('click', { target: itemOf(h.menu, 'sphere_gradient.miko') });
 
         expect(h.onSelect).toHaveBeenCalledTimes(1);
         expect(h.onSelect.mock.calls[0][0]).toMatchObject({
-            file: 'sphere_gradient.scad',
+            file: 'sphere_gradient.miko',
             title: '球体隐式场梯度',
         });
         expect(h.controller.isOpen).toBe(false);
@@ -153,12 +153,12 @@ describe('选中示例', () => {
         const h = setup();
         h.button.dispatch('click');
 
-        const item = itemOf(h.menu, 'Zemlya.scad');
+        const item = itemOf(h.menu, 'Zemlya.miko');
         const label = item.querySelector<StubElement>('.example-menu-label')!;
         h.menu.dispatch('click', { target: label });
 
         expect(h.onSelect).toHaveBeenCalledTimes(1);
-        expect(h.onSelect.mock.calls[0][0]).toMatchObject({ file: 'Zemlya.scad' });
+        expect(h.onSelect.mock.calls[0][0]).toMatchObject({ file: 'Zemlya.miko' });
     });
 });
 
@@ -211,14 +211,14 @@ describe('键盘', () => {
 describe('高亮与销毁', () => {
     it('setActive 标记当前示例,切换时旧标记被清掉', () => {
         const h = setup();
-        const first = itemOf(h.menu, 'object_addition.scad');
-        const second = itemOf(h.menu, 'curl_vector_field.scad');
+        const first = itemOf(h.menu, 'object_addition.miko');
+        const second = itemOf(h.menu, 'curl_vector_field.miko');
 
-        h.controller.setActive('object_addition.scad');
+        h.controller.setActive('object_addition.miko');
         expect(first.classList.contains('is-active')).toBe(true);
         expect(first.getAttribute('aria-current')).toBe('true');
 
-        h.controller.setActive('curl_vector_field.scad');
+        h.controller.setActive('curl_vector_field.miko');
         expect(first.classList.contains('is-active')).toBe(false);
         expect(first.getAttribute('aria-current')).toBeNull();
         expect(second.classList.contains('is-active')).toBe(true);

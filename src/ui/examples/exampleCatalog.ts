@@ -5,7 +5,7 @@
  * `example/` 不在 `public/` 下,构建后不会进 `dist/`,运行时 `fetch` 在
  * GitHub Pages 上必然 404;把文件复制进 `public/` 又会让同一份文本存在
  * 两个位置,违背"源码是唯一真相源"的约定.raw glob 在**构建期**把文本内联
- * 进 bundle,`example/*.scad` 仍然是唯一真相源,而且文本随 JS 一起进
+ * 进 bundle,`example/*.miko` 仍然是唯一真相源,而且文本随 JS 一起进
  * PWA 预缓存,离线打开也能载入示例.
  *
  * 代价:生产站新增示例要重新构建才可见(dev 下丢进 `example/` 立刻就能选到),
@@ -29,7 +29,7 @@ export interface ExampleEntry {
 }
 
 /** 构建期内联的示例源码,键为 `/example/<文件名>`. */
-const EXAMPLE_MODULES = import.meta.glob('/example/*.scad', {
+const EXAMPLE_MODULES = import.meta.glob('/example/*.miko', {
     query: '?raw',
     import: 'default',
     eager: true,
@@ -41,29 +41,29 @@ const EXAMPLE_MODULES = import.meta.glob('/example/*.scad', {
  */
 const _orther = '其他主题';
 export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
-    { file: 'derivative_graph.scad', title: '导数函数图像', group: '求导 / 偏导' },
-    { file: 'derivative_curve.scad', title: '一元函数求导', group: '求导 / 偏导' },
-    { file: 'derivative_rules.scad', title: '求导法则对照', group: '求导 / 偏导' },
-    { file: 'partial_derivative_surface.scad', title: '二元函数偏导', group: '求导 / 偏导' },
-    { file: 'divergence_vector_field.scad', title: '散度 div(F)', group: '求导 / 偏导' },
-    { file: 'curl_vector_field.scad', title: '旋度 curl(F)', group: '求导 / 偏导' },
-    { file: 'laplacian_scalar_field.scad', title: '拉普拉斯 ∇²f', group: '求导 / 偏导' },
-    { file: 'laplacian_harmonic.scad', title: '调和场 ∇²f = 0', group: '求导 / 偏导' },
-    { file: 'sphere_gradient.scad', title: '球体隐式场梯度', group: '求导 / 偏导' },
-    { file: 'gauss_surface.scad', title: '高斯钟形曲面', group: '求导 / 偏导' },
-    { file: 'object_addition.scad', title: '对象相加', group: _orther },
-    { file: 'intersection_line_curves.scad', title: '曲线 ∩ 曲线', group: _orther },
-    { file: 'intersection_surfaces.scad', title: '曲面 ∩ 曲面', group: _orther },
-    { file: 'double_integral_region.scad', title: 'region 域二重积分', group: _orther },
-    { file: 'solve_equations.scad', title: '方程求解分步推导', group: _orther },
-    { file: 'antiderivative_basic.scad', title: '不定积分与求导验算', group: _orther },
-    { file: 'antiderivative_rational.scad', title: '有理函数部分分式', group: _orther },
-    { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: _orther },
-    { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: _orther },
-    { file: 'ode_separable.scad', title: '微分方程:可分离', group: _orther },
-    { file: 'ode_linear_first_order.scad', title: '微分方程:一阶线性', group: _orther },
-    { file: 'ode_second_order.scad', title: '微分方程:二阶常系数', group: _orther },
-    { file: 'ode_with_initial.scad', title: '微分方程:初值', group: _orther },
+    { file: 'derivative_graph.miko', title: '导数函数图像', group: '求导 / 偏导' },
+    { file: 'derivative_curve.miko', title: '一元函数求导', group: '求导 / 偏导' },
+    { file: 'derivative_rules.miko', title: '求导法则对照', group: '求导 / 偏导' },
+    { file: 'partial_derivative_surface.miko', title: '二元函数偏导', group: '求导 / 偏导' },
+    { file: 'divergence_vector_field.miko', title: '散度 div(F)', group: '求导 / 偏导' },
+    { file: 'curl_vector_field.miko', title: '旋度 curl(F)', group: '求导 / 偏导' },
+    { file: 'laplacian_scalar_field.miko', title: '拉普拉斯 ∇²f', group: '求导 / 偏导' },
+    { file: 'laplacian_harmonic.miko', title: '调和场 ∇²f = 0', group: '求导 / 偏导' },
+    { file: 'sphere_gradient.miko', title: '球体隐式场梯度', group: '求导 / 偏导' },
+    { file: 'gauss_surface.miko', title: '高斯钟形曲面', group: '求导 / 偏导' },
+    { file: 'object_addition.miko', title: '对象相加', group: _orther },
+    { file: 'intersection_line_curves.miko', title: '曲线 ∩ 曲线', group: _orther },
+    { file: 'intersection_surfaces.miko', title: '曲面 ∩ 曲面', group: _orther },
+    { file: 'double_integral_region.miko', title: 'region 域二重积分', group: _orther },
+    { file: 'solve_equations.miko', title: '方程求解分步推导', group: _orther },
+    { file: 'antiderivative_basic.miko', title: '不定积分与求导验算', group: _orther },
+    { file: 'antiderivative_rational.miko', title: '有理函数部分分式', group: _orther },
+    { file: 'animation_box_rotations.miko', title: '动画片段顺序播放', group: _orther },
+    { file: 'Zemlya.miko', title: '三星覆盖与极冠', group: _orther },
+    { file: 'ode_separable.miko', title: '微分方程:可分离', group: _orther },
+    { file: 'ode_linear_first_order.miko', title: '微分方程:一阶线性', group: _orther },
+    { file: 'ode_second_order.miko', title: '微分方程:二阶常系数', group: _orther },
+    { file: 'ode_with_initial.miko', title: '微分方程:初值', group: _orther },
 ];
 
 /**

@@ -211,10 +211,10 @@ pub fn solve_ode(
 
 | 文件 | 覆盖 |
 | --- | --- |
-| `example/ode_separable.scad` | 可分离:`y' = x*y`,斜率场 + 解族 + 初值特解 |
-| `example/ode_linear_first_order.scad` | 一阶线性:积分因子,参数 `p`/`q` 联动 |
-| `example/ode_second_order.scad` | 二阶常系数:三种根型(实/重/复),特征方程与通解 |
-| `example/ode_with_initial.scad` | 初值:`y(0)=1` 把族收成一条,拖初值看曲线怎么动 |
+| `example/ode_separable.miko` | 可分离:`y' = x*y`,斜率场 + 解族 + 初值特解 |
+| `example/ode_linear_first_order.miko` | 一阶线性:积分因子,参数 `p`/`q` 联动 |
+| `example/ode_second_order.miko` | 二阶常系数:三种根型(实/重/复),特征方程与通解 |
+| `example/ode_with_initial.miko` | 初值:`y(0)=1` 把族收成一条,拖初值看曲线怎么动 |
 
 ---
 
