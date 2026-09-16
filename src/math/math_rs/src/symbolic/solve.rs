@@ -83,6 +83,60 @@ fn step(latex: impl Into<String>, reason: &str, kind: &str) -> SolveStep {
     }
 }
 
+/// 方程里实际用到的**参数**(即系数),按在方程文本里出现的先后去重.
+///
+/// 只认调用方给了值的名字:它们是"当前系数",读板书的人要靠它们把符号换成数
+/// (拖动滑块时这条就是唯一能看出系数变了的地方).`x` 这种未知量不在
+/// `coefficients` 里,自然不会被列成系数.
+///
+/// 文本匹配加了一层边界判断(`a` 不会匹配 `ax`/`a_1`),避免子串误判;
+/// `a^2`/`a*x` 这类正常写法两边都是运算符,照样命中.
+fn equation_parameters(source: &str, coefficients: &HashMap<String, f64>) -> Vec<String> {
+    let bytes = source.as_bytes();
+    let mut used = Vec::new();
+
+    for (index, _) in source.char_indices() {
+        if index > 0 {
+            let previous = bytes[index - 1];
+            if previous.is_ascii_alphanumeric() || previous == b'_' {
+                continue;
+            }
+        }
+        let mut end = index;
+        while end < source.len() && bytes[end].is_ascii_alphanumeric() {
+            end += 1;
+        }
+        // 名字本身必须是完整标识符(后面不接字母/下划线/数字).
+        if end == index || end >= source.len() {
+            continue;
+        }
+        let following = bytes[end];
+        if following == b'_' {
+            continue;
+        }
+        let name = &source[index..end];
+        if coefficients.contains_key(name) && !used.iter().any(|entry| entry == name) {
+            used.push(name.to_string());
+        }
+    }
+
+    used
+}
+
+/// "参数取值"那一步的 LaTeX:方程与 `a=1` 一行一项,叠成两行.
+///
+/// 用 `gathered` 而不是把 `a=1` 接在等号后面:参数多起来(或方程本身很长)时
+/// 一行放不下,横向滚动会把最关键的系数挤到屏幕外.步内换行是 LaTeX 自己的
+/// 排版,不动过程页"一行一步"的结构.
+fn parameter_values_latex(equation_latex: &str, entries: &[String]) -> String {
+    let mut stacked = equation_latex.to_string();
+    for entry in entries {
+        stacked.push_str(" \\\\ ");
+        stacked.push_str(entry);
+    }
+    format!("\\begin{{gathered}} {stacked} \\end{{gathered}}")
+}
+
 /// 把方程文本按**顶层**等号切成左右两段.
 ///
 /// 只需处理括号深度:函数调用/数组字面量里的 `=` 不可能是方程的等号,而
@@ -515,6 +569,26 @@ pub fn solve_equation(
     };
 
     let mut steps = vec![step(equation_latex.clone(), "原式", KIND_DEFINITION)];
+    // 系数是参数时,紧跟着把"当前取值"逐条写出来:拖动系数之后,这一行是读者
+    // 唯一能看出"代进去的数变了"的地方(方程本身仍写 `a x^{2}`,不隐藏符号).
+    let parameters = equation_parameters(source, &coefficient_map);
+    if !parameters.is_empty() {
+        let entries: Vec<String> = parameters
+            .iter()
+            .map(|name| {
+                format!(
+                    "{}={}",
+                    super::latex::latex_symbol(name),
+                    latex_number(coefficient_map[name]),
+                )
+            })
+            .collect();
+        steps.push(step(
+            parameter_values_latex(&equation_latex, &entries),
+            "参数取值",
+            KIND_NUMERIC,
+        ));
+    }
     if !rhs_is_zero {
         steps.push(step(
             format!("{}=0", poly.to_latex(&variable)),
@@ -754,7 +828,74 @@ mod tests {
         assert!(!formula.contains("2a"), "{formula}");
         assert!(!formula.contains("-b"), "{formula}");
         // 判别式那一步早就是代入形式,两步口径必须一致.
-        assert!(outcome.steps[1].latex.contains("4 \\cdot 1 \\cdot (-2)"));
+        let discriminant = outcome
+            .steps
+            .iter()
+            .find(|entry| entry.reason == "判别式")
+            .expect("应当有判别式一步");
+        assert!(discriminant.latex.contains("4 \\cdot 1 \\cdot (-2)"));
+
+        // 系数取值单独成一步:方程 + `a=1`,叠成两行(参数多时不会横向挤出屏幕).
+        let values = outcome
+            .steps
+            .iter()
+            .find(|entry| entry.reason == "参数取值")
+            .expect("参数是系数时应当给出取值一步");
+        assert_eq!(
+            values.latex,
+            "\\begin{gathered} a\\,x^{2} - 2=0 \\\\ a=1 \\end{gathered}"
+        );
+        assert_eq!(values.kind, KIND_NUMERIC);
+    }
+
+    #[test]
+    fn parameter_values_step_lists_only_parameters_the_equation_uses() {
+        // 声明了 a 但方程里没有:不该出现在"参数取值"里(它影响不了这道题).
+        let outcome = solve_equation(
+            "k*x^2 + m*x - 2 = 0",
+            None,
+            &[
+                ("k".to_string(), 1.0),
+                ("m".to_string(), 2.0),
+                ("unused".to_string(), 9.0),
+            ],
+        )
+        .expect("可解");
+        let values = outcome
+            .steps
+            .iter()
+            .find(|entry| entry.reason == "参数取值")
+            .expect("应当有参数取值一步");
+
+        // 顺序跟着方程里出现的先后,不跟参数表.
+        assert_eq!(
+            values.latex,
+            "\\begin{gathered} k\\,x^{2} + m\\,x - 2=0 \\\\ k=1 \\\\ m=2 \\end{gathered}"
+        );
+        assert!(!values.latex.contains("unused"));
+
+        // 系数全是数值时没有这一步:空壳不给.
+        let numeric = solve_equation("x^2 - 2 = 0", None, &[]).expect("可解");
+        assert!(!numeric.steps.iter().any(|entry| entry.reason == "参数取值"));
+    }
+
+    #[test]
+    fn parameter_names_are_matched_as_whole_identifiers() {
+        // `a` 不能匹配到 `ax` 或 `a_1`:那是另一个名字,取值写出来就是错的.
+        let outcome = solve_equation(
+            "a*x - 3 = 0",
+            None,
+            &[("a".to_string(), 2.0), ("ax".to_string(), 5.0)],
+        )
+        .expect("可解");
+        let values = outcome
+            .steps
+            .iter()
+            .find(|entry| entry.reason == "参数取值")
+            .expect("应当有参数取值一步");
+
+        assert!(values.latex.contains("a=2"));
+        assert!(!values.latex.contains("ax=5"));
     }
 
     #[test]

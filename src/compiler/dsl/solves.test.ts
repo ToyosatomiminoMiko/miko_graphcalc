@@ -87,6 +87,28 @@ describe('compileSolves:声明级求解', () => {
         expect(formulaStep?.latex).not.toContain('-b');
     });
 
+    it('系数是参数时紧跟"参数取值"一步:方程 + a=1 叠成两行', async () => {
+        const task = await solveTask(
+            'param a = 1 in [1, 4, 0.5];\nsolve S = a*x^2 - 2 = 0;',
+            { a: 2 },
+        );
+
+        // 原式之后就是取值:读者先看到"哪个方程,哪些系数",再看到数.
+        expect(task.steps[0].reason).toBe('原式');
+        expect(task.steps[1].reason).toBe('参数取值');
+        expect(task.steps[1].kind).toBe('numeric');
+        expect(task.steps[1].latex).toBe(
+            '\\begin{gathered} a\\,x^{2} - 2=0 \\\\ a=2 \\end{gathered}',
+        );
+        // 方程本身保留符号写法,不把 a 直接换成 2.
+        expect(task.steps[0].latex).toContain('a\\,x^{2}');
+
+        // 覆盖值一路带到公式:2x^2 - 2 = 0 -> Δ = 0² - 4·2·(-2) = 16(完全平方),
+        // 分母是 2a = 4,根号按精确值给.
+        const formulaStep = task.steps.find((step) => step.reason === '求根公式');
+        expect(formulaStep?.latex).toBe('x = \\frac{+ 0 \\pm \\sqrt{4}}{4}');
+    });
+
     it('variable 选项指定未知量', async () => {
         const task = await solveTask('solve S = t^2 - 9 = 0 { variable = t; };');
 
