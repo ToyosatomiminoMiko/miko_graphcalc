@@ -30,8 +30,10 @@ mod derivative;
 mod eval;
 mod latex;
 mod parser;
+mod poly;
 mod printing;
 mod simplify;
+mod solve;
 
 pub(crate) use eval::compile_runtime_expr;
 /// 查表版求值器只在测试里作为预绑定路径的参照物(见 `eval.rs`).
@@ -39,6 +41,8 @@ pub(crate) use eval::compile_runtime_expr;
 pub(crate) use eval::evaluate_runtime_expr;
 pub(crate) use eval::{bind_expression, evaluate_bound, BoundExpr, EvalContext};
 pub use latex::latex_expression;
+// 方程求解内核:步骤产物是独立类型(`SolveOutcome`/`SolveStep`),不含 `Expr`.
+pub use solve::{solve_equation, SolveOutcome, SolveStep};
 
 use std::collections::HashSet;
 

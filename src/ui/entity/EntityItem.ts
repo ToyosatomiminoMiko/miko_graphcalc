@@ -17,14 +17,16 @@
  *     </div>                                                │
  *     <code class="object-expr">...</code>                  │ 第二行:公式独占整行
  *   </div>                                                  ← ┘
- *   <button class="row-visibility-btn">隐藏/显示</button>    ← 行末,靠右
+ *   <div class="row-actions">                               ← 行末,靠右
+ *     <button class="row-visibility-btn">隐藏/显示</button>
+ *   </div>
  * </article>
  * ```
  *
- * `.row-main` 是除显隐按钮外的全部内容,内部沿用"可换行横排":`.object-expr`
+ * `.row-main` 是除行末动作外的全部内容,内部沿用"可换行横排":`.object-expr`
  * 的 `flex-basis` 是 100%,于是公式自己占一整行,长公式有整行宽度可用;
  * 第一行只留"身份 + 名字",不再与公式抢横向空间.包装层把行分成"主内容 +
- * 按钮"两个直接子节点,按钮因此在 DOM 里就在末位,视觉上贴右,见
+ * 动作"两个直接子节点,动作区因此在 DOM 里就在末位,视觉上贴右,见
  * {@link createObjectRow}.
  *
  * 行内**没有自建的开合按钮**:实体行本来就没有可展开细节;行末的**显隐按钮**
@@ -37,7 +39,7 @@
  */
 import type { SceneObject } from '../../ir';
 import { createFormulaElement } from '../formula/FormulaView';
-import { createObjectRow, createVisibilityButton } from '../shared/rowDom';
+import { createObjectRow, createRowActions, createVisibilityButton } from '../shared/rowDom';
 import { el } from '../widgets/dom';
 import { sceneObjectExpression, sceneObjectKindLabel } from './entityText';
 
@@ -105,7 +107,7 @@ export class EntityItem {
 
         // 主内容内部顺序即两行:`徽章 + 颜色 + 名称行` 在第一行,公式自己占
         // 第二行;按钮由 createObjectRow 放在行末.
-        const { row, main } = createObjectRow('entity-row', toggle);
+        const { row, main } = createObjectRow('entity-row', createRowActions(toggle));
         main.append(badge, color, head, expression);
         row.classList.toggle('is-hidden', !object.enabled);
         this.row = row;

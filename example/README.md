@@ -45,5 +45,6 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名沿用 `.scad`,文件名按
 | `intersection_line_curves.scad` | 曲线 ∩ 曲线 -> 离散交点 |
 | `intersection_surfaces.scad` | 曲面 ∩ 曲面(平面)-> 三维交线 |
 | `double_integral_region.scad` | `region` 面积图形作域的二重积分(辛普森法) |
+| `solve_equations.scad` | 方程求解:单变量一次/二次多项式方程的**分步推导**(因式分解 + 零积律 / 判别式 + 求根公式),解集与步骤进"求解"子列表,点"过程"在右栏过程页看题目与逐行依据 |
 | `animation_box_rotations.scad` | 动画片段 `rotate` 列表按顺序播放 |
 | `Zemlya.scad` | 地球与三星覆盖:3 颗同轨道面均布(相隔 120°)的卫星,各自一道切于地表的"覆盖波束"圆锥(底沿即覆盖圈);`param h` 拖动轨道高度,可看覆盖圈扩大,两极极冠缩小但**永不消失**--文件头给出"3 颗卫星不可能覆盖全球"的证明与各级高度的覆盖纬度表 |

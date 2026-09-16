@@ -22,6 +22,7 @@ interface SplitFixture {
     readonly stub: DomStub;
     readonly root: StubElement;
     readonly panel: StubElement;
+    readonly page: StubElement;
     readonly handle: StubElement;
 }
 
@@ -34,6 +35,12 @@ function setup(): SplitFixture {
     panel.id = 'right-panel';
     panel.className = 'panel';
 
+    // 比例基准是参数**页容器**(#right-page-params),不是右面板本身:
+    // 标签栏占了面板顶部一条,面板矩形与参数区顶边不再重合(见控制器说明).
+    const page = stub.document.createElement('div');
+    page.id = 'right-page-params';
+    page.className = 'right-page';
+
     const handle = stub.document.createElement('div');
     handle.id = 'right-splitter';
     handle.className = 'right-splitter';
@@ -41,10 +48,11 @@ function setup(): SplitFixture {
     // 样式表,所以把"分隔条自带光标"写在元素上,拖动时读的就是它(见 dragGesture).
     handle.style.cursor = 'ns-resize';
 
-    panel.append(handle);
+    page.append(handle);
+    panel.append(page);
     root.append(panel);
     stub.document.body.append(root);
-    return { stub, root, panel, handle };
+    return { stub, root, panel, page, handle };
 }
 
 function readBasis(root: StubElement): string {
@@ -83,7 +91,7 @@ describe('bind 与拖动', () => {
         expect(readBasis(root)).toBe(`${SPLIT_DEFAULT_RATIO * 100}%`);
     });
 
-    it('缺少分隔条或右面板时安静返回,不写变量', () => {
+    it('缺少分隔条或参数页容器时安静返回,不写变量', () => {
         const stub = installDomStub();
         const root = stub.document.createElement('div');
         root.id = 'app';
@@ -93,9 +101,31 @@ describe('bind 与拖动', () => {
         expect(readBasis(root)).toBe('');
     });
 
+    it('参数页高度为 0(过程页激活/面板折叠)时忽略拖动,比例冻结', () => {
+        const { root, page, handle } = setup();
+        page.offsetHeight = 600;
+        new RightSplitController().bind(root as unknown as HTMLElement);
+
+        handle.dispatch('pointerdown', { clientY: 100, pointerId: 1 });
+        handle.dispatch('pointermove', { clientY: 220, pointerId: 1 });
+        expect(readBasis(root)).toBe('60%');
+
+        // 过程页激活:整个参数页容器被 hidden,量到的高度为 0 -- 此时拖动
+        // 不改比例(分隔条本来也不可见),切回参数页后比例与切走前一致.
+        page.offsetHeight = 0;
+        handle.dispatch('pointerup', { clientY: 220, pointerId: 1 });
+        handle.dispatch('pointerdown', { clientY: 100, pointerId: 2 });
+        handle.dispatch('pointermove', { clientY: 400, pointerId: 2 });
+        expect(readBasis(root)).toBe('60%');
+
+        page.offsetHeight = 600;
+        handle.dispatch('pointerup', { clientY: 400, pointerId: 2 });
+        expect(readBasis(root)).toBe('60%');
+    });
+
     it('拖动按位移改变比例,并给出拖动中的视觉与光标线索', () => {
-        const { stub, root, panel, handle } = setup();
-        panel.offsetHeight = 600;
+        const { stub, root, page, handle } = setup();
+        page.offsetHeight = 600;
         new RightSplitController().bind(root as unknown as HTMLElement);
 
         handle.dispatch('pointerdown', { clientY: 100, pointerId: 1 });
@@ -116,8 +146,8 @@ describe('bind 与拖动', () => {
     });
 
     it('没按下时移动不改变比例', () => {
-        const { root, panel, handle } = setup();
-        panel.offsetHeight = 600;
+        const { root, page, handle } = setup();
+        page.offsetHeight = 600;
         new RightSplitController().bind(root as unknown as HTMLElement);
 
         handle.dispatch('pointermove', { clientY: 400, pointerId: 1 });
@@ -126,8 +156,8 @@ describe('bind 与拖动', () => {
     });
 
     it('拖到极端位置时被下限/上限夹住', () => {
-        const { root, panel, handle } = setup();
-        panel.offsetHeight = 600;
+        const { root, page, handle } = setup();
+        page.offsetHeight = 600;
         new RightSplitController().bind(root as unknown as HTMLElement);
 
         handle.dispatch('pointerdown', { clientY: 300, pointerId: 1 });
@@ -192,8 +222,8 @@ describe('键盘调整', () => {
 
 describe('dispose', () => {
     it('拖动中 dispose:监听摘掉,光标与拖动标记复位', () => {
-        const { stub, root, panel, handle } = setup();
-        panel.offsetHeight = 600;
+        const { stub, root, page, handle } = setup();
+        page.offsetHeight = 600;
         const controller = new RightSplitController();
         controller.bind(root as unknown as HTMLElement);
 

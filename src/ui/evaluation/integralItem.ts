@@ -24,12 +24,15 @@ import { latexResultNumber } from '../../math/latexNumber';
 import { formatNumber } from '../shared/numberText';
 import { createFormulaElement } from '../formula/FormulaView';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
-import { createVisibilityButton } from '../shared/rowDom';
+import { createRowActions, createVisibilityButton } from '../shared/rowDom';
+import { buildIntegralProcess } from '../process/processData';
+import { needsProcessPage } from '../process/disclosure';
 import { el } from '../widgets/dom';
 import {
     createDetailSections,
     createEvaluationRow,
     createEvaluationSummary,
+    createProcessEntryButton,
     createResultRow,
 } from './evaluationDom';
 
@@ -127,15 +130,13 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         );
 
         // 展开细节第一行就是完整等式;数值尚未回填时省略右端(纯文本元信息
-        // 由各类型的细节生成函数决定,这里不需要额外判断).
-        const details = task.enabled
-            ? createDetailSections(integralLatexDetails(
-                task,
-                context.objects,
-                INTEGRAL_METHOD_LABELS[task.method],
-                value,
-            ))
-            : null;
+        // 由各类型的细节生成函数决定,这里不需要额外判断).细节行只算一次,
+        // 披露判据与公式块消费同一份.
+        const methodLabel = INTEGRAL_METHOD_LABELS[task.method];
+        const detailLines = task.enabled
+            ? integralLatexDetails(task, context.objects, methodLabel, value)
+            : [];
+        const details = task.enabled ? createDetailSections(detailLines) : null;
 
         // 状态行只在"没有等式可挂"或"还没算出/已禁用"时需要:
         // - 就绪 + 有积分式:等式已由细节行承载,再挂状态行就是重复行;
@@ -165,7 +166,31 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             () => context.toggleHidden(task.name),
         );
 
-        const { row, main } = createEvaluationRow(summary, details, status, toggle);
+        // "过程"入口(三级披露的 L2):积分条目只在细节行超过披露阈值时才给;
+        // 隐藏项入口置灰并给理由(不参与计算也就没有过程可展示).
+        const processDisabledReason = task.enabled ? null : '已隐藏,不参与计算';
+        const processEntry = (processDisabledReason !== null || needsProcessPage(detailLines))
+            ? createProcessEntryButton({
+                name: task.name,
+                disabledReason: processDisabledReason,
+                onOpen: () => context.openProcess({
+                    name: task.name,
+                    document: buildIntegralProcess(
+                        task,
+                        context.objects,
+                        methodLabel,
+                        value,
+                    ),
+                }),
+            })
+            : null;
+
+        const { row, main } = createEvaluationRow(
+            summary,
+            details,
+            status,
+            createRowActions(processEntry, toggle),
+        );
         row.classList.toggle('is-hidden', !task.enabled);
 
         super(task, row);

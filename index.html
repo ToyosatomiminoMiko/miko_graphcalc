@@ -20,6 +20,7 @@
     <link href="css/editor.css" rel="stylesheet" type="text/css">
     <link href="css/controls.css" rel="stylesheet" type="text/css">
     <link href="css/diagnostics.css" rel="stylesheet" type="text/css">
+    <link href="css/process.css" rel="stylesheet" type="text/css">
 </head>
 
 <body>
@@ -214,6 +215,11 @@ intersection X = intersection(s1, s2) {
     segments = 96;
 };
 
+// 方程求解:在编译期解单变量一次/二次方程,解集与步骤进"求解"子列表;
+// 点条目行末的"过程",右栏过程页先给题目再逐步推导.
+solve S1 = x^2 - 5*x + 6 = 0;   // 因式分解路径
+solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
+
 </textarea>
                         <div id="dsl-editor-highlight" aria-hidden="true">
                             <pre id="dsl-editor-highlight-code"></pre>
@@ -226,25 +232,47 @@ intersection X = intersection(s1, s2) {
 
         <aside id="right-panel" class="panel">
             <header class="panel-header">
-                <span class="panel-title">参数</span>
+                <!-- 右栏标签页(参数/视图 与 过程):标签栏本身就是这一栏的标题,
+                     不再另放一个 .panel-title(那会和"参数 / 视图"重复).
+                     两个标签按钮由 ui/panels/RightPanelTabs 经 ui/widgets/Tabs
+                     装配,HTML 里不留副本(与视图面板同一约定).标签栏必须留在
+                     header **内部**:PanelController 折叠时会隐藏除承载开合
+                     按钮的 header 以外的全部直接子元素,放进页容器里一折叠就
+                     再也切不回来(见 docs/equation-solving-process.md 3.2). -->
+                <div id="right-tabs"></div>
                 <button data-panel-toggle="#right-panel">收起</button>
             </header>
-            <section id="params-panel"></section>
-            <section id="diagnostics" aria-live="polite"></section>
 
-            <!-- 参数区/视图区的分隔条:上下拖动改变两块各占多少高度
-                 (见 RightSplitController).焦点在它上面时,上下方向键同样
-                 可以调整,所以它是可聚焦的 separator 而不是纯装饰.
-                 视觉与状态由 css/panels.css 的 .right-splitter 负责. -->
-            <div id="right-splitter" class="right-splitter" role="separator"
-                aria-orientation="horizontal" aria-label="调整参数区与视图区的高度" tabindex="0"
-                title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
+            <!-- 页1:参数 / 视图.两页各自包一层,与折叠逻辑的"直接子元素"
+                 判断互不干扰:折叠隐藏整页,页级 hidden 只藏另一页.
+                 分隔条的比例基准就是这一层,它恢复 flex 列布局,于是
+                 #params-panel 的 flex-basis 参照的是**页高度**(见
+                 RightSplitController). -->
+            <div id="right-page-params" class="right-page" role="tabpanel">
+                <section id="params-panel"></section>
+                <section id="diagnostics" aria-live="polite"></section>
 
-            <header class="panel-header">视图</header>
-            <!-- 视图面板的全部控件(相机/预置视角/点/坐标轴/曲面)由
-                 src/ui/view/ViewPanel.ts 声明式装配,HTML 里不再留手写副本;
-                 加控件只改那个文件,控制器通过句柄引用节点(见 DslApp). -->
-            <section id="view-controls"></section>
+                <!-- 参数区/视图区的分隔条:上下拖动改变两块各占多少高度
+                     (见 RightSplitController).焦点在它上面时,上下方向键同样
+                     可以调整,所以它是可聚焦的 separator 而不是纯装饰.
+                     视觉与状态由 css/panels.css 的 .right-splitter 负责. -->
+                <div id="right-splitter" class="right-splitter" role="separator"
+                    aria-orientation="horizontal" aria-label="调整参数区与视图区的高度" tabindex="0"
+                    title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
+
+                <header class="panel-header">视图</header>
+                <!-- 视图面板的全部控件(相机/预置视角/点/坐标轴/曲面)由
+                     src/ui/view/ViewPanel.ts 声明式装配,HTML 里不再留手写副本;
+                     加控件只改那个文件,控制器通过句柄引用节点(见 DslApp). -->
+                <section id="view-controls"></section>
+            </div>
+
+            <!-- 页2:过程(默认收起).通高的递等式视图,内容与交互由
+                 ui/process/ProcessPanel 装配;页级显隐由 RightPanelTabs 写
+                 hidden 属性,折叠仍归 PanelController. -->
+            <div id="right-page-process" class="right-page" role="tabpanel" hidden>
+                <section id="process-panel" class="process-panel"></section>
+            </div>
 
             <div class="resize-handle resize-handle-left" data-resize-panel="right-panel"></div>
         </aside>
@@ -269,6 +297,7 @@ intersection X = intersection(s1, s2) {
                         <div id="analysis-object-list" class="object-sublist"></div>
                         <div id="integral-object-list" class="object-sublist"></div>
                         <div id="intersection-object-list" class="object-sublist"></div>
+                        <div id="solve-object-list" class="object-sublist"></div>
                     </div>
                 </div>
             </section>

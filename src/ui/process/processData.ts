@@ -1,0 +1,145 @@
+/**
+ * 过程数据源(**纯函数**,只消费 IR 与既有的细节行,不碰 DOM).
+ *
+ * 一期口径:数据来自现有 `analysisLatexDetailEntries` / `integralLatexDetailEntries`
+ * 的细节行,按递等式口径重组--不新增内核产物,不改 IR 字段语义(见
+ * docs/equation-solving-process.md 第 6 节).三类里先接**梯度与积分**
+ * (细节行最多,递等结构最明显,路线图 B5 的降级口径),散度/旋度/求交
+ * 继续留在 L1.
+ *
+ * 分工:
+ * - `evaluationLatex.ts` 给出每行的**角色**(公式在那里拼装,只有它知道来历);
+ * - 本模块把角色翻译成展示用的 `kind` 与依据文案(P4:文案与数据分离);
+ * - `processSteps.ts` 只管上限与分区.
+ * 因此"公式怎么排"与"这一步算什么依据"各自只有一个改动点.
+ */
+import type { AnalysisResult, IntegralTask, SceneObject, SolveTask } from '../../ir';
+import { UI_CONFIG } from '../../config/uiConfig';
+import {
+    analysisLatexDetailEntries,
+    analysisLatexSummary,
+    integralLatexDetailEntries,
+    integralLatexSummary,
+    type EvaluationDetailEntry,
+    type EvaluationDetailRole,
+} from '../../compiler/dsl/evaluationLatex';
+import {
+    truncateProcessSteps,
+    type ProcessDocument,
+    type ProcessStep,
+    type ProcessStepKind,
+} from './processSteps';
+
+/** 角色 -> 展示:`kind` 决定徽章分区,`reason` 是徽章文案. */
+interface StepPresentation {
+    readonly kind: ProcessStepKind;
+    readonly reason: string;
+}
+
+/**
+ * 只有**描述推导一步**的角色才进过程页.
+ *
+ * 纯文本元信息行(积分域/采样分段)不是等式,留在 L1 的 `<details>` 里;
+ * 过程页是"一行一步的递等式",不掺说明文字.因此这里用 `Partial`:没有登记的
+ * 角色(以及所有 `kind === 'text'` 的行)自然不成步,而不是靠调用方过滤.
+ */
+const ROLE_PRESENTATION: Partial<Record<EvaluationDetailRole, StepPresentation>> = {
+    symbolic: { kind: 'definition', reason: '算子定义式' },
+    value: { kind: 'numeric', reason: '数值代入' },
+    point: { kind: 'algebra', reason: '代入取点' },
+    spherical: { kind: 'numeric', reason: '球坐标回显' },
+    scalar: { kind: 'numeric', reason: '函数值' },
+    tangent: { kind: 'numeric', reason: '切向量' },
+    equation: { kind: 'definition', reason: '积分定义式' },
+};
+
+/**
+ * 把带角色的细节行分区成步骤,再按上限截断.
+ *
+ * `title` 给页头,`problem` 是题目(待处理的式子),`name` 给回链;截断只发生在
+ * 这里,视图拿到的一定是最终步骤.
+ */
+function buildProcessDocument(
+    name: string,
+    title: string,
+    problem: string | null,
+    entries: readonly EvaluationDetailEntry[],
+    maxSteps: number,
+): ProcessDocument {
+    const steps: ProcessStep[] = [];
+    for (const entry of entries) {
+        if (entry.line.kind !== 'latex') continue;
+        const presentation = ROLE_PRESENTATION[entry.role];
+        if (presentation === undefined) continue;
+        steps.push({
+            latex: entry.line.latex,
+            kind: presentation.kind,
+            reason: presentation.reason,
+        });
+    }
+    const truncated = truncateProcessSteps(steps, maxSteps);
+    return {
+        name,
+        title,
+        problem,
+        steps: truncated.steps,
+        droppedSteps: truncated.droppedSteps,
+    };
+}
+
+/** 梯度条目的过程:符号展开 -> 该点数值 -> 取点/回显 -> 函数值与切向量. */
+export function buildGradientProcess(
+    analysis: AnalysisResult,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    return buildProcessDocument(
+        analysis.name,
+        `梯度 ${analysis.name}`,
+        analysisLatexSummary(analysis),
+        analysisLatexDetailEntries(analysis),
+        maxSteps,
+    );
+}
+
+/**
+ * 积分条目的过程:目前只有"积分式 = 数值"这一步(数值未回填时省略右端).
+ *
+ * 没有内核产物就没有更多步骤可给(路线图 B5 的三期范围);这里如实只产出
+ * 已有的等式,不编造中间步骤.
+ */
+export function buildIntegralProcess(
+    task: IntegralTask,
+    objects: readonly SceneObject[],
+    methodLabel: string,
+    value: number | null,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    return buildProcessDocument(
+        task.name,
+        `积分 ${task.name}`,
+        integralLatexSummary(task, objects),
+        integralLatexDetailEntries(task, objects, methodLabel, value),
+        maxSteps,
+    );
+}
+
+/**
+ * 方程求解条目的过程:题目就是待求解的方程,步骤由**内核产物**直接给出.
+ *
+ * 这是"三期只换数据源,UI 层零改动"的落点:步骤的 `kind`/`reason`/`latex` 全部
+ * 来自 `math_rs::symbolic::solve`,过程页只是把它排版出来,不再做任何重组或
+ * 猜测.求解失败时给出空步骤 + 错误理由,过程页仍显示题目.
+ */
+export function buildSolveProcess(task: SolveTask): ProcessDocument {
+    return {
+        name: task.name,
+        title: `求解 ${task.name}`,
+        problem: task.equationLatex === '' ? null : task.equationLatex,
+        steps: task.steps.map((step) => ({
+            latex: step.latex,
+            kind: step.kind,
+            reason: step.reason,
+        })),
+        droppedSteps: null,
+    };
+}

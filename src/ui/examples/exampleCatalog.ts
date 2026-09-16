@@ -55,6 +55,7 @@ export const EXAMPLE_CATALOG: readonly ExampleEntry[] = [
     { file: 'intersection_line_curves.scad', title: '曲线 ∩ 曲线', group: _orther },
     { file: 'intersection_surfaces.scad', title: '曲面 ∩ 曲面', group: _orther },
     { file: 'double_integral_region.scad', title: 'region 域二重积分', group: _orther },
+    { file: 'solve_equations.scad', title: '方程求解分步推导', group: _orther },
     { file: 'animation_box_rotations.scad', title: '动画片段顺序播放', group: _orther },
     { file: 'Zemlya.scad', title: '三星覆盖与极冠', group: _orther },
 ];

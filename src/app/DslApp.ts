@@ -26,7 +26,10 @@ import { EditorHighlight } from '../ui/editor/EditorHighlight';
 import { FormulaCopyController } from '../ui/formula/FormulaCopyController';
 import { ObjectListController } from '../ui/objects/ObjectListController';
 import { PanelController } from '../ui/panels/PanelController';
+import { RightPanelTabs } from '../ui/panels/RightPanelTabs';
 import { RightSplitController } from '../ui/panels/RightSplitController';
+import { ProcessPanel, formatProcessParamEcho } from '../ui/process/ProcessPanel';
+import type { ProcessRequest } from '../ui/evaluation/EvaluationItem';
 import { ExampleLoaderController } from '../ui/examples/ExampleLoaderController';
 import { exampleSource, type ExampleEntry } from '../ui/examples/exampleCatalog';
 import { replaceTextareaSource } from '../ui/examples/replaceEditorSource';
@@ -55,6 +58,10 @@ export class DslApp {
     private readonly editorHighlight: EditorHighlight;
     private panelController: PanelController | null = null;
     private rightSplitController: RightSplitController | null = null;
+    /** 右栏标签页:页归属的状态源;页宽通过 PanelController 的宽度组生效. */
+    private rightPanelTabs: RightPanelTabs | null = null;
+    /** 过程页视图:条目"过程"入口把文档交给它载入. */
+    private processPanel: ProcessPanel | null = null;
 
     private animationFrameId: number | null = null;
     private refreshFrame: number | null = null;
@@ -84,6 +91,7 @@ export class DslApp {
         const analysisList = document.getElementById('analysis-object-list')!;
         const integralList = document.getElementById('integral-object-list')!;
         const intersectionList = document.getElementById('intersection-object-list')!;
+        const solveList = document.getElementById('solve-object-list')!;
         const formulaCopyHint = document.getElementById('formula-copy-hint')!;
 
         this.editor = document.getElementById('dsl-editor') as HTMLTextAreaElement;
@@ -109,6 +117,7 @@ export class DslApp {
                 analysis: analysisList,
                 integral: integralList,
                 intersection: intersectionList,
+                solve: solveList,
             },
             {
                 // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要
@@ -117,6 +126,9 @@ export class DslApp {
                 toggleAnalysis: (name) => this._toggleAnalysis(name),
                 toggleIntegral: (name) => this._toggleIntegral(name),
                 toggleIntersection: (name) => this._toggleIntersection(name),
+                toggleSolve: (name) => this._toggleSolve(name),
+                // 三级披露的 L2 入口:条目已把过程文档建好,这里只负责切页与载入.
+                openProcess: (request) => this._openProcess(request),
             },
         );
         this.paramPanelController = new ParamPanelController(
@@ -162,6 +174,33 @@ export class DslApp {
         // 属于布局态,由控制器写到 #app 的 CSS 变量上.
         this.rightSplitController = new RightSplitController();
         this.rightSplitController.bind(document.getElementById('app')!);
+        // 右栏标签页:切页只改"哪一页在前";页宽交给 PanelController 的宽度组
+        // (`--right-panel-width` 的唯一写入点不变),分隔条比例不归它管.
+        this.rightPanelTabs = new RightPanelTabs(
+            document.getElementById('right-tabs')!,
+            {
+                params: document.getElementById('right-page-params')!,
+                process: document.getElementById('right-page-process')!,
+            },
+            {
+                onTabChange: (tab) => {
+                    this.panelController?.setWidthGroup('right-panel', tab);
+                    // 参数可能刚在另一页被改过:切回过程页时刷新只读回显,
+                    // 但不重载过程(那会把当前步复位到第 0 步).
+                    if (tab === 'process') this.processPanel?.refreshEcho();
+                },
+            },
+        );
+        this.rightPanelTabs.bind();
+
+        // 过程页视图只装配一次;参数只读回显(R6)按需拉当前值,不在这里存副本.
+        this.processPanel = new ProcessPanel(
+            document.getElementById('process-panel')!,
+            {
+                getParamEcho: () =>
+                    formatProcessParamEcho(this.paramPanelController.getValues()),
+            },
+        );
         this.formulaCopyController.bind(document.getElementById('app')!);
         // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听
         // (键盘那条路仍然只走 KeyboardController).
@@ -177,6 +216,13 @@ export class DslApp {
         for (const binding of this.exampleLoader.keyboardBindings()) {
             this.keyboardController.register(binding);
         }
+        // 过程页左右翻步:只在过程页激活时生效,焦点在编辑器/标签栏里时让位
+        // (让位规则在 ProcessPanel.keyboardBinding 里,不在这里判断).
+        this.keyboardController.register(
+            this.processPanel.keyboardBinding(
+                () => this.rightPanelTabs?.get() === 'process',
+            ),
+        );
         this.keyboardController.bind();
 
         window.addEventListener('resize', this.onResize);
@@ -201,6 +247,10 @@ export class DslApp {
 
         this.panelController?.dispose();
         this.rightSplitController?.dispose();
+        this.rightPanelTabs?.dispose();
+        this.rightPanelTabs = null;
+        this.processPanel?.dispose();
+        this.processPanel = null;
         this.lineNumbers.dispose();
         this.editorHighlight.dispose();
         this.renderController.dispose();
@@ -231,6 +281,9 @@ export class DslApp {
          */
         this.diagnosticsController.clear();
         this._cancelPendingRefresh();
+        // 源码重跑 = 场景整体替换:已载入的过程可能指向不再存在的条目,先清掉.
+        // 拖动参数只走 `_refreshObjects`,不会经过这里,所以过程页不会被误清.
+        this.processPanel?.clear();
 
         try {
             const scene = await this.compileController.run(this.editor.value);
@@ -362,5 +415,29 @@ export class DslApp {
             this.paramPanelController.getValues(),
         );
         if (scene) this.renderController.commitSceneWithoutRedraw(scene);
+    }
+
+    /**
+     * 切换方程求解对象的显隐:与求交/积分同一语义--隐藏 = 列表保留占位,
+     * 不再调用求解内核,所以必须重新编译(见 compileSolves 的隐藏分支).
+     */
+    private _toggleSolve(name: string): void {
+        const scene = this.compileController.toggleSolve(
+            name,
+            this.paramPanelController.getValues(),
+        );
+        if (scene) this.renderController.commitSceneWithoutRedraw(scene);
+    }
+
+    /**
+     * 打开某条求值对象的过程页(三级披露的 L2).
+     *
+     * 过程文档由条目在点击时构建(item 知道自己的 IR 字段),这里只做两件事:
+     * 切到过程页(顺带把右栏换成过程宽度组),载入步骤.切页不清参数状态,
+     * 过程页顶部另有当前参数的只读回显(R6).
+     */
+    private _openProcess(request: ProcessRequest): void {
+        this.rightPanelTabs?.show('process');
+        this.processPanel?.show(request.document);
     }
 }

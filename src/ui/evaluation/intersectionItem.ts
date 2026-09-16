@@ -15,7 +15,7 @@ import {
     intersectionLatexDetails,
     intersectionLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
-import { createVisibilityButton } from '../shared/rowDom';
+import { createRowActions, createVisibilityButton } from '../shared/rowDom';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,
@@ -95,7 +95,14 @@ export class IntersectionItem extends EvaluationItem<
             () => context.toggleHidden(task.name),
         );
 
-        const { row } = createEvaluationRow(summary, detail, result, toggle);
+        // 求交一期不接过程页(细节行没有递等结构,见设计文档第 6 节的降级
+        // 口径),行末只有显隐按钮.
+        const { row } = createEvaluationRow(
+            summary,
+            detail,
+            result,
+            createRowActions(toggle),
+        );
         row.classList.toggle('is-hidden', !task.enabled);
         super(task, row);
         this.result = result;

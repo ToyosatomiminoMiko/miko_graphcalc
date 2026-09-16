@@ -549,6 +549,34 @@ pub fn matrix4_from_expr(expr: &str) -> Result<Vec<f64>, JsValue> {
     symbolic::matrix4_from_expr(expr).map_err(math_error)
 }
 
+/// 方程求解入口(设计文档 `docs/equation-solving-process.md` 的三期内核).
+///
+/// 返回**独立步骤产物的 JSON**:`{ variable, equation_latex, solution_latex,
+/// real_root_count, identity, steps: [{ latex, reason, kind }] }`.步骤产物类型
+/// (`symbolic::SolveOutcome`)不含 `Expr`,符号引擎内部表示不越过这一层
+/// (路线图 §7.1).
+///
+/// `coeff_names` / `coeff_values` 与积分/分析同一条"系数"链路:方程里的参数
+/// 由调用方给当前值,内核不做符号系数代数.`variable` 为空串时从方程推断.
+#[wasm_bindgen]
+pub fn solve_equation(
+    equation: &str,
+    variable: &str,
+    coeff_names: Vec<String>,
+    coeff_values: Vec<f64>,
+) -> Result<String, JsValue> {
+    let coefficients: Vec<(String, f64)> = coeff_names.into_iter().zip(coeff_values).collect();
+    let variable = if variable.trim().is_empty() {
+        None
+    } else {
+        Some(variable)
+    };
+    let outcome =
+        symbolic::solve_equation(equation, variable, &coefficients).map_err(math_error)?;
+    serde_json::to_string(&outcome)
+        .map_err(|error| math_error(format!("求解结果序列化失败: {error}")))
+}
+
 /// 梯度数值求值入口;参数走 JSON 请求(见 `wasm_payloads`).
 #[wasm_bindgen]
 pub fn evaluate_gradient_point(payload: &str) -> Result<GradientPointResult, JsValue> {

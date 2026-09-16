@@ -5,7 +5,7 @@
  * 完成三件事:
  * 1. `run(source)`:解析新源码并生成一份完整 SceneIR;
  * 2. `refresh(paramOverrides)`:复用当前 AST,只按新参数重新编译;
- * 3. `toggleAnalysis/toggleIntegral/toggleIntersection`:切换求值对象显隐后重新编译.
+ * 3. `toggleAnalysis/toggleIntegral/toggleIntersection/toggleSolve`:切换求值对象显隐后重新编译.
  *
  * 实体显隐不经过这里:它只改 Plotter 可见性,不需要重新编译
  * (见 RenderController.toggleObject).
@@ -76,6 +76,14 @@ export class CompileController {
         return this.recompileForVisibilityChange(paramOverrides);
     }
 
+    toggleSolve(
+        name: string,
+        paramOverrides: Record<string, number>,
+    ): SceneIR | null {
+        this.store.toggleSolveHidden(name);
+        return this.recompileForVisibilityChange(paramOverrides);
+    }
+
     dispose(): void {
         this.disposed = true;
         this.runSequence += 1;
@@ -110,6 +118,7 @@ export class CompileController {
                 hiddenAnalysisNames: this.store.hiddenAnalysisNames,
                 hiddenIntegralNames: this.store.hiddenIntegralNames,
                 hiddenIntersectionNames: this.store.hiddenIntersectionNames,
+                hiddenSolveNames: this.store.hiddenSolveNames,
             });
         } catch (error) {
             throw this.locate(error);

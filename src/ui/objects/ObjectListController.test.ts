@@ -16,7 +16,7 @@
  * 不看排版.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AnalysisResult, SceneIR, SceneObject } from '../../ir';
+import type { AnalysisResult, SceneIR, SceneObject, SolveTask } from '../../ir';
 import { installDomStub, StubElement } from '../../test/domStub';
 
 vi.mock('katex', () => ({
@@ -97,6 +97,7 @@ const scene = {
             enabled: true,
         },
     ],
+    solves: [],
 } as unknown as SceneIR;
 
 /** 显隐按钮回调的落点:测试只关心"点了哪一条",不模拟重新编译. */
@@ -105,6 +106,9 @@ interface ToggleCalls {
     analysis: string[];
     integral: string[];
     intersection: string[];
+    solve: string[];
+    /** 点过"过程"入口的条目名(过程文档内容另有用例断言). */
+    process: string[];
 }
 
 function createController(): {
@@ -112,6 +116,7 @@ function createController(): {
     analysisList: StubElement;
     integralList: StubElement;
     intersectionList: StubElement;
+    solveList: StubElement;
     calls: ToggleCalls;
     controller: ObjectListController;
 } {
@@ -119,11 +124,14 @@ function createController(): {
     const analysisList = new StubElement('div');
     const integralList = new StubElement('div');
     const intersectionList = new StubElement('div');
+    const solveList = new StubElement('div');
     const calls: ToggleCalls = {
         entity: [],
         analysis: [],
         integral: [],
         intersection: [],
+        solve: [],
+        process: [],
     };
     const controller = new ObjectListController(
         {
@@ -131,12 +139,15 @@ function createController(): {
             analysis: analysisList as unknown as HTMLElement,
             integral: integralList as unknown as HTMLElement,
             intersection: intersectionList as unknown as HTMLElement,
+            solve: solveList as unknown as HTMLElement,
         },
         {
             toggleEntity: (id) => calls.entity.push(id),
             toggleAnalysis: (name) => calls.analysis.push(name),
             toggleIntegral: (name) => calls.integral.push(name),
             toggleIntersection: (name) => calls.intersection.push(name),
+            toggleSolve: (name) => calls.solve.push(name),
+            openProcess: (request) => calls.process.push(request.name),
         },
     );
     return {
@@ -144,6 +155,7 @@ function createController(): {
         analysisList,
         integralList,
         intersectionList,
+        solveList,
         calls,
         controller,
     };
@@ -321,22 +333,25 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(calls.intersection).toEqual(['X']);
     });
 
-    it('按钮是行末的直接子节点,不在 <summary> 内,点它不开合细节', () => {
+    it('按钮在行末动作容器里,容器不在 <summary> 内,点它不开合细节', () => {
         const { integralList, controller } = createController();
         controller.renderScene(scene);
 
         const row = integralList.querySelector<StubElement>('.evaluation-row')!;
         const main = row.querySelector<StubElement>('.row-main')!;
         const summary = row.querySelector<StubElement>('.eval-summary')!;
+        const actions = row.querySelector<StubElement>('.row-actions')!;
         const button = row.querySelector<StubElement>('.row-visibility-btn')!;
         expect(summary.tagName).toBe('summary');
         expect(summary.querySelectorAll<StubElement>('.row-visibility-btn')).toHaveLength(0);
-        // 行的直接子节点只有"主内容 + 按钮":摘要/折叠区在主内容里,按钮在
-        // 末位,靠 .row-main 的 flex:1 贴右(见 rowDom.createObjectRow).
+        // 行的直接子节点只有"主内容 + 行末动作"两个:摘要/折叠区在主内容里,
+        // 动作容器在末位,靠 .row-main 的 flex:1 贴右(见 rowDom.createObjectRow).
         expect(row.children).toHaveLength(2);
         expect(row.children[0]).toBe(main);
-        expect(row.children[1]).toBe(button);
-        expect(button.parent).toBe(row);
+        expect(row.children[1]).toBe(actions);
+        expect(button.parent).toBe(actions);
+        // 签名扩成"行末动作容器"后,显隐按钮仍排在容器**最后一位**,位置语义没变.
+        expect(actions.children[actions.children.length - 1]).toBe(button);
         expect(main.querySelector<StubElement>('.eval-details')).not.toBeNull();
         // 行里没有监听 click 的自建开合按钮:开合只认 <summary> 原生行为.
         expect(summary.listeners.get('click')).toBeUndefined();
@@ -525,5 +540,174 @@ describe('列表缓存:内容不变就复用,顺序/展开态/数值都不串', 
                 .querySelector<StubElement>('.evaluation-row')!
                 .getAttribute('role'),
         ).toBe('listitem');
+    });
+});
+
+describe('三级披露:长过程的 L2 入口', () => {
+    /**
+     * 带球坐标回显 + 切向量的梯度 = 6 行细节(符号展开 / 数值 / 取点 / 球坐标 /
+     * 函数值 / 切向量),超过 UI_CONFIG.process.disclosureThreshold(5).
+     * 这是 `example/sphere_gradient.scad` 里 `at spherical` 那条梯度的形状.
+     */
+    const longGradient: AnalysisResult = {
+        ...analysis,
+        name: 'gs',
+        pointSpherical: [2, 0.9, 0.6],
+        tangent: [0, 0, 1],
+    };
+
+    it('细节行超过阈值:出现"过程"入口,点击把条目名回调出去', () => {
+        const { analysisList, calls, controller } = createController();
+        controller.renderScene({ ...scene, analyses: [longGradient] } as SceneIR);
+
+        const entry = analysisList.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry).not.toBeNull();
+        expect(entry.textContent).toBe('过程');
+        expect(entry.disabled).toBe(false);
+
+        entry.dispatch('click');
+        expect(calls.process).toEqual(['gs']);
+    });
+
+    it('短过程(不超过阈值)不出现"过程"入口,继续留在行内 <details>', () => {
+        const { analysisList, controller } = createController();
+        controller.renderScene(scene);
+
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+        expect(analysisList.querySelector<StubElement>('.eval-details')).not.toBeNull();
+    });
+
+    it('一期只接梯度:散度即使带球坐标回显也没有过程入口', () => {
+        const { analysisList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            analyses: [{ ...longGradient, op: 'divergence' }],
+        } as SceneIR);
+
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+    });
+
+    it('隐藏对象的过程入口置灰并给出明文理由,点击不触发', () => {
+        const { analysisList, calls, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            analyses: [{ ...longGradient, enabled: false }],
+        } as SceneIR);
+
+        const entry = analysisList.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(true);
+        // 理由写在 title 与 aria-label 上:鼠标悬停与读屏都能拿到.
+        expect(entry.title).toBe('已隐藏,不参与计算');
+        expect(entry.getAttribute('aria-label')).toContain('已隐藏,不参与计算');
+
+        entry.dispatch('click');
+        expect(calls.process).toEqual([]);
+    });
+});
+
+describe('方程求解条目', () => {
+    const solve: SolveTask = {
+        name: 'S',
+        equation: 'x^2 - 5*x + 6 = 0',
+        variable: 'x',
+        equationLatex: 'x^{2}-5x+6=0',
+        solutionLatex: 'x = 2 \\quad\\text{或}\\quad x = 3',
+        realRootCount: 2,
+        identity: false,
+        steps: [
+            { latex: 'x^{2}-5x+6=0', reason: '原式', kind: 'definition' },
+            {
+                latex: '\\left(x - 2\\right)\\left(x - 3\\right) = 0',
+                reason: '因式分解',
+                kind: 'algebra',
+            },
+            { latex: 'x - 2 = 0 \\quad\\text{或}\\quad x - 3 = 0', reason: '零积律', kind: 'rule' },
+            { latex: 'x = 2 \\quad\\text{或}\\quad x = 3', reason: '移项', kind: 'algebra' },
+        ],
+        error: null,
+        enabled: true,
+    };
+
+    it('摘要 = 题目:求解标签 + 变量名 + 方程', () => {
+        const { solveList, controller } = createController();
+        controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
+
+        const row = solveList.querySelector<StubElement>('.evaluation-row')!;
+        const badge = row.querySelector<StubElement>('.kind-badge')!;
+        expect(badge.className).toBe('kind-badge kind-solve');
+        expect(badge.textContent).toBe('求解');
+        expect(row.querySelector<StubElement>('.object-name')!.textContent).toBe('S');
+        expect(row.querySelector<StubElement>('.eval-summary-formula')!.textContent)
+            .toBe('x^{2}-5x+6=0');
+    });
+
+    it('展开细节给解集与步骤计数', () => {
+        const { solveList, controller } = createController();
+        controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
+
+        const details = solveList.querySelector<StubElement>('.eval-details')!;
+        const lines = details.querySelectorAll<StubElement>('.eval-detail-line');
+        expect(lines[0].textContent).toContain('x = 2');
+        const metas = details.querySelectorAll<StubElement>('.eval-detail-meta');
+        expect(metas[0].textContent).toContain('4 步');
+    });
+
+    it('过程入口可用并回调条目名;显隐按钮回调 toggleSolve', () => {
+        const { solveList, calls, controller } = createController();
+        controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
+
+        const entry = solveList.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(false);
+        entry.dispatch('click');
+        expect(calls.process).toEqual(['S']);
+
+        solveList.querySelector<StubElement>('.row-visibility-btn')!.dispatch('click');
+        expect(calls.solve).toEqual(['S']);
+    });
+
+    it('隐藏项:摘要回退方程原文,入口置灰并给理由', () => {
+        const { solveList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            solves: [{
+                ...solve,
+                enabled: false,
+                equationLatex: '',
+                solutionLatex: null,
+                steps: [],
+            }],
+        } as SceneIR);
+
+        const row = solveList.querySelector<StubElement>('.evaluation-row')!;
+        expect(row.classList.contains('is-hidden')).toBe(true);
+        // 没有题目 LaTeX 时回退成方程原文(纯文本),不留半条公式.
+        expect(row.querySelector<StubElement>('.object-expr')!.textContent)
+            .toBe('x^2 - 5*x + 6 = 0');
+        expect(row.querySelector<StubElement>('.eval-result')!.textContent)
+            .toBe('已隐藏,不参与计算');
+        const entry = row.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(true);
+        expect(entry.getAttribute('aria-label')).toContain('已隐藏,不参与计算');
+    });
+
+    it('内核拒绝的方程:细节写明理由,过程入口置灰', () => {
+        const { solveList, controller } = createController();
+        controller.renderScene({
+            ...scene,
+            solves: [{
+                ...solve,
+                error: '求解内核目前只支持一次/二次方程,当前方程的次数是 3;三次以上留待后续分期',
+                equationLatex: '',
+                solutionLatex: null,
+                steps: [],
+            }],
+        } as SceneIR);
+
+        const row = solveList.querySelector<StubElement>('.evaluation-row')!;
+        expect(row.querySelector<StubElement>('.eval-detail-meta')!.textContent)
+            .toContain('无法求解');
+        const entry = row.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry.disabled).toBe(true);
+        expect(entry.getAttribute('aria-label')).toContain('无法求解');
     });
 });

@@ -97,7 +97,7 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
         expect(container.children).toHaveLength(0);
     });
 
-    it('内容都在 .row-main 里,显隐按钮是行末的直接子节点', () => {
+    it('内容都在 .row-main 里,显隐按钮在行末动作容器里', () => {
         const { container, list } = createList();
         list.render([curve], { 1: 'y=1' });
 
@@ -105,6 +105,7 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
         const main = row.querySelector<StubElement>('.row-main')!;
         const head = row.querySelector<StubElement>('.object-head')!;
         const expr = row.querySelector<StubElement>('.object-expr')!;
+        const actions = row.querySelector<StubElement>('.row-actions')!;
         const toggle = row.querySelector<StubElement>('.row-visibility-btn')!;
 
         // 名称行与公式都在主内容包装里;公式独占第二行靠
@@ -114,12 +115,14 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
         expect(expr.parent).toBe(main);
         expect(head.querySelector<StubElement>('.object-expr')).toBeNull();
 
-        // 行的直接子节点只有"主内容 + 按钮":按钮在末位,主内容 flex:1 把它
-        // 推到右端(见 rowDom.createObjectRow).
+        // 行的直接子节点只有"主内容 + 行末动作":动作容器在末位,主内容 flex:1
+        // 把它推到右端(见 rowDom.createObjectRow);显隐按钮仍在容器的最后一位,
+        // 位置语义没因多一个动作容器而改变.
         expect(row.children).toHaveLength(2);
         expect(row.children[0]).toBe(main);
-        expect(row.children[1]).toBe(toggle);
-        expect(toggle.parent).toBe(row);
+        expect(row.children[1]).toBe(actions);
+        expect(toggle.parent).toBe(actions);
+        expect(actions.children[actions.children.length - 1]).toBe(toggle);
     });
 
     it('颜色定义是"色块 + 明文值",紧跟在类型徽章后面(同一行)', () => {

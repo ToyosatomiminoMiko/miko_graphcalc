@@ -201,6 +201,23 @@ export interface DerivativeStatement {
     span: SourceSpan;
 }
 
+/**
+ * `solve 名称 = 方程 [选项];` 方程求解语句(设计文档
+ * `docs/equation-solving-process.md` 的三期内核).
+ *
+ * 方程原文由 `expr` 整段捕获(`x^2 - 5*x + 6 = 0`),顶层等号由 Rust 求解内核
+ * 切分;变量缺省从方程推断,也可用 `variable` 选项显式指定.求解是**声明级
+ * 编译**:在 `compileSolves` 里一次算出步骤产物,写进 IR 的 `solves`.
+ */
+export interface SolveStatement {
+    type: 'solve';
+    name: string;
+    /** 方程原文,含一个顶层 `=`(如 `x^2 - 5*x + 6 = 0`). */
+    equation: string;
+    options: OptionPair[];
+    span: SourceSpan;
+}
+
 export type AstStatement =
     | ParamStatement
     | TensorStatement
@@ -209,7 +226,8 @@ export type AstStatement =
     | AnalysisStatement
     | IntegralStatement
     | IntersectionStatement
-    | DerivativeStatement;
+    | DerivativeStatement
+    | SolveStatement;
 
 export interface AstProgram {
     statements: AstStatement[];

@@ -475,6 +475,32 @@ fn intersection_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     })
 }
 
+/// 将方程求解语句(solve_stmt)转换为 JSON AST 节点.
+/// 包含名称,方程原文(含顶层 `=`),选项列表和位置.
+/// 变量缺省由求解内核从方程推断,也可用 `variable` 选项显式给出.
+fn solve_to_stmt(pair: &Pair<'_, Rule>) -> Value {
+    let mut name = String::new();
+    let mut equation = String::new();
+    let mut options: Vec<Value> = Vec::new();
+
+    for child in pair.clone().into_inner() {
+        match child.as_rule() {
+            Rule::ident => name = child.as_str().to_string(),
+            Rule::expr => equation = child.as_str().trim().to_string(),
+            Rule::stmt_end => options = options_from_end(&child),
+            _ => {}
+        }
+    }
+
+    json!({
+        "type": "solve",
+        "name": name,
+        "equation": equation,
+        "options": options,
+        "span": span_of(pair),
+    })
+}
+
 /// 根据语法规则将单个语句节点(Pair)转换为对应的 AST JSON 节点.
 /// 若规则未知,则返回错误信息.
 fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
@@ -487,6 +513,7 @@ fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
         Rule::integral_stmt => Ok(integral_to_stmt(&pair)),
         Rule::intersection_stmt => Ok(intersection_to_stmt(&pair)),
         Rule::derivative_stmt => Ok(derivative_to_stmt(&pair)),
+        Rule::solve_stmt => Ok(solve_to_stmt(&pair)),
         _ => Err(format!("未知语句规则: {:?}", pair.as_rule())),
     }
 }

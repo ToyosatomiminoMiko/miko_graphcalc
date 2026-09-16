@@ -14,7 +14,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UI_CONFIG } from '../../config/uiConfig';
 import { installDomStub, type DomStub, type StubElement } from '../../test/domStub';
-import { PanelController } from './PanelController';
+import {
+    PanelController,
+    WIDTH_GROUP_PARAMS,
+    WIDTH_GROUP_PROCESS,
+} from './PanelController';
 
 interface FakePanel {
     readonly panel: StubElement;
@@ -283,5 +287,155 @@ describe('dispose 复位与重复 bind(UI-P3.3)', () => {
         expect(root.style.getPropertyValue('--left-panel-width')).toBe(
             `${UI_CONFIG.panel.collapsedSideWidth}px`,
         );
+    });
+});
+
+describe('右栏宽度按页(宽度组)记', () => {
+    function setupRight(): {
+        stub: DomStub;
+        root: StubElement;
+        right: FakePanel;
+        controller: PanelController;
+    } {
+        const stub = installDomStub();
+        const root = stub.document.createElement('div');
+        root.id = 'app';
+        const right = createPanel(stub, 'right-panel', '参数', 'aside');
+        root.append(right.panel);
+        stub.document.body.append(root);
+
+        const controller = new PanelController();
+        controller.bind(root as unknown as HTMLElement);
+        return { stub, root, right, controller };
+    }
+
+    it('切页 = 切宽度:各页各自的调整互不覆盖', () => {
+        const { root, right, controller } = setupRight();
+        const paramsDefault = UI_CONFIG.panel.sideDefaultWidth;
+
+        expect(controller.getWidthGroup('right-panel')).toBe(WIDTH_GROUP_PARAMS);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault}px`);
+
+        // 参数页拖宽 40px(右面板向左拖是变宽).
+        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 1 });
+        right.handle.dispatch('pointermove', { clientX: 460, clientY: 0, pointerId: 1 });
+        right.handle.dispatch('pointerup', { clientX: 460, clientY: 0, pointerId: 1 });
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault + 40}px`);
+
+        // 切到过程页:换成过程组的默认宽度(与参数页不同).
+        controller.setWidthGroup('right-panel', WIDTH_GROUP_PROCESS);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.process.defaultWidth}px`,
+        );
+
+        // 过程页拖窄 40px.
+        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 2 });
+        right.handle.dispatch('pointermove', { clientX: 540, clientY: 0, pointerId: 2 });
+        right.handle.dispatch('pointerup', { clientX: 540, clientY: 0, pointerId: 2 });
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.process.defaultWidth - 40}px`,
+        );
+
+        // 切回参数页:用户对参数页的调整还在,没有被过程页的拖动顶掉.
+        controller.setWidthGroup('right-panel', WIDTH_GROUP_PARAMS);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault + 40}px`);
+    });
+
+    it('过程页在前时,同一根手柄改的是过程组的宽度', () => {
+        const { root, right, controller } = setupRight();
+        controller.setWidthGroup('right-panel', WIDTH_GROUP_PROCESS);
+
+        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 1 });
+        right.handle.dispatch('pointermove', { clientX: 460, clientY: 0, pointerId: 1 });
+        right.handle.dispatch('pointerup', { clientX: 460, clientY: 0, pointerId: 1 });
+
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.process.defaultWidth + 40}px`,
+        );
+        // 参数组不受影响.
+        controller.setWidthGroup('right-panel', WIDTH_GROUP_PARAMS);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideDefaultWidth}px`,
+        );
+    });
+
+    it('dispose 把宽度组复位成参数页(与折叠复位同一条路径)', () => {
+        const { root, controller } = setupRight();
+        controller.setWidthGroup('right-panel', WIDTH_GROUP_PROCESS);
+
+        controller.dispose();
+
+        expect(controller.getWidthGroup('right-panel')).toBe(WIDTH_GROUP_PARAMS);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideDefaultWidth}px`,
+        );
+    });
+});
+
+describe('带标签页的右栏:折叠与页级显隐互不干扰', () => {
+    function setupTabsPanel(): {
+        stub: DomStub;
+        root: StubElement;
+        panel: StubElement;
+        header: StubElement;
+        tabs: StubElement;
+        paramsPage: StubElement;
+        processPage: StubElement;
+        button: StubElement;
+    } {
+        const stub = installDomStub();
+        const root = stub.document.createElement('div');
+        root.id = 'app';
+
+        const panel = stub.document.createElement('aside');
+        panel.id = 'right-panel';
+        panel.className = 'panel';
+
+        // 标签栏必须在 header **内部**:折叠遍历隐藏的是面板的直接子元素,
+        // 放进页容器里一折叠就再也切不回来(见设计文档 3.2 第 1 条).
+        const header = stub.document.createElement('header');
+        header.className = 'panel-header';
+        const tabs = stub.document.createElement('div');
+        tabs.id = 'right-tabs';
+        const button = stub.document.createElement('button');
+        button.textContent = '收起';
+        button.dataset.panelToggle = '#right-panel';
+        header.append(tabs, button);
+
+        const paramsPage = stub.document.createElement('div');
+        paramsPage.id = 'right-page-params';
+        const processPage = stub.document.createElement('div');
+        processPage.id = 'right-page-process';
+        processPage.setAttribute('hidden', '');
+
+        const handle = stub.document.createElement('div');
+        handle.dataset.resizePanel = 'right-panel';
+        handle.style.cursor = 'ew-resize';
+
+        panel.append(header, paramsPage, processPage, handle);
+        root.append(panel);
+        stub.document.body.append(root);
+        return { stub, root, panel, header, tabs, paramsPage, processPage, button };
+    }
+
+    it('折叠隐藏两页但保留页签所在的 header,展开后两页恢复', () => {
+        const { root, panel, header, tabs, paramsPage, processPage, button } = setupTabsPanel();
+        new PanelController().bind(root as unknown as HTMLElement);
+
+        button.dispatch('click');
+
+        expect(panel.classList.contains('collapsed')).toBe(true);
+        expect(header.style.display).toBe('');
+        expect(paramsPage.style.display).toBe('none');
+        expect(processPage.style.display).toBe('none');
+        // 标签栏不在折叠遍历的直接子元素里,其显隐由 CSS 的 .collapsed 负责.
+        expect(tabs.style.display).toBe('');
+
+        button.dispatch('click');
+
+        expect(paramsPage.style.display).toBe('');
+        expect(processPage.style.display).toBe('');
+        // 展开不等于把过程页也显示出来:页级 hidden 仍归标签页控制器.
+        expect(processPage.getAttribute('hidden')).toBe('');
     });
 });

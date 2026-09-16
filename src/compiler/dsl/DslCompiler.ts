@@ -11,6 +11,7 @@ import { applyParamOverrides } from './params';
 import { compileIntegralTask } from './integrals';
 import { compileAnalyses } from './analyses';
 import { compileIntersections } from './intersections';
+import { compileSolves } from './solves';
 import { integralLatex, sceneObjectLatex } from './latex';
 import {
     cloneAnimations,
@@ -54,6 +55,7 @@ export interface CompileSceneOptions {
     hiddenAnalysisNames?: ReadonlySet<string>;
     hiddenIntegralNames?: ReadonlySet<string>;
     hiddenIntersectionNames?: ReadonlySet<string>;
+    hiddenSolveNames?: ReadonlySet<string>;
 }
 
 export function compileScene(
@@ -66,6 +68,7 @@ export function compileScene(
     const hiddenAnalysisNames = options.hiddenAnalysisNames ?? new Set<string>();
     const hiddenIntegralNames = options.hiddenIntegralNames ?? new Set<string>();
     const hiddenIntersectionNames = options.hiddenIntersectionNames ?? new Set<string>();
+    const hiddenSolveNames = options.hiddenSolveNames ?? new Set<string>();
 
     const params = cloneParams(staticScene.params);
     const objects = staticScene.objectBlueprints.map((blueprint) =>
@@ -140,5 +143,7 @@ export function compileScene(
             objectAnimations,
             hiddenIntersectionNames,
         ),
+        // 方程求解是声明级编译(与 analysis 同一档):步骤链一次算出写进 IR.
+        solves: compileSolves(ast, params, paramOverrides, hiddenSolveNames),
     };
 }

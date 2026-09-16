@@ -16,12 +16,15 @@ import {
     analysisLatexDetails,
     analysisLatexSummary,
 } from '../../compiler/dsl/evaluationLatex';
-import { createVisibilityButton } from '../shared/rowDom';
+import { createRowActions, createVisibilityButton } from '../shared/rowDom';
+import { buildGradientProcess } from '../process/processData';
+import { needsProcessPage } from '../process/disclosure';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,
     createEvaluationRow,
     createEvaluationSummary,
+    createProcessEntryButton,
     createResultRow,
 } from './evaluationDom';
 
@@ -63,10 +66,10 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
         );
 
         // 展开细节里先给算子的符号展开,再给该点的数值结果;隐藏项不生成
-        // 细节(数值在编译期被跳过,只有占位).
-        const detail = analysis.enabled
-            ? createDetailSections(analysisLatexDetails(analysis))
-            : null;
+        // 细节(数值在编译期被跳过,只有占位).细节行只算一次,披露判据与
+        // 公式块消费同一份.
+        const detailLines = analysis.enabled ? analysisLatexDetails(analysis) : [];
+        const detail = analysis.enabled ? createDetailSections(detailLines) : null;
 
         // 显隐按钮:切换后重新编译,该条目的数值计算随之跳过(隐藏 = 不渲染
         // + 不参与计算);按钮不在 summary 内,点它不会开合细节.
@@ -75,6 +78,23 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
             analysis.name,
             () => context.toggleHidden(analysis.name),
         );
+
+        // "过程"入口(三级披露的 L2):一期只接梯度(其余算子没有可看的中间
+        // 步骤);隐藏项入口置灰并给理由--不参与计算也就没有过程可展示,但
+        // "为什么点不了"要有明文.
+        const processDisabledReason = analysis.enabled ? null : '已隐藏,不参与计算';
+        const hasProcess = analysis.op === 'gradient';
+        const processEntry = hasProcess
+            && (processDisabledReason !== null || needsProcessPage(detailLines))
+            ? createProcessEntryButton({
+                name: analysis.name,
+                disabledReason: processDisabledReason,
+                onOpen: () => context.openProcess({
+                    name: analysis.name,
+                    document: buildGradientProcess(analysis),
+                }),
+            })
+            : null;
 
         // 隐藏项没有细节可展开(detail=null),状态行会直接落在 main 里,
         // 屏幕上有"已隐藏,不参与计算"这句明文--不能只靠 is-hidden 的透明度.
@@ -85,7 +105,13 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
                 text: '已隐藏,不参与计算',
             });
 
-        const { row } = createEvaluationRow(summary, detail, status, toggle);
+        // 显隐按钮排在"过程"之后:它的位置语义(仍在行末)不因多一个入口而变.
+        const { row } = createEvaluationRow(
+            summary,
+            detail,
+            status,
+            createRowActions(processEntry, toggle),
+        );
         row.classList.toggle('is-hidden', !analysis.enabled);
         super(analysis, row);
     }

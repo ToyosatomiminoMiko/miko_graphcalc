@@ -5,7 +5,7 @@
  * - 最近一次成功解析的 AST
  * - 当前矩阵运算后端
  * - 最近一次编译出的场景对象快照
- * - 实体/分析/积分的显隐状态
+ * - 实体/分析/积分/求交/求解的显隐状态
  * - 动画计时起点
  *
  * 它不负责解析/编译/渲染,也不直接操作 DOM.CompileController 负责
@@ -31,6 +31,7 @@ export class SceneStore {
     private readonly _hiddenAnalysisNames = new Set<string>();
     private readonly _hiddenIntegralNames = new Set<string>();
     private readonly _hiddenIntersectionNames = new Set<string>();
+    private readonly _hiddenSolveNames = new Set<string>();
 
     get ast(): AstProgram | null {
         return this._currentAst;
@@ -69,6 +70,10 @@ export class SceneStore {
         return this._hiddenIntersectionNames;
     }
 
+    get hiddenSolveNames(): ReadonlySet<string> {
+        return this._hiddenSolveNames;
+    }
+
     /**
      * @cache_access
      * 在一次源码解析成功后提交新的 AST 和矩阵后端.
@@ -86,6 +91,7 @@ export class SceneStore {
             this._hiddenAnalysisNames.clear();
             this._hiddenIntegralNames.clear();
             this._hiddenIntersectionNames.clear();
+            this._hiddenSolveNames.clear();
         }
 
         this._lastRunSource = source;
@@ -168,6 +174,18 @@ export class SceneStore {
             this._hiddenIntersectionNames.delete(name);
         } else {
             this._hiddenIntersectionNames.add(name);
+        }
+    }
+
+    /**
+     * @cache_access
+     * 更新方程求解对象显隐缓存.
+     */
+    toggleSolveHidden(name: string): void {
+        if (this._hiddenSolveNames.has(name)) {
+            this._hiddenSolveNames.delete(name);
+        } else {
+            this._hiddenSolveNames.add(name);
         }
     }
 }

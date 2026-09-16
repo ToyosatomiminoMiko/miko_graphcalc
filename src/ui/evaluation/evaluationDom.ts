@@ -39,6 +39,7 @@
  * `ui/shared/rowDom.ts`.
  */
 import { createObjectRow } from '../shared/rowDom';
+import { createButton } from '../widgets/Button';
 import { el } from '../widgets/dom';
 import { createFormulaElement } from '../formula/FormulaView';
 import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
@@ -149,6 +150,45 @@ export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
 }
 
 /**
+ * 行末"过程"入口的规格.
+ *
+ * `disabledReason` 为 null 表示可打开;否则按钮置灰并把它作为理由给出.
+ */
+export interface ProcessEntrySpec {
+    readonly name: string;
+    /** 置灰理由;null 表示可用. */
+    readonly disabledReason: string | null;
+    readonly onOpen: () => void;
+}
+
+/**
+ * 行末"过程"入口按钮:三级披露里 L2 的入口.
+ *
+ * - 可用:点击后由应用层切到右栏过程页并载入该条目的过程;
+ * - 不可用(`disabledReason !== null`,目前只有"已隐藏,不参与计算"):**仍然
+ *   渲染**但置灰,并把理由写进 `title`/`aria-label`.隐藏对象不参与计算,也就
+ *   没有过程可展示,但"为什么点不了"必须有明文,与列表里"已隐藏,不参与计算"
+ *   的文案口径一致(见设计文档 4.4).
+ *
+ * 由各 item 按披露判据决定是否创建;它与显隐按钮同处行末动作容器,显隐按钮
+ * 排在它**之后**,保持"显隐按钮仍在行末"这条既有位置语义.
+ */
+export function createProcessEntryButton(spec: ProcessEntrySpec): HTMLElement {
+    const disabled = spec.disabledReason !== null;
+    const button = createButton({
+        class: 'row-process-btn',
+        text: '过程',
+        disabled,
+        ariaLabel: disabled
+            ? `${spec.name} 的过程不可用:${spec.disabledReason}`
+            : `打开 ${spec.name} 的过程`,
+        title: disabled ? (spec.disabledReason ?? undefined) : '在右栏过程页查看推导步骤',
+    });
+    if (!disabled) button.onClick(spec.onOpen);
+    return button.element;
+}
+
+/**
  * 行外壳:把摘要/细节/结果行装配成 `<article class="evaluation-row">`.
  *
  * - 没有展开细节(`detail === null`,如被隐藏的条目):summary 进 `.row-main`,
@@ -159,18 +199,19 @@ export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
  *
  * `result` 节点本身可能已被搬进公式块(仍由调用方持有引用做异步回填);返回
  * `{ row, main }` 是因为积分条目在公式块不存在时要把状态行挂回主内容包装,
- * 而不是挂到行上变成按钮的第三个兄弟(见 IntegralItem.ensureStatusRow).
- * 开合完全交给 `<details>/<summary>` 原生行为;`toggle` 是行末的显隐按钮
- * (可为 null),它与 `.row-main` 同级,在行末(见 {@link createObjectRow}),
- * 不在 `<summary>` 内,所以点它只切换显隐,不开合细节.
+ * 而不是挂到行上变成动作区的第三个兄弟(见 IntegralItem.ensureStatusRow).
+ * 开合完全交给 `<details>/<summary>` 原生行为;`actions` 是行末动作容器
+ * (显隐按钮 + 可选的"过程"入口,由 `createRowActions` 生成,可为 null),
+ * 它与 `.row-main` 同级,在行末(见 {@link createObjectRow}),
+ * 不在 `<summary>` 内,所以点它只触发动作,不开合细节.
  */
 export function createEvaluationRow(
     summary: HTMLElement,
     detail: EvaluationDetailSections | null,
     result: HTMLElement | null,
-    toggle: HTMLElement | null = null,
+    actions: HTMLElement | null = null,
 ): { readonly row: HTMLElement; readonly main: HTMLElement } {
-    const { row, main } = createObjectRow('evaluation-row', toggle);
+    const { row, main } = createObjectRow('evaluation-row', actions);
 
     if (detail === null) {
         main.append(summary);

@@ -1,10 +1,11 @@
 /**
  * 右侧面板"参数区 / 视图区"分隔条控制器.
  *
- * 右面板通高不变,参数区与视图区只是分同一块可用高度:分隔条上下拖动就是
- * 把高度从一边挪到另一边.
+ * 参数页通高不变,参数区与视图区只是分同一块可用高度:分隔条上下拖动就是
+ * 把高度从一边挪到另一边.过程页激活时整个参数页容器被 `hidden`,分隔条与
+ * 参数区一起退出布局,比例冻结在最后的值上.
  *
- * 状态只有一份:`basisRatio`(参数区占右面板高度的比例),唯一写入点是
+ * 状态只有一份:`basisRatio`(参数区占**参数页**高度的比例),唯一写入点是
  * `_applySplit()`--它把比例写成根节点上的 `--right-split-basis`,由
  * `css/panels.css` 的 `#params-panel` 消费(见那里的 flex-basis).拖动与
  * 键盘调整都只改这一个数,不直接写元素高度,因此和"参数区最小高度/视图区
@@ -54,11 +55,14 @@ function roundRatio(value: number): number {
 /**
  * 指针位置 -> 参数区比例.
  *
- * 参数区是右面板的第一个子元素,它的顶边就是右面板顶边,所以"分隔条当前
- * 落在面板高度的百分之几"正好等于"参数区占面板高度的百分之几"--拖动时
- * 不必反推 `flex-basis` 的解析结果,量一次矩形就够.
+ * 基准是**参数页容器**(`#right-page-params`)而不是右面板本身:右栏改成标签页
+ * 之后,参数页的顶边比面板顶边低了一个标签栏,拿面板矩形当基准会整体偏移一个
+ * 标签栏的高度(见设计文档 3.2 第 2 条).页容器上恢复了
+ * `display:flex; flex-direction:column; flex:1; min-height:0`,参数页占**页高度**
+ * 的比例与 `#params-panel { flex-basis }` 的参照系一致.
  *
- * 面板高度为 0(尚未布局/已折叠)时返回 null,调用方跳过这一帧.
+ * 页容器高度为 0(过程页激活时整页被 hidden,或尚未布局)时返回 null,
+ * 调用方跳过这一帧.
  */
 export function computeSplitRatio(
     pointerY: number,
@@ -73,12 +77,12 @@ export class RightSplitController {
     private abortController: AbortController | null = null;
     private ratio: number = SPLIT_DEFAULT_RATIO;
     /**
-     * 右面板节点:拖动时每次移动都要量它的高度.
+     * 参数页容器节点:拖动时每次移动都要量它的高度.
      *
      * 缓存而不是每帧 `querySelector`:拖动是每帧路径,不该在热路径上查 DOM.
      * 只持有这一个节点(分隔条由共用拖动件自己管),`dispose` 时一并清掉.
      */
-    private panel: HTMLElement | null = null;
+    private page: HTMLElement | null = null;
 
     bind(root: HTMLElement): void {
         this.root = root;
@@ -86,14 +90,14 @@ export class RightSplitController {
         this.abortController = new AbortController();
 
         const handle = root.querySelector<HTMLElement>('#right-splitter');
-        const panel = root.querySelector<HTMLElement>('#right-panel');
-        if (!handle || !panel) {
+        const page = root.querySelector<HTMLElement>('#right-page-params');
+        if (!handle || !page) {
             // 结构缺失就是结构缺失:不写变量,也不装作绑好了.
-            this.panel = null;
+            this.page = null;
             return;
         }
 
-        this.panel = panel;
+        this.page = page;
         const signal = this.abortController.signal;
 
         // 拖动本身(起手/累计/收尾/光标/指针捕获)走共用件;本控制器只解释
@@ -116,7 +120,7 @@ export class RightSplitController {
         this.abortController?.abort();
         this.abortController = null;
         this.root = null;
-        this.panel = null;
+        this.page = null;
     }
 
     /** 比例的唯一写入点:写成 CSS 变量,由面板样式消费. */
@@ -137,11 +141,11 @@ export class RightSplitController {
         this._applySplit();
     };
 
-    /** 按指针位移调整比例;面板高度为 0 时(未布局)忽略这一帧. */
+    /** 按指针位移调整比例;参数页高度为 0 时(过程页激活/未布局)忽略这一帧. */
     private _shift(deltaPixels: number): void {
-        const panel = this.panel;
-        if (!panel) return;
-        const height = panel.clientHeight;
+        const page = this.page;
+        if (!page) return;
+        const height = page.clientHeight;
         if (height <= 0) return;
         this.ratio = roundRatio(clamp(
             this.ratio + deltaPixels / height,

@@ -55,6 +55,7 @@
 
 /* 折叠时隐藏标题和左侧"运行"/"示例"按钮,仅保留展开按钮 */
 .panel.collapsed .panel-title,
+.panel.collapsed #right-tabs,
 .panel.collapsed #example-btn,
 .panel.collapsed #run-btn,
 .panel.collapsed .object-list-hint {
@@ -64,6 +65,70 @@
 /* 折叠后按钮不再需要 auto 推右,改为紧贴边缘 */
 .panel.collapsed .panel-header button {
     margin-left: 0;
+}
+
+/* ==========================================================================
+ * 右栏标签页(参数/视图 与 过程)
+ * --------------------------------------------------------------------------
+ * 标签按钮由 ui/widgets/Tabs.ts 生成;`#right-tabs` 是它们的容器(留在
+ * 面板 header 内部,见 index.html 的说明).两页各包一层 `.right-page`,
+ * 页级显隐写 `hidden` 属性(由 ui/panels/RightPanelTabs.ts 维护).
+ * ========================================================================== */
+
+#right-tabs {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* header 里的通用规则是"按钮 margin-left:auto 推到最右",标签按钮不参与
+   推右:整组紧跟标题,只有"收起"按钮贴右. */
+.panel-header .tabs .tab {
+    margin-left: 0;
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.panel-header .tabs .tab:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}
+
+.panel-header .tabs .tab.active {
+    color: var(--color-text-active);
+    background: var(--color-accent-active-bg);
+    border-color: var(--color-accent-border);
+}
+
+.panel-header .tabs .tab:focus-visible {
+    outline: 2px solid var(--color-accent-focus);
+    outline-offset: 1px;
+}
+
+/* 页容器:与右面板同一条"纵向 flex"骨架,并吃掉面板剩余高度.
+   `[hidden]` 必须显式写:`display:flex` 是作者样式,会盖掉 UA 对
+   `[hidden]` 的 `display:none`,不写这一条就藏不住另一页. */
+.right-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.right-page[hidden] {
+    display: none;
 }
 
 /* ==========================================================================
@@ -386,6 +451,49 @@
     outline-offset: 1px;
 }
 
+/* 行末动作容器:把"过程"入口与显隐按钮收成**一个**直接子节点(见
+   ui/shared/rowDom.ts 的 createRowActions).整组贴右靠 .row-main 的 flex:1;
+   按钮竖排:右栏默认 300px 时两个按钮并排会把摘要行挤得读不出来,竖排只占
+   一个按钮的宽度. */
+.row-actions {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+
+/* "过程"入口(三级披露的 L2):与显隐按钮同一套盒模型,只是用透明底表示
+   "这是进入另一页"的次级动作;不可用(隐藏对象)时置灰并保留理由在
+   title/aria-label 上. */
+.row-process-btn {
+    padding: 3px 7px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.row-process-btn:hover:not(:disabled) {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}
+
+.row-process-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.row-process-btn:focus-visible {
+    outline: 2px solid var(--color-accent-focus);
+    outline-offset: 1px;
+}
+
 .kind-badge {
     flex: 0 0 auto;
     min-width: 40px;
@@ -495,6 +603,12 @@
 .kind-intersection {
     color: var(--color-badge-ink);
     background: var(--kind-intersection);
+}
+
+/* 方程求解条目:第 4 类求值对象,与积分/求交同类(浅底深字),只换色相. */
+.kind-solve {
+    color: var(--color-badge-ink);
+    background: var(--kind-solve);
 }
 
 /* 名称行:对象名与"已隐藏"状态芯片排在同一行(见 entity/EntityItem 的

@@ -24,6 +24,7 @@ const CSS_FILES = [
     'editor.css',
     'controls.css',
     'diagnostics.css',
+    'process.css',
 ] as const;
 
 /** 颜色字面量:十六进制或 rgb()/rgba() */

@@ -1,0 +1,260 @@
+/* ==========================================================================
+ * GraphCalc 过程视图样式(右栏"过程"标签页)
+ * --------------------------------------------------------------------------
+ * 结构与类名由 `src/ui/process/ProcessPanel.ts` 决定;这里只负责视觉:
+ *   .process-panel       面板根(右栏第二页的内容)
+ *   .process-header      页头:标题 + 依据图例 + 翻步控件 + 参数只读回显
+ *   .process-steps       步骤列表(逐行递等式)
+ *   .process-step        一行:序号 + KaTeX + 依据徽章;当前步高亮
+ *   .process-step-reason 依据徽章,按 `data-kind` 分区配色
+ *   .process-empty       空状态明文
+ *   .process-truncated   截断明文(超长过程)
+ *
+ * 配色的唯一来源是 css/base.css 的色板,本文件不出现颜色字面量
+ * (由 src/ui/theme/cssPalette.test.ts 断言).
+ * ========================================================================== */
+
+.process-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 页头:标题/图例在左,翻步控件贴右,参数回显独占第二行.
+   允许换行是为了窄栏(220px)下不把标题挤没. */
+.process-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border-divider);
+    background: var(--color-bg-header);
+}
+
+.process-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.process-title {
+    font-size: 13px;
+    color: var(--color-text-strong);
+    white-space: nowrap;
+}
+
+/* 依据图例("定义 2 · 数值 3"):一眼看出这条过程用了哪几类依据. */
+.process-legend {
+    font-size: 10px;
+    color: var(--color-text-hint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.process-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.process-nav-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    background: var(--color-fill-control-strong);
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.process-nav-btn:hover:not(:disabled) {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}
+
+.process-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.process-nav-btn:focus-visible {
+    outline: 2px solid var(--color-accent-focus);
+    outline-offset: 1px;
+}
+
+/* 当前步计数:等宽数字,翻步时宽度不跳. */
+.process-counter {
+    min-width: 52px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-text-meta);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 题目区:过程页先给"在解什么"(方程/算子式),再给逐行步骤.
+   整行独占(flex 1 0 100%),公式排不下时自己横向滚动. */
+.process-problem {
+    flex: 1 0 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 0 6px;
+    border-bottom: 1px solid var(--color-border-divider);
+}
+
+.process-problem-formula {
+    min-width: 0;
+    color: var(--color-text-strong);
+}
+
+.process-problem-formula .katex {
+    color: inherit;
+    font-size: var(--katex-font-size, 1em);
+}
+
+.process-problem-formula[data-tex] {
+    cursor: pointer;
+}
+
+.process-problem-formula[data-tex]:hover {
+    color: var(--color-text-formula);
+}
+
+/* 参数只读回显(R6):参数被藏到另一页后,过程页顶部仍能看到当前值. */
+.process-param-echo {
+    flex: 1 0 100%;
+    min-width: 0;
+    overflow-x: auto;
+    font-size: 11px;
+    color: var(--color-text-hint);
+    white-space: nowrap;
+}
+
+.process-steps {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
+}
+
+.process-steps::-webkit-scrollbar {
+    width: 8px;
+}
+
+.process-steps::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--color-scrollbar);
+    background-clip: content-box;
+}
+
+.process-steps::-webkit-scrollbar-thumb:hover {
+    background: var(--color-scrollbar-hover);
+    background-clip: content-box;
+}
+
+/* 一行 = 序号 + 公式 + 依据徽章.公式列 minmax(0,1fr):公式自己横向滚动,
+   不把徽章挤出栏外. */
+.process-step {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--color-fill-row);
+    cursor: pointer;
+    /* 非当前步降饱和度,当前步才是"讲到哪"的视觉焦点. */
+    opacity: 0.72;
+}
+
+.process-step:hover {
+    border-color: var(--color-border-strong);
+}
+
+.process-step.is-current {
+    opacity: 1;
+    border-color: var(--color-accent-border);
+    background: var(--color-fill-inset);
+    box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.process-step-index {
+    font-size: 11px;
+    color: var(--color-text-faint);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 公式一行不换行(KaTeX 换行会破坏公式语义),排不下由该行横向滚动. */
+.process-step-formula {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    color: var(--color-text-formula);
+}
+
+.process-step-formula .katex {
+    color: inherit;
+    font-size: var(--katex-font-size, 1em);
+}
+
+.process-step-reason {
+    flex: 0 0 auto;
+}
+
+/* 依据分区配色(见 design 4.2):法则=强调色,代数=中性色,定义=虚线,
+   数值=等宽数字.文案由数据源给(ui/process/processSteps.ts). */
+.process-step-reason[data-kind="rule"] {
+    color: var(--color-text-strong);
+    background: var(--color-accent-tint);
+}
+
+.process-step-reason[data-kind="algebra"] {
+    color: var(--color-badge-ink);
+    background: var(--color-neutral);
+}
+
+.process-step-reason[data-kind="definition"] {
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px dashed var(--color-border-strong);
+}
+
+.process-step-reason[data-kind="numeric"] {
+    color: var(--color-text-meta);
+    background: var(--color-fill-control-strong);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 空状态:一句明文,不给空盒子. */
+.process-empty {
+    margin: 0;
+    padding: 12px 10px;
+    font-size: 12px;
+    color: var(--color-text-meta);
+}
+
+/* 截断明文:超长过程不能静默截断,必须写明还有多少步没显示. */
+.process-truncated {
+    margin: 0;
+    padding: 6px 10px;
+    border-top: 1px solid var(--color-border-divider);
+    font-size: 11px;
+    color: var(--color-warning);
+}

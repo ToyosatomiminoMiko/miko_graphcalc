@@ -78,5 +78,16 @@ intersection_stmt = { intersection_kind ~ ident ~ "=" ~ intersection_call ~ stmt
 derivative_stmt = { "derivative" ~ ident ~ "=" ~ derivative_call ~ stmt_end }
 derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 
-statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt }
+// 方程求解语句:`solve 名称 = 方程 [选项];`.
+//
+// 方程写成 `左边 = 右边`(例:`solve S = x^2 - 5*x + 6 = 0;`).整段方程由 `expr`
+// 捕获--它的停止集是 `;`/`{`/`}`,不含 `=`,所以顶层等号原样落在文本里,由
+// Rust 求解内核按顶层等号切分(见 math_rs::symbolic::solve).
+//
+// 求解变量缺省从方程推断(恰好一个非参数自由符号);需要时用选项显式指定:
+//     solve S = a*x^2 + b*x + c = 0 { variable = x; }
+// 参数(a/b/c)按当前声明值代入,内核不做符号系数代数.
+solve_stmt = { "solve" ~ ident ~ "=" ~ expr ~ stmt_end }
+
+statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt }
 program = { SOI ~ statement* ~ EOI }

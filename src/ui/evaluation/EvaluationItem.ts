@@ -15,7 +15,19 @@
  * 字段取,不再要求每个 kind 各写一遍同样的函数.
  */
 import type { SceneObject } from '../../ir';
+import type { ProcessDocument } from '../process/processSteps';
 import { carryDetailsOpen } from '../shared/rowDom';
+
+/**
+ * 打开过程页的请求:条目名 + 已经重组好的过程文档.
+ *
+ * 过程数据由条目自己在点击时构建(它知道自己的 IR 字段),应用层只负责切页
+ * 与载入,不需要认识"梯度/积分"的差别.
+ */
+export interface ProcessRequest {
+    readonly name: string;
+    readonly document: ProcessDocument;
+}
 
 /**
  * 渲染求值 item 时的场景上下文.
@@ -24,12 +36,16 @@ import { carryDetailsOpen } from '../shared/rowDom';
  *   依赖走这里,不往 item 里塞全局状态;
  * - `toggleHidden`:行末显隐按钮的回调,由 `EvaluationList` 按子列表绑到对应的
  *   `toggleAnalysis/toggleIntegral/toggleIntersection`.item 只负责把按钮建出来
- *   并接上它,不关心"隐藏后要重新编译"的流程.
+ *   并接上它,不关心"隐藏后要重新编译"的流程;
+ * - `openProcess`:行末"过程"入口的回调(三级披露的 L2).item 只负责按披露
+ *   判据决定要不要建按钮,并在点击时给出过程文档,切页由应用层做.
  */
 export interface EvaluationContext {
     readonly objects: readonly SceneObject[];
     /** 点击该条目的显隐按钮:切换隐藏态(不渲染 + 不参与计算). */
     readonly toggleHidden: (name: string) => void;
+    /** 点击该条目的"过程"入口:切到过程页并载入该条目的过程. */
+    readonly openProcess: (request: ProcessRequest) => void;
 }
 
 /**

@@ -485,6 +485,65 @@ export interface IntersectionOutput {
     curves: Vec3[][];
 }
 
+/**
+ * 求解步骤的依据分区.
+ *
+ * 与 `ui/process/processSteps.ts` 的 `ProcessStepKind` 同域:内核产物直接带
+ * 分区,UI 只负责配色与文案.四种取值与设计文档 4.2 一致--法则 / 代数 /
+ * 定义 / 数值.
+ */
+export const SOLVE_STEP_KINDS = ['rule', 'algebra', 'definition', 'numeric'] as const;
+
+/** `SOLVE_STEP_KINDS` 对应的字面量联合(由数组派生,不要单独维护). */
+export type SolveStepKind = (typeof SOLVE_STEP_KINDS)[number];
+
+/**
+ * 求解过程的一步:**内核产物独立类型**(路线图 §7.1).
+ *
+ * 只带渲染需要的字符串,不含 `Expr`--符号引擎内部表示不越过内核边界
+ * (见 `math_rs::symbolic::solve`).
+ */
+export interface SolveStep {
+    /** 一行 LaTeX(不换行,排不下由该行横向滚动). */
+    latex: string;
+    /** 依据文案,如"因式分解"/"零积律"/"求根公式". */
+    reason: string;
+    kind: SolveStepKind;
+}
+
+/**
+ * 方程求解任务(求值对象列表里的第 4 类).
+ *
+ * 求解在**编译期**完成(与 analysis 同一档,不像 integral/intersection 走异步
+ * 数值回调):步骤链本身就是最终结果.
+ *
+ * 能力边界错误(多未知量 / 三次以上 / 非多项式)落在 `error`,列表照常保留
+ * 占位并给出理由,而不是让整份源码编译失败.隐藏项(`enabled === false`)
+ * 按既有约定"先完整校验,后禁用,仅跳过计算":内核不再调用,`equationLatex`
+ * 为空串,行内回退显示方程原文.
+ */
+export interface SolveTask {
+    name: string;
+    /** 方程原文(DSL 里写的 `左 = 右`). */
+    equation: string;
+    /** 求解变量;隐藏或推断失败时为空串. */
+    variable: string;
+    /** 题目 LaTeX(原方程,保留用户写法);隐藏项为空串. */
+    equationLatex: string;
+    /** 解集 LaTeX;无实数解时为 null. */
+    solutionLatex: string | null;
+    /** 实数解个数. */
+    realRootCount: number;
+    /** 恒等式(任意实数都是解):与"无解"必须区分. */
+    identity: boolean;
+    /** 求解步骤;`error !== null` 或隐藏时为空. */
+    steps: SolveStep[];
+    /** 能力边界/声明错误;null 表示求解成功. */
+    error: string | null;
+    /** 求解任务是否参与计算.为 false 时仅保留列表项,不调用求解内核. */
+    enabled: boolean;
+}
+
 /** 一个动画片段:单个变换矩阵 + 持续时间. */
 export interface AnimationClip {
     name: string;
@@ -533,6 +592,12 @@ export interface SceneIR {
     analyses: AnalysisResult[];
     integrals: IntegralTask[];
     intersections: IntersectionTask[];
+    /**
+     * 方程求解任务(设计文档 `docs/equation-solving-process.md` 的三期内核).
+     *
+     * 只新增字段:既有 `analyses`/`integrals`/`intersections` 的字段语义不变.
+     */
+    solves: SolveTask[];
 }
 
 // ================================================================
