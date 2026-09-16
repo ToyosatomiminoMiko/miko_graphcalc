@@ -7,18 +7,27 @@
 # `*.mycola linguist-language=MyCoolLang linguist-detectable` 也不会进入
 # 统计.
 #
-# 本仓库的 DSL 叫 Miko,`.miko`(example/ 下的示例场景)与 `.pest`
-# (compiler_rs 用它解析 .miko 的外层文法)目前都没有被 Linguist 收录,
-# 所以下面两条现在不会在语言栏里产生任何色块:这里先把归属写对,等上游
-# 收录之后无需再改仓库即可生效.本地核对:`github-linguist --breakdown`.
+# 当前状态:DSL 的名字 Miko 还没被 Linguist 收录,而 `.miko` 已经不再是它
+# 原来借用的 OpenSCAD 扩展名(改名之前语言栏里显示的就是 OpenSCAD),所以
+# 第一条先把示例算回 OpenSCAD:色块与改名前完全一致(#e5cd45),代价只是
+# 名字显示为 OpenSCAD.
 #
-# 想让示例在收录前仍然出现在语言栏,把第一条临时改成下面这样即可,代价是
-# 色块名字显示为 OpenSCAD(这正是改名前的显示,颜色 #e5cd45):
-#     *.miko linguist-language=OpenSCAD
+# 等 Miko 被 Linguist 收录,把第一条的值改回 Miko 即可(收录后该扩展名本来
+# 也会被自动识别,显式写出来只是把归属固定下来):
+#     *.miko linguist-language=Miko
+#
+# 先例(别被 daScript 的 .gitattributes 误导):图里那条 Daslang 色块来自
+# linguist PR #7399(2025-06-02 合并,extensions: .das,color #d3d3d3,
+# language_id 648759486);GaijinEntertainment/daScript 自己的 .gitattributes
+# 里一条 linguist-* 都没有,其中 `src/das/**/*.cpp binary` 那几条 glob 在
+# 仓库树里只匹配到 0 个已提交文件.能不能进统计,只取决于 languages.yml.
+# 本地核对:`github-linguist --breakdown`.
 # =============================================================
 
-# DSL 源码:example/ 下的场景文件
-*.miko linguist-language=Miko linguist-detectable=true
+# DSL 源码:example/ 下的场景文件(暂借 OpenSCAD 的名字进统计)
+*.miko linguist-language=OpenSCAD linguist-detectable=true
 
-# DSL 文法:pest 语法,负责把 .miko 切成一条条声明
+# DSL 文法:pest 语法,负责把 .miko 切成一条条声明.
+# Pest 同样还没被 Linguist 收录,所以这一行现在不产生色块;若想让文法也
+# 并进上面那个块,把值改成 OpenSCAD 即可.
 *.pest linguist-language=Pest linguist-detectable=true

@@ -1,82 +1,351 @@
-// .miko 外层声明式语法.
+// =============================================================================
+// miko.pest -- `.miko` DSL 语法的唯一规定
+// =============================================================================
 //
-// 这里只负责把一条条声明切出来,数学表达式的优先级与结合性
-// 不在这里实现:表达式作为原始片段捕获,交给 Rust 符号引擎归一化.
+// [定位]本文件是 DSL 语法的**唯一事实源**:语句种类,关键字,标点与边界行为
+// 都以这里为准.前端高亮/补全用的关键字表也由本文件派生,不另设第二份列表:
+//   - Rust:`compiler_rs/src/parser_wasm.rs` 用 `#[grammar = "miko.pest"]` 经
+//     pest_derive 生成 `Rule` 枚举;`parse_to_json` 把语法树转成 JSON AST,各
+//     `*_to_stmt` 函数负责取字段(每条规则下的"下游"注记指明了对应函数);
+//   - TS:`compiler/dsl/keywords.ts` 在运行期经 Vite `?raw` 读入本文件抽取关键字;
+//     `compiler/ast/types.ts` 是 AST 形状的唯一 schema.
+//   改本文件 = 改语言:必须重新构建 wasm(`npm run build:wasm:compiler`)才对应用
+//   生效;TS 关键字表会随语法自动更新,但语法写坏只有 `keywords.test.ts` 能拦住.
+//
+// [设计边界]本文件只做两件事:把一条条声明切开,把数学片段原样抓下来.它不做
+// 任何数学判断:表达式的优先级/结合性,变量推断,方程与导数的归一化,维度判定,
+// 全部在 Rust 符号引擎与 TS 编译器里完成.`expr` / `param_value` / `value` /
+// `op_arg` / `at_expr` / `at_arg` 这些"原子原文捕获"规则因此存在:语法层不需要
+// 懂数学,只需要知道数学片段在哪里结束.
+//
+// [pest 写法约定]
+//   - `name = _{ ... }` 静默规则:参与匹配但不产生节点(WHITESPACE / COMMENT /
+//     `statement`),所以 `program` 的直接子节点就是各条具体 `*_stmt`;
+//   - `name = @{ ... }` 原子规则:内部不插入隐式空白,不识别注释,吃进去的文本
+//     (包括 `// 注释`)原样进入捕获;
+//   - 普通 `name = { ... }`:元素之间自动跳过 WHITESPACE,注释因此可出现在这些
+//     位置;
+//   - 规则头必须写在行首(允许缩进):`keywords.ts` 的抽取器据此识别规则边界;
+//   - 只用 `//` 行注释:抽取器只认 `//`,写 `/* */` 会让它错位.
+//
+// [词法要点]
+//   - 空白包含 `\r` / `\n`,语句可跨行;语句之间不需要分隔符,`program` 就是
+//     `statement*`,每条语句靠 `;` 或选项块 `}` 收尾;
+//   - 注释是空白的一部分,可出现在任何允许空白的位置;但原子规则内部除外,
+//     例如 `curve c = sin(x) // 注` 换行再写 `{ ... }` 时,`// 注` 会被捕进
+//     表达式文本;
+//   - 标识符仅 ASCII 字母/数字/下划线;关键字全小写且大小写敏感.语法层**没有
+//     保留字**:`param param = 1;` 合法,关键字只在特定位置才有含义;
+//   - 原子捕获到的原文由 Rust 侧 `trim()` 掉首尾空白后才进 JSON.
+//
+// [完整示例](语法层全部合法)
+//     // 单行注释
+//     param a = 2 in [-5, 5, 0.1];                 // 普通参数 + UI 区间
+//     param phi = 0 in cyclic [-3.14, 3.14, 0.01]; // 循环类系数(必须显式写)
+//     scalar k = 2.5;                              // 张量(数据),不吃选项块
+//     animation spin = rotate([0, 0, pi / 4]) { duration = 2; };
+//     curve c = sin(x * a) { color = "#6dd5ff"; segments = 256; };
+//     curve c2 = x * a;                            // 无选项块时 `;` 必须写
+//     implicit S = x^2 + y^2 + z^2 - 4 { level = 0; };
+//     sphere S1 = [0, 0, 0] { radius = 2; };
+//     gradient g = grad(c) at [a, 1] { show = [point, normal]; };
+//     gradient g2 = grad(S1) at spherical(2, pi / 2, 0);
+//     integral I = integral(c) { method = riemann; range = [-8, 8]; };
+//     intersect X = intersection(c, S1);
+//     derivative dc = derivative(c);
+//     antiderivative A = antiderivative(c, x);
+//     solve R = x^2 - 5*x + 6 = 0 { variable = x; };
+//     ode O = y' + p*y = q, y(0) = 1 { range = [-2, 2, -2, 2]; };
+//
+// [语句总览]`statement` 的择一顺序(见文件末尾):
+//     param -> tensor -> animation -> object -> analysis -> integral ->
+//     intersection -> derivative -> solve -> antiderivative -> ode
+//   顺序有意义;新增语句要同时在 parser_wasm.rs 的 `statement_to_ast` 与 TS 的
+//   AST 联合类型里各登记一处.
 
+
+// =============================================================================
+// 一,词法基础与原文片段
+// =============================================================================
+
+// 空白:空格/制表/回车/换行 + 注释.pest 的保留规则名,非原子规则的元素之间会
+// 自动跳过它,所以它同时决定了"换行与注释能出现在哪里".
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" | COMMENT }
+
+// 注释:仅 `//` 行注释,直到行尾;DSL 没有块注释(`/* */` 在源码里是语法错误).
+// 静默规则:注释不产生 AST 节点,也不进入任何捕获(原子规则内部除外,见上).
 COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
 
+// 标识符:语句名,对象名,以及选项名和函数实参里引用的对象名.
+//   - 首字符为 ASCII 字母或 `_`,其后为 ASCII 字母/数字/`_`;
+//   - 不接受 Unicode 字母,`-`,`'`:故 `param α = 1;` 与 `param y' = 1;` 都是
+//     语法错误.导数记号 `y'` 只出现在 `expr` 原文里,不经过 ident;
+//   - 原子规则,内部无空白;
+//   - 语法层不排除关键字:同一个词是不是关键字由它所处的位置决定.
 ident = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// 数字字面量:**只**用于 param_ui 的区间端点与步长,不参与表达式解析
+// (表达式里的数字属于 expr 原文).
+//   - 形态:可选 `-` + 一位以上十进制数字 + 可选 `.` 与小数部分;
+//   - 支持 `-2`,`0.1`,`007`;不支持 `+2`,指数 `1e-3`,省略整数位的 `.5`,
+//     结尾小数点的 `1.`,下划线分隔;
+//   - 因此 `param a = 1 in [x, 2, 1];` 报 "expected number":区间边界必须是
+//     字面量,不能是表达式.
 number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
-// 普通表达式:到分号或选项块为止.
+// 普通表达式:从当前位置原样吃到 `;` / `{` / `}` 之前.所有"数学"都从这里以
+// 原文形式进入 AST,是贯穿全文件的基础片段.
+//   - 至少一个字符(`curve c = ;` 报 "expected expr");
+//   - 表达式内不能出现 `{` / `}`(所以没有集合字面量之类的写法);`=` 与 `,`
+//     可以出现,并原样保留在文本里--`solve` 的 `左 = 右` 和 `ode` 的初值列表
+//     正依赖这一点,由 Rust 侧按顶层符号切分;
+//   - 原子规则:`// 注释` 会被当作表达式内容捕获,不要写在表达式中间;
+//   - 被 tensor / animation / object / solve / ode 复用;首尾空白由 Rust 侧 trim.
 expr = @{ (!(";" | "{" | "}") ~ ANY)+ }
 
-// param 的取值需要在 `in [...]` 前截断,这里用前置空白保证
-// 不会误伤 `sin(...)` 这类标识符里的 "in".
-// `in cyclic [...]`(循环类系数)由 Rust 侧在 param_value 文本上显式切分,
-// 见 parser_wasm.rs 的 split_cyclic_param_value:语法层继续只认"值到 in 为止",
-// 这样 `a in[...]` / `1in[0,1,1]` / `2sin(x)` 等既有边界行为一字不改.
-// 第二个前瞻 `" in" ~ 空白+ ~ "cyclic"` 是为循环类系数准备的:让
-// `param_value` 在 `in cyclic` 前停下,后面交给 param_ui 里的 cyclic 规则.
-// 这里必须有空白,in 与 cyclic 才不会粘成一个标识符(incyclic);
-// 循环写法本就写作 `in cyclic [...]`,不牺牲任何既有写法.
+
+// =============================================================================
+// 二,参数:param 声明与 UI 区间
+// =============================================================================
+
+// 参数取值:与 expr 同族的原子原文,额外带"在 UI 区间前截断"的边界规则.
+// 参数完整形态是 `param 名 = 值 [in 区间] ;`,值必须在 `in [...]` 前停下.
+// 负向前瞻的停止条件(任一命中即停):
+//   1) ` in` + 若干空格/制表符 + `[`          -> 普通参数的 UI 区间;
+//   2) ` in` + 至少一个空格/制表符 + `cyclic` -> 循环类系数区间(见 param_ui);
+//   3) `;` / `{` / `}`                        -> 语句与选项块边界.
+//
+// `in` 前的前导空白是**字面空格 U+0020**,这是既有的边界行为,不要随手改:
+//   - `a in[..]`(in 与 [ 之间无空格)能截断;`1in[0,1,1]`(in 前无空格)不能,
+//     整段留在值里;`2sin(x)` 里的 "in" 同理不受影响;
+//   - 用制表符/换行代替 `in` 前的空格**不会**截断:
+//     `param a = 1\tin [1,2,3];` 的值就是 `1\tin [1,2,3]`,也不产生 ui.
+//     写区间时请在 `in` 前写一个普通空格.
+//
+// 语法层只认"值到哪里为止";`in cyclic` 的取模回绕语义由 param_ui 的 cyclic
+// 标记承载,Rust 侧另有文本兜底(parser_wasm.rs 的 split_cyclic_param_value),
+// 所以 `a in[...]`,`1in[0,1,1]`,`2sin(x)` 这些既有写法一字不改,而 `in` 后
+// 换行/多空格等写法也能被兜住.
 param_value = @{ (!( " in" ~ (" " | "\t")* ~ "[" | " in" ~ (" " | "\t")+ ~ "cyclic" | ";" | "{" | "}") ~ ANY)+ }
 
+// 参数语句:`param 名 = 值 [in 区间] ;`.
+//   - 字段:`type: "param"` / `name` / `value`(原文,可含表达式)/ 可选
+//     `ui: {min, max, step}`(数字原文串)/ 可选 `cyclic: true`;
+//   - 必须有 `;`;param 不接受选项块(param_stmt 不用 stmt_end);
+//   - cyclic 只落字段不落默认值:不写 cyclic 的 JSON 里没有 `cyclic` 键,下游
+//     据此区分普通参数与循环类系数;
+//   - 下游:param_to_stmt / param_ui / param_ui_is_cyclic /
+//     split_cyclic_param_value;AST 见 compiler/ast/types.ts.
 param_stmt = { "param" ~ ident ~ "=" ~ param_value ~ param_ui? ~ ";" }
-// param_ui:参数 UI 区间,可选前置 `cyclic` 显式声明"循环类系数".
-// 循环参数(球坐标方位角 φ ∈ (-π, π] 这类)的取值在 min/max 两端相接:
-// 越界值按区间长度取模回绕,而不是像普通参数一样被夹到端点.它是**显式**
-// 声明--不写 cyclic 的参数永远是普通参数,不做任何隐式周期猜测;
-// 也必须在 `in [...]` 里写(没有区间的循环参数没有意义,pest 直接拒绝).
-// JSON 里仅当写了 cyclic 才带 "cyclic": true 字段(见 parser_wasm.rs).
+
+// 参数 UI 区间:`in [min, max, step]`,可在 `in` 后写 `cyclic` 显式声明"循环类系数".
+// 循环参数(如球坐标方位角 φ ∈ (-π, π]) 的取值在 min/max 两端相接:越界值按
+// 区间长度取模回绕,而不是像普通参数一样被夹到端点.它是**显式**声明--不写
+// cyclic 的参数永远是普通参数,不做任何隐式周期猜测;也必须在 `in [...]` 里写
+// (没有区间的循环参数没有意义,`param phi = 0 in cyclic;` 直接被 pest 拒绝).
+//   - 三个值都必须是 number 字面量(不能是表达式),逗号为英文半角;
+//   - `in` 与 `[` 之间,`cyclic` 与 `[` 之间允许空白,`in[` 也合法;
+//   - 三个数在 JSON 里按下标取 min/max/step,保持原样字符串,语义(含 step 为 0
+//     一类非法情形)由下游校验;
+//   - JSON 里仅当写了 cyclic 才带 `"cyclic": true`(见 parser_wasm.rs).
 param_ui = { "in" ~ cyclic? ~ "[" ~ number ~ "," ~ number ~ "," ~ number ~ "]" }
+
+// 循环标记:原子关键字,只能出现在 param_ui 的 `in` 与 `[` 之间.
+// 单独出现(`in cyclic;`)或没有区间时都是语法错误;它是循环类系数的唯一显式标记.
 cyclic = @{ "cyclic" }
 
+
+// =============================================================================
+// 三,张量:纯数据声明(无几何,无选项块)
+// =============================================================================
+
+// 张量种类:标量/向量/矩阵/变换.语义由 TS 侧按 kind 分派.
+// 注意 `vector` 也出现在 object_kind 里:`vector v = [1,2,3];` 走张量,
+// `vector V = [[0,0,0],[1,0,0]] { color = "#f00"; }` 是几何对象--见 statement.
 tensor_kind = { "scalar" | "vector" | "matrix" | "transform" }
+
+// 张量语句:`种类 名 = 表达式 ;`.
+//   - 字段:`type: "tensor"` / `kind` / `name` / `expr` / `span`(没有 options);
+//   - 用裸 `;` 收尾,不接受选项块:`scalar k = 2.5 { ... }` 是语法错误;
+//   - 表达式为原文,首尾空白由 Rust 侧 trim;下游 tensor_to_stmt.
 tensor_stmt = { tensor_kind ~ ident ~ "=" ~ expr ~ ";" }
 
+
+// =============================================================================
+// 四,动画:animation 命名表达式 + 选项块
+// =============================================================================
+
+// 动画语句:`animation 名 = 表达式 收尾`.
+//   - 收尾用 stmt_end,所以选项块可有可无:`animation a = 1;` 与
+//     `animation spin = rotate([0,0,pi/4]) { duration = 2; };` 都合法;
+//   - 字段:`type: "animation"` / `name` / `expr` / `options` / `span`;
+//   - 下游 animation_to_stmt.
 animation_stmt = { "animation" ~ ident ~ "=" ~ expr ~ stmt_end }
 
-// `implicit` 是隐式标量场声明:`f(x,y)=0`(二维等值线)或 `f(x,y,z)=0`
-// (三维等值面),维度由表达式里出现的坐标变量推断(见 objects/build.ts).
+
+// =============================================================================
+// 五,对象:几何与场声明
+// =============================================================================
+
+// 对象种类.`implicit` 是隐式标量场声明:`f(x,y)=0`(二维等值线)或
+// `f(x,y,z)=0`(三维等值面),维度由表达式里出现的坐标变量推断(见 objects/build.ts);
 // 它只有隐式方程本身,没有显式的 y=/z= 左端,因此与 curve/surface 并列.
+// 其余种类语义(网格/实体/场)在下游按 kind 分派;`region` 的表达式文本形如
+// `region(曲线甲, 曲线乙)`,其中两个名字由下游解析,语法层只当原文.
 object_kind = { "curve" | "surface" | "vector_field" | "point" | "vector" | "sphere" | "box" | "cylinder" | "cone" | "frustum" | "region" | "implicit" }
+
+// 对象语句:`种类 名 = 表达式 收尾`.
+//   - 字段:`type: "object"` / `kind` / `name` / `expr` / `options` / `span`;
+//   - expr 到第一个 `{` 为止,所以选项块从第一个 `{` 开始;无选项块时必须写 `;`;
+//   - 表达式为原文,几何装配/求值在 TS 侧按 kind 分派;下游 object_to_stmt.
 object_stmt = { object_kind ~ ident ~ "=" ~ expr ~ stmt_end }
+
+
+// =============================================================================
+// 六,选项块与语句收尾(被 animation / object / analysis / integral /
+//     intersection / derivative / solve / antiderivative / ode 共用)
+// =============================================================================
+
+// 选项块:`{ 名 = 值; ... }`,可为空(`{}`).它是 stmt_end 的一部分,所以只有用
+// stmt_end 收尾的语句才带选项块;`param` 与 `tensor` 用裸 `;`,不接受选项块.
 options = { "{" ~ option* ~ "}" }
+
+// 单个选项:名必须是 ident,值必须是 value,且**每条**(含最后一条)都要写 `;`:
+// `curve c = x { color = "#fff" }` 报 "expected option".
+// 语法层不校验选项名合法性与重复性,由 Rust/TS 侧按语句语义处理.
 option = { ident ~ "=" ~ value ~ ";" }
+
+// 选项值:原样吃到 `;` 或 `}` 之前,与 expr 同族的原子捕获.
+//   - 可以含 `=`,`,`,`[`,`]`,引号,函数调用,如 `label = a = b;`
+//     (第一个 `=` 归 option,其余归 value);
+//   - 不能含 `}`;因为是原子规则,里面写注释也会被捕获
+//     (`color = "#fff" // 注` 的值就是 `"#fff" // 注`),注释请写在 `;` 之后;
+//   - 至少一个字符;首尾空白由 Rust 侧 trim.
 value = @{ (!(";" | "}") ~ ANY)+ }
+
+// 语句收尾:要么"选项块 + 可选的 `;`",要么一个裸 `;`.
+// 因此 `x = e;`,`x = e {}`,`x = e { ... }`,`x = e { ... };` 都合法;
+// 而无选项块时 `;` 不可省略(`param a = 1` 报 "expected param_ui").
+// 注意 `options ~ ";"?`:分号属于收尾,不属于选项块本身.
 stmt_end = { options ~ ";"? | ";" }
 
+
+// =============================================================================
+// 七,分析算子:gradient / divergence / curl / jacobian / laplacian
+// =============================================================================
+
+// 分析算子关键字:声明这条语句在算什么.它与后面的调用名不是一回事:
+// `gradient g = grad(s)` 里 `gradient` 是算子(字段 op),`grad` 是调用名(call),
+// 语法不要求两者相等(别名归一留给下游).
 analysis_op = { "gradient" | "divergence" | "curl" | "jacobian" | "laplacian" }
+
+// 算子调用:`调用名(源) [at 位置]`.
+//   - 调用名是 ident(通常是算子缩写),作为字段 call 原样保留;
+//   - 源由 op_arg 捕获,语法层不校验它是不是已声明的对象名(下游查表);
+//   - `at` 可选:不写就没有位置字段,由下游决定默认行为;
+//   - 下游 analysis_to_stmt.
 op_call = { ident ~ "(" ~ op_arg ~ ")" ~ at? }
+
+// 算子实参:原样吃到**第一个** `)` 为止.这里没有括号嵌套:
+// `curl(F(x,y))` 会在第一个 `)` 处收尾,多出来的 `)` 让整条语句报错.
+// 需要嵌套括号的位置(球坐标 r)用下面的 at_expr.
 op_arg = @{ (!")" ~ ANY)+ }
-// at 有两种显式形式,不隐式猜测语义:
-// - 笛卡尔:`at [x, y]` / `at [x, y, z]`;
-// - 球坐标:`at spherical(r, θ, φ)`(θ/φ 约定见 numericConfig,显式写
-//   spherical 关键字).三维球坐标允许省略 r:`at spherical(θ, φ)` 时 r 取
-//   源球体半径(源不是 sphere 时编译期报错).
-// at_expr 允许参数里嵌套括号(如 `asin(0.5)`,`sqrt(2)`),因此用自递归的
-// 平衡括号规则;at_arg 仍是"撞到 ] 才停"的简单片段(方向量 at 用).
+
+// 求值位置两种显式形式,不隐式猜测语义:
+//   - 笛卡尔:`at [x, y]` / `at [x, y, z]`;
+//   - 球坐标:`at spherical(r, θ, φ)`(θ/φ 约定见 numericConfig,显式写
+//     spherical 关键字).三维球坐标允许省略 r:`at spherical(θ, φ)` 时 r 取
+//     源球体半径(源不是 sphere 时编译期报错).
+// 两种形式都要求至少 2 个参数(`at [1]` 与 `at spherical(1)` 都是语法错误).
+// `at` 属于 op_call,所以位置写在调用的 `)` 之后,选项块之前.
 at = { "at" ~ (spherical_at | cartesian_at) }
+
+// 球坐标形式:`spherical(参数, 参数 [, 参数])`,即 2 或 3 个参数.
+// 参数用 at_expr,允许嵌套括号(如 `asin(0.5)`,`sqrt(2)`);它是普通规则,
+// 因此 `spherical` 与 `(` 之间可有空白.
 spherical_at = { "spherical" ~ "(" ~ at_expr ~ ("," ~ at_expr)+ ~ ")" }
+
+// 球坐标参数:自递归的平衡括号片段--要么是一对配平的括号包住的 at_expr,要么是
+// 任意一个既不是 `,` 也不是 `)` 的字符.
+//   - 于是 `asin(0.5)`,`pi / 2`,`r0`,`sqrt(2)` 都成立,嵌套层数不限;
+//   - 括号**内部同样不能有逗号**(内层 at_expr 也以逗号为界),所以多参数函数
+//     调用写不进 at 参数(`at spherical(f(1,2), 3)` 报错);
+//   - 原子规则:内部不跳空白,不认注释,`/* */` 之类文本会被当参数原文捕获.
 at_expr = @{ ( "(" ~ at_expr ~ ")" | !("," | ")") ~ ANY )+ }
+
+// 笛卡尔形式:`[参数, 参数]`,至少 2 个,上限不限(下游按维度校验).
+// 参数用 at_arg,没有嵌套结构保护:`at [[1,2], 3]` 会因逗号被当分隔符而报错,
+// 参数里带逗号的函数调用 `at [f(1,2), 3]` 会被静默切成 3 个参数,不要这样写.
 cartesian_at = { "[" ~ at_arg ~ ("," ~ at_arg)+ ~ "]" }
+
+// 笛卡尔参数:原样吃到 `,` 或 `]` 为止.允许不含逗号的函数调用括号
+// (`at [f(1), g(2)]` 合法),不能含逗号;首尾空白由 Rust 侧 trim.
 at_arg = @{ (!( "," | "]") ~ ANY)+ }
+
+// 分析语句:`算子 名 = 调用 收尾`.
+//   - 字段:`type: "analysis"` / `op`(分析算子关键字)/ `name` / `call`(调用名)/
+//     `source`(实参原文)/ `options` / `span`,以及可选的 `at`(参数原文数组)与
+//     `atForm`(仅球坐标形式为 "spherical";笛卡尔形式省略该字段,由 TS 缺省处理);
+//   - 下游 analysis_to_stmt.
 analysis_stmt = { analysis_op ~ ident ~ "=" ~ op_call ~ stmt_end }
 
+
+// =============================================================================
+// 八,定积分:integral(方法 × 域矩阵 + 黎曼可视化)
+// =============================================================================
+
+// 定积分语句:`integral 名 = integral(源对象) 收尾`.
+//   - 源只能是一个对象名(ident),不能是表达式;方法/域/分段数等全部走选项
+//     (如 `method = riemann:right;` / `range = [-8,8];` / `segments = 32;`);
+//   - 字段:`type: "integral"` / `name` / `source` / `options` / `span`;
+//   - 语句头关键字与调用名都必须是 `integral`(与 derivative 同构的写法);
+//   - 下游 integral_to_stmt.`integral` 这个名字被"定积分"独占:不定积分见
+//     antiderivative_stmt,两者不要混用(理由见该规则注释).
 integral_stmt = { "integral" ~ ident ~ "=" ~ integral_call ~ stmt_end }
+
+// 定积分调用:恰好一个对象名参数.语法层不校验该名字是否存在,是否为曲线/曲面.
 integral_call = { "integral" ~ "(" ~ ident ~ ")" }
 
+
+// =============================================================================
+// 九,交集:intersection / intersect
+// =============================================================================
+
+// 交集关键字:`intersection` 与 `intersect` 等价(两种历史写法都保留).
 intersection_kind = { "intersection" | "intersect" }
+
+// 交集调用:恰好两个对象名参数.
 intersection_call = { intersection_kind ~ "(" ~ ident ~ "," ~ ident ~ ")" }
+
+// 交集语句:`关键字 名 = 调用 收尾`.
+//   - 字段:`type: "intersection"` / `name` / `a` / `b`(按实参顺序的两个操作数名)/
+//     `options` / `span`;
+//   - 语句头与调用处的关键字各自匹配,语法不要求写成同一个
+//     (`intersect X = intersection(a, b);` 也能通过),字段按语句头的关键字取;
+//   - 下游 intersection_to_stmt.
 intersection_stmt = { intersection_kind ~ ident ~ "=" ~ intersection_call ~ stmt_end }
+
+
+// =============================================================================
+// 十,求导:derivative
+// =============================================================================
 
 // 求导语句:`derivative 名称 = derivative(源对象 [, 变量]);`.
 // 源对象必须是已声明的 curve(surface 需在第二个参数给出 x 或 y).
 // 函数名遵循项目全名习惯,不缩写.
+//   - 字段:`type: "derivative"` / `name` / `source` / `options` / `span`,
+//     以及仅在写了第二个参数时才有的 `variable`;
+//   - 变量缺省语义(曲线取 x,曲面必须显式)由下游内核决定,语法层只做可选捕获;
+//   - 下游 derivative_to_stmt.
 derivative_stmt = { "derivative" ~ ident ~ "=" ~ derivative_call ~ stmt_end }
+
+// 求导调用:`derivative(源 [, 变量])`,1 或 2 个名字(对象名与变量名).
 derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
+
+
+// =============================================================================
+// 十一,方程求解:solve
+// =============================================================================
 
 // 方程求解语句:`solve 名称 = 方程 [选项];`.
 //
@@ -87,7 +356,15 @@ derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 // 求解变量缺省从方程推断(恰好一个非参数自由符号);需要时用选项显式指定:
 //     solve S = a*x^2 + b*x + c = 0 { variable = x; }
 // 参数(a/b/c)按当前声明值代入,内核不做符号系数代数.
+//   - 字段:`type: "solve"` / `name` / `equation`(原文,含顶层 `=`)/ `options` /
+//     `span`;
+//   - 下游 solve_to_stmt 与 compiler/dsl/solves.ts.
 solve_stmt = { "solve" ~ ident ~ "=" ~ expr ~ stmt_end }
+
+
+// =============================================================================
+// 十二,不定积分(原函数):antiderivative
+// =============================================================================
 
 // 不定积分(原函数)语句:`antiderivative 名称 = antiderivative(源对象 [, 变量]) [选项];`.
 //
@@ -98,8 +375,18 @@ solve_stmt = { "solve" ~ ident ~ "=" ~ expr ~ stmt_end }
 // 语法关键字用全名 `antiderivative`(GNU 习惯不缩写),与 `derivative` 对称;
 // 不要把它写成 `integral`--后者已承载"方法 × 域矩阵 + 黎曼可视化"的定积分
 // 语义,混在一起会污染既有字段语义(路线图 §7.1).
+//   - 字段:`type: "antiderivative"` / `name` / `source` / `options` / `span`,
+//     以及仅当写了第二个参数时的 `variable`;
+//   - 下游 antiderivative_to_stmt 与 compiler/dsl/antiderivativeBlueprint.ts.
 antiderivative_stmt = { "antiderivative" ~ ident ~ "=" ~ antiderivative_call ~ stmt_end }
+
+// 不定积分调用:`antiderivative(源 [, 变量])`,1 或 2 个名字.
 antiderivative_call = { "antiderivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
+
+
+// =============================================================================
+// 十三,微分方程:ode
+// =============================================================================
 
 // 微分方程语句:`ode 名称 = 方程[, 初值...] [选项];`(设计文档 docs/plan3.md 1.1).
 //
@@ -112,7 +399,26 @@ antiderivative_call = { "antiderivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 //     ode O1 = y' = x*y;
 //     ode O2 = y' + p*y = q, y(0) = 1;
 //     ode O3 = y'' - 3*y' + 2*y = 0, y(0) = 0, y'(0) = 1;
+//   - 字段:`type: "ode"` / `name` / `equation`(首个顶层逗号之前的原文,含顶层 `=`)/
+//     `initialConditions`(其余各段原文数组)/ `options` / `span`;
+//   - 括号内的逗号(函数实参 `f(x, y)`)不是分界,只有顶层逗号才是;
+//   - 下游 ode_to_stmt / split_ode_conditions 与 compiler/dsl/odeBlueprint.ts.
 ode_stmt = { "ode" ~ ident ~ "=" ~ expr ~ stmt_end }
 
+
+// =============================================================================
+// 十四,语句分派与程序根
+// =============================================================================
+
+// 语句集合:静默规则,只做择一,不产生节点(所以 `program` 的子节点就是各条
+// `*_stmt`).**顺序有意义**:pest 按顺序尝试并回溯,先匹配上的分支胜出.
+// 目前唯一的重叠是 `vector`:`tensor_kind` 里的 `vector` 用于
+// `vector v = [1,2,3];`,而 `object_kind` 里的 `vector` 带选项块
+// (`vector V = [...] { ... }`)--后者在 tensor_stmt 的 `;` 处失败后回溯到
+// object_stmt.新增语句时:排好这里的顺序,并在 parser_wasm.rs 的
+// `statement_to_ast` 与 TS 的 AST 联合类型里各登记一处.
 statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt | antiderivative_stmt | ode_stmt }
+
+// 程序根:整份 `.miko` 源文件 = 若干语句 + 文件结束,语句之间无需分隔符.
+// parse_to_json 取此节点,过滤 EOI 后逐条转 AST,输出 `{ "statements": [...] }`.
 program = { SOI ~ statement* ~ EOI }
