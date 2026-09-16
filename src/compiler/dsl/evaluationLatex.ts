@@ -17,7 +17,7 @@
  * 没有中间步骤可看的(散度,旋度)直接把结果排进摘要.同一列表里两类条目
  * 折叠态的信息量因此不同,这是设计选择而不是漏排.
  */
-import type { AnalysisResult, IntegralTask, SceneObject, SolveTask } from '../../ir';
+import type { AnalysisResult, AntiderivativeTask, IntegralTask, SceneObject, SolveTask } from '../../ir';
 import { latexResultNumber } from '../../math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
 
@@ -86,7 +86,11 @@ export type EvaluationDetailRole =
     /** 积分域与方法的纯文本元信息. */
     | 'domain'
     /** 分段/分层的纯文本元信息. */
-    | 'sampling';
+    | 'sampling'
+    /** 不定积分:原函数结果(带积分常数). */
+    | 'antiderivative'
+    /** 不定积分:回代验证结论. */
+    | 'verified';
 
 /** 带角色的细节行:角色与内容一起产出,调用方不必按位置猜. */
 export interface EvaluationDetailEntry {
@@ -308,4 +312,86 @@ export function solveLatexDetails(task: SolveTask): EvaluationDetailLine[] {
         text: `${about}共 ${task.steps.length} 步(见右栏"过程")`,
     });
     return lines;
+}
+
+/**
+ * 不定积分结果摘要:默认可见的一行,即**题目**(待求的积分).
+ *
+ * 与求解条目同口径:折叠态放"在算什么",结果放展开细节与过程页.
+ * 内核拒绝(非初等/超出规则)时题目依然有效(被积函数已解析成功),所以这里
+ * 仍返回积分式;题目排不出来(隐藏项)时返回 null,调用方回退到被积函数文本.
+ */
+export function antiderivativeLatexSummary(task: AntiderivativeTask): LatexLine | null {
+    if (task.integrandLatex === '') return null;
+    return integralProblemLatex(task.integrandLatex, task.variable);
+}
+
+/** 积分式本体 `\int f \, dx`. */
+function integralProblemLatex(integrandLatex: string, variable: string): LatexLine {
+    return `\\int ${integrandLatex}\\,\\mathrm{d}${variable}`;
+}
+
+/**
+ * 不定积分细节(带角色):展开后逐行排版.
+ *
+ * - 题目(积分式);
+ * - 成功:原函数 `= F + C`(做题时写通解,所以保留符号常数),再一行写下发
+ *   对象的取值 `F + 数值`(拖动滑块会变的那一行);
+ * - 回代验证结论(`d/dx F = f`)--这是"原函数对不对"的唯一凭据,必须给学生看;
+ * - 内核拒绝:写明"无法求原函数: 理由".
+ */
+export function antiderivativeLatexDetailEntries(
+    task: AntiderivativeTask,
+): EvaluationDetailEntry[] {
+    const entries: EvaluationDetailEntry[] = [];
+    const push = (role: EvaluationDetailRole, latex: LatexLine): void => {
+        entries.push({ role, line: { kind: 'latex', latex } });
+    };
+
+    if (task.integrandLatex !== '') {
+        push('equation', integralProblemLatex(task.integrandLatex, task.variable));
+    }
+    if (task.error !== null) {
+        entries.push({
+            role: 'domain',
+            line: { kind: 'text', text: `无法求原函数: ${task.error}` },
+        });
+        return entries;
+    }
+
+    const general = `=${task.antiderivativeLatex}+${task.constantSymbol}`;
+    push('antiderivative', general);
+    if (task.constant !== 0) {
+        entries.push({
+            role: 'value',
+            line: {
+                kind: 'latex',
+                latex: `=${task.antiderivativeLatex}+${latexNumberText(task.constant)}`,
+            },
+        });
+    }
+    if (task.verified) {
+        entries.push({
+            role: 'verified',
+            line: {
+                kind: 'latex',
+                latex: `\\frac{\\mathrm{d}}{\\mathrm{d}${task.variable}}\\left(${task.antiderivativeLatex}\\right)=${task.integrandLatex}`,
+            },
+        });
+    }
+    entries.push({
+        role: 'sampling',
+        line: {
+            kind: 'text',
+            text: `对 ${task.variable} 积分 · 常数 ${task.constantSymbol} 取 ${task.constant} · 共 ${task.steps.length} 步(见右栏"过程")`,
+        },
+    });
+    return entries;
+}
+
+/**
+ * 不定积分细节(不带角色):列表 item 的展示块用.
+ */
+export function antiderivativeLatexDetails(task: AntiderivativeTask): EvaluationDetailLine[] {
+    return detailLinesOf(antiderivativeLatexDetailEntries(task));
 }

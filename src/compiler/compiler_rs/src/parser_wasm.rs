@@ -501,6 +501,48 @@ fn solve_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     })
 }
 
+/// 将不定积分语句(antiderivative_stmt)转换为 JSON AST 节点.
+///
+/// 与 `derivative_to_stmt` 同形:名称,源对象,可选积分变量,选项与位置.
+/// 函数名用全名 `antiderivative`(见 miko.pest 的 antiderivative_stmt).
+fn antiderivative_to_stmt(pair: &Pair<'_, Rule>) -> Value {
+    let mut name = String::new();
+    let mut source = String::new();
+    let mut variable: Option<String> = None;
+    let mut options: Vec<Value> = Vec::new();
+
+    for child in pair.clone().into_inner() {
+        match child.as_rule() {
+            Rule::ident => name = child.as_str().to_string(),
+            Rule::antiderivative_call => {
+                let mut idents = child
+                    .into_inner()
+                    .filter(|inner| inner.as_rule() == Rule::ident);
+                if let Some(first) = idents.next() {
+                    source = first.as_str().to_string();
+                }
+                if let Some(second) = idents.next() {
+                    variable = Some(second.as_str().to_string());
+                }
+            }
+            Rule::stmt_end => options = options_from_end(&child),
+            _ => {}
+        }
+    }
+
+    let mut statement = json!({
+        "type": "antiderivative",
+        "name": name,
+        "source": source,
+        "options": options,
+        "span": span_of(pair),
+    });
+    if let Some(variable) = variable {
+        statement["variable"] = json!(variable);
+    }
+    statement
+}
+
 /// 根据语法规则将单个语句节点(Pair)转换为对应的 AST JSON 节点.
 /// 若规则未知,则返回错误信息.
 fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
@@ -514,6 +556,7 @@ fn statement_to_ast(pair: Pair<'_, Rule>) -> Result<Value, String> {
         Rule::intersection_stmt => Ok(intersection_to_stmt(&pair)),
         Rule::derivative_stmt => Ok(derivative_to_stmt(&pair)),
         Rule::solve_stmt => Ok(solve_to_stmt(&pair)),
+        Rule::antiderivative_stmt => Ok(antiderivative_to_stmt(&pair)),
         _ => Err(format!("未知语句规则: {:?}", pair.as_rule())),
     }
 }

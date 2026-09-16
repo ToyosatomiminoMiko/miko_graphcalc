@@ -32,6 +32,7 @@ export class SceneStore {
     private readonly _hiddenIntegralNames = new Set<string>();
     private readonly _hiddenIntersectionNames = new Set<string>();
     private readonly _hiddenSolveNames = new Set<string>();
+    private readonly _hiddenAntiderivativeNames = new Set<string>();
 
     get ast(): AstProgram | null {
         return this._currentAst;
@@ -74,6 +75,10 @@ export class SceneStore {
         return this._hiddenSolveNames;
     }
 
+    get hiddenAntiderivativeNames(): ReadonlySet<string> {
+        return this._hiddenAntiderivativeNames;
+    }
+
     /**
      * @cache_access
      * 在一次源码解析成功后提交新的 AST 和矩阵后端.
@@ -92,6 +97,7 @@ export class SceneStore {
             this._hiddenIntegralNames.clear();
             this._hiddenIntersectionNames.clear();
             this._hiddenSolveNames.clear();
+        this._hiddenAntiderivativeNames.clear();
         }
 
         this._lastRunSource = source;
@@ -181,6 +187,14 @@ export class SceneStore {
      * @cache_access
      * 更新方程求解对象显隐缓存.
      */
+    toggleAntiderivativeHidden(name: string): void {
+        if (this._hiddenAntiderivativeNames.has(name)) {
+            this._hiddenAntiderivativeNames.delete(name);
+        } else {
+            this._hiddenAntiderivativeNames.add(name);
+        }
+    }
+
     toggleSolveHidden(name: string): void {
         if (this._hiddenSolveNames.has(name)) {
             this._hiddenSolveNames.delete(name);

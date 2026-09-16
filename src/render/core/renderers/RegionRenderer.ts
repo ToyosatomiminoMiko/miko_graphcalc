@@ -34,7 +34,9 @@ type RegionSampleRequest = {
     segments: number;
 };
 
-// @cache 与 CurveRenderer 共享同一采样门面(共享模块级 worker client).
+/**
+ * @cache 与 CurveRenderer 共享同一采样门面(共享模块级 worker client).
+ */
 const regionRequestClient: RequestClient<RegionSampleRequest, CurveSampleResult> = {
     request(request) {
         return regionComputeEngine.sampleCurve(request);

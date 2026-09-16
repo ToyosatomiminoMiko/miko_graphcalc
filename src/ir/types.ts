@@ -55,6 +55,26 @@ export interface DerivativeOrigin {
     variable: 'x' | 'y';
 }
 
+/**
+ * 原函数来源:只有 `antiderivative` 语句下发的 curve/surface 才携带.
+ *
+ * 与 {@link DerivativeOrigin} 同样的存在意义:产物在数值/渲染上与手写对象
+ * 完全同构,但公式展示要保留积分号.与求导不同的是,对象自身的 `expr` 是
+ * **原函数**(已含积分常数取值,因为对象必须可求值),所以公式层要在括号里放
+ * **被积函数**(数学上是 ∫f,不是"对原函数再积一次分"),再由公式层把对象
+ * 自身的 expr 接在等号右侧.
+ *
+ * 渲染/求值路径不读这个字段,它只服务于 `sceneObjectLatex` 的公式拼装.
+ */
+export interface AntiderivativeOrigin {
+    /** 被积函数(未积分的归一化结果). */
+    integrandExpr: string;
+    /** 积分变量:curve 恒为 x,surface 为 x 或 y. */
+    variable: 'x' | 'y';
+    /** 积分常数取值(对象 expr 已经把常数的数值并入). */
+    constant: number;
+}
+
 /** 曲线对象:y = f(x),渲染在 z=0 平面. */
 export interface CurveObject {
     kind: 'curve';
@@ -69,6 +89,8 @@ export interface CurveObject {
     segments?: number;
     /** 该 curve 由 `derivative` 生成时给出源函数与求导变量. */
     derivativeOrigin?: DerivativeOrigin;
+    /** 该 curve 由 `antiderivative` 下发时给出被积函数与积分常数. */
+    antiderivativeOrigin?: AntiderivativeOrigin;
 }
 
 /** 曲面对象:z = f(x, y). */
@@ -85,6 +107,8 @@ export interface SurfaceObject {
     segments?: number;
     /** 该 surface 由 `derivative` 生成时给出源函数与求导变量. */
     derivativeOrigin?: DerivativeOrigin;
+    /** 该 surface 由 `antiderivative` 下发时给出被积函数与积分常数. */
+    antiderivativeOrigin?: AntiderivativeOrigin;
 }
 
 /** 向量场对象:F(x, y, z) = [P, Q, R]. */
@@ -486,13 +510,30 @@ export interface IntersectionOutput {
 }
 
 /**
- * 求解步骤的依据分区.
+ * 过程步骤的依据分区(**全部内核共用**).
  *
  * 与 `ui/process/processSteps.ts` 的 `ProcessStepKind` 同域:内核产物直接带
- * 分区,UI 只负责配色与文案.四种取值与设计文档 4.2 一致--法则 / 代数 /
- * 定义 / 数值.
+ * 分区,UI 只负责配色与文案.
+ *
+ * 前四种与求解内核的既有取值一致--法则 / 代数 / 定义 / 数值;后三种由
+ * 不定积分与微分方程内核引入(见 docs/calculus-suite-plan.md):
+ * - `table`:基本积分公式表 / 特征方程这类"查表"依据;
+ * - `substitute`:换元与分部积分这类"变量代换"依据;
+ * - `check`:结果回代验证(对原函数求导 / 把解代回原方程),与推导步骤分开,
+ *   避免学生把"验证"当成推导的一环.
+ *
+ * 常量名保持 `SOLVE_STEP_KINDS` 不改:它是既有导出,改名会同时动
+ * `ui/process/processSteps.ts` 的别名与三处导入;语义已经写在这里.
  */
-export const SOLVE_STEP_KINDS = ['rule', 'algebra', 'definition', 'numeric'] as const;
+export const SOLVE_STEP_KINDS = [
+    'rule',
+    'algebra',
+    'definition',
+    'numeric',
+    'table',
+    'substitute',
+    'check',
+] as const;
 
 /** `SOLVE_STEP_KINDS` 对应的字面量联合(由数组派生,不要单独维护). */
 export type SolveStepKind = (typeof SOLVE_STEP_KINDS)[number];
@@ -546,6 +587,96 @@ export interface SolveTask {
     /** 能力边界/声明错误;null 表示求解成功. */
     error: string | null;
     /** 求解任务是否参与计算.为 false 时仅保留列表项,不调用求解内核. */
+    enabled: boolean;
+}
+
+/**
+ * 原函数任务(求值对象列表里的"原函数"子列表条目).
+ *
+ * 与求解同一条"声明级编译"口径:内核在编译期一次算完,步骤链与结果都是
+ * 最终产物,没有异步数值回调(见 docs/calculus-suite-plan.md 第 3 节).
+ *
+ * 两路同源:
+ * - 展示侧(`ui/evaluation/AntiderivativeItem`)读本类型排摘要 / 细节 / 过程页;
+ * - 实体侧(`SceneIR.objects` 里同名对象)读 `antiderivativeText`,把原函数当
+ *   作普通 curve/surface 下发,于是 `derivative` / `gradient` / `integral`
+ *   全部既有能力对它可用.
+ */
+export interface AntiderivativeTask {
+    name: string;
+    /** 源对象 id;源被删除时展示层回退到纯文本. */
+    objectId: number;
+    /** 源对象种类;决定下发对象是 curve 还是 surface. */
+    sourceKind: 'curve' | 'surface';
+    /** 积分变量(`x`,曲面可为 `y`). */
+    variable: string;
+    /** 被积表达式(归一化后字符串,即源对象自己的表达式). */
+    integrand: string;
+    /** 题目 LaTeX(积分式,含 `dx`). */
+    integrandLatex: string;
+    /**
+     * 原函数表达式(归一化后字符串,**不含积分常数**).
+     *
+     * 不含常数是刻意的:它要直接喂 `evaluate_scalar` 与对象物化管线,多一个
+     * 自由符号 `C` 会让每个消费方各自处理一次;常数只活在展示层(`+C`)与
+     * 下发对象的取值里.
+     */
+    antiderivativeText: string;
+    /** 原函数 LaTeX(不含 `+C`,由展示层拼常数). */
+    antiderivativeLatex: string;
+    /** 积分常数取值(选项 `constant`,缺省 0);下发对象与细节行都用它. */
+    constant: number;
+    /** 积分常数符号(内核给出,如 `C`). */
+    constantSymbol: string;
+    /** 回代验证是否通过(对原函数求导与被积函数对拍). */
+    verified: boolean;
+    /** 推导步骤;`error !== null` 或隐藏时为空. */
+    steps: AntiderivativeStep[];
+    /** 能力边界理由(非初等 / 超出预算);null 表示成功. */
+    error: string | null;
+    /** 是否参与计算.为 false 时仅保留列表项,不调用内核,也不下发对象. */
+    enabled: boolean;
+}
+
+/** 原函数推导的一步:与 `SolveStep` 同形(独立类型,不含 `Expr`). */
+export interface AntiderivativeStep {
+    latex: string;
+    reason: string;
+    kind: SolveStepKind;
+}
+
+/**
+ * 微分方程任务(求值对象列表里的"微分方程"子列表条目).
+ *
+ * 同为声明级编译;`error` 是能力边界(不在可解类型清单内),不是调用失败.
+ */
+export interface OdeTask {
+    name: string;
+    /** 方程原文(DSL 里写的 `y' = f(x, y)`). */
+    equation: string;
+    /** 自变量(`x`/`t`);推断失败或隐藏时为空串. */
+    independent: string;
+    /** 因变量(`y`). */
+    dependent: string;
+    /** 方程阶数;`error !== null` 时为 0. */
+    order: number;
+    /** 题目 LaTeX(原方程,保留用户写法). */
+    equationLatex: string;
+    /** 通解 LaTeX;`error !== null` 时为 null. */
+    generalLatex: string | null;
+    /** 特解 LaTeX(写了初值时);无初值或无法定出时为 null. */
+    particularLatex: string | null;
+    /** 初值条件原文(回显用),无初值时为空数组. */
+    initialConditions: string[];
+    /** 任意常数个数(= 阶数,特解时为 0). */
+    arbitraryConstantCount: number;
+    /** 解是否回代验证通过. */
+    verified: boolean;
+    /** 推导步骤;`error !== null` 或隐藏时为空. */
+    steps: SolveStep[];
+    /** 能力边界理由;null 表示求解成功. */
+    error: string | null;
+    /** 是否参与计算.为 false 时仅保留列表项,不调用内核. */
     enabled: boolean;
 }
 
@@ -603,6 +734,15 @@ export interface SceneIR {
      * 只新增字段:既有 `analyses`/`integrals`/`intersections` 的字段语义不变.
      */
     solves: SolveTask[];
+    /**
+     * 原函数任务(设计文档 `docs/calculus-suite-plan.md` 第 3 节).
+     *
+     * 只新增字段:既有 `analyses`/`integrals`/`intersections`/`solves` 的字段
+     * 语义不变.与 `solves` 同一档--声明级编译,没有异步数值回调.
+     */
+    antiderivatives: AntiderivativeTask[];
+    /** 微分方程任务(设计文档 `docs/calculus-suite-plan.md` 第 4 节). */
+    odes: OdeTask[];
 }
 
 // ================================================================

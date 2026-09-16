@@ -28,6 +28,7 @@
 
 mod derivative;
 mod eval;
+mod integral;
 mod latex;
 mod parser;
 mod poly;
@@ -40,6 +41,11 @@ pub(crate) use eval::compile_runtime_expr;
 #[cfg(test)]
 pub(crate) use eval::evaluate_runtime_expr;
 pub(crate) use eval::{bind_expression, evaluate_bound, BoundExpr, EvalContext};
+/// 不定积分内核入口(产物类型见 `integral.rs`,不含 `Expr`).
+pub use integral::{
+    antiderivative as antiderivative_outcome, antiderivative_with_parameters,
+    AntiderivativeOutcome, AntiderivativeStep,
+};
 pub use latex::latex_expression;
 // 方程求解内核:步骤产物是独立类型(`SolveOutcome`/`SolveStep`),不含 `Expr`.
 pub use solve::{solve_equation, SolveOutcome, SolveStep};
@@ -139,7 +145,7 @@ fn builtin_symbol(name: &str) -> bool {
     builtins::constant_value(name).is_some() || builtins::is_reserved_word(name)
 }
 
-fn collect_symbols(expr: &Expr, out: &mut Vec<String>) {
+pub(crate) fn collect_symbols(expr: &Expr, out: &mut Vec<String>) {
     match expr {
         Expr::Sym(name) => {
             if !builtin_symbol(name) {

@@ -218,6 +218,27 @@ export interface SolveStatement {
     span: SourceSpan;
 }
 
+/**
+ * `antiderivative 名称 = antiderivative(源对象 [, 变量]);` 不定积分语句
+ * (设计文档 `docs/calculus-suite-plan.md` 第 3 节).
+ *
+ * 与 `derivative` 对称:源对象必须是已声明的 curve(变量恒为 x)或 surface
+ * (可显式给 x|y);产物**既是求值列表里的"原函数"条目,也是下发给场景的实体
+ * 对象**(曲线/曲面),因此可以照常参与 `derivative` / `gradient` / `integral`.
+ *
+ * 积分常数与源区间走选项:`constant`(缺省 0)/`range`(缺省取源对象区间)/
+ * `segments`(缺省取源对象分段数).
+ */
+export interface AntiderivativeStatement {
+    type: 'antiderivative';
+    name: string;
+    source: string;
+    /** 积分变量;curve 缺省为 'x',surface 可显式给 'x' 或 'y'. */
+    variable?: string;
+    options: OptionPair[];
+    span: SourceSpan;
+}
+
 export type AstStatement =
     | ParamStatement
     | TensorStatement
@@ -227,7 +248,8 @@ export type AstStatement =
     | IntegralStatement
     | IntersectionStatement
     | DerivativeStatement
-    | SolveStatement;
+    | SolveStatement
+    | AntiderivativeStatement;
 
 export interface AstProgram {
     statements: AstStatement[];

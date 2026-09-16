@@ -1,5 +1,6 @@
 import type { AstProgram } from '../ast/types';
 import type {
+    AntiderivativeTask,
     IntegralTask,
     SceneIR,
     SceneObject,
@@ -12,6 +13,7 @@ import { compileIntegralTask } from './integrals';
 import { compileAnalyses } from './analyses';
 import { compileIntersections } from './intersections';
 import { compileSolves } from './solves';
+import { collectAntiderivativeTasks } from './antiderivativeTasks';
 import { integralLatex, sceneObjectLatex } from './latex';
 import {
     cloneAnimations,
@@ -56,6 +58,7 @@ export interface CompileSceneOptions {
     hiddenIntegralNames?: ReadonlySet<string>;
     hiddenIntersectionNames?: ReadonlySet<string>;
     hiddenSolveNames?: ReadonlySet<string>;
+    hiddenAntiderivativeNames?: ReadonlySet<string>;
 }
 
 export function compileScene(
@@ -71,9 +74,18 @@ export function compileScene(
     const hiddenSolveNames = options.hiddenSolveNames ?? new Set<string>();
 
     const params = cloneParams(staticScene.params);
-    const objects = staticScene.objectBlueprints.map((blueprint) =>
-        materializeObject(blueprint, params, paramOverrides),
-    );
+    // 隐藏的原函数语句既不下发对象,也不进后续引用解析(与"隐藏=不参与计算"
+    // 同一语义);静态场景里仍保留 blueprint,这样切回显示不需要重新解析.
+    const hiddenAntiderivativeNames = options.hiddenAntiderivativeNames ?? new Set<string>();
+    const objects = staticScene.objectBlueprints
+        .filter(
+            (blueprint) =>
+                blueprint.kind !== 'curve' && blueprint.kind !== 'surface'
+                    ? true
+                    : blueprint.antiderivativeOrigin === undefined
+                        || !hiddenAntiderivativeNames.has(blueprint.name),
+        )
+        .map((blueprint) => materializeObject(blueprint, params, paramOverrides));
     // 仅用于让 IR scene.params 反映当前滑块值(见文件头约定 4).
     applyParamOverrides(params, paramOverrides);
 
@@ -85,6 +97,24 @@ export function compileScene(
         if (object.name !== undefined) {
             objectByName.set(object.name, object);
         }
+    }
+
+    // 不定积分(设计文档 docs/calculus-suite-plan.md 第 3 节):声明级编译,
+    // 产物有两路--求值条目进 `antiderivatives`,成功的原函数**同时**作为普通
+    // curve/surface 进 `objects`.后者让"原函数"直接获得渲染,求导,分析,
+    // 积分,求交的全部既有能力,不需要任何渲染层改动.
+    //
+    // 顺序必须在 integral/analysis 之前:原函数对象要能被它们的 `objectByName`
+    // 查到(下面把新对象与名字一起并入).
+    const compiledAntiderivatives = collectAntiderivativeTasks(
+        ast,
+        staticScene.antiderivativeFacts,
+        objects,
+        hiddenAntiderivativeNames,
+    );
+    const antiderivatives: AntiderivativeTask[] = [];
+    for (const entry of compiledAntiderivatives) {
+        antiderivatives.push(entry.task);
     }
 
     // integral 名称查重(约定 2);隐藏积分同样先完整编译校验,再置
@@ -114,7 +144,6 @@ export function compileScene(
     for (const object of objects) {
         objectFormulas[object.id] = sceneObjectLatex(object, objectByName);
     }
-
     const integralFormulas: Record<string, string | null> = {};
     for (const task of integrals) {
         integralFormulas[task.name] = integralLatex(task, objects);
@@ -145,5 +174,10 @@ export function compileScene(
         ),
         // 方程求解是声明级编译(与 analysis 同一档):步骤链一次算出写进 IR.
         solves: compileSolves(ast, params, paramOverrides, hiddenSolveNames),
+        // 不定积分同为声明级编译;实体侧的新对象已并入上面的 `objects`/`objectByName`.
+        antiderivatives,
+        // 微分方程(设计文档 docs/calculus-suite-plan.md 第 4 节)按三期实现:
+        // 先固定空表,让 IR 契约与渲染层一次到位(与求解内核当年的分期口径一致).
+        odes: [],
     };
 }

@@ -7,7 +7,7 @@
  * d/dx(源函数)=导函数 或 ∂/∂y(源函数)=导函数,region 是不等式带,
  * 积分是 ∫/∬/∭...).
  */
-import type { DerivativeOrigin, IntegralTask, SceneObject } from '../../ir';
+import type { AntiderivativeOrigin, DerivativeOrigin, IntegralTask, SceneObject } from '../../ir';
 import { cachedLatexExpression } from './expression';
 
 function latexNumber(value: number): string {
@@ -58,6 +58,25 @@ function derivativeLatex(
 }
 
 /**
+ * 原函数对象的公式:`y = ∫(被积函数) dx + c`(surface 用 `z`,并对 y 积分时写 `dy`).
+ *
+ * 与 {@link derivativeLatex} 同一套展示契约:保留积分号说明"这条曲线是怎么来的",
+ * 右侧给出对象自身的表达式(已把积分常数并入).常数写成 `+ (数值)` 而不是 `+C`:
+ * 下发的对象必须可求值,`C` 只是符号通解的一部分,展示层在摘要里保留 `+C`.
+ */
+function antiderivativeLatex(
+    target: 'y' | 'z',
+    origin: AntiderivativeOrigin,
+    constant: number,
+): string {
+    const integral = `\\int\\left(${cachedLatexExpression(origin.integrandExpr)}\\right)\\,\\mathrm{d}${origin.variable}`;
+    if (constant === 0) {
+        return `${target}=${integral}`;
+    }
+    return `${target}=${integral}+\\left(${latexNumberText(constant)}\\right)`;
+}
+
+/**
  * 实体对象表达式行对应的 LaTeX.
  *
  * 目前只对真正"携带表达式/可展示"的对象生成公式:
@@ -77,10 +96,16 @@ export function sceneObjectLatex(
     try {
         switch (object.kind) {
             case 'curve':
+                if (object.antiderivativeOrigin) {
+                    return antiderivativeLatex('y', object.antiderivativeOrigin, object.antiderivativeOrigin.constant);
+                }
                 return object.derivativeOrigin
                     ? derivativeLatex('y', object.derivativeOrigin, object.expr, false)
                     : `y=${cachedLatexExpression(object.expr)}`;
             case 'surface':
+                if (object.antiderivativeOrigin) {
+                    return antiderivativeLatex('z', object.antiderivativeOrigin, object.antiderivativeOrigin.constant);
+                }
                 return object.derivativeOrigin
                     ? derivativeLatex('z', object.derivativeOrigin, object.expr, true)
                     : `z=${cachedLatexExpression(object.expr)}`;

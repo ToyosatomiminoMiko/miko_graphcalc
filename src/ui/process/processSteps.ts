@@ -57,6 +57,10 @@ export const PROCESS_STEP_KIND_LABELS: Record<ProcessStepKind, string> = {
     algebra: '代数',
     definition: '定义',
     numeric: '数值',
+    // 不定积分与微分方程内核引入的三类依据(见 ir/types.ts 的 SOLVE_STEP_KINDS).
+    table: '查表',
+    substitute: '换元',
+    check: '验证',
 };
 
 /**

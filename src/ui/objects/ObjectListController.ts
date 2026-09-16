@@ -35,6 +35,7 @@ export interface ObjectListContainers {
     readonly integral: HTMLElement;
     readonly intersection: HTMLElement;
     readonly solve: HTMLElement;
+    readonly antiderivative: HTMLElement;
 }
 
 /**
@@ -50,6 +51,8 @@ export interface ObjectListHandlers {
     toggleIntegral(name: string): void;
     toggleIntersection(name: string): void;
     toggleSolve(name: string): void;
+    /** 原函数条目:隐藏 = 不调积分内核,也不下发实体对象. */
+    toggleAntiderivative(name: string): void;
     /**
      * 打开某条求值对象的过程页(三级披露的 L2).
      *
@@ -79,12 +82,14 @@ export class ObjectListController {
                 integral: containers.integral,
                 intersection: containers.intersection,
                 solve: containers.solve,
+                antiderivative: containers.antiderivative,
             },
             {
                 toggleAnalysis: (name) => handlers.toggleAnalysis(name),
                 toggleIntegral: (name) => handlers.toggleIntegral(name),
                 toggleIntersection: (name) => handlers.toggleIntersection(name),
                 toggleSolve: (name) => handlers.toggleSolve(name),
+                toggleAntiderivative: (name) => handlers.toggleAntiderivative(name),
                 openProcess: (request) => handlers.openProcess(request),
             },
         );

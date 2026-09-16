@@ -64,8 +64,9 @@ export function materializeObject(
                 enabled: true,
                 range: blueprint.range,
                 segments: blueprint.segments,
-                // 纯展示元数据:只有 derivative 产物有,直接透传给公式层.
+                // 纯展示元数据:derivative / antiderivative 产物才有,直接透传给公式层.
                 derivativeOrigin: blueprint.derivativeOrigin,
+                antiderivativeOrigin: blueprint.antiderivativeOrigin,
             } satisfies CurveObject;
         }
 
@@ -81,6 +82,7 @@ export function materializeObject(
                 range: blueprint.range,
                 segments: blueprint.segments,
                 derivativeOrigin: blueprint.derivativeOrigin,
+                antiderivativeOrigin: blueprint.antiderivativeOrigin,
             } satisfies SurfaceObject;
         }
 

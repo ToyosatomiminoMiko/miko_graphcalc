@@ -450,4 +450,4 @@ RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初�
 
 ## meta
 
-**GraphCalc** 于 2026.09.13.20:15:00 正式立项
+**GraphCalc** 于 `2026.09.13.20:15:00` 正式立项

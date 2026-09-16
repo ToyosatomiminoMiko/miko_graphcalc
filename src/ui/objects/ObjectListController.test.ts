@@ -98,6 +98,8 @@ const scene = {
         },
     ],
     solves: [],
+    odes: [],
+    antiderivatives: [],
 } as unknown as SceneIR;
 
 /** 显隐按钮回调的落点:测试只关心"点了哪一条",不模拟重新编译. */
@@ -107,6 +109,7 @@ interface ToggleCalls {
     integral: string[];
     intersection: string[];
     solve: string[];
+    antiderivative: string[];
     /** 点过"过程"入口的条目名(过程文档内容另有用例断言). */
     process: string[];
 }
@@ -125,12 +128,14 @@ function createController(): {
     const integralList = new StubElement('div');
     const intersectionList = new StubElement('div');
     const solveList = new StubElement('div');
+    const antiderivativeList = new StubElement('div');
     const calls: ToggleCalls = {
         entity: [],
         analysis: [],
         integral: [],
         intersection: [],
         solve: [],
+        antiderivative: [],
         process: [],
     };
     const controller = new ObjectListController(
@@ -140,6 +145,7 @@ function createController(): {
             integral: integralList as unknown as HTMLElement,
             intersection: intersectionList as unknown as HTMLElement,
             solve: solveList as unknown as HTMLElement,
+            antiderivative: antiderivativeList as unknown as HTMLElement,
         },
         {
             toggleEntity: (id) => calls.entity.push(id),
@@ -147,6 +153,7 @@ function createController(): {
             toggleIntegral: (name) => calls.integral.push(name),
             toggleIntersection: (name) => calls.intersection.push(name),
             toggleSolve: (name) => calls.solve.push(name),
+            toggleAntiderivative: (name) => calls.antiderivative.push(name),
             // 回调的是过程文档;这里只记题目(内容稳定,不受标题文案改动影响).
             openProcess: (request) => calls.process.push(request.document.problem ?? ''),
         },

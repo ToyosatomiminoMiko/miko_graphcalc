@@ -9,20 +9,28 @@
  * 执行(见 finalizeRegionBlueprints),编译缓存命中后不再重复.
  */
 import type {
+    AntiderivativeStatement,
     AstProgram,
     DerivativeStatement,
     ObjectStatement,
     OptionPair,
 } from '../ast/types';
-import type { AnimationClip, ParamDeclaration } from '../../ir';
+import { SOLVE_STEP_KINDS, type AnimationClip, type ParamDeclaration, type SolveStepKind } from '../../ir';
 import type { MatrixOps } from '../../math/matrix/MatrixOps';
 import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 import { withStatementSpan } from '../errors';
 import { buildObjectBlueprint } from './objects/build';
+import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import { createObjectReferenceResolver } from './objects/references';
-import { blueprintHasCoefficients, type ObjectBlueprint } from './objects/types';
-import { assertKnownOptions, findOption, toFiniteNumber } from './options';
-import { cachedDerivativeExpression } from './expression';
+import {
+    blueprintHasCoefficients,
+    type CurveBlueprint,
+    type ObjectBlueprint,
+    type SurfaceBlueprint,
+} from './objects/types';
+import { assertKnownOptions, findOption, parseCappedPositiveInteger, parseNumberListOfSize, toFiniteNumber } from './options';
+import { cachedDerivativeExpression, extractSymbolNames } from './expression';
+import { antiderivative as wasmAntiderivative } from '../../wasm/math_rs/math_rs';
 import {
     sphereGradientExpressions,
     sphereImplicitExpression,
@@ -35,12 +43,216 @@ import {
     resolveObjectTransform,
 } from './transforms';
 
+/**
+ * 一条不定积分的编译事实:实体 blueprint + 求值条目要用的展示数据.
+ *
+ * 为什么把两者一起返回:内核只调**一次**,表达式(实体侧)与步骤链(展示侧)
+ * 天然同源;分两处各调一次会在改内核时留下漂移风险(见 `antiderivativeTasks.ts`
+ * 文件头).
+ */
+export interface AntiderivativeFact {
+    sourceKind: 'curve' | 'surface';
+    variable: string;
+    integrand: string;
+    integrandLatex: string;
+    antiderivativeText: string;
+    antiderivativeLatex: string;
+    constant: number;
+    constantSymbol: string;
+    verified: boolean;
+    steps: Array<{ latex: string; reason: string; kind: SolveStepKind }>;
+    error: string | null;
+}
+
+/** 内核 `antiderivative` 返回的 JSON 形状(与 Rust `AntiderivativeOutcome` 对齐). */
+interface AntiderivativeOutcomeJson {
+    integrand_latex: string;
+    antiderivative_latex: string;
+    antiderivative_text: string;
+    verified: boolean;
+    steps: Array<{ latex: string; reason: string; kind: string }>;
+    error: string | null;
+}
+
+/** 内核给的分区字符串 -> IR 字面量联合(未登记退化成中性色 `algebra`). */
+function toAntiderivativeStepKind(raw: string): SolveStepKind {
+    return (SOLVE_STEP_KINDS as readonly string[]).includes(raw)
+        ? (raw as SolveStepKind)
+        : 'algebra';
+}
+
+/**
+ * 把 `antiderivative 名称 = antiderivative(源对象 [, 变量])` 编译成一个新对象
+ * (设计文档 `docs/calculus-suite-plan.md` 第 3 节),并带回展示事实.
+ *
+ * 口径:
+ * 1. **表达式来自内核**:`math_rs::symbolic::integral` 给出原函数文本(参数按
+ *    声明值折叠)与步骤链;
+ * 2. **积分常数并入表达式**:`constant` 选项(缺省 0)直接加在表达式上,对象
+ *    因此可求值,展示层仍写 `+C`;
+ * 3. **定义域/外观继承源对象**:颜色与 range 缺省取源对象,显式选项优先;
+ * 4. **能力边界不是源码错误**:非初等/超出规则时返回 `blueprint: null` +
+ *    `fact.error`,调用方保留占位条目而不是抛异常.
+ */
+function buildAntiderivativeBlueprint(
+    statement: AntiderivativeStatement,
+    id: number,
+    blueprintByName: Map<string, ObjectBlueprint>,
+): { blueprint: CurveBlueprint | SurfaceBlueprint | null; fact: AntiderivativeFact } {
+    const sourceBlueprint = blueprintByName.get(statement.source.trim());
+    if (sourceBlueprint === undefined) {
+        throw new Error(
+            `不定积分 ${statement.name} 引用了不存在的对象 ${statement.source}`,
+        );
+    }
+    if (sourceBlueprint.kind !== 'curve' && sourceBlueprint.kind !== 'surface') {
+        throw new Error(`不定积分 ${statement.name} 只能应用于 curve 或 surface`);
+    }
+    const planeSource = sourceBlueprint;
+    assertKnownOptions(statement.options, ANTIDERIVATIVE_OPTION_NAMES, `不定积分 ${statement.name}`);
+    const variable = (statement.variable ?? 'x').trim();
+    if (planeSource.kind === 'curve' && variable !== 'x') {
+        throw new Error(`不定积分 ${statement.name} 的 curve 源只支持对 x 积分`);
+    }
+    if (planeSource.kind === 'surface' && variable !== 'x' && variable !== 'y') {
+        throw new Error(`不定积分 ${statement.name} 的曲面源只能对 x 或 y 积分`);
+    }
+
+    // 系数表**故意留空**:内核把除积分变量以外的符号当常数,原函数里因此
+    // 保留参数名(`a*x^3/3 - cos(x)`),参数值由物化层按当前滑块折叠.
+    // 若在这里传 `buildParamScope(params, {})`,得到的表达式会把参数冻在
+    // 声明默认值上:静态场景按 AST 缓存,拖滑块只重物化不重解析,曲线就再也
+    // 不跟手了(这正是原函数必须挂在静态场景 blueprint 上的代价,已实测).
+    // 只给**名字**不给值:内核据此把这些符号当已声明,保留在结果里
+    // (`a*x^3/3 - cos(x)`),数值由物化层按当前滑块折叠.
+    //
+    // 名单必须同时包含:
+    // - 源对象的参数(`a`):原函数里保持符号,拖滑块才跟手;
+    // - 源表达式里出现的**另一个坐标**(对 y 积分时的 x):它对积分是常数,
+    //   内核只认"已声明"的符号,漏掉就会报"未声明符号 x"(实测踩过).
+    const declaredSymbols = new Set<string>(planeSource.coefficientNames);
+    for (const name of extractSymbolNames(planeSource.expr, new Set())) {
+        if (name !== variable) declaredSymbols.add(name);
+    }
+    const outcome = JSON.parse(
+        wasmAntiderivative(
+            planeSource.expr,
+            variable,
+            [...declaredSymbols],
+            new Float64Array(),
+        ),
+    ) as AntiderivativeOutcomeJson;
+
+    const rawConstant = findOption(statement.options, 'constant');
+    const parsedConstant = rawConstant === undefined ? 0 : Number(rawConstant);
+    const constant = Number.isFinite(parsedConstant) ? parsedConstant : 0;
+    const baseFact = {
+        sourceKind: planeSource.kind,
+        variable,
+        integrand: planeSource.expr,
+        constant,
+        constantSymbol: 'C',
+    } as const;
+
+    if (outcome.error !== null) {
+        return {
+            blueprint: null,
+            fact: {
+                ...baseFact,
+                integrandLatex: outcome.integrand_latex,
+                antiderivativeText: '',
+                antiderivativeLatex: '',
+                verified: false,
+                steps: [],
+                error: outcome.error,
+            },
+        };
+    }
+
+    const expr = constant === 0
+        ? outcome.antiderivative_text
+        : `(${outcome.antiderivative_text}) + (${constant})`;
+
+    const origin = {
+        integrandExpr: planeSource.expr,
+        variable: (variable === 'y' ? 'y' : 'x') as 'x' | 'y',
+        constant,
+    } as const;
+
+    const fact: AntiderivativeFact = {
+        ...baseFact,
+        integrandLatex: outcome.integrand_latex,
+        antiderivativeText: outcome.antiderivative_text,
+        antiderivativeLatex: outcome.antiderivative_latex,
+        verified: outcome.verified,
+        steps: outcome.steps.map((entry) => ({
+            latex: entry.latex,
+            reason: entry.reason,
+            kind: toAntiderivativeStepKind(entry.kind),
+        })),
+        error: null,
+    };
+
+    if (planeSource.kind === 'curve') {
+        const range = findOption(statement.options, 'range');
+        return {
+            blueprint: {
+                kind: 'curve',
+                id,
+                name: statement.name,
+                expr,
+                // 依赖继承源对象的系数:参数变化要让这条对象重新物化.
+                coefficientNames: [...planeSource.coefficientNames],
+                color: findOption(statement.options, 'color') ?? planeSource.color,
+                range: range
+                    ? (parseNumberListOfSize(range, 2, `不定积分 ${statement.name} 的 range`) as [number, number])
+                    : planeSource.range,
+                segments: parseOptionalSegments(statement.options, `不定积分 ${statement.name} 的 segments`) ?? planeSource.segments,
+                antiderivativeOrigin: origin,
+            },
+            fact,
+        };
+    }
+
+    const range = findOption(statement.options, 'range');
+    return {
+        blueprint: {
+            kind: 'surface',
+            id,
+            name: statement.name,
+            expr,
+            coefficientNames: [...planeSource.coefficientNames],
+            color: findOption(statement.options, 'color') ?? planeSource.color,
+            range: range
+                ? (parseNumberListOfSize(range, 4, `不定积分 ${statement.name} 的 range`) as [
+                    number,
+                    number,
+                    number,
+                    number,
+                ])
+                : planeSource.range,
+            segments: parseOptionalSegments(statement.options, `不定积分 ${statement.name} 的 segments`) ?? planeSource.segments,
+            antiderivativeOrigin: origin,
+        },
+        fact,
+    };
+}
+
+/** `segments` 选项;缺省 undefined(由 blueprint 继承源对象). */
+function parseOptionalSegments(options: OptionPair[], context: string): number | undefined {
+    const raw = findOption(options, 'segments');
+    if (raw === undefined) return undefined;
+    return parseCappedPositiveInteger(raw, context, NUMERIC_CONFIG.limits.curve.maxSegments);
+}
+
 export type StaticScene = {
     params: Map<string, ParamDeclaration>;
     objectBlueprints: ObjectBlueprint[];
     objectTransforms: Map<number, Mat4>;
     animations: Map<string, AnimationClip>;
     objectAnimations: Map<number, string[]>;
+    /** 不定积分的展示事实(内核产物一次算完,求值层只消费);见本文件同名接口. */
+    antiderivativeFacts: Map<string, AntiderivativeFact>;
 };
 
 /**
@@ -80,6 +292,9 @@ function collectDeclaredValueNames(ast: AstProgram): Map<string, string> {
             case 'derivative':
                 names.set(statement.name, 'derivative 产物');
                 break;
+            case 'antiderivative':
+                names.set(statement.name, 'antiderivative 产物');
+                break;
             case 'analysis':
                 names.set(statement.name, '分析产物');
                 break;
@@ -95,6 +310,9 @@ function collectDeclaredValueNames(ast: AstProgram): Map<string, string> {
     }
     return names;
 }
+
+/** `antiderivative` 语句允许的选项(外观与 range 继承源对象,可选覆盖). */
+const ANTIDERIVATIVE_OPTION_NAMES = ['color', 'range', 'segments', 'constant', 'variable'] as const;
 
 /** `derivative` 求导语句允许的选项(与对象外观一致,transform/animation 不继承). */
 const DERIVATIVE_OPTION_NAMES = ['color', 'range', 'segments'] as const;
@@ -378,6 +596,7 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
     const objectAnimations = new Map<number, string[]>();
     const objectBlueprints: ObjectBlueprint[] = [];
     const objectTransforms = new Map<number, Mat4>();
+    const antiderivativeFacts = new Map<string, AntiderivativeFact>();
 
     for (const statement of ast.statements) {
         if (statement.type !== 'tensor') continue;
@@ -539,6 +758,44 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
             });
         }
     }
+    // 不定积分语句:同样生成一个新 curve/surface 对象(设计文档
+    // docs/calculus-suite-plan.md 第 3 节"作为可渲染对象下发").
+    //
+    // 为什么必须在静态场景里建 blueprint(而不是在 compileScene 之后补一个
+    // 对象):后面的 `derivative F2 = derivative(F1)` 等引用走的是这里的
+    // `resolvable`;产物只在 compileScene 之后追加,链式引用就找不到它
+    // (实测踩过:`derivative back = derivative(F)` 报"引用了不存在的对象 F").
+    //
+    // 参数按当前值折叠进表达式(与求解/分析同口径):`paramScope` 只用声明里的
+    // 默认值,滑块值经 `paramOverrides` 在物化时生效;因此这里必须把源对象解析
+    // 出的"依赖了哪些参数"原样带到 blueprint,参数变化时物化才会重算.
+    for (const statement of ast.statements) {
+        if (statement.type !== 'antiderivative') continue;
+        withStatementSpan(statement.span, () => {
+            if (objectNames.has(statement.name)) {
+                throw new Error(`对象 ${statement.name} 重复声明`);
+            }
+            const { blueprint, fact } = buildAntiderivativeBlueprint(
+                statement,
+                nextId,
+                blueprintByName,
+            );
+            antiderivativeFacts.set(statement.name, fact);
+            if (blueprint === null) {
+                // 能力边界(非初等/超出规则):不下发对象,也不登记 resolvable;
+                // 求值条目由 fact.error 给出理由(与求解内核同口径).
+                return;
+            }
+            objectNames.add(blueprint.name);
+            objectBlueprints.push(blueprint);
+            resolvable.set(blueprint.name, {
+                kind: blueprint.kind,
+                expr: blueprint.expr,
+            });
+            nextId += 1;
+        });
+    }
+
     for (const statement of ast.statements) {
         if (statement.type !== 'derivative') continue;
         withStatementSpan(statement.span, () => {
@@ -592,6 +849,7 @@ function buildStaticScene(ast: AstProgram, matrixOps: MatrixOps): StaticScene {
         objectTransforms,
         animations,
         objectAnimations,
+        antiderivativeFacts,
     };
 }
 

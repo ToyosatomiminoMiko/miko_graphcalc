@@ -13,6 +13,7 @@
  * `SolveItem.ts`),新增一类求值对象 = 写一个 item 类 + 这里挂一个 Section.
  */
 import type {
+    AntiderivativeTask,
     AnalysisResult,
     IntegralTask,
     IntersectionOutput,
@@ -25,6 +26,7 @@ import { EvaluationSection } from './EvaluationSection';
 import { IntegralItem } from './integralItem';
 import { IntersectionItem } from './intersectionItem';
 import { SolveItem } from './SolveItem';
+import { AntiderivativeItem } from './AntiderivativeItem';
 import type { ProcessRequest } from './EvaluationItem';
 
 /** 右栏子列表容器;用具名对象而不是同类型的 HTMLElement 位置参数. */
@@ -33,6 +35,7 @@ export interface EvaluationListContainers {
     readonly integral: HTMLElement;
     readonly intersection: HTMLElement;
     readonly solve: HTMLElement;
+    readonly antiderivative: HTMLElement;
 }
 
 /**
@@ -44,6 +47,7 @@ export interface EvaluationListHandlers {
     toggleIntegral(name: string): void;
     toggleIntersection(name: string): void;
     toggleSolve(name: string): void;
+    toggleAntiderivative(name: string): void;
     /** 打开条目过程页(三级披露的 L2):切页与载入由应用层做. */
     openProcess(request: ProcessRequest): void;
 }
@@ -73,6 +77,13 @@ export class EvaluationList {
     /** 求解子列表:结构定义见 `evaluation/SolveItem.ts`. */
     private readonly solve: EvaluationSection<SolveTask, void, SolveItem>;
 
+    /** 原函数子列表:结构定义见 `evaluation/AntiderivativeItem.ts`. */
+    private readonly antiderivative: EvaluationSection<
+        AntiderivativeTask,
+        void,
+        AntiderivativeItem
+    >;
+
     constructor(
         containers: EvaluationListContainers,
         private readonly handlers: EvaluationListHandlers,
@@ -86,6 +97,10 @@ export class EvaluationList {
             IntersectionItem,
         );
         this.solve = new EvaluationSection(containers.solve, SolveItem);
+        this.antiderivative = new EvaluationSection(
+            containers.antiderivative,
+            AntiderivativeItem,
+        );
     }
 
     render(scene: SceneIR): void {
@@ -109,6 +124,11 @@ export class EvaluationList {
         this.solve.render(scene.solves, {
             objects: scene.objects,
             toggleHidden: (name) => this.handlers.toggleSolve(name),
+            openProcess: (request) => this.handlers.openProcess(request),
+        });
+        this.antiderivative.render(scene.antiderivatives, {
+            objects: scene.objects,
+            toggleHidden: (name) => this.handlers.toggleAntiderivative(name),
             openProcess: (request) => this.handlers.openProcess(request),
         });
     }
@@ -148,12 +168,13 @@ export class EvaluationList {
 
     /**
      * @cache_access
-     * 清空四个子列表及其全部 DOM 行缓存与数值缓存.
+     * 清空五个子列表及其全部 DOM 行缓存与数值缓存.
      */
     clear(): void {
         this.analysis.clear();
         this.integral.clear();
         this.intersection.clear();
         this.solve.clear();
+        this.antiderivative.clear();
     }
 }

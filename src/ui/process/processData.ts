@@ -13,7 +13,7 @@
  * - `processSteps.ts` 只管上限与分区.
  * 因此"公式怎么排"与"这一步算什么依据"各自只有一个改动点.
  */
-import type { AnalysisResult, IntegralTask, SceneObject, SolveTask } from '../../ir';
+import type { AnalysisResult, AntiderivativeTask, IntegralTask, SceneObject, SolveTask } from '../../ir';
 import { UI_CONFIG } from '../../config/uiConfig';
 import {
     analysisLatexDetailEntries,
@@ -142,6 +142,31 @@ export function buildSolveProcess(
     return {
         title: `求解 ${task.name}`,
         problem: task.equationLatex === '' ? null : task.equationLatex,
+        steps: truncated.steps,
+        droppedSteps: truncated.droppedSteps,
+    };
+}
+
+/**
+ * 不定积分条目的过程:题目是积分式,步骤由**内核产物**直接给出.
+ *
+ * 与求解同一条"三期只换数据源"的口径:`kind` / `reason` / `latex` 全部来自
+ * `math_rs::symbolic::integral`,过程页只负责排版.最后一步固定是回代验证
+ * (对原函数求导等于被积函数),它是"原函数对不对"的凭据,不能省略.
+ */
+export function buildAntiderivativeProcess(
+    task: AntiderivativeTask,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    const steps: ProcessStep[] = task.steps.map((step) => ({
+        latex: step.latex,
+        kind: step.kind,
+        reason: step.reason,
+    }));
+    const truncated = truncateProcessSteps(steps, maxSteps);
+    return {
+        title: `原函数 ${task.name}`,
+        problem: task.integrandLatex === '' ? null : task.integrandLatex,
         steps: truncated.steps,
         droppedSteps: truncated.droppedSteps,
     };

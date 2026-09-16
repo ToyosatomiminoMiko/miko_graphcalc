@@ -137,6 +137,7 @@
     --kind-integral: var(--color-success);
     --kind-intersection: #ffd93d;
     --kind-solve: #7fd8ff;                            /* 求解徽章底(与求交/积分同一套浅底深字体系) */
+    --kind-antiderivative: #ffb3d9;                   /* 原函数徽章底(与求解同类,换色相区分) */
     --kind-divergence-bg: rgba(142, 230, 165, 0.16); /* 散度徽章底(与梯度/旋度同深色底体系) */
     --kind-curl-bg: rgba(255, 194, 109, 0.18);       /* 旋度徽章底 */
     --kind-laplacian-bg: rgba(196, 168, 255, 0.20);  /* 拉普拉斯徽章底 */

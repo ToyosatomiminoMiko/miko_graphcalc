@@ -89,5 +89,17 @@ derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 // 参数(a/b/c)按当前声明值代入,内核不做符号系数代数.
 solve_stmt = { "solve" ~ ident ~ "=" ~ expr ~ stmt_end }
 
-statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt }
+// 不定积分(原函数)语句:`antiderivative 名称 = antiderivative(源对象 [, 变量]) [选项];`.
+//
+// 与 `derivative` 同构:源对象必须是已声明的 curve 或 surface,变量缺省 x,
+// surface 可显式给 y.产物是一个**既进求值列表又下发为实体对象**的原函数
+// (设计文档 docs/calculus-suite-plan.md 第 3 节).
+//
+// 语法关键字用全名 `antiderivative`(GNU 习惯不缩写),与 `derivative` 对称;
+// 不要把它写成 `integral`--后者已承载"方法 × 域矩阵 + 黎曼可视化"的定积分
+// 语义,混在一起会污染既有字段语义(路线图 §7.1).
+antiderivative_stmt = { "antiderivative" ~ ident ~ "=" ~ antiderivative_call ~ stmt_end }
+antiderivative_call = { "antiderivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
+
+statement = _{ param_stmt | tensor_stmt | animation_stmt | object_stmt | analysis_stmt | integral_stmt | intersection_stmt | derivative_stmt | solve_stmt | antiderivative_stmt }
 program = { SOI ~ statement* ~ EOI }

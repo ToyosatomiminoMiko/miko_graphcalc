@@ -92,6 +92,7 @@ export class DslApp {
         const integralList = document.getElementById('integral-object-list')!;
         const intersectionList = document.getElementById('intersection-object-list')!;
         const solveList = document.getElementById('solve-object-list')!;
+        const antiderivativeList = document.getElementById('antiderivative-object-list')!;
         const formulaCopyHint = document.getElementById('formula-copy-hint')!;
 
         this.editor = document.getElementById('dsl-editor') as HTMLTextAreaElement;
@@ -118,6 +119,7 @@ export class DslApp {
                 integral: integralList,
                 intersection: intersectionList,
                 solve: solveList,
+                antiderivative: antiderivativeList,
             },
             {
                 // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要
@@ -127,6 +129,7 @@ export class DslApp {
                 toggleIntegral: (name) => this._toggleIntegral(name),
                 toggleIntersection: (name) => this._toggleIntersection(name),
                 toggleSolve: (name) => this._toggleSolve(name),
+                toggleAntiderivative: (name) => this._toggleAntiderivative(name),
                 // 三级披露的 L2 入口:条目已把过程文档建好,这里只负责切页与载入.
                 openProcess: (request) => this._openProcess(request),
             },
@@ -422,6 +425,18 @@ export class DslApp {
      */
     private _toggleSolve(name: string): void {
         const scene = this.compileController.toggleSolve(
+            name,
+            this.paramPanelController.getValues(),
+        );
+        if (scene) this.renderController.commitSceneWithoutRedraw(scene);
+    }
+
+    /**
+     * 切换原函数条目的显隐:隐藏 = 列表保留占位,既不再调用积分内核,也不再
+     * 下发对应的曲线/曲面,所以必须重新编译(见 compileAntiderivatives).
+     */
+    private _toggleAntiderivative(name: string): void {
+        const scene = this.compileController.toggleAntiderivative(
             name,
             this.paramPanelController.getValues(),
         );

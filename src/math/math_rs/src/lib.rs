@@ -589,6 +589,52 @@ pub fn solve_equation(
         .map_err(|error| math_error(format!("求解结果序列化失败: {error}")))
 }
 
+/// 不定积分(原函数)入口(设计文档 `docs/calculus-suite-plan.md` 第 3 节).
+///
+/// 返回**独立步骤产物的 JSON**:`{ integrand_latex, antiderivative_latex,
+/// antiderivative_text, verified, steps: [{ latex, reason, kind }], error }`.
+/// 步骤产物类型(`symbolic::AntiderivativeOutcome`)不含 `Expr`,符号引擎内部
+/// 表示不越过这一层(路线图 §7.1).
+///
+/// `error` 是**能力边界**理由(非初等 / 超出规则 / 未声明符号),不是调用失败;
+/// 抛出的异常只表示表达式读不出来,变量为空或系数表坏掉.
+///
+/// `antiderivative_text` 是归一化后的**可求值**表达式(不含积分常数 `C`),
+/// 供 TS 侧物化渲染对象与数值对拍;符号通解由展示层拼 `+ C`.
+/// `declared_names` 是**已声明参数名**(可以不带数值):
+/// - 只给名字(与 `coeff_names` 相同,`coeff_values` 为空)时参数保持符号,
+///   原函数写成 `a*x^3/3 - cos(x)`,参数值由 TS 侧物化时按当前滑块折叠;
+/// - 名字与值都给时参数折成数值.
+///
+/// 这条区分是给"原函数作为可渲染对象下发"用的:静态场景按 AST 缓存,若在这里
+/// 就把参数折成数,拖滑块只重物化不重解析,曲线会冻在旧值上.
+#[wasm_bindgen]
+pub fn antiderivative(
+    expression: &str,
+    variable: &str,
+    coeff_names: Vec<String>,
+    coeff_values: Vec<f64>,
+) -> Result<String, JsValue> {
+    if !coeff_values.is_empty() && coeff_names.len() != coeff_values.len() {
+        return Err(math_error(format!(
+            "积分系数表长度不一致:名字 {} 个,数值 {} 个",
+            coeff_names.len(),
+            coeff_values.len()
+        )));
+    }
+    let coefficients: std::collections::HashMap<String, f64> = if coeff_values.is_empty() {
+        std::collections::HashMap::new()
+    } else {
+        coeff_names.iter().cloned().zip(coeff_values).collect()
+    };
+    let declared: Vec<String> = coeff_names.clone();
+    let outcome =
+        symbolic::antiderivative_with_parameters(expression, variable, &coefficients, &declared)
+            .map_err(math_error)?;
+    serde_json::to_string(&outcome)
+        .map_err(|error| math_error(format!("积分结果序列化失败: {error}")))
+}
+
 /// 梯度数值求值入口;参数走 JSON 请求(见 `wasm_payloads`).
 #[wasm_bindgen]
 pub fn evaluate_gradient_point(payload: &str) -> Result<GradientPointResult, JsValue> {
