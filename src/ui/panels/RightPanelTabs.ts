@@ -5,8 +5,8 @@
  * - 页级显隐只在这里写(`hidden` 属性),与 `PanelController` 的折叠级显隐
  *   (`display` 行内样式)分开:折叠隐藏的是整个页容器,切页隐藏的是另一页,
  *   两者各写各的属性,不会互相覆盖;
- * - 页宽走 `PanelController.setWidthGroup`(宽度的唯一写入点),本控制器不碰
- *   `--right-panel-width`;
+ * - 页宽**不归本控制器管**:参数页与过程页共用侧栏那一份宽度(右栏宽度的
+ *   唯一写入点仍是 `PanelController._applyLayout`),切页不改宽度;
  * - 分隔条比例归 `RightSplitController`,切页不动它(过程页激活时整个参数页
  *   容器被隐藏,`#params-panel`/`#right-splitter` 自然退出布局,切回后比例
  *   与切走前一致).
@@ -16,7 +16,7 @@
  */
 import { createTabs, type TabsHandle } from '../widgets/Tabs';
 
-/** 右栏两个标签页;值同时用作宽度组 id(`PanelController` 按它记宽). */
+/** 右栏两个标签页. */
 export type RightTab = 'params' | 'process';
 
 export interface RightPanelTabsPages {
@@ -25,11 +25,16 @@ export interface RightPanelTabsPages {
 }
 
 export interface RightPanelTabsHandlers {
-    /** 页归属变化的回调:应用层据此切换右栏宽度组. */
+    /** 页归属变化的回调:应用层据此刷新只读回显等页级内容. */
     onTabChange(tab: RightTab): void;
 }
 
-/** 默认页:与 `index.html` 里 `#right-page-process` 带 `hidden` 的初态一致. */
+/**
+ * 默认页:**唯一声明处**.
+ *
+ * `index.html` 里的两个页容器不写 `hidden` 初值(HTML 不留副本),构造期由
+ * `_applyPages()` 按本常量写出页级显隐,`dispose()` 也复位到它.
+ */
 const DEFAULT_RIGHT_TAB: RightTab = 'params';
 
 function setHidden(element: HTMLElement, hidden: boolean): void {

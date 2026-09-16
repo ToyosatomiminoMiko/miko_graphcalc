@@ -58,7 +58,7 @@ export class DslApp {
     private readonly editorHighlight: EditorHighlight;
     private panelController: PanelController | null = null;
     private rightSplitController: RightSplitController | null = null;
-    /** 右栏标签页:页归属的状态源;页宽通过 PanelController 的宽度组生效. */
+    /** 右栏标签页:页归属的状态源;页宽与页归属无关(两页共用一份宽度). */
     private rightPanelTabs: RightPanelTabs | null = null;
     /** 过程页视图:条目"过程"入口把文档交给它载入. */
     private processPanel: ProcessPanel | null = null;
@@ -174,8 +174,8 @@ export class DslApp {
         // 属于布局态,由控制器写到 #app 的 CSS 变量上.
         this.rightSplitController = new RightSplitController();
         this.rightSplitController.bind(document.getElementById('app')!);
-        // 右栏标签页:切页只改"哪一页在前";页宽交给 PanelController 的宽度组
-        // (`--right-panel-width` 的唯一写入点不变),分隔条比例不归它管.
+        // 右栏标签页:切页只改"哪一页在前",不碰宽度 -- 参数页与过程页共用
+        // 侧栏那一份宽度(`--right-panel-width` 的唯一写入点仍是 PanelController).
         this.rightPanelTabs = new RightPanelTabs(
             document.getElementById('right-tabs')!,
             {
@@ -184,7 +184,6 @@ export class DslApp {
             },
             {
                 onTabChange: (tab) => {
-                    this.panelController?.setWidthGroup('right-panel', tab);
                     // 参数可能刚在另一页被改过:切回过程页时刷新只读回显,
                     // 但不重载过程(那会把当前步复位到第 0 步).
                     if (tab === 'process') this.processPanel?.refreshEcho();
@@ -433,7 +432,7 @@ export class DslApp {
      * 打开某条求值对象的过程页(三级披露的 L2).
      *
      * 过程文档由条目在点击时构建(item 知道自己的 IR 字段),这里只做两件事:
-     * 切到过程页(顺带把右栏换成过程宽度组),载入步骤.切页不清参数状态,
+     * 切到过程页(右栏宽度不变,两页共用一份宽度),载入步骤.切页不清参数状态,
      * 过程页顶部另有当前参数的只读回显(R6).
      */
     private _openProcess(request: ProcessRequest): void {

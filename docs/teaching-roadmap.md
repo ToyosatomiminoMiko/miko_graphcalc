@@ -295,7 +295,7 @@
 | 依赖 | 一期无(可与 T8/B1 并行);二期接一期预留的 `onStepChange` 出口(一期无订阅者,只发索引);三期依赖 B1 的产物类型口径 |
 | 工作量 | 一期 `3–5d`(跨 HTML/CSS/新控制器/共享行件契约),二期 `3–5d`,三期 `1w+`(需先豁免 §7.1 的禁令) |
 | 验收 | 一期:①标签页切换后折叠/展开与 `dispose()` 复位与现有一致;②过程页激活时 `#params-panel` / `#right-splitter` 不参与布局,切回后分隔比例不变;③长过程条目进过程页后底栏高度不变;④判据/翻步状态机/步骤分区有纯函数测试;⑤`npm test` 与 `npm run typecheck` 全绿;⑥主 chunk 增量实测 < 30KB |
-| 风险 | ①`PanelController._applyLayout()` 的折叠语义是"隐藏除承载按钮的 header 外的全部直接子元素",标签栏必须放进该 header 内部,页内容各包一层;②`RightSplitController.computeSplitRatio()` 以 `#right-panel` 矩形为基准,加标签栏后该前提失效,基准要换成页容器;③`--right-panel-width` 只有 `PanelController._applyLayout` 一个写入点(UI-P3.3 的教训),过程页更宽只能走"宽度组"实现,不能让标签页控制器自己写变量;④右栏默认 300px 对递等式偏窄,需按页记宽(建议过程页默认 420);⑤参数被藏到另一页后用户可能忘了调参,过程页顶部保留只读参数回显 |
+| 风险 | ①`PanelController._applyLayout()` 的折叠语义是"隐藏除承载按钮的 header 外的全部直接子元素",标签栏必须放进该 header 内部,页内容各包一层;②`RightSplitController.computeSplitRatio()` 以 `#right-panel` 矩形为基准,加标签栏后该前提失效,基准要换成页容器;③`--right-panel-width` 只有 `PanelController._applyLayout` 一个写入点(UI-P3.3 的教训),标签页控制器不能自己写变量;④右栏默认 300px 对递等式偏窄(实作后确认"按页记宽"会让切页时栏宽跳变,已改为参数页与过程页**共用一份宽度**,需要时手动拖);⑤参数被藏到另一页后用户可能忘了调参,过程页顶部保留只读参数回显 |
 | 降级 | 只做一期且不做标签页:过程页做成右栏内一个可折叠区块,数据只接**积分与梯度**两类(细节行最多,递等结构最明显) |
 
 ## 阶段 C:长期/探索

@@ -2,7 +2,8 @@
  * 右栏标签页控制器单测.
  *
  * 锁的是"页归属"这一件事:页级 `hidden` 只有一个写入点,切页回调把当前页
- * 报给应用层(应用层据此换右栏宽度组),dispose 复位成参数页后不再有监听.
+ * 报给应用层(应用层据此刷新页级内容),dispose 复位成参数页后不再有监听.
+ * 页宽不在这里:参数页与过程页共用侧栏那一份宽度(见 PanelController).
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -141,5 +142,21 @@ describe('样式契约', () => {
         const css = readFileSync(new URL('../../../css/panels.css', import.meta.url), 'utf8');
 
         expect(css).toMatch(/\.panel\.collapsed #right-tabs/);
+    });
+
+    /**
+     * 默认哪一页在前**只有 `DEFAULT_RIGHT_TAB` 一处声明**:HTML 的页容器不带
+     * `hidden` 初值,页级显隐由构造期的 `_applyPages()` 写出.若有人在 HTML 里
+     * 补一个 hidden,默认页就又有了第二份副本(改一处漏一处不会报错,只会让
+     * HTML 初态与 TS 不一致),这条断言让那种改动直接失败.
+     */
+    it('index.html 的页容器不写 hidden 初值(默认页只有一处声明)', () => {
+        const html = readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+
+        for (const id of ['right-page-params', 'right-page-process']) {
+            const tag = new RegExp(`<div\\s+id="${id}"[^>]*>`).exec(html)?.[0];
+            expect(tag).toBeDefined();
+            expect(tag).not.toContain('hidden');
+        }
     });
 });

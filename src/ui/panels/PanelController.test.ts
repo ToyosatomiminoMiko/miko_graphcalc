@@ -286,7 +286,7 @@ describe('dispose 复位与重复 bind(UI-P3.3)', () => {
     });
 });
 
-describe('右栏宽度按页(宽度组)记', () => {
+describe('右栏宽度只有一份(参数页与过程页共用)', () => {
     function setupRight(): {
         stub: DomStub;
         root: StubElement;
@@ -305,67 +305,57 @@ describe('右栏宽度按页(宽度组)记', () => {
         return { stub, root, right, controller };
     }
 
-    it('切页 = 切宽度:各页各自的调整互不覆盖', () => {
-        const { root, right, controller } = setupRight();
-        const paramsDefault = UI_CONFIG.panel.sideDefaultWidth;
+    /** 右面板向左拖是变宽;拖 `times` 次,每次 40px. */
+    function dragWider(right: FakePanel, times: number, pointerId: number): void {
+        for (let i = 0; i < times; i += 1) {
+            right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId });
+            right.handle.dispatch('pointermove', { clientX: 460, clientY: 0, pointerId });
+            right.handle.dispatch('pointerup', { clientX: 460, clientY: 0, pointerId });
+        }
+    }
 
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        );
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault}px`);
+    it('拖动只写一份宽度:右栏没有第二个"页宽",切页无从换值', () => {
+        const { root, right } = setupRight();
+        const start = UI_CONFIG.panel.sideDefaultWidth;
 
-        // 参数页拖宽 40px(右面板向左拖是变宽).
-        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 1 });
-        right.handle.dispatch('pointermove', { clientX: 460, clientY: 0, pointerId: 1 });
-        right.handle.dispatch('pointerup', { clientX: 460, clientY: 0, pointerId: 1 });
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault + 40}px`);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${start}px`);
 
-        // 切到过程页:换成过程组的默认宽度(与参数页不同).
-        controller.setWidthGroup('right-panel', 'process');
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.process.defaultWidth}px`,
-        );
+        dragWider(right, 1, 1);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${start + 40}px`);
 
-        // 过程页拖窄 40px.
-        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 2 });
-        right.handle.dispatch('pointermove', { clientX: 540, clientY: 0, pointerId: 2 });
-        right.handle.dispatch('pointerup', { clientX: 540, clientY: 0, pointerId: 2 });
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.process.defaultWidth - 40}px`,
-        );
-
-        // 切回参数页:用户对参数页的调整还在,没有被过程页的拖动顶掉.
-        controller.setWidthGroup('right-panel', 'params');
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${paramsDefault + 40}px`);
+        // 同一根手柄接着拖:数值在同一份宽度上累计,不存在另一个宽度组.
+        dragWider(right, 1, 2);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${start + 80}px`);
     });
 
-    it('过程页在前时,同一根手柄改的是过程组的宽度', () => {
-        const { root, right, controller } = setupRight();
-        controller.setWidthGroup('right-panel', 'process');
+    it('左右两侧的宽度互不影响', () => {
+        const stub = installDomStub();
+        const root = stub.document.createElement('div');
+        root.id = 'app';
+        const left = createPanel(stub, 'left-panel', '源码', 'aside');
+        const right = createPanel(stub, 'right-panel', '参数', 'aside');
+        root.append(left.panel, right.panel);
+        stub.document.body.append(root);
+        new PanelController().bind(root as unknown as HTMLElement);
 
-        right.handle.dispatch('pointerdown', { clientX: 500, clientY: 0, pointerId: 1 });
-        right.handle.dispatch('pointermove', { clientX: 460, clientY: 0, pointerId: 1 });
-        right.handle.dispatch('pointerup', { clientX: 460, clientY: 0, pointerId: 1 });
+        const start = UI_CONFIG.panel.sideDefaultWidth;
+        left.handle.dispatch('pointerdown', { clientX: 100, clientY: 0, pointerId: 1 });
+        left.handle.dispatch('pointermove', { clientX: 140, clientY: 0, pointerId: 1 });
+        left.handle.dispatch('pointerup', { clientX: 140, clientY: 0, pointerId: 1 });
 
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.process.defaultWidth + 40}px`,
-        );
-        // 参数组不受影响.
-        controller.setWidthGroup('right-panel', 'params');
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        );
+        expect(root.style.getPropertyValue('--left-panel-width')).toBe(`${start + 40}px`);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(`${start}px`);
     });
 
-    it('dispose 把宽度组复位成参数页(与折叠复位同一条路径)', () => {
-        const { root, controller } = setupRight();
-        controller.setWidthGroup('right-panel', 'process');
+    it('dispose 把拖出的宽度复位成默认值(与折叠复位同一条路径)', () => {
+        const { root, right, controller } = setupRight();
+        dragWider(right, 1, 1);
+        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
+            `${UI_CONFIG.panel.sideDefaultWidth + 40}px`,
+        );
 
         controller.dispose();
 
-        expect(root.style.getPropertyValue('--right-panel-width')).toBe(
-            `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        );
         expect(root.style.getPropertyValue('--right-panel-width')).toBe(
             `${UI_CONFIG.panel.sideDefaultWidth}px`,
         );

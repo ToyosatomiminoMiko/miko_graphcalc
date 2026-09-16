@@ -5,10 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>GraphCalc DSL</title>
-    <!-- PWA 浏览器外框色:与 vite.config.ts 的 PWA_CHROME_COLOR(manifest 的
-         theme_color / background_color)必须保持一致;静态 HTML 读不到那个常量,
-         只能人工同步.它不是页面底色 css/base.css 的 --color-bg-app(#0e101a). -->
-    <meta name="theme-color" content="#0d0d0d">
+    <!-- PWA 浏览器外框色:由 vite.config.ts 的 PWA_CHROME_COLOR 在开发/构建时经
+         transformIndexHtml 注入(与 manifest 的 theme_color / background_color
+         共用同一个常量,设置只有一处,HTML 里不留字面量副本).
+         它不等于页面底色 css/base.css 的 --color-bg-app(#0e101a):这里刻意更深,
+         让独立窗口的状态栏与页面内容有分界. -->
+    <meta name="theme-color" content="%PWA_CHROME_COLOR%">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -255,10 +257,13 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
                 <!-- 参数区/视图区的分隔条:上下拖动改变两块各占多少高度
                      (见 RightSplitController).焦点在它上面时,上下方向键同样
                      可以调整,所以它是可聚焦的 separator 而不是纯装饰.
+                     `data-split-page` 指向比例基准--参数**页容器**的 id,与面板
+                     拖拽手柄的 `data-resize-panel` 同一约定:控制器与标记的连接
+                     走数据属性,id 只留给锚点/无障碍.
                      视觉与状态由 css/panels.css 的 .right-splitter 负责. -->
-                <div id="right-splitter" class="right-splitter" role="separator"
-                    aria-orientation="horizontal" aria-label="调整参数区与视图区的高度" tabindex="0"
-                    title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
+                <div id="right-splitter" class="right-splitter" data-split-page="right-page-params"
+                    role="separator" aria-orientation="horizontal" aria-label="调整参数区与视图区的高度"
+                    tabindex="0" title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
 
                 <header class="panel-header">视图</header>
                 <!-- 视图面板的全部控件(相机/预置视角/点/坐标轴/曲面)由
@@ -267,10 +272,11 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
                 <section id="view-controls"></section>
             </div>
 
-            <!-- 页2:过程(默认收起).通高的递等式视图,内容与交互由
-                 ui/process/ProcessPanel 装配;页级显隐由 RightPanelTabs 写
-                 hidden 属性,折叠仍归 PanelController. -->
-            <div id="right-page-process" class="right-page" role="tabpanel" hidden>
+            <!-- 页2:过程.通高的递等式视图,内容与交互由 ui/process/ProcessPanel
+                 装配;页级显隐(含"默认哪一页在前")由 RightPanelTabs 独占,
+                 HTML 不写 hidden 初值 -- 默认页只留一处声明;折叠仍归
+                 PanelController. -->
+            <div id="right-page-process" class="right-page" role="tabpanel">
                 <section id="process-panel" class="process-panel"></section>
             </div>
 

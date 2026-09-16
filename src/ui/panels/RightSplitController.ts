@@ -37,6 +37,15 @@ export const SPLIT_DEFAULT_RATIO = UI_CONFIG.panel.splitDefaultRatio;
 /** 键盘一次调整的比例步长. */
 const KEY_STEP = 0.03;
 
+/**
+ * 分隔条与"比例基准页容器"的连接点.
+ *
+ * 与 `PanelController` 的 `[data-resize-panel]` 同一约定:**数据属性负责连接,
+ * id 只留给锚点与无障碍**.因此控制器不再认识 `#right-splitter` 这个 id:
+ * 标记里换/去掉那个 id 都不用改控制器,分隔条换个位置也照样绑得上.
+ */
+const SPLIT_PAGE_ATTRIBUTE = 'data-split-page';
+
 function clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
 }
@@ -89,10 +98,11 @@ export class RightSplitController {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        const handle = root.querySelector<HTMLElement>('#right-splitter');
-        const page = root.querySelector<HTMLElement>('#right-page-params');
+        const handle = root.querySelector<HTMLElement>(`[${SPLIT_PAGE_ATTRIBUTE}]`);
+        const page = this._resolvePage(handle);
         if (!handle || !page) {
-            // 结构缺失就是结构缺失:不写变量,也不装作绑好了.
+            // 结构缺失就是结构缺失:不写变量,也不装作绑好了.分隔条指向的页
+            // 容器不存在时与根本没有分隔条同样处理.
             this.page = null;
             return;
         }
@@ -126,6 +136,20 @@ export class RightSplitController {
     /** 比例的唯一写入点:写成 CSS 变量,由面板样式消费. */
     private _applySplit(): void {
         this.root?.style.setProperty('--right-split-basis', `${this.ratio * 100}%`);
+    }
+
+    /**
+     * 分隔条的 `data-split-page` -> 页容器.
+     *
+     * 属性值是页容器的 id,这里再拼成 `#id` 从 root 子树里找 -- 与
+     * `PanelController` 解析 `data-panel-toggle` 完全同一套写法(那边也不把
+     * `#` 写进标记,也走 root/document 的 `querySelector`).缺失或指错(页容器
+     * 不存在)时返回 null,由 `bind()` 当作"结构缺失"跳过,不抛错也不写变量.
+     */
+    private _resolvePage(handle: HTMLElement | null): HTMLElement | null {
+        const pageId = handle?.dataset.splitPage;
+        if (!pageId) return null;
+        return this.root?.querySelector<HTMLElement>(`#${pageId}`) ?? null;
     }
 
     private _onKeyDown = (event: KeyboardEvent): void => {

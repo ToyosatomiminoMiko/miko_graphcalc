@@ -6,17 +6,6 @@ type PanelId = 'left-panel' | 'right-panel' | 'bottom-panel';
 /** 只有左右侧面板有"宽度";底部面板是高度. */
 type WidthPanelId = 'left-panel' | 'right-panel';
 
-/**
- * 宽度组 id.宽度**按组**记:右栏有两个标签页,用户对参数页与过程页各拖一次,
- * 切页 = 切宽度,互不覆盖(见设计文档 3.2 第 3 条).
- *
- * 字面量联合而不是 `string`:组名是**闭集合**,写成 `string` 会把"组没登记"
- * 变成运行期才能发现的静默兜底(见 `_activeWidth`).右栏的组名与
- * `RightPanelTabs` 的 `RightTab` 取值一致(`params` / `process`),由应用层在
- * 切页时通过 {@link setWidthGroup} 告知.
- */
-export type WidthGroup = 'left-panel' | 'params' | 'process';
-
 // 尺寸的唯一真相源是 UI_CONFIG.panel(见那里的说明):这里只是取个短名字.
 // 默认尺寸/折叠尺寸在 css/base.css 的 :root 里有一份首帧兜底,由
 // applyUiConfig.test.ts 锁住一致性;上下限 CSS 不消费,没有第二处副本.
@@ -30,9 +19,6 @@ const {
     collapsedSideWidth: COLLAPSED_SIDE_WIDTH,
     collapsedFooterHeight: COLLAPSED_FOOTER_HEIGHT,
 } = UI_CONFIG.panel;
-
-/** 过程页(右栏第二个宽度组)的默认宽度,来自 UI_CONFIG.process. */
-const PROCESS_DEFAULT_WIDTH = UI_CONFIG.process.defaultWidth;
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value));
@@ -62,23 +48,17 @@ export class PanelController {
     private root: HTMLElement | null = null;
     private _abortController: AbortController | null = null;
     /**
-     * 宽度组 -> 用户拖出的宽度(px).
+     * 侧栏 -> 用户拖出的宽度(px).
      *
-     * 与"哪个组在前"分开:`activeWidthGroup` 是当前页归属,`sideWidths` 是各页
-     * 各自的宽度;切页只换前者的指向,不动后者,所以来回切不会丢用户的调整.
+     * 左右各一份,与右栏标签页无关:参数页与过程页**共用同一份宽度**,切页不
+     * 改宽度(否则切一次页栏宽就跳一次,见 `_applyLayout`).
      *
-     * 用 `Record` 而不是 `Map`:组名是闭集合(见 `WidthGroup`),写全三个键就
-     * 不再需要"组没登记"的运行期兜底.
+     * 用 `Record` 而不是 `Map`:面板 id 是闭集合(见 `WidthPanelId`),写全两个键
+     * 就不再需要"面板没登记"的运行期兜底.
      */
-    private readonly sideWidths: Record<WidthGroup, number> = {
+    private readonly sideWidths: Record<WidthPanelId, number> = {
         'left-panel': SIDE_DEFAULT_WIDTH,
-        params: SIDE_DEFAULT_WIDTH,
-        process: PROCESS_DEFAULT_WIDTH,
-    };
-    /** 每个侧栏当前生效的宽度组(右栏随标签页切换). */
-    private readonly activeWidthGroup: Record<WidthPanelId, WidthGroup> = {
-        'left-panel': 'left-panel',
-        'right-panel': 'params',
+        'right-panel': SIDE_DEFAULT_WIDTH,
     };
     private footerHeight: number = FOOTER_DEFAULT_HEIGHT;
     private readonly collapsed = new Set<PanelId>();
@@ -97,12 +77,13 @@ export class PanelController {
     }
 
     dispose(): void {
-        // 先把 DOM 复位回"全部展开"再丢状态:dispose 会清空 collapsed 集合与
-        // 宽度组归属,若不复位,DOM 上的 .collapsed / display:none / "源码"式
-        // 按钮文案,以及过程页那一份宽度,都会留下,之后再次 bind() 就会得到
-        // 自相矛盾的面板(见 UI-P3.3).
-        this.activeWidthGroup['left-panel'] = 'left-panel';
-        this.activeWidthGroup['right-panel'] = 'params';
+        // 先把 DOM 复位回"全部展开 + 默认尺寸"再丢状态:dispose 会清空 collapsed
+        // 集合,把用户拖出的宽/高写回默认值,若不复位,DOM 上的 .collapsed /
+        // display:none / "源码"式按钮文案,以及拖出来的尺寸,都会留下,之后再次
+        // bind() 就会得到自相矛盾的面板(见 UI-P3.3).
+        this.sideWidths['left-panel'] = SIDE_DEFAULT_WIDTH;
+        this.sideWidths['right-panel'] = SIDE_DEFAULT_WIDTH;
+        this.footerHeight = FOOTER_DEFAULT_HEIGHT;
         this.collapsed.clear();
         this._applyLayout();
 
@@ -111,18 +92,6 @@ export class PanelController {
         this.bindings.clear();
         this.root = null;
         document.body.style.cursor = '';
-    }
-
-    /**
-     * 切换某个侧栏生效的宽度组(右栏由标签页控制器在切页时调用).
-     *
-     * 宽度仍然只有 `_applyLayout` 一个写入点:这里只改"哪个组在前",随后立刻
-     * 走同一条路径写出 `--right-panel-width`,不让调用方自己碰 CSS 变量.
-     */
-    setWidthGroup(panelId: WidthPanelId, group: WidthGroup): void {
-        if (this.activeWidthGroup[panelId] === group) return;
-        this.activeWidthGroup[panelId] = group;
-        this._applyLayout();
     }
 
     /**
@@ -181,12 +150,11 @@ export class PanelController {
                         );
                     } else {
                         // 左面板向右拖(正位移)变宽;右面板向左拖(负位移)才是变宽.
-                        // 右面板只有一根宽度手柄,它改的是**当前生效的宽度组**
-                        // (切页 = 换组),不让"哪一页在前"变成第二个写宽度的入口.
-                        const group = this.activeWidthGroup[panelId];
+                        // 右面板只有一根宽度手柄,一份宽度:参数页与过程页共用,
+                        // 切页不会把用户的调整换成另一份值.
                         const sign = panelId === 'left-panel' ? 1 : -1;
-                        this.sideWidths[group] = clamp(
-                            this.sideWidths[group] + sign * deltaX,
+                        this.sideWidths[panelId] = clamp(
+                            this.sideWidths[panelId] + sign * deltaX,
                             SIDE_MIN_WIDTH,
                             SIDE_MAX_WIDTH,
                         );
@@ -196,11 +164,6 @@ export class PanelController {
                 onEnd: () => {},
             });
         });
-    }
-
-    /** 当前生效组的宽度.组名是闭集合,查表一定命中,不需要兜底. */
-    private _activeWidth(panelId: WidthPanelId): number {
-        return this.sideWidths[this.activeWidthGroup[panelId]];
     }
 
     /**
@@ -235,11 +198,11 @@ export class PanelController {
 
         this.root.style.setProperty(
             '--left-panel-width',
-            `${this.collapsed.has('left-panel') ? COLLAPSED_SIDE_WIDTH : this._activeWidth('left-panel')}px`,
+            `${this.collapsed.has('left-panel') ? COLLAPSED_SIDE_WIDTH : this.sideWidths['left-panel']}px`,
         );
         this.root.style.setProperty(
             '--right-panel-width',
-            `${this.collapsed.has('right-panel') ? COLLAPSED_SIDE_WIDTH : this._activeWidth('right-panel')}px`,
+            `${this.collapsed.has('right-panel') ? COLLAPSED_SIDE_WIDTH : this.sideWidths['right-panel']}px`,
         );
         this.root.style.setProperty(
             '--footer-height',

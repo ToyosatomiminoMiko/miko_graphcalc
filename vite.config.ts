@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 /**
@@ -11,17 +11,30 @@ import { VitePWA } from 'vite-plugin-pwa';
  * scope/start_url 与 Service Worker 的相对预缓存清单.
  */
 /**
- * PWA 的浏览器外框色(manifest 的 theme_color 与 background_color 共用).
+ * PWA 的浏览器外框色(manifest 的 theme_color / background_color / HTML 的
+ * `<meta name="theme-color">` 共用).
  *
- * 单一来源:这两个字段以前各写一遍 `#0d0d0d`,改一处漏一处不会报错,只会让
- * 安装后的启动画面与状态栏颜色分叉.
+ * 单一来源:这些字段以前各写一遍 `#0d0d0d`,改一处漏一处不会报错,只会让
+ * 安装后的启动画面与状态栏颜色分叉.`index.html` 里写占位符
+ * `%PWA_CHROME_COLOR%`,由下面的 {@link injectChromeColor} 在开发/构建时替换,
+ * HTML 里不留第二份字面量.
  *
- * 注意 `index.html` 的 `<meta name="theme-color">` 是同一族配色的第三份副本:
- * 静态 HTML 读不到这个常量,只能人工保持一致(当前两者相同).
  * 它不等于色板里的 `--color-bg-app`(#0e101a),那是页面底色;这里刻意更深,
  * 让独立窗口的状态栏与页面内容有分界.
  */
 const PWA_CHROME_COLOR = '#0d0d0d';
+
+/** `index.html` 里待替换的占位符;写成常量是为了让 HTML 与这里同名可查. */
+const CHROME_COLOR_PLACEHOLDER = '%PWA_CHROME_COLOR%';
+
+/** 把 {@link PWA_CHROME_COLOR} 注入 `index.html` 的 `<meta name="theme-color">`. */
+function injectChromeColor(): Plugin {
+    return {
+        name: 'graphcalc:inject-pwa-chrome-color',
+        transformIndexHtml: (html) =>
+            html.replaceAll(CHROME_COLOR_PLACEHOLDER, PWA_CHROME_COLOR),
+    };
+}
 
 export default defineConfig({
     base: '/miko_graphcalc/',
@@ -37,6 +50,7 @@ export default defineConfig({
         setupFiles: ['./src/test/setupWasm.ts'],
     },
     plugins: [
+        injectChromeColor(),
         VitePWA({
             registerType: 'autoUpdate',
             injectRegister: 'auto',

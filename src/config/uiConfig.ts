@@ -87,20 +87,13 @@ export const UI_CONFIG = {
      * 过程视图(右栏"过程"标签页)的展示参数.
      *
      * 与 `panel` 里那部分同理,**CSS 用不到**这几个数:
-     * - `defaultWidth` 只是 `PanelController` 里"过程宽度组"的初值,最终宽度仍由
-     *   控制器写成 `--right-panel-width`(宽度的唯一写入点不变);
-     * - `disclosureThreshold` 与 `maxSteps` 只被纯函数当数字用.
+     * - `disclosureThreshold` 与 `maxSteps` 只被纯函数当数字用;
+     * - 过程页**不单独设宽度**:参数页与过程页共用 `panel.sideDefaultWidth`
+     *   (右栏一共只有一份宽度,切页不换宽度),宽了就由用户拖,夹取范围沿用
+     *   `panel.sideMinWidth/sideMaxWidth`.
      * 所以它们不进 `applyUiConfig` 的变量表,`css/base.css` 里也没有第二份副本.
      */
     process: {
-        /**
-         * 过程页(右栏第二个标签页)的默认宽度(px).
-         *
-         * 右栏默认 300px 对递等式偏窄:一条 `sin(a·x)` 的链式展开不带分式也要
-         * 400–500px.夹取范围沿用 `panel.sideMinWidth/sideMaxWidth`,宽度按页
-         * (宽度组)分别记住.
-         */
-        defaultWidth: 420,
         /**
          * 三级披露阈值:细节行数**超过**它就进 L2 过程页,否则留在 L1 行内
          * `<details>`.与底栏"一屏约 14 行"的上限配合,留在 L1 的最多占掉
