@@ -8,12 +8,17 @@
 //!
 //! 行为契约:
 //! - **所有几何容差都是相对尺度**(随坐标量级缩放,见 find_1d_roots /
-//!   dedupe_* / 顶点量化),场景整体缩放到任意量级都不该改变拓扑--
+//!   dedupe_* / 顶点池),场景整体缩放到任意量级都不该改变拓扑--
 //!   新容差一律相对化,禁止再引入硬编码绝对半径/绝对量化;
 //! - segments 规模护栏在 [`compute_pair`] 入口执行(见 config),marching
 //!   squares 单元数与 curve×curve 空间候选对都是 O(segments²);
-//! - 顶点池去重(vertex key)与点/根去重语义一致:视作"同一几何顶点"合并,
-//!   防止跨单元同一边两侧的浮点差产生缝隙.
+//! - 顶点池合并(VertexPool)与点/根去重语义一致:视作"同一几何顶点"合并,
+//!   防止跨单元同一边两侧的浮点差产生缝隙.合并标度必须**整块面片共用**
+//!   (面片点集直径),逐点按自身坐标量级取相对精度会把过原点的整条交线
+//!   塌成一个顶点,详见 `VertexPool`;
+//! - 交线折线是简单链:等值线交叉处(度 != 2 的顶点)断开,闭合环首尾点
+//!   相同,见 `chain_segments`.渲染侧把每条链当一个 `Line` 画出,
+//!   因此链内相邻两点必须真的是一条网格单元内的线段.
 //!
 //! 模块边界(2026 架构审查):对象描述符模型/解析与隐式场(FieldEval /
 //! SolidProbe / solid_world_aabb)已抽到共享的 [`crate::geometry_core`]--
@@ -25,7 +30,7 @@
 //! 本模块不直接依赖 wasm-bindgen,便于在 `cargo test` 里做纯 Rust 验证.
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::config::MAX_INTERSECTION_SEGMENTS;
 use crate::eval_core::CompiledEvaluator;
@@ -42,24 +47,82 @@ const CONIC_CAP_RELATIVE_EPSILON: f64 = 1e-9;
 /// 去重半径的基础系数.实际去重按"点集直径 / 根集跨度"等几何自身尺度缩放,
 /// 见 `dedupe_point_tolerance` / `dedupe_root_tolerance`(坐标绝对值不参与).
 const POINT_DEDUP_TOLERANCE: f64 = 1e-5;
-/// 顶点池坐标量化的相对精度:key = round(坐标 · VERTEX_QUANTUM / 该点量级),
-/// 等价于"相对 1e-6 精度"量化(旧实现与 TS 的 toFixed(6) 是绝对 1e-6,
-/// 场景整体缩小时会把不同顶点错误合并;202609 审查后改相对,见 vertex_key).
+/// 顶点池合并容差的相对精度:容差 = 该面片点集直径 / VERTEX_QUANTUM
+/// (即相对 1e-6),与坐标绝对值无关,场景整体平移/缩放不改变并键结果.
 const VERTEX_QUANTUM: f64 = 1e6;
 
 type V3 = [f64; 3];
 
-/// 顶点池的坐标量化键:按该顶点自身的坐标量级取相对精度,
-/// 使"同一几何顶点的两次计算(±ulp)"必然命中同键,而真实不同的顶点
-/// (间距 ~ 网格步长)永不并键.
-fn vertex_key(p: V3) -> (i64, i64, i64) {
-    let scale = p.iter().fold(0.0f64, |max, &c| max.max(c.abs())).max(1e-6);
-    let factor = VERTEX_QUANTUM / scale;
-    (
-        (p[0] * factor).round() as i64,
-        (p[1] * factor).round() as i64,
-        (p[2] * factor).round() as i64,
-    )
+/// marching squares 交叉点的共享顶点池(把"同一几何顶点"合并成一个 id).
+///
+/// 为什么不能再按"每个点各自的坐标量级"取相对精度(202609 修复):
+/// 旧实现 `quantum = VERTEX_QUANTUM / max|该点坐标|` 让每个点用自己的尺子,
+/// 于是任何一条过原点,只有一个坐标在变化的交线都会整条塌成一个点--
+/// 例如交线 `x = 0, z = 0` 上的所有点都被量化成 `(0, ±VERTEX_QUANTUM, 0)`.
+/// 顶点合并后,折线的相邻两点不再是网格内的相邻交叉点,而是在场景两端
+/// 各取一个"代表点",于是画出横贯整个曲面的长弦(曲面求交示例里成扇形的
+/// 白色错误线条).
+///
+/// 现在改成"整块面片共用一把尺子":容差 = 面片点集直径 × 相对精度,
+/// 仍然平移/缩放无关,但同一个面片里真实不同的顶点不会再并键.
+/// 合并用空间哈希 + 邻格精确距离查询,不再依赖坐标落在网格线上的运气.
+struct VertexPool {
+    /// 格子划分的原点(取面片外接盒最小角):先减原点再量化,格子下标
+    /// 只与面片尺度有关,场景整体平移到很大的坐标也不会丢精度.
+    origin: V3,
+    /// 单元格边长,同时就是合并容差(相对面片尺度).
+    tolerance: f64,
+    points: Vec<V3>,
+    cells: HashMap<(i64, i64, i64), Vec<u32>>,
+}
+
+impl VertexPool {
+    fn new(origin: V3, tolerance: f64) -> Self {
+        Self {
+            origin,
+            // 退化面片(所有采样点重合)时直径可以是 0:此时容差取最小正数,
+            // 行为退化为"只合并完全相等的点",不会把不同点错误并键.
+            tolerance: tolerance.max(f64::MIN_POSITIVE),
+            points: Vec::new(),
+            cells: HashMap::new(),
+        }
+    }
+
+    fn cell_of(&self, point: V3) -> (i64, i64, i64) {
+        let inverse = 1.0 / self.tolerance;
+        (
+            ((point[0] - self.origin[0]) * inverse).floor() as i64,
+            ((point[1] - self.origin[1]) * inverse).floor() as i64,
+            ((point[2] - self.origin[2]) * inverse).floor() as i64,
+        )
+    }
+
+    /// 返回 `point` 的顶点 id:与已有点的距离不超过容差时复用,否则新建.
+    ///
+    /// 容差等于单元格边长,故距离在容差内的两点最多相差一个格子,
+    /// 查 3×3×3 邻格即可覆盖(不必全池扫描).
+    fn intern(&mut self, point: V3) -> u32 {
+        let cell = self.cell_of(point);
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                for dz in -1..=1 {
+                    let key = (cell.0 + dx, cell.1 + dy, cell.2 + dz);
+                    let Some(ids) = self.cells.get(&key) else {
+                        continue;
+                    };
+                    for &id in ids {
+                        if dist(self.points[id as usize], point) <= self.tolerance {
+                            return id;
+                        }
+                    }
+                }
+            }
+        }
+        let id = self.points.len() as u32;
+        self.points.push(point);
+        self.cells.entry(cell).or_default().push(id);
+        id
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -1155,6 +1218,10 @@ fn trace_contours(
     let grid_width = nu + 1;
     let mut values = vec![f64::NAN; grid_width * (nv + 1)];
     let mut valid_flags = vec![false; grid_width * (nv + 1)];
+    // 有效采样点的世界坐标外接盒:用来量出"这块面片的几何尺度",
+    // 作为顶点池合并容差的基准(见 VertexPool).
+    let mut bounds_min = [f64::INFINITY; 3];
+    let mut bounds_max = [f64::NEG_INFINITY; 3];
 
     for j in 0..=nv {
         let v = patch.v0 + ((patch.v1 - patch.v0) * j as f64) / nv as f64;
@@ -1170,23 +1237,24 @@ fn trace_contours(
             let ok = point_valid && finite(f);
             values[index] = f;
             valid_flags[index] = ok;
+            if ok {
+                if let Some(point) = point {
+                    for axis in 0..3 {
+                        bounds_min[axis] = bounds_min[axis].min(point[axis]);
+                        bounds_max[axis] = bounds_max[axis].max(point[axis]);
+                    }
+                }
+            }
         }
     }
 
-    let mut points: Vec<V3> = Vec::new();
-    let mut pool: HashMap<(i64, i64, i64), u32> = HashMap::new();
+    // 面片尺度 = 采样点外接盒对角线.用整块面片共用的标度,而不是每个点
+    // 各自的坐标量级,否则过原点的直线交线会整条塌成一个点.
+    let vertex_tolerance = VERTEX_QUANTUM.recip() * dist(bounds_min, bounds_max);
+    let mut pool = VertexPool::new(bounds_min, vertex_tolerance);
     let mut vertex_id = |u: f64, v: f64| -> Option<u32> {
         let p = patch.point(u, v)?;
-        let key = vertex_key(p);
-        Some(match pool.get(&key) {
-            Some(id) => *id,
-            None => {
-                let id = points.len() as u32;
-                pool.insert(key, id);
-                points.push(p);
-                id
-            }
-        })
+        Some(pool.intern(p))
     };
 
     let mut segments: Vec<(u32, u32)> = Vec::new();
@@ -1215,21 +1283,19 @@ fn trace_contours(
             let v1 = patch.v0 + ((patch.v1 - patch.v0) * (j + 1) as f64) / nv as f64;
 
             let mut crossings: Vec<Crossing> = Vec::with_capacity(4);
+            // 角点符号约定:`< 0` 为负,恰好 0 归入非负.
+            //
+            // 旧实现在这里对"角点恰好为 0"做了两个特例(推到角点 / 两边都是 0
+            // 就跳过),结果同一条边的两个端点会各自把同一个角点压进 crossings,
+            // 单元因此可能出现 3 个交叉点(被静默丢弃,交线出现缺口)或出现
+            // 一点重复的退化线段.统一符号后,四条边的跨号次数恒为偶数,
+            // 只会出现 0 / 2 / 4 个交叉点,且端点恰好为 0 时 t 取 0 或 1,
+            // 交叉点精确落在角点上.
             let mut add_crossing = |fa: f64, fb: f64, ua: f64, va: f64, ub: f64, vb: f64| {
-                if fa == 0.0 && fb == 0.0 {
-                    return;
-                }
-                if fa == 0.0 {
-                    crossings.push(Crossing { u: ua, v: va });
-                    return;
-                }
-                if fb == 0.0 {
-                    crossings.push(Crossing { u: ub, v: vb });
-                    return;
-                }
                 if (fa < 0.0) == (fb < 0.0) {
                     return;
                 }
+                // 跨号(含端点恰为 0)保证 fa - fb != 0.
                 let t = fa / (fa - fb);
                 crossings.push(Crossing {
                     u: ua + (ub - ua) * t,
@@ -1262,11 +1328,22 @@ fn trace_contours(
         }
     }
 
+    // 退化情形(整条网格边恰好落在等值线上)下,相邻两个单元可能各生成一次
+    // 同一条线段;先按无向边去重,避免出现假的度为 3 顶点把折线截断.
+    let mut seen: HashSet<(u32, u32)> = HashSet::with_capacity(segments.len());
+    let segments: Vec<(u32, u32)> = segments
+        .into_iter()
+        .filter(|&(a, b)| seen.insert(if a < b { (a, b) } else { (b, a) }))
+        .collect();
+
     let chains = chain_segments(&segments);
     let mut contours = Vec::with_capacity(chains.len());
     for chain in chains {
         if chain.len() >= 2 {
-            let contour: Vec<V3> = chain.into_iter().map(|id| points[id as usize]).collect();
+            let contour: Vec<V3> = chain
+                .into_iter()
+                .map(|id| pool.points[id as usize])
+                .collect();
             contours.push(contour);
         }
     }
@@ -1282,10 +1359,23 @@ fn push_segment(
     if let (Some(first), Some(second)) =
         (vertex_id(first.u, first.v), vertex_id(second.u, second.v))
     {
-        segments.push((first, second));
+        // 两端并进同一个顶点说明这条线段的长度已在合并容差以下
+        // (极窄的等值线切片):画成自环只会让折线原地折返,直接丢弃.
+        if first != second {
+            segments.push((first, second));
+        }
     }
 }
 
+/// 把无向线段集连接成折线(等值线轮廓).
+///
+/// 连接规则(202609 重写):
+/// - **只在度为 2 的顶点继续延伸**.遇到度 ≥ 3 的交点(两条等值线在此
+///   交叉,例如 `sin(x)cos(y) = 0` 的 `x = 0` 与 `y = π/2`)就断开:
+///   贪心延伸会在交点上拐弯,把本不共线的分支串成一条折线;
+/// - 先走度 1 的端点(开链),再走剩下的环(所有顶点度为 2);
+///   环回到起点,首尾点相同,渲染为闭合曲线;
+/// - 线段集内没有自环(见 [`push_segment`])且已去重,故每条线段只被消费一次.
 fn chain_segments(segments: &[(u32, u32)]) -> Vec<Vec<u32>> {
     let mut adjacency: HashMap<u32, Vec<(u32, usize)>> = HashMap::new();
     for (id, (a, b)) in segments.iter().enumerate() {
@@ -1293,57 +1383,57 @@ fn chain_segments(segments: &[(u32, u32)]) -> Vec<Vec<u32>> {
         adjacency.entry(*b).or_default().push((*a, id));
     }
 
+    let degree = |vertex: u32| adjacency.get(&vertex).map_or(0, Vec::len);
     let mut used = vec![false; segments.len()];
     let mut chains: Vec<Vec<u32>> = Vec::new();
+
+    // 开链:从度 1 的端点出发.端点排序,避免依赖 HashMap 迭代顺序.
+    let mut endpoints: Vec<u32> = adjacency
+        .iter()
+        .filter(|(_, edges)| edges.len() == 1)
+        .map(|(vertex, _)| *vertex)
+        .collect();
+    endpoints.sort_unstable();
+    for endpoint in endpoints {
+        if adjacency[&endpoint].iter().all(|(_, id)| used[*id]) {
+            continue;
+        }
+        chains.push(walk_chain(&adjacency, &mut used, endpoint, &degree));
+    }
+
+    // 剩下的都是环:任取一条未消费线段,沿度 2 的顶点走回起点.
     for id in 0..segments.len() {
         if used[id] {
             continue;
         }
-        used[id] = true;
-        let mut tail = segments[id].0;
-        let mut head = segments[id].1;
-        let mut chain = vec![tail, head];
-
-        let mut extended = true;
-        while extended {
-            extended = false;
-            if let Some(edges) = adjacency.get(&head) {
-                for (other, edge_id) in edges {
-                    if used[*edge_id] {
-                        continue;
-                    }
-                    if *other == chain[0] && chain.len() > 2 {
-                        used[*edge_id] = true;
-                        chain.push(*other);
-                        extended = true;
-                        break;
-                    }
-                    used[*edge_id] = true;
-                    chain.push(*other);
-                    head = *other;
-                    extended = true;
-                    break;
-                }
-            }
-            if extended {
-                continue;
-            }
-            if let Some(edges) = adjacency.get(&tail) {
-                for (other, edge_id) in edges {
-                    if used[*edge_id] {
-                        continue;
-                    }
-                    used[*edge_id] = true;
-                    chain.insert(0, *other);
-                    tail = *other;
-                    extended = true;
-                    break;
-                }
-            }
-        }
-        chains.push(chain);
+        chains.push(walk_chain(&adjacency, &mut used, segments[id].0, &degree));
     }
+
     chains
+}
+
+/// 从 `start` 出发沿未消费线段前进,直到端点或交点(度 != 2)为止.
+fn walk_chain(
+    adjacency: &HashMap<u32, Vec<(u32, usize)>>,
+    used: &mut [bool],
+    start: u32,
+    degree: &impl Fn(u32) -> usize,
+) -> Vec<u32> {
+    let mut chain = vec![start];
+    let mut current = start;
+    while let Some(edges) = adjacency.get(&current) {
+        let Some((next, id)) = edges.iter().find(|(_, id)| !used[*id]) else {
+            break;
+        };
+        used[*id] = true;
+        chain.push(*next);
+        // 交点上断开:折线不在等值线交叉处拐弯串到另一条分支.
+        if degree(*next) != 2 {
+            break;
+        }
+        current = *next;
+    }
+    chain
 }
 
 fn patch_field_intersections(
@@ -1590,6 +1680,86 @@ mod tests {
             assert!(chunk[0].abs() < 0.03);
             assert!(chunk[2].abs() < 1e-9);
         }
+    }
+
+    /// 回归:过原点的直线交线曾被顶点池整条塌成一个顶点.
+    ///
+    /// 旧 `vertex_key` 用"该点自身的坐标量级"做量化,`(0, y, 0)` 上任意 y
+    /// 都量化到同一个键;折线的相邻两点于是变成场景两端的代表点,渲染成
+    /// 横贯曲面的长弦(曲面求交示例里的扇形错误线条).这里直接量顶点池.
+    #[test]
+    fn vertex_pool_keeps_points_along_axis_apart() {
+        let mut pool = VertexPool::new([0.0, -5.0, 0.0], 1e-6 * 10.0);
+        let low = pool.intern([0.0, -4.9, 0.0]);
+        let high = pool.intern([0.0, 4.9, 0.0]);
+        assert_ne!(low, high, "x = z = 0 直线上的不同顶点被并成了一个");
+        // 同一顶点的浮点扰动(远小于容差)仍必须命中同一个顶点.
+        assert_eq!(pool.intern([1e-9, -4.9, 0.0]), low);
+        // 距离超过容差的点必须另起一个顶点.
+        assert_ne!(pool.intern([0.0, -4.9 + 1e-3, 0.0]), low);
+    }
+
+    /// 回归:`s1 = sin(x)cos(y)`,range ±6;`s2 = 0`(平面 z = 0),range ±5.
+    ///
+    /// 交线是 `x = kπ` 与 `y = π/2 + mπ` 的直线网格.这里断言采样出的折线
+    /// 真的沿这组直线走,而不是塌陷后连成长弦:
+    /// - 每条折线的相邻两点不超过 4 个采样步长(等值线只在一个单元内插值);
+    /// - 每个点落在 z = 0 上,且到最近一条 `x = kπ` / `y = π/2 + mπ`
+    ///   不超过 2 个采样步长(恰好在格点上的零值让交点有一格以内的近似);
+    /// - 直线 `x = 0` 被完整描出(y 跨度 > 9),而不是塌成少数几个点.
+    #[test]
+    fn wavy_surface_plane_intersection_traces_straight_line_grid() {
+        let surface = surface_descriptor("sin(x) * cos(y)", [-6.0, 6.0, -6.0, 6.0]);
+        let plane = surface_descriptor("0", [-5.0, 5.0, -5.0, 5.0]);
+        let segments = 256;
+        let output = compute_pair(&surface, &plane, segments).unwrap();
+        let step = 12.0 / segments as f64;
+        assert!(output.curve_offsets.len() > 2, "交线应被描出");
+
+        let point_at = |index: usize| -> V3 {
+            [
+                output.curve_points[index * 3],
+                output.curve_points[index * 3 + 1],
+                output.curve_points[index * 3 + 2],
+            ]
+        };
+        let mut axis_span = (f64::INFINITY, f64::NEG_INFINITY);
+        for pair in output.curve_offsets.windows(2) {
+            let (start, end) = (pair[0] as usize, pair[1] as usize);
+            assert!(end - start >= 2, "折线至少要有两个点");
+            for index in start..end {
+                let point = point_at(index);
+                assert!(point[2].abs() < 1e-9, "交线点不在 z = 0 上: {point:?}");
+                assert!(
+                    point[0].abs() <= 5.0 + step && point[1].abs() <= 5.0 + step,
+                    "交线点跑到截平面 range 之外: {point:?}"
+                );
+                let x_line = (point[0] / std::f64::consts::PI).round() * std::f64::consts::PI;
+                let y_line = ((point[1] - std::f64::consts::FRAC_PI_2) / std::f64::consts::PI)
+                    .round()
+                    * std::f64::consts::PI
+                    + std::f64::consts::FRAC_PI_2;
+                let distance = (point[0] - x_line).abs().min((point[1] - y_line).abs());
+                assert!(
+                    distance <= 2.0 * step,
+                    "交线点偏离直线网格 {distance}: {point:?}"
+                );
+                if point[0].abs() < step {
+                    axis_span.0 = axis_span.0.min(point[1]);
+                    axis_span.1 = axis_span.1.max(point[1]);
+                }
+            }
+            for index in start + 1..end {
+                assert!(
+                    dist(point_at(index - 1), point_at(index)) <= 4.0 * step,
+                    "折线相邻两点跨度过大(顶点被错误合并)"
+                );
+            }
+        }
+        assert!(
+            axis_span.1 - axis_span.0 > 9.0,
+            "直线 x = 0 未被完整描出: {axis_span:?}"
+        );
     }
 
     #[test]
