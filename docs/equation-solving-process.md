@@ -58,7 +58,6 @@
 
 - **当前走到第几步**,而不是整段一次性给出;
 - **这一步的依据**(链式法则 / 因式分解 / 同底数幂合并),而不只是等号两边;
-- **前后翻步**(板书节奏由讲者控制,不由滚动条控制);
 - **几何跟着变**(拖动 `h->0` 时割线变切线,分割加细时黎曼矩形变密).
 
 最后一条是本项目区别于"能解方程的 CAS"的地方,也是这条路线上唯一值得
@@ -74,7 +73,7 @@
 | P2 | **保守式新增** | 一期只碰展示层:不改 Rust,不改 `contract/ir.ts` 既有字段语义,不新增 DSL 语句.求解内核是"不可避免但必须分期"的事,不许一步到位 |
 | P3 | **三级披露** | 短过程留在原地(零改动),长过程才进过程页.判据是纯函数,阈值进配置 |
 | P4 | **文案与数据分离** | 步骤的依据文案(如"链式法则")是数学内容,放纯数据模块,不硬编码进渲染逻辑(与 `src/config/uiConfig.ts` 的"只放纯数据"同一约定) |
-| P5 | **可单测** | 披露判据,步骤分区,翻步状态机都是纯函数/纯状态转移;碰不到 DOM 的部分必须能在测试里断言(路线图改造原则 4) |
+| P5 | **可单测** | 披露判据,步骤分区都是纯函数/纯状态转移;碰不到 DOM 的部分必须能在测试里断言(路线图改造原则 4) |
 
 ---
 
@@ -252,20 +251,26 @@ tabindex".语义不同强行复用会把读屏与键盘行为做成四不像.新
 4   x₁ ≈ −1.414213562373095, x₂ ≈ 1.414213562373095       数值近似
 ```
 
-### 4.4 当前步与交互
+### 4.4 当前步与交互(v1 后为**只读列表**,无游标)
 
-- **当前步**:高亮一行,其余降饱和度.点击任意行也可跳转.
-- **翻步**:`上一个 / 下一个` 两个按钮 + 键盘左右方向键.键盘走
-  `KeyboardController.register`(项目约定"唯一键盘出口",见 `DslApp.start()`),
-  控制器自己**不绑** keydown.
-- **连续播放**(可选,一期先不做):离散步进用 `AnimationPlayer` 现有的时间轴
-  有点重;一期只做离散前后翻.
-- **状态机**(可单测):`{ steps, index }`,转移函数 `next/prev/goto` 夹取到
-  `[0, steps.length-1]`,越界是 no-op 而不是回绕.这条单独放一个纯模块,
-  与 DOM 无关.
-- **出口**:视图对外只暴露 `onStepChange(index)`.**一期没有订阅者**(高亮与
-  滚动是面板自己的 DOM 写入);二期的消费者是"把第 k 步写成一个虚拟参数"去
-  驱动几何(见第 6 节),接口因此按二期需要定,只发索引不发公式.
+一期曾实现"当前步高亮一行,其余降饱和度 + `上一个 / 下一个` 按钮 + 键盘左右
+方向键 + 点击任意行跳转",并配一个纯状态机 `processState.ts` 与 `onStepChange`
+出口.实测后**整体移除**,三条原因:
+
+- **不隐藏任何东西**:后续步骤照样全部渲染,`is-current` 的全部效果只是
+  `opacity 0.72 -> 1` 加一条 2px 强调色左边框,读不出"讲到哪";
+- **不驱动任何东西**:`onStepChange` 本是二期"第 k 步当虚拟参数驱动几何"的
+  接口,但生产代码里零消费者--一期唯一的可观测效果就是那个高亮;
+- **本节原文承诺的滚动也没实现**:"高亮与滚动是面板自己的 DOM 写入"里没有
+  `scrollIntoView`,过程超过一屏后按"下一个"连视觉变化都没有.
+
+现在:**整条过程一次铺开,行是只读的**(见 `src/ui/process/ProcessPanel.ts`
+头注释).同期删除的还有 `processState.ts` 及其单测,`css/process.css` 的
+`.process-nav` / `.process-counter` / `.process-step.is-current`,以及 `DslApp`
+注册进 `KeyboardController` 的左右方向键绑定.
+
+**若要重做**:二期的"步骤索引驱动几何"应当和那时真正的交互一起设计(要披露就
+真的披露,要联动就真的联动),不复用已删除的 `onStepChange` 残接口.
 
 ### 4.5 空状态与上限
 
@@ -313,7 +318,8 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 
 > 三期已落地(v1,单变量一次/二次多项式)的**实际 UI 增量**:`SolveItem` 子列表
 > 条目,`solveLatexSummary/solveLatexDetails`,过程页题目区,`buildSolveProcess`.
-> 过程页骨架(标签页/递等式/披露/翻步)确实零改动,这是"展示层先行"成立的部分.
+> 过程页骨架(标签页/递等式/披露)确实零改动,这是"展示层先行"成立的部分;
+> 翻步是 v1 后**移除**的(见 4.4),不在此列.
 
 三点说明:
 
@@ -325,7 +331,7 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
    "复用,不要重建.缓存,不要重算"口径.
 3. **三期的步骤产物必须是独立类型**,不是 `Expr`(路线图 §7.1 的既有结论:
    不要把符号引擎内部表示泄漏成项目级 API).三期**只换数据源**:过程页的排版,
-   披露,翻步,行缓存都不动;UI 侧的增量只有"求解"子列表条目与过程页的**题目区**
+   披露,行缓存都不动;UI 侧的增量只有"求解"子列表条目与过程页的**题目区**
    (`ProcessDocument.problem`),这一点已在下表中如实修正--"UI 层零改动"只对
    **过程页骨架**成立,对列表条目不成立.
 
@@ -335,10 +341,9 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 
 | 复用什么 | 怎么复用 | 不要做什么 |
 | --- | --- | --- |
-| `ui/shared/keyedRowList.ts` | 过程页的步骤行按"步骤指纹"做增删复用;当前步高亮只改类名,不重建行 | 不要另写一套行缓存 |
+| `ui/shared/keyedRowList.ts` | 过程页的步骤行按"步骤指纹"做增删复用,重载不重建同内容行 | 不要另写一套行缓存 |
 | `ui/formula/FormulaView.ts` | KaTeX 排版与模板缓存直接复用 | 不要扩大 512 的模板缓存上限(步骤 LaTeX 是有限集合) |
 | `ui/shared/dragGesture.ts` | 右栏宽度拖动沿用现有手柄 | 不要新写拖动实现 |
-| `service/KeyboardController.ts` | 左右方向键翻步注册进去 | 不要在过程控制器里绑 keydown |
 | `config/uiConfig.ts` | 过程页默认宽度,披露阈值,步骤上限都放这里(纯数据) | 不要硬编码进渲染逻辑;若某个值 CSS 首帧也要消费,必须同步 `css/base.css` 的 `:root` 兜底并由 `applyUiConfig.test.ts` 锁住一致性 |
 
 ---
@@ -352,7 +357,7 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 - [ ] 过程页激活时 `#params-panel` 与 `#right-splitter` 不参与布局,参数页
       切回后分隔条比例与切走前一致;`RightSplitController.test.ts` 增补用例;
 - [ ] 长过程条目进过程页后,底栏不再被撑高(展开前后 `#object-panel` 高度不变);
-- [ ] 披露判据,翻步状态机,步骤分区都是纯函数/纯状态,有独立单测;
+- [ ] 披露判据,步骤分区都是纯函数/纯状态,有独立单测;
 - [ ] 隐藏对象的过程入口置灰且有明文理由;
 - [ ] `npm test` 全绿,`npm run typecheck` 通过(含 `--noUnusedLocals`);
 - [ ] 主 chunk 增量实测 < 30KB(本方案只加 DOM 与文本,不加依赖),首屏体积

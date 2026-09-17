@@ -3,12 +3,15 @@
  * --------------------------------------------------------------------------
  * 结构与类名由 `src/ui/process/ProcessPanel.ts` 决定;这里只负责视觉:
  *   .process-panel       面板根(右栏第二页的内容)
- *   .process-header      页头:标题 + 依据图例 + 翻步控件 + 参数只读回显
+ *   .process-header      页头:标题 + 依据图例 + 题目区 + 参数只读回显
  *   .process-steps       步骤列表(逐行递等式)
- *   .process-step        一行:序号 + KaTeX + 依据徽章;当前步高亮
+ *   .process-step        一行:序号 + KaTeX + 依据徽章
  *   .process-step-reason 依据徽章,按 `data-kind` 分区配色
  *   .process-empty       空状态明文
  *   .process-truncated   截断明文(超长过程)
+ *
+ * 没有当前步游标样式:`.process-nav` / `.process-counter` / `.process-step.is-current`
+ * 随"上一个 / 下一个"整套移除(见 src/ui/process/ProcessPanel.ts 头注释).
  *
  * 配色的唯一来源是 css/base.css 的色板,本文件不出现颜色字面量
  * (由 src/ui/theme/cssPalette.test.ts 断言).
@@ -22,7 +25,7 @@
     overflow: hidden;
 }
 
-/* 页头:标题/图例在左,翻步控件贴右,参数回显独占第二行.
+/* 页头:标题/图例在左,题目区与参数回显各占一整行.
    允许换行是为了窄栏(220px)下不把标题挤没. */
 .process-header {
     display: flex;
@@ -54,49 +57,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.process-nav {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-}
-
-.process-nav-btn {
-    padding: 3px 8px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 6px;
-    background: var(--color-fill-control-strong);
-    color: var(--color-text-muted);
-    font-size: 12px;
-    line-height: 1.2;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.process-nav-btn:hover:not(:disabled) {
-    color: var(--color-text-strong);
-    border-color: var(--color-accent-border);
-}
-
-.process-nav-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.process-nav-btn:focus-visible {
-    outline: 2px solid var(--color-accent-focus);
-    outline-offset: 1px;
-}
-
-/* 当前步计数:等宽数字,翻步时宽度不跳. */
-.process-counter {
-    min-width: 52px;
-    text-align: center;
-    font-size: 12px;
-    color: var(--color-text-meta);
-    font-variant-numeric: tabular-nums;
 }
 
 /* 题目区:过程页先给"在解什么"(方程/算子式),再给逐行步骤.
@@ -167,30 +127,15 @@
 }
 
 /* 一行 = 序号 + 公式 + 依据徽章.公式列 minmax(0,1fr):公式自己横向滚动,
-   不把徽章挤出栏外. */
+   不把徽章挤出栏外.行是只读的:没有高亮/悬停态,也没有点击语义. */
 .process-step {
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border: 1px solid transparent;
     border-radius: 6px;
     background: var(--color-fill-row);
-    cursor: pointer;
-    /* 非当前步降饱和度,当前步才是"讲到哪"的视觉焦点. */
-    opacity: 0.72;
-}
-
-.process-step:hover {
-    border-color: var(--color-border-strong);
-}
-
-.process-step.is-current {
-    opacity: 1;
-    border-color: var(--color-accent-border);
-    background: var(--color-fill-inset);
-    box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .process-step-index {

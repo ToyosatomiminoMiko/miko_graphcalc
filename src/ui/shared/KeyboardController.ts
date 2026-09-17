@@ -43,8 +43,7 @@ export interface KeyboardBinding {
  * 在 contenteditable 里是"移到行首";这些都必须原样留给控件,不能被全局
  * 快捷键连坐(旧实现只看 `event.key === 'Home'`,在编辑器里会同时重置视角).
  *
- * 导出给组件级绑定复用(过程页的左右翻步同样不该抢走编辑器里的光标移动):
- * "什么算输入目标"只需要一份判断.
+ * 导出给组件级绑定复用:"什么算输入目标"只需要一份判断.
  */
 export function isTypingTarget(target: EventTarget | null): boolean {
     if (!(target instanceof Element)) return false;

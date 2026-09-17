@@ -191,7 +191,7 @@ export class DslApp {
             {
                 onTabChange: (tab) => {
                     // 参数可能刚在另一页被改过:切回过程页时刷新只读回显,
-                    // 但不重载过程(那会把当前步复位到第 0 步).
+                    // 但不重载过程(那会白白重建整张步骤表).
                     if (tab === 'process') this.processPanel?.refreshEcho();
                 },
             },
@@ -221,13 +221,6 @@ export class DslApp {
         for (const binding of this.exampleLoader.keyboardBindings()) {
             this.keyboardController.register(binding);
         }
-        // 过程页左右翻步:只在过程页激活时生效,焦点在编辑器/标签栏里时让位
-        // (让位规则在 ProcessPanel.keyboardBinding 里,不在这里判断).
-        this.keyboardController.register(
-            this.processPanel.keyboardBinding(
-                () => this.rightPanelTabs?.get() === 'process',
-            ),
-        );
         this.keyboardController.bind();
 
         window.addEventListener('resize', this.onResize);

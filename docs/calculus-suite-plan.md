@@ -197,7 +197,7 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
 
 `contract/ir.ts` 追加字段与 step kind;`SceneStore`/`CompileController`/`DslApp`/
 `index.html`/CSS 挂两个子列表;`processData.ts` 两个 builder;新示例文件名先
-登记.**验收**:空语句占位不报错;隐藏/过程入口/翻步与求解条目完全同构;
+登记.**验收**:空语句占位不报错;隐藏/过程入口与求解条目完全同构;
 `npm test` + `npm run typecheck` 全绿.
 
 ### 二期 不定积分(含可渲染对象)-- 已落地
