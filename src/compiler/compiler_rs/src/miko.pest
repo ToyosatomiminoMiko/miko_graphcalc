@@ -6,7 +6,8 @@
 // 都以这里为准.前端高亮/补全用的关键字表也由本文件派生,不另设第二份列表:
 //   - Rust:`compiler_rs/src/parser_wasm.rs` 用 `#[grammar = "miko.pest"]` 经
 //     pest_derive 生成 `Rule` 枚举;`parse_to_json` 把语法树转成 JSON AST,各
-//     `*_to_stmt` 函数负责取字段(每条规则下的"下游"注记指明了对应函数);
+//     `*_to_stmt` 函数负责取字段(每条规则下的"下游"注记指明了对应函数;函数
+//     按语句族分在 `parser_wasm/` 的 param / scene / calculus / solve 子模块);
 //   - TS:`compiler/dsl/keywords.ts` 在运行期经 Vite `?raw` 读入本文件抽取关键字;
 //     `compiler/ast/types.ts` 是 AST 形状的唯一 schema.
 //   改本文件 = 改语言:必须重新构建 wasm(`npm run build:wasm:compiler`)才对应用
@@ -123,7 +124,8 @@ expr = @{ (!(";" | "{" | "}") ~ ANY)+ }
 //     写区间时请在 `in` 前写一个普通空格.
 //
 // 语法层只认"值到哪里为止";`in cyclic` 的取模回绕语义由 param_ui 的 cyclic
-// 标记承载,Rust 侧另有文本兜底(parser_wasm.rs 的 split_cyclic_param_value),
+// 标记承载,Rust 侧另有文本兜底(parser_wasm/param.rs 的
+// split_cyclic_param_value),
 // 所以 `a in[...]`,`1in[0,1,1]`,`2sin(x)` 这些既有写法一字不改,而 `in` 后
 // 换行/多空格等写法也能被兜住.
 param_value = @{ (!( " in" ~ (" " | "\t")* ~ "[" | " in" ~ (" " | "\t")+ ~ "cyclic" | ";" | "{" | "}") ~ ANY)+ }
@@ -147,7 +149,7 @@ param_stmt = { "param" ~ ident ~ "=" ~ param_value ~ param_ui? ~ ";" }
 //   - `in` 与 `[` 之间,`cyclic` 与 `[` 之间允许空白,`in[` 也合法;
 //   - 三个数在 JSON 里按下标取 min/max/step,保持原样字符串,语义(含 step 为 0
 //     一类非法情形)由下游校验;
-//   - JSON 里仅当写了 cyclic 才带 `"cyclic": true`(见 parser_wasm.rs).
+//   - JSON 里仅当写了 cyclic 才带 `"cyclic": true`(见 parser_wasm/param.rs).
 param_ui = { "in" ~ cyclic? ~ "[" ~ number ~ "," ~ number ~ "," ~ number ~ "]" }
 
 // 循环标记:原子关键字,只能出现在 param_ui 的 `in` 与 `[` 之间.
@@ -402,7 +404,7 @@ antiderivative_call = { "antiderivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 //
 // 整段方程(含导数记号与初值)由 `expr` 捕获:它的停止集是 `;`/`{`/`}`,不含
 // 逗号,所以初值原样落在文本里,由 Rust 侧按**首个顶层逗号**切成"方程 + 各条
-// 初值"(见 parser_wasm.rs 的 split_ode_conditions).
+// 初值"(见 parser_wasm/solve.rs 的 split_ode_conditions).
 //
 // 自变量/因变量缺省从方程推断(坐标变量 x/t;因变量取带导数记号的符号),
 // 也可用 `independent`/`dependent` 选项显式指定:

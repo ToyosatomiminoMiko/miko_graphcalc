@@ -210,7 +210,8 @@ ode O4 = y' + p*y = q*y^2;                      // Bernoulli
 - WASM `lib.rs::antiderivative`:名字与值分开传,**只给名字时参数保持符号**
   (静态场景按 AST 缓存,参数一旦在编译期折成数值,拖滑块曲线就不跟手);
   `declared_parameters` 同时收"另一个坐标"(对 y 积分时的 x);
-- 语法:`miko.pest` 的 `antiderivative_stmt` + `parser_wasm.rs` 的 AST 节点;
+- 语法:`miko.pest` 的 `antiderivative_stmt` + `parser_wasm/calculus.rs` 的
+  AST 节点(与 `derivative` 共用 `unary_call_to_stmt`);
 - 编译分两层:静态场景层建 blueprint(实体侧 + 展示事实),`antiderivativeTasks.ts`
   把事实转成 IR 条目并处理隐藏与占位;
 - 展示:`evaluationLatex.ts` 的摘要/细节,`processData.ts` 的
