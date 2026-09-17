@@ -202,18 +202,30 @@ export interface DerivativeStatement {
 }
 
 /**
- * `solve 名称 = 方程 [选项];` 方程求解语句(设计文档
+ * `solve 名称 = 方程 [选项];` 方程求解语句,或联立方程组
+ * `solve 名称 = { 方程1; 方程2; } [选项];`(设计文档
  * `docs/equation-solving-process.md` 的三期内核).
  *
  * 方程原文由 `expr` 整段捕获(`x^2 - 5*x + 6 = 0`),顶层等号由 Rust 求解内核
- * 切分;变量缺省从方程推断,也可用 `variable` 选项显式指定.求解是**声明级
- * 编译**:在 `compileSolves` 里一次算出步骤产物,写进 IR 的 `solves`.
+ * 切分;变量缺省从方程推断,也可用 `variable`(单方程)/`variables`(联立)选项
+ * 显式指定.求解是**声明级编译**:在 `compileSolves` 里一次算出步骤产物,写进
+ * IR 的 `solves`.
  */
 export interface SolveStatement {
     type: 'solve';
     name: string;
-    /** 方程原文,含一个顶层 `=`(如 `x^2 - 5*x + 6 = 0`). */
+    /**
+     * 首条方程原文(含一个顶层 `=`),兼容既有单方程消费方.
+     *
+     * 新代码一律读 {@link equations}:联立时这里只是第一条.
+     */
     equation: string;
+    /**
+     * 全部方程原文(单方程时长度为 1,联立时按书写顺序).
+     *
+     * 与 `equation` 的关系:`equations[0] === equation`.
+     */
+    equations: string[];
     options: OptionPair[];
     span: SourceSpan;
 }

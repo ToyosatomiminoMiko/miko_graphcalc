@@ -28,6 +28,8 @@ function sphere(id: number, name: string, x: number): SphereObject {
 function task(color: string): IntersectionTask {
     return {
         name: 'I',
+        method: 'numeric',
+        unknowns: ['x', 'y', 'z'],
         aName: 'a',
         bName: 'b',
         aId: 1,

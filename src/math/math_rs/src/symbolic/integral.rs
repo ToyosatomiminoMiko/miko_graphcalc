@@ -34,6 +34,8 @@ use super::latex::latex_symbol;
 use super::parser::{parse_expr, rewrite_aliases, validate_supported};
 use super::simplify::{evaluate_constant, simplify};
 use super::{BinOp, Expr, UnaryOp};
+// 线性消元是 crate 级数值原语(见 `numeric_core`):部分分式与联立共用一份实现.
+use crate::numeric_core::linalg::solve_system;
 
 /// 依据分区:与 `ir::SOLVE_STEP_KINDS` 同域.
 const KIND_TABLE: &str = "table";
@@ -1867,44 +1869,6 @@ fn rational_root(poly: &Poly) -> Option<f64> {
     candidates
         .into_iter()
         .find(|candidate| poly.evaluate(*candidate).abs() < 1e-7)
-}
-
-/// 高斯消元(部分选主元);无解/奇异返回 `None`.
-fn solve_system(mut matrix: Vec<Vec<f64>>, unknowns: usize) -> Option<Vec<f64>> {
-    let rows = matrix.len();
-    for column in 0..unknowns {
-        let mut pivot = column;
-        for row in column + 1..rows {
-            if matrix[row][column].abs() > matrix[pivot][column].abs() {
-                pivot = row;
-            }
-        }
-        if matrix[pivot][column].abs() < 1e-12 {
-            return None;
-        }
-        matrix.swap(column, pivot);
-        let divisor = matrix[column][column];
-        for value in matrix[column].iter_mut().skip(column) {
-            *value /= divisor;
-        }
-        for row in 0..rows {
-            if row == column {
-                continue;
-            }
-            let factor = matrix[row][column];
-            if factor.abs() < 1e-15 {
-                continue;
-            }
-            let pivot_row = matrix[column].clone();
-            for (cell, pivot_cell) in matrix[row][column..=unknowns]
-                .iter_mut()
-                .zip(pivot_row[column..=unknowns].iter())
-            {
-                *cell -= factor * pivot_cell;
-            }
-        }
-    }
-    Some((0..unknowns).map(|index| matrix[index][unknowns]).collect())
 }
 
 /// 积分一个部分分式项.

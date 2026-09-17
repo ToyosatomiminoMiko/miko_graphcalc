@@ -144,6 +144,9 @@ describe('compileIntersections', () => {
         expect(scene.intersections).toHaveLength(1);
         const task = scene.intersections[0];
         expect(task.name).toBe('I');
+        // 统一词汇:求交恒为数值后端,未知量是世界坐标轴(为联立留的接口).
+        expect(task.method).toBe('numeric');
+        expect(task.unknowns).toEqual(['x', 'y', 'z']);
         expect(task.aName).toBe('a');
         expect(task.bName).toBe('b');
         expect(task.aId).toBe(scene.objects.find((o) => o.name === 'a')!.id);

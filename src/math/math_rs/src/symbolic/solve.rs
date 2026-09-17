@@ -31,13 +31,13 @@ use super::printing::{format_expr, PrintMode};
 use super::{collect_symbols, BinOp, Expr};
 
 /** 依据分区:法则. */
-const KIND_RULE: &str = "rule";
+pub(crate) const KIND_RULE: &str = "rule";
 /** 依据分区:代数化简. */
-const KIND_ALGEBRA: &str = "algebra";
+pub(crate) const KIND_ALGEBRA: &str = "algebra";
 /** 依据分区:定义式. */
-const KIND_DEFINITION: &str = "definition";
+pub(crate) const KIND_DEFINITION: &str = "definition";
 /** 依据分区:数值. */
-const KIND_NUMERIC: &str = "numeric";
+pub(crate) const KIND_NUMERIC: &str = "numeric";
 
 /// 一步求解过程:一行 LaTeX + 依据文案 + 依据分区.
 ///
@@ -75,7 +75,7 @@ pub struct SolveOutcome {
     pub error_message: Option<String>,
 }
 
-fn step(latex: impl Into<String>, reason: &str, kind: &str) -> SolveStep {
+pub(crate) fn step(latex: impl Into<String>, reason: &str, kind: &str) -> SolveStep {
     SolveStep {
         latex: latex.into(),
         reason: reason.to_string(),
@@ -91,7 +91,10 @@ fn step(latex: impl Into<String>, reason: &str, kind: &str) -> SolveStep {
 ///
 /// 文本匹配加了一层边界判断(`a` 不会匹配 `ax`/`a_1`),避免子串误判;
 /// `a^2`/`a*x` 这类正常写法两边都是运算符,照样命中.
-fn equation_parameters(source: &str, coefficients: &HashMap<String, f64>) -> Vec<String> {
+pub(crate) fn equation_parameters(
+    source: &str,
+    coefficients: &HashMap<String, f64>,
+) -> Vec<String> {
     let bytes = source.as_bytes();
     let mut used = Vec::new();
 
@@ -128,7 +131,7 @@ fn equation_parameters(source: &str, coefficients: &HashMap<String, f64>) -> Vec
 /// 用 `gathered` 而不是把 `a=1` 接在等号后面:参数多起来(或方程本身很长)时
 /// 一行放不下,横向滚动会把最关键的系数挤到屏幕外.步内换行是 LaTeX 自己的
 /// 排版,不动过程页"一行一步"的结构.
-fn parameter_values_latex(equation_latex: &str, entries: &[String]) -> String {
+pub(crate) fn parameter_values_latex(equation_latex: &str, entries: &[String]) -> String {
     let mut stacked = equation_latex.to_string();
     for entry in entries {
         stacked.push_str(" \\\\ ");
@@ -141,7 +144,7 @@ fn parameter_values_latex(equation_latex: &str, entries: &[String]) -> String {
 ///
 /// 只需处理括号深度:函数调用/数组字面量里的 `=` 不可能是方程的等号,而
 /// 本项目 DSL 也没有 `==` 运算符.
-fn split_equation(source: &str) -> Result<(&str, &str), String> {
+pub(crate) fn split_equation(source: &str) -> Result<(&str, &str), String> {
     let mut depth = 0i32;
     let mut found: Option<usize> = None;
     for (index, ch) in source.char_indices() {
@@ -189,7 +192,7 @@ fn infer_variable(expr: &Expr, coefficients: &HashMap<String, f64>) -> Result<St
 }
 
 /// 负数加括号(幂底数与乘积因子位置),其余原样.
-fn parenthesize_number(value: f64) -> String {
+pub(crate) fn parenthesize_number(value: f64) -> String {
     if value < 0.0 {
         format!("({})", latex_number(value))
     } else {
@@ -198,7 +201,7 @@ fn parenthesize_number(value: f64) -> String {
 }
 
 /// 去掉 `-0.0`:展示层不该出现 "-0".
-fn without_negative_zero(value: f64) -> f64 {
+pub(crate) fn without_negative_zero(value: f64) -> f64 {
     if value == 0.0 {
         0.0
     } else {
@@ -217,7 +220,7 @@ fn linear_term(coeff: f64, variable: &str) -> String {
 }
 
 /// `num/den` 的精确分式 LaTeX;两者都是整数时约分,返回 `None` 表示不适合分数.
-fn rational_latex(numerator: f64, denominator: f64) -> Option<String> {
+pub(crate) fn rational_latex(numerator: f64, denominator: f64) -> Option<String> {
     if denominator == 0.0 {
         return None;
     }
@@ -246,7 +249,7 @@ fn rational_latex(numerator: f64, denominator: f64) -> Option<String> {
     })
 }
 
-fn gcd(left: u64, right: u64) -> u64 {
+pub(crate) fn gcd(left: u64, right: u64) -> u64 {
     if right == 0 {
         left
     } else {

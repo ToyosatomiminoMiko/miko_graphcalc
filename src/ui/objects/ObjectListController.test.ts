@@ -94,6 +94,8 @@ const scene = {
     intersections: [
         {
             name: 'X',
+            method: 'numeric',
+            unknowns: ['x', 'y', 'z'],
             aName: 'c1',
             bName: 'c2',
             aId: 1,
@@ -633,6 +635,9 @@ describe('三级披露:长过程的 L2 入口', () => {
 describe('方程求解条目', () => {
     const solve: SolveTask = {
         name: 'S',
+        method: 'exact',
+        unknowns: ['x'],
+        equations: ['x^2 - 5*x + 6 = 0'],
         equation: 'x^2 - 5*x + 6 = 0',
         variable: 'x',
         equationLatex: 'x^{2}-5x+6=0',

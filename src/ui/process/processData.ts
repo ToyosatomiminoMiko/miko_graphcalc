@@ -19,6 +19,7 @@ import type {
     IntegralTask,
     OdeTask,
     SceneObject,
+    SolveStep,
     SolveTask,
 } from '../../contract/ir';
 import { UI_CONFIG } from '../../config/uiConfig';
@@ -129,31 +130,68 @@ export function buildIntegralProcess(
 }
 
 /**
- * 方程求解条目的过程:题目就是待求解的方程,步骤由**内核产物**直接给出.
+ * 约束条目的过程输入(求解 / 后续联立共用).
  *
- * 这是"三期只换数据源"的落点:步骤的 `kind`/`reason`/`latex` 全部来自
- * `math_rs::symbolic::solve`,过程页只是把它排版出来,不再做任何重组或
- * 猜测.求解失败时给出空步骤 + 错误理由,过程页仍显示题目.
+ * 只有三样东西与"哪一类约束"有关:页头类别名,条目名,题目 LaTeX;步骤链
+ * 一律是内核产物.把这三样抽出来,联立落地时不必再抄一份过程装配.
+ */
+export interface ConstraintProcessInput {
+    /** 页头类别名(如 `求解`),与条目徽章文案同源. */
+    readonly label: string;
+    readonly name: string;
+    /** 题目 LaTeX;空串表示排不出公式(页头不再显示题目区). */
+    readonly problemLatex: string;
+    readonly steps: readonly SolveStep[];
+}
+
+/**
+ * 约束条目的过程:题目 + **内核产物**步骤.
+ *
+ * 这是"三期只换数据源"的落点:步骤的 `kind`/`reason`/`latex` 全部来自内核
+ * (`math_rs::symbolic::solve`,联立落地后是同层的内核产物),过程页只把它排版
+ * 出来,不再做任何重组或猜测.求解失败时给出空步骤 + 错误理由,过程页仍显示
+ * 题目.
  *
  * 上限同样生效:内核理论上可以给出任意长的步骤链,视图的截断明文不能对
- * 三期数据源失灵.
+ * 内核数据源失灵.
  */
-export function buildSolveProcess(
-    task: SolveTask,
+export function buildConstraintProcess(
+    input: ConstraintProcessInput,
     maxSteps: number = UI_CONFIG.process.maxSteps,
 ): ProcessDocument {
-    const steps: ProcessStep[] = task.steps.map((step) => ({
+    const steps: ProcessStep[] = input.steps.map((step) => ({
         latex: step.latex,
         kind: step.kind,
         reason: step.reason,
     }));
     const truncated = truncateProcessSteps(steps, maxSteps);
     return {
-        title: `求解 ${task.name}`,
-        problem: task.equationLatex === '' ? null : task.equationLatex,
+        title: `${input.label} ${input.name}`,
+        problem: input.problemLatex === '' ? null : input.problemLatex,
         steps: truncated.steps,
         droppedSteps: truncated.droppedSteps,
     };
+}
+
+/**
+ * 方程求解条目的过程:题目就是待求解的方程,步骤由内核产物直接给出.
+ *
+ * 求解是统一词汇里的一个特例(`method = exact`),过程装配走
+ * [`buildConstraintProcess`];保留本函数只是让"求解"有一个语义明确的入口.
+ */
+export function buildSolveProcess(
+    task: SolveTask,
+    maxSteps: number = UI_CONFIG.process.maxSteps,
+): ProcessDocument {
+    return buildConstraintProcess(
+        {
+            label: '求解',
+            name: task.name,
+            problemLatex: task.equationLatex,
+            steps: task.steps,
+        },
+        maxSteps,
+    );
 }
 
 /**

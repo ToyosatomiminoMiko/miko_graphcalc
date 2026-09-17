@@ -11,10 +11,12 @@ use crate::geometry_core::{FieldEval, ObjectDescriptor};
 use crate::sampling_core::uniform_nodes;
 use crate::transform_core::Mat4;
 
-use super::roots::{
+use crate::numeric_core::roots::{
     dedupe_points, dedupe_roots, dedupe_tolerance_for_scale, find_1d_roots, push_deduped_point,
 };
-use super::{clamp, dist, dot, finite, midpoint, sub, to_world, V3};
+use crate::numeric_core::{clamp, dist, dot, finite, midpoint, sub, V3};
+
+use super::to_world;
 
 struct CurveEval {
     expr: CompiledEvaluator,

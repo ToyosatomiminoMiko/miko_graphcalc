@@ -24,9 +24,33 @@ describe('parseMiko 方程求解语句', () => {
             type: 'solve',
             name: 'S',
             equation: 'x^2 - 5*x + 6 = 0',
+            // 单方程时 `equations` 长度为 1,与 `equation` 同源.
+            equations: ['x^2 - 5*x + 6 = 0'],
             options: [],
         });
         expect(statement?.span.end).toBeGreaterThan(statement?.span.start ?? -1);
+    });
+
+    it('接受联立方程组 `{ 方程; 方程; }`,`equations` 按书写顺序', async () => {
+        const program = await parseMiko(
+            'solve S = { x + y = 3; x - y = 1; } { variables = x, y; };',
+        );
+
+        const statement = findSolve(program);
+        expect(statement?.equations).toEqual(['x + y = 3', 'x - y = 1']);
+        // 兼容字段取首条.
+        expect(statement?.equation).toBe('x + y = 3');
+        expect(statement?.options).toEqual([{ name: 'variables', value: 'x, y' }]);
+    });
+
+    it('联立方程组不带选项块时也合法', async () => {
+        const program = await parseMiko('solve S = { a = 1; b = 2; };');
+
+        expect(findSolve(program)?.equations).toEqual(['a = 1', 'b = 2']);
+    });
+
+    it('空方程组 `{}` 是语法错误', async () => {
+        await expect(parseMiko('solve S = { };')).rejects.toThrow();
     });
 
     it('接受选项块里的 variable', async () => {

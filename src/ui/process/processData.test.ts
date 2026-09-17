@@ -139,6 +139,9 @@ describe('题目(problem)与求解过程', () => {
 
     const solve: SolveTask = {
         name: 'S',
+        method: 'exact',
+        unknowns: ['x'],
+        equations: ['x^2 - 5*x + 6 = 0'],
         equation: 'x^2 - 5*x + 6 = 0',
         variable: 'x',
         equationLatex: 'x^{2}-5x+6=0',

@@ -41,6 +41,9 @@ describe('compileSolves:声明级求解', () => {
 
         expect(task.name).toBe('S');
         expect(task.variable).toBe('x');
+        // 统一词汇:求解恒为精确后端,未知量以列表形式给出(为联立留的接口).
+        expect(task.method).toBe('exact');
+        expect(task.unknowns).toEqual(['x']);
         expect(task.enabled).toBe(true);
         expect(task.error).toBeNull();
         expect(task.identity).toBe(false);
@@ -113,6 +116,7 @@ describe('compileSolves:声明级求解', () => {
         const task = await solveTask('solve S = t^2 - 9 = 0 { variable = t; };');
 
         expect(task.variable).toBe('t');
+        expect(task.unknowns).toEqual(['t']);
         expect(task.solutionLatex).toContain('t = 3');
     });
 
@@ -142,6 +146,9 @@ describe('compileSolves:声明级求解', () => {
         );
 
         expect(task.enabled).toBe(false);
+        expect(task.method).toBe('exact');
+        // 没调用内核就没有未知量可报.
+        expect(task.unknowns).toEqual([]);
         expect(task.equation).toBe('x^2 - 5*x + 6 = 0');
         expect(task.equationLatex).toBe('');
         expect(task.steps).toEqual([]);
@@ -163,6 +170,85 @@ describe('compileSolves:声明级求解', () => {
     });
 });
 
+describe('compileSolves:联立方程组(v1)', () => {
+    it('线性方程组:精确消元,未知量与解集都进 IR', async () => {
+        const task = await solveTask('solve S = { x + y = 3; x - y = 1; };');
+
+        expect(task.method).toBe('exact');
+        expect(task.unknowns).toEqual(['x', 'y']);
+        expect(task.equations).toEqual(['x + y = 3', 'x - y = 1']);
+        // `equation` / `variable` 是展示用的连接文案,结构化数据在 equations/unknowns.
+        expect(task.equation).toBe('x + y = 3; x - y = 1');
+        expect(task.variable).toBe('x, y');
+        expect(task.solutionLatex).toBe('x = 2,\\quad y = 1');
+        expect(task.realRootCount).toBe(1);
+        expect(task.error).toBeNull();
+        expect(task.steps.map((step) => step.reason)).toEqual([
+            '原式',
+            '移项,合并同类项',
+            '加减消元',
+            '回代求解',
+        ]);
+        expect(task.equationLatex).toContain('\\begin{cases}');
+    });
+
+    it('variables 选项显式指定未知量;未声明符号仍报能力边界', async () => {
+        const task = await solveTask(
+            'solve S = { a*x + y = 1; x - y = 0; } { variables = x, y; };',
+        );
+
+        // `a` 既不是未知量也不是已声明参数:明确报出来,不能静默当成 0.
+        expect(task.error).toContain('未声明参数 a');
+    });
+
+    it('非线性方程组落到数值路径,过程里如实标注搜索区间与"数值解"', async () => {
+        const task = await solveTask(
+            'solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };',
+        );
+
+        expect(task.method).toBe('numeric');
+        expect(task.realRootCount).toBe(2);
+        expect(task.error).toBeNull();
+        expect(task.solutionLatex).toContain('\\approx');
+        const reasons = task.steps.map((step) => step.reason);
+        expect(reasons).toContain('数值搜索区间');
+        expect(reasons).toContain('数值解');
+    });
+
+    it('超定方程组是能力边界:列表保留占位,题目 LaTeX 照给', async () => {
+        const task = await solveTask('solve S = { x + y = 1; x - y = 0; x = 1; };');
+
+        expect(task.enabled).toBe(true);
+        expect(task.error).toContain('多于未知量数');
+        expect(task.solutionLatex).toBeNull();
+        expect(task.equationLatex).toContain('\\begin{cases}');
+    });
+
+    it('隐藏的联立方程组不调用内核:方法取 auto,方程原文保留', async () => {
+        const task = await solveTask(
+            'solve S = { x + y = 3; x - y = 1; };',
+            {},
+            new Set(['S']),
+        );
+
+        expect(task.enabled).toBe(false);
+        expect(task.method).toBe('auto');
+        expect(task.equations).toEqual(['x + y = 3', 'x - y = 1']);
+        expect(task.unknowns).toEqual([]);
+        expect(task.equationLatex).toBe('');
+        expect(task.steps).toEqual([]);
+    });
+
+    it('range/segments 只对联立有意义;单方程不接受多变量', async () => {
+        await expect(
+            compile('solve S = x - 1 = 0 { range = [-2, 2]; };'),
+        ).rejects.toThrow(/只对联立方程组有意义/);
+        await expect(
+            compile('solve S = x - 1 = 0 { variables = x, y; };'),
+        ).rejects.toThrow(/只有一个方程/);
+    });
+});
+
 describe('随仓库分发的求解示例', () => {
     it('example/solve_equations.miko 的四条方程各给出预期结果', async () => {
         const source = await readFile(
@@ -172,7 +258,7 @@ describe('随仓库分发的求解示例', () => {
         const scene = await compile(source);
         const byName = new Map(scene.solves.map((task) => [task.name, task]));
 
-        expect([...byName.keys()]).toEqual(['S1', 'S2', 'S3', 'S4']);
+        expect([...byName.keys()]).toEqual(['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);
         // S1:因式分解板书路径.
         expect(byName.get('S1')?.steps.map((step) => step.reason)).toEqual([
             '原式',
@@ -187,6 +273,13 @@ describe('随仓库分发的求解示例', () => {
         // S4:判别式小于 0.
         expect(byName.get('S4')?.solutionLatex).toBeNull();
         expect(byName.get('S4')?.realRootCount).toBe(0);
+        // S5:联立线性方程组 -> 精确消元.
+        expect(byName.get('S5')?.method).toBe('exact');
+        expect(byName.get('S5')?.unknowns).toEqual(['x', 'y']);
+        expect(byName.get('S5')?.solutionLatex).toBe('x = 2,\\quad y = 1');
+        // S6:联立非线性方程组 -> 数值路径.
+        expect(byName.get('S6')?.method).toBe('numeric');
+        expect(byName.get('S6')?.realRootCount).toBe(2);
     });
 
     it('默认场景里的两条 solve 也产出步骤', async () => {

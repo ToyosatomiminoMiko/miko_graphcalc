@@ -11,7 +11,7 @@ use super::curve_intersection::{curve_curve_intersections, curve_field_intersect
 use super::marching_squares::patch_field_intersections;
 use super::V3;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct IntersectionCoreOutput {
     /// 离散交点,扁平 `[x, y, z, ...]`.
     pub points: Vec<f64>,

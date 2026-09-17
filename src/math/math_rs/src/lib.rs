@@ -8,6 +8,9 @@
 //! - 几何对象模型与隐式场在 geometry_core(求交与体积积分共享),求交算法在
 //!   intersection_core,带域积分在 domain_integral:域积分特性只依赖几何,
 //!   不依赖求交实现(依赖方向见 geometry_core 文件头);
+//! - 求解/求交在**统一词汇**下分派:solve_core 描述"解什么约束,用哪种方法",
+//!   本文件只把统一结果还原成各自的线格式(solve 走 JSON,求交走扁平数组),
+//!   两个线格式刻意不并(见 solve_core 模块头);
 //! - 复杂入口走 JSON payload(wasm_payloads.rs),签名保持 `(payload: &str)`,
 //!   新增字段只动"结构体 + TS 构造处",不要退回 20 个扁平参数的旧风格;
 //! - 掩码语义,规模护栏(n/m/layers/segments 上限)由 core 模块统一执行,
@@ -26,7 +29,11 @@ pub mod geometry_core;
 pub mod integral_core;
 pub mod integral_method;
 pub mod intersection_core;
+/// crate 级共享数值原语(线性消元 / 一维求根 / 方程组 Newton):求解,求交与
+/// 联立共用,见模块文档.
+mod numeric_core;
 pub mod sampling_core;
+pub mod solve_core;
 pub mod symbolic;
 pub mod transform_core;
 mod wasm_payloads;
@@ -36,7 +43,7 @@ use wasm_bindgen::prelude::*;
 use wasm_payloads::{
     EvaluateCurlPointPayload, EvaluateDivergencePointPayload, EvaluateGradientPointPayload,
     EvaluateLaplacianPointPayload, Integrate1dPayload, Integrate2dPayload, IntegrateRegionPayload,
-    IntegrateSolidPayload, IntersectPairPayload, SampleVectorFieldPayload,
+    IntegrateSolidPayload, IntersectPairPayload, SampleVectorFieldPayload, SolveSystemPayload,
 };
 
 fn math_error(message: impl Into<String>) -> JsValue {
@@ -507,7 +514,19 @@ pub fn intersect_pair(payload: &str) -> Result<IntersectionOutput, JsValue> {
     )
     .map_err(math_error)?;
 
-    let output = intersection_core::compute_pair(&a, &b, segments).map_err(math_error)?;
+    // 求交是约束求解的数值特例:经 `solve_core` 统一词汇分派到数值后端,
+    // 再把统一结果还原成既有扁平线格式(见 solve_core 模块头).
+    let problem = solve_core::ConstraintProblem {
+        method: solve_core::SolveMethod::Auto,
+        kind: solve_core::ConstraintKind::ObjectPair {
+            a: &a,
+            b: &b,
+            segments,
+        },
+    };
+    let output = solve_core::solve_problem(problem)
+        .map_err(math_error)?
+        .into_intersection();
     Ok(IntersectionOutput {
         points: output.points,
         curve_points: output.curve_points,
@@ -583,10 +602,96 @@ pub fn solve_equation(
     } else {
         Some(variable)
     };
-    let outcome =
-        symbolic::solve_equation(equation, variable, &coefficients).map_err(math_error)?;
+    // 方程求解是约束求解的精确特例:经 `solve_core` 统一词汇分派到符号后端,
+    // 再把统一结果还原成既有 JSON 线格式(见 solve_core 模块头).
+    let problem = solve_core::ConstraintProblem {
+        method: solve_core::SolveMethod::Auto,
+        kind: solve_core::ConstraintKind::Equation {
+            text: equation,
+            variable,
+            coefficients: &coefficients,
+        },
+    };
+    let outcome = solve_core::solve_problem(problem)
+        .map_err(math_error)?
+        .into_solve();
     serde_json::to_string(&outcome)
         .map_err(|error| math_error(format!("求解结果序列化失败: {error}")))
+}
+
+/// 联立方程组求解入口(设计文档 `docs/equation-solving-process.md` 的联立分期).
+///
+/// 与 `solve_equation` 同一条"独立步骤产物的 JSON"口径:
+/// `{ variables, problem_latex, solution_latex, solution_count, steps:
+/// [{ latex, reason, kind }], error, method }`.线性方程组走精确消元并给板书
+/// 步骤;非线性走数值路径(网格起点 + 阻尼 Newton),`method` 会如实标成
+/// `"numeric"`,过程里给出搜索区间.
+///
+/// `error` 同样是**能力边界**(非线性但指定 exact / 超定 / 欠定 / 奇异 /
+/// 区间内无解),不是调用失败;抛出的异常只表示方程组文本读不出来或请求坏掉.
+///
+/// 请求走 JSON payload(见 `wasm_payloads::SolveSystemPayload`):字段多且以后
+/// 还会长(联立的分期会持续加能力),扁平参数会重复 `solve_equation` 的老路.
+#[wasm_bindgen]
+pub fn solve_system(payload: &str) -> Result<String, JsValue> {
+    let SolveSystemPayload {
+        equations,
+        variables,
+        coeff_names,
+        coeff_values,
+        domain,
+        segments,
+        method,
+    } = parse_payload::<SolveSystemPayload>(payload)?;
+
+    if coeff_names.len() != coeff_values.len() {
+        return Err(math_error(format!(
+            "联立系数表长度不一致:名字 {} 个,数值 {} 个",
+            coeff_names.len(),
+            coeff_values.len()
+        )));
+    }
+    if domain.len() % 2 != 0 {
+        return Err(math_error(format!(
+            "联立 range 需要 (下界, 上界) 成对给出,当前 {} 个数字",
+            domain.len()
+        )));
+    }
+
+    let solve_method = match method.as_str() {
+        "" | "auto" => solve_core::SolveMethod::Auto,
+        "exact" => solve_core::SolveMethod::Exact,
+        "numeric" => solve_core::SolveMethod::Numeric,
+        other => {
+            return Err(math_error(format!(
+                "未知的联立求解方法 {other}:只接受 exact / numeric / auto"
+            )));
+        }
+    };
+
+    let coefficients: Vec<(String, f64)> = coeff_names.into_iter().zip(coeff_values).collect();
+    let domain_axes: Vec<[f64; 2]> = domain
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| [pair[0], pair[1]])
+        .collect();
+
+    let problem = solve_core::ConstraintProblem {
+        method: solve_method,
+        kind: solve_core::ConstraintKind::System {
+            equations: &equations,
+            variables: &variables,
+            coefficients: &coefficients,
+            domain: &domain_axes,
+            segments,
+        },
+    };
+    let outcome = solve_core::solve_problem(problem)
+        .map_err(math_error)?
+        .into_system();
+    serde_json::to_string(&outcome)
+        .map_err(|error| math_error(format!("联立结果序列化失败: {error}")))
 }
 
 /// 不定积分(原函数)入口(设计文档 `docs/calculus-suite-plan.md` 第 3 节).

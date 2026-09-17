@@ -476,26 +476,44 @@ fn intersection_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 }
 
 /// 将方程求解语句(solve_stmt)转换为 JSON AST 节点.
-/// 包含名称,方程原文(含顶层 `=`),选项列表和位置.
-/// 变量缺省由求解内核从方程推断,也可用 `variable` 选项显式给出.
+///
+/// 覆盖两种形态:
+/// - 单方程 `solve S = 左 = 右 [选项];` -> `equations` 长度为 1;
+/// - 联立 `solve S = { 方程; 方程; } [选项];` -> `equations` 是全部方程原文.
+///
+/// `equation` 始终是**首条**方程原文,给既有单方程消费方兜底;新代码一律读
+/// `equations`.变量缺省由求解内核从方程推断,也可用 `variable` / `variables`
+/// 选项显式给出.
 fn solve_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let mut name = String::new();
-    let mut equation = String::new();
+    let mut equations: Vec<String> = Vec::new();
     let mut options: Vec<Value> = Vec::new();
 
     for child in pair.clone().into_inner() {
         match child.as_rule() {
             Rule::ident => name = child.as_str().to_string(),
-            Rule::expr => equation = child.as_str().trim().to_string(),
+            Rule::expr => equations.push(child.as_str().trim().to_string()),
+            Rule::solve_system_set => {
+                // 方程组:每条 `solve_system_entry` 里是一个 `expr`.
+                for entry in child.into_inner() {
+                    for inner in entry.into_inner() {
+                        if inner.as_rule() == Rule::expr {
+                            equations.push(inner.as_str().trim().to_string());
+                        }
+                    }
+                }
+            }
             Rule::stmt_end => options = options_from_end(&child),
             _ => {}
         }
     }
 
+    let equation = equations.first().cloned().unwrap_or_default();
     json!({
         "type": "solve",
         "name": name,
         "equation": equation,
+        "equations": equations,
         "options": options,
         "span": span_of(pair),
     })

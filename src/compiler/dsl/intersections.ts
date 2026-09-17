@@ -11,19 +11,18 @@
  * "隐藏 = 先完整校验,后禁用,仅跳过计算".隐藏求交同样必须通过对象存在/
  * 自交 / kind 支持 / 动画与静态变换可逆性校验,否则照常抛语句级错误;
  * 只是不产出可计算的任务(占位项 aId/bId = -1,enabled = false).
- * 求交名在 compileIntersections 循环内查重,与 param/object/animation 的
- * "重复声明"契约一致.
+ * 求交名查重 / 选项校验 / 语句级错误定位由 `statementShell.ts` 的
+ * `compileConstraintStatements` 统一提供(与求解同一外壳,契约一致).
  */
 import type { AstProgram, IntersectionStatement } from '../../contract/ast';
 import type { IntersectionTask, SceneObject } from '../../contract/ir';
 import { NUMERIC_CONFIG } from '../../config/numericConfig';
-import { withStatementSpan } from '../errors';
 import {
-    assertKnownOptions,
     findOption,
     parseCappedPositiveInteger,
     stripQuotes,
 } from './options';
+import { compileConstraintStatements } from './statementShell';
 import { invertMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
 
 const INTERSECTION_OPTION_NAMES = ['color', 'segments'] as const;
@@ -63,6 +62,12 @@ function assertObjectFrame(
     }
 }
 
+/**
+ * 编译全部 intersection 语句.
+ *
+ * 查重 / 选项校验 / 语句级错误定位 / hidden 语义由
+ * `compileConstraintStatements` 统一提供(与求解同一外壳).
+ */
 export function compileIntersections(
     ast: AstProgram,
     objects: Map<string, SceneObject>,
@@ -70,56 +75,40 @@ export function compileIntersections(
     objectAnimations: Record<number, string[]>,
     hiddenNames: ReadonlySet<string> = new Set(),
 ): IntersectionTask[] {
-    const tasks: IntersectionTask[] = [];
-    let colorIndex = 0;
-    const seenNames = new Set<string>();
-
-    for (const statement of ast.statements) {
-        if (statement.type !== 'intersection') continue;
-        // 语句级错误定位:单条求交编译抛错时携带本语句 span,
-        // 应用层据此换算成源码行列(见 compiler/errors.ts).
-        withStatementSpan(statement.span, () => {
-            if (seenNames.has(statement.name)) {
-                throw new Error(`求交 ${statement.name} 重复声明`);
-            }
-            seenNames.add(statement.name);
+    return compileConstraintStatements(
+        ast,
+        (statement): statement is IntersectionStatement =>
+            statement.type === 'intersection',
+        '求交',
+        INTERSECTION_OPTION_NAMES,
+        hiddenNames,
+        (statement, hidden, index) =>
             compileIntersectionStatement(
                 statement,
                 objects,
                 objectTransforms,
                 objectAnimations,
-                hiddenNames,
-                colorIndex,
-                tasks,
-            );
-            colorIndex += 1;
-        });
-    }
-
-    return tasks;
+                hidden,
+                index,
+            ),
+    );
 }
 
 /**
  * 编译单条 intersection 语句.
  *
- * 从 compileIntersections 的循环体拆出,让"错误携带语句 span"只发生在
- * 循环边界一处,各条 throw 无需手工携带 statement.span.
+ * 语句级错误定位(带语句 span 抛出)已由外壳的 `withStatementSpan` 提供,
+ * 这里各条 throw 无需手工携带 `statement.span`.
  */
 function compileIntersectionStatement(
     statement: IntersectionStatement,
     objects: Map<string, SceneObject>,
     objectTransforms: Record<number, Mat4>,
     objectAnimations: Record<number, string[]>,
-    hiddenNames: ReadonlySet<string>,
+    hidden: boolean,
     colorIndex: number,
-    tasks: IntersectionTask[],
-): void {
+): IntersectionTask {
     const name = statement.name;
-    assertKnownOptions(
-        statement.options,
-        INTERSECTION_OPTION_NAMES,
-        `求交 ${name}`,
-    );
     const rawColor = findOption(statement.options, 'color');
     const color = rawColor !== undefined
         ? stripQuotes(rawColor)
@@ -160,10 +149,17 @@ function compileIntersectionStatement(
     assertObjectFrame(a, objectTransforms, objectAnimations, name);
     assertObjectFrame(b, objectTransforms, objectAnimations, name);
 
+    // 统一词汇(见 contract/ir.ts 的 ConstraintTaskBase):求交走数值后端,
+    // 未知量是世界坐标轴(数值路径在世界坐标里求解).
+    const method = 'numeric' as const;
+    const unknowns = ['x', 'y', 'z'];
+
     // ---- 隐藏:保留占位项但不调度计算 ----
-    if (hiddenNames.has(name)) {
-        tasks.push({
+    if (hidden) {
+        return {
             name,
+            method,
+            unknowns,
             aName: statement.a,
             bName: statement.b,
             aId: -1,
@@ -171,12 +167,13 @@ function compileIntersectionStatement(
             segments,
             color,
             enabled: false,
-        });
-        return;
+        };
     }
 
-    tasks.push({
+    return {
         name,
+        method,
+        unknowns,
         aName: statement.a,
         bName: statement.b,
         aId: a.id,
@@ -184,5 +181,5 @@ function compileIntersectionStatement(
         segments,
         color,
         enabled: true,
-    });
+    };
 }

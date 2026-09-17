@@ -45,7 +45,7 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名统一为 DSL 自己的 `.m
 | `intersection_line_curves.miko` | 曲线 ∩ 曲线 -> 离散交点 |
 | `intersection_surfaces.miko` | 曲面 ∩ 曲面(平面)-> 三维交线 |
 | `double_integral_region.miko` | `region` 面积图形作域的二重积分(辛普森法) |
-| `solve_equations.miko` | 方程求解:单变量一次/二次多项式方程的**分步推导**(因式分解 + 零积律 / 判别式 + 求根公式),解集与步骤进"求解"子列表,点"过程"在右栏过程页看题目与逐行依据 |
+| `solve_equations.miko` | 方程求解:单变量一次/二次多项式方程的**分步推导**(因式分解 + 零积律 / 判别式 + 求根公式),以及**联立方程组**(线性精确消元 + 非线性数值路径),解集与步骤进"求解"子列表,点"过程"在右栏过程页看题目与逐行依据 |
 | `antiderivative_basic.miko` | 不定积分:原函数作为**新的曲线**下发,再对原函数求导得到与源曲线重合的曲线(微积分基本定理的图形版);"原函数"子列表的过程页给出回代验证 `d/dx F = f` |
 | `antiderivative_rational.miko` | 不定积分:有理函数走"多项式除法 -> 因式分解 -> 部分分式";分母可分解(对数解)与不可约(arctan 解)的对照 |
 | `animation_box_rotations.miko` | 动画片段 `rotate` 列表按顺序播放 |

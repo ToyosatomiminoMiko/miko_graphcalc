@@ -127,6 +127,24 @@ pub struct IntersectPairPayload {
     pub segments: usize,
 }
 
+/// `solve_system`:联立方程组求解请求.
+///
+/// `equations` 是每条方程原文(含一个顶层 `=`);`variables` 是 `variables`
+/// 选项给的未知量(空数组表示从方程组推断);`domain` 是数值路径的搜索盒域,
+/// 扁平 `[lo, hi, lo, hi, ...]`(空数组表示用内核默认区间);`method` 取
+/// `"exact" | "numeric" | "auto"`.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SolveSystemPayload {
+    pub equations: Vec<String>,
+    pub variables: Vec<String>,
+    pub coeff_names: Vec<String>,
+    pub coeff_values: Vec<f64>,
+    pub domain: Vec<f64>,
+    pub segments: usize,
+    pub method: String,
+}
+
 /// `evaluate_gradient_point`:梯度数值求值请求.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

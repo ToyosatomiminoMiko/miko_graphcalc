@@ -30,20 +30,22 @@
 //! 本模块不直接依赖 wasm-bindgen,便于在 `cargo test` 里做纯 Rust 验证.
 //!
 //! 子模块划分(202609 结构整理,原来单文件 2000 行):
-//! - `roots`:一维求根与点/根去重;
 //! - `patches`:参数化面片(曲面网格 / 球面 / 盒面 / 旋转体);
 //! - `curve_intersection`:曲线 ∩ 曲线 / 曲线 ∩ 隐式场;
 //! - `marching_squares`:等值线描迹与折线连接;
 //! - `pipeline`:组合语义与顶层入口,对外只暴露 `compute_pair` /
 //!   `IntersectionCoreOutput`;
 //! - `test_support`:`#[cfg(test)]` 描述符构造与输出解码;
-//! - 本文件只留模块文档,共享的 `V3` 小工具,以及 `geometry_core` 的转发.
+//! - 本文件只留模块文档,共享向量小工具转发,以及 `geometry_core` 的转发.
+//!
+//! 202609 后续整理:一维求根与点/根去重("沿参数扫符号变化找根"这件事本身
+//! 与几何无关)已提到 crate 级 [`crate::numeric_core::roots`],与联立的数值
+//! 路径共用;这里只做转发,调用方路径不变.
 
 mod curve_intersection;
 mod marching_squares;
 mod patches;
 mod pipeline;
-mod roots;
 
 #[cfg(test)]
 mod test_support;
@@ -65,35 +67,9 @@ pub use pipeline::{compute_pair, IntersectionCoreOutput};
 // 共享向量小工具:各子模块通过 `super::` 复用,不重复定义
 // ================================================================
 
-type V3 = [f64; 3];
-
-fn sub(a: V3, b: V3) -> V3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn dot(a: V3, b: V3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn dist(a: V3, b: V3) -> f64 {
-    (sub(a, b)).iter().map(|v| v * v).sum::<f64>().sqrt()
-}
-
-fn midpoint(a: V3, b: V3) -> V3 {
-    [
-        (a[0] + b[0]) * 0.5,
-        (a[1] + b[1]) * 0.5,
-        (a[2] + b[2]) * 0.5,
-    ]
-}
-
-fn clamp(value: f64, lo: f64, hi: f64) -> f64 {
-    value.max(lo).min(hi)
-}
-
-fn finite(value: f64) -> bool {
-    value.is_finite()
-}
+/// 向量小工具与去重原语统一由 [`crate::numeric_core`] 提供,这里转发给
+/// 子模块的 `super::` 路径,避免每个子模块各抄一份.
+pub(crate) use crate::numeric_core::{clamp, dist, finite, V3};
 
 fn to_world(matrix: Option<Mat4>, local: V3) -> V3 {
     match matrix {

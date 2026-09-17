@@ -508,22 +508,55 @@ export interface IntegralTask {
 }
 
 /**
+ * 求解方法(**求解 / 求交 / 后续联立共用的统一词汇**).
+ *
+ * 与 Rust `math_rs::solve_core::SolveMethod` 同域:
+ * - `exact`:符号精确内核(`math_rs::symbolic::solve`),产出教学步骤;
+ * - `numeric`:采样数值内核(`math_rs::intersection_core`),产出点集与轨迹(交线);
+ * - `auto`:由内核按问题形状选择(方程 -> 精确,几何对象对 -> 数值).
+ *
+ * 这一步是"为联立做准备"的落点:三种语句服务的是同一件事--解一组约束,
+ * 只是方程数/未知量数/方法不同;统一词汇之后,新增 `System` 不必再新开一条
+ * 完整链路(见 `docs/` 的求解设计口径).
+ */
+export type SolveMethod = 'exact' | 'numeric' | 'auto';
+
+/**
+ * 约束任务公共基座:求解 / 求交(以及后续联立)共享的"命名 + 显隐 + 未知量 + 方法".
+ *
+ * 只统一**词汇**,不统一容器与调度:`SceneIR.solves` 与 `SceneIR.intersections`
+ * 仍是两个数组(遵守本文件"只新增字段"的既有约定),求解在编译期同步算完,
+ * 求交在 Worker 里异步算,这一层不做任何改变.
+ */
+export interface ConstraintTaskBase {
+    name: string;
+    method: SolveMethod;
+    /** 任务是否参与计算.为 false 时仅保留列表项,不执行计算. */
+    enabled: boolean;
+    /**
+     * 未知量名.
+     *
+     * - 求解:求解变量(推断失败或隐藏时为空数组);
+     * - 求交:世界坐标轴 `['x', 'y', 'z']`(数值路径在世界坐标里求解);
+     * - 联立(后续):被求解的变量列表.
+     */
+    unknowns: string[];
+}
+
+/**
  * 求交任务(编译产物).
  *
  * 编译器只负责描述"要算哪两个对象,用什么分辨率",真正的数值计算由
  * Worker + Rust `intersection_core` 异步完成;结果缓存与渲染由
  * IntersectionRenderer 按任务名管理.
  */
-export interface IntersectionTask {
-    name: string;
+export interface IntersectionTask extends ConstraintTaskBase {
     aName: string;
     bName: string;
     aId: number;
     bId: number;
     segments: number;
     color: string;
-    /** 求交任务是否参与计算.为 false 时仅保留列表项,不执行数值计算. */
-    enabled: boolean;
 }
 
 /**
@@ -592,32 +625,48 @@ export interface SolveStep {
  * 占位并给出理由,**题目 LaTeX 仍然有效**(方程已解析成功);隐藏项
  * (`enabled === false`)按既有约定"先完整校验,后禁用,仅跳过计算":内核不再
  * 调用,`equationLatex` 为空串,行内回退显示方程原文.
+ *
+ * 统一词汇:`method` 是内核实际用的方法(单方程恒为 `exact`;联立线性为
+ * `exact`,非线性落到 `numeric`),`unknowns` 是全部未知量(推断失败或隐藏时
+ * 为空数组).
  */
-export interface SolveTask {
-    name: string;
-    /** 方程原文(DSL 里写的 `左 = 右`). */
+export interface SolveTask extends ConstraintTaskBase {
+    /**
+     * 全部方程原文(单方程时长度为 1;联立时按书写顺序).
+     *
+     * 与 {@link equation} 的关系:单方程时 `equations[0] === equation`;联立时
+     * `equation` 是 `; ` 连接后的展示用原文.
+     */
+    equations: string[];
+    /** 方程原文(单方程就是它;联立是 `; ` 连接的原文,仅供纯文本回退). */
     equation: string;
-    /** 求解变量;隐藏或推断失败时为空串. */
+    /**
+     * 求解变量(单方程);联立时是全部未知量用 `, ` 连接后的展示文案.
+     *
+     * 结构化数据一律读 {@link ConstraintTaskBase.unknowns}.
+     */
     variable: string;
-    /** 题目 LaTeX(原方程,保留用户写法);隐藏项为空串,内核拒绝的条目仍有值. */
+    /** 题目 LaTeX(单方程是原方程;联立是 `cases` 方程组);隐藏项为空串. */
     equationLatex: string;
-    /** 解集 LaTeX;无实数解时为 null. */
+    /** 解集 LaTeX;无实数解时为 null;联立数值路径是 `\approx` 近似解. */
     solutionLatex: string | null;
     /**
      * 实数解个数.
      *
-     * 内核的原始结论之一;结果展示走 `solutionLatex`/`identity`,这个计数留给
-     * 测试对拍与后续"解集摘要"展示.
+     * 单方程是根的个数;联立是解的个数(精确唯一解为 1,数值路径是找出的解点
+     * 个数).结果展示走 `solutionLatex`/`identity`,这个计数留给测试对拍.
      */
     realRootCount: number;
-    /** 恒等式(任意实数都是解):与"无解"必须区分. */
+    /**
+     * 恒等式(任意实数都是解):与"无解"必须区分.
+     *
+     * 单方程专用;联立恒为 false(方程组的"恒等"没有统一展示口径).
+     */
     identity: boolean;
     /** 求解步骤;`error !== null` 或隐藏时为空. */
     steps: SolveStep[];
     /** 能力边界/声明错误;null 表示求解成功. */
     error: string | null;
-    /** 求解任务是否参与计算.为 false 时仅保留列表项,不调用求解内核. */
-    enabled: boolean;
 }
 
 /**

@@ -36,6 +36,7 @@ mod poly;
 mod printing;
 mod simplify;
 mod solve;
+mod system;
 
 pub(crate) use eval::compile_runtime_expr;
 /// 查表版求值器只在测试里作为预绑定路径的参照物(见 `eval.rs`).
@@ -52,6 +53,8 @@ pub use latex::latex_expression;
 pub use ode::{solve_ode as solve_ode_outcome, OdeOutcome, OdeStep};
 // 方程求解内核:步骤产物是独立类型(`SolveOutcome`/`SolveStep`),不含 `Expr`.
 pub use solve::{solve_equation, SolveOutcome, SolveStep};
+// 联立方程组内核:线性精确解 + 非线性数值路径,产物同样是独立类型.
+pub use system::{solve_system, SystemMethod, SystemOutcome};
 
 use std::collections::HashSet;
 
