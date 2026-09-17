@@ -1,5 +1,7 @@
 # GraphCalc 文档
 
+本项目最重要的两个指标:数学准确性与性能
+
 - [求导与偏导(微分分析)使用指南](derivatives-guide.md) -- DSL 用户文档:
   在 GraphCalc 里如何求一元导数,偏导数,散度,旋度,以及 `show` /
   `at` / 参数联动等用法.
@@ -11,6 +13,41 @@
   **实测收益表**(边界固定开销 ~1.1 µs,`CompiledEvaluator` context 占求值成本
   94–99%),P0(求值器去 `HashMap<String, f64>`)的前后实测数字,以及明确不该
   迁移的项(P1 solid 可视化重复采样待设计).
+- [渲染精度,双目标架构与桌面端(Linux)分离方案](render-ui-migration-plan.md) --
+  评估文档:回答"性能是卖点,three.js 的 WebGPU 不稳定,WebGL 不接受,如何分离
+  桌面端".**已拍板**:①Web 端保留在 repo + GitHub Pages;②桌面端只做
+  Linux/Wayland/Vulkan/KDE Plasma(无设备测 Windows/macOS);③**桌面优先,Web
+  滞后,差距由作者人工控制**;④**数学核心硬共享,编译器共享是目标方向**;⑤**精度
+  参照定为 matplotlib 绘出图片的精度**.
+  三个值得单记的结论:
+  ①**精度参照是可执行判据**:matplotlib 开源,可脚本化,输出确定,自带
+  `image_comparison`/pytest-mpl 图像对比体系,同一场景能真的生成对照图;而
+  **三维不能用它当参照** -- mplot3d 官方 FAQ 明说三维被降成"二维 + z-order 标量",
+  相交三维物体"无法正确渲染",出路是"给后端加 GPU 三维渲染". 本项目的核心图形
+  (实体积分体 + 区域面 + 曲面相交)正是它做不到的那类,故精度目标拆成"二维与输出
+  品质照 matplotlib,三维另立".
+  ②**公式排版的否决项可降级**:matplotlib 自带 `mathtext`(轻量 TeX 子集解析器与
+  排版引擎,官方称"不需要装 TeX"且"排版算法是对 Knuth TeX 的直接改编"),其支持
+  子集**覆盖本项目用到的全部宏**,输出**字形**,内置 `cm`(Computer Modern)/`stix`
+  等数学字体集,许可为 BSD 兼容(可并入本项目 AGPL-3.0,需保留归属). 验证判据随之
+  从"能不能排出来"改为"与 mathtext 做矢量对照".
+  ③**egui 侧的"画布"是齐的,缺的只是布局引擎**:`Painter` 有 `line`/`circle`/
+  `rect_filled`/`text`/`image`/裁剪,`epaint::Shape` 有 11 个变体含 `Mesh`,
+  `QuadraticBezier`,`CubicBezier`,还有 `Callback` 逃生口可接自己的 wgpu 管线.
+  **唯一硬边界**:`PathShape.fill` 文档原话"**只支持凸多边形**",而字形轮廓是凹的且
+  带洞,所以不能像 Agg 那样直接填轮廓 -- 字形须走**图集 / 带洞三角化 / 离屏光栅 /
+  自绘管线** 四条路线之一(推荐图集:egui 自己的文字就是这么做的,`ab_glyph` 已在
+  依赖里). 另记:epaint 的抗锯齿是 feathering,不是 Agg 的解析覆盖率,这条差距要在
+  验证时量化.
+  ④**编译器共享比预想干净**:TS 语义层今天本就是"Rust 原语之上的编排层"
+  (`CompileController` 只做 `parseMiko`(wasm)+ `compileScene`,后者已在调 wasm 的
+  矩阵运算与 `symbolic_derivative`),所以共享不是新增耦合而是收拢;但**它决定了 IR
+  契约要不要生成器** -- 不共享则两份独立 IR(生成器可选),共享则一份产物两个消费者
+  (生成器必需),这条会影响阶段 1 的接口形状,所以现在就要定口径.
+  另含:Web 端四项结构性天花板与性能杠杆排序(**多核 4-8x > GPU compute > 去 wasm
+  边界 1.2-3x**,现状是单线程),共享集核实(`math_rs` 189 个原生测试,`render_rs`
+  8 个且 0 处浏览器 API),three.js 的四类不精确,**Wayland 中文输入法链路已核实为
+  通**(三个待验点),第一个里程碑(基本 Vulkan 骨架),以及六项验证与十一项风险登记.
 - [教学化改造路线图](teaching-roadmap.md) -- 规划文档:把 GraphCalc 从"能看
   结论的可视化器"做成**教学工具 + 自学教材**.含数学表达力与教学动线缺口
   清单,分阶段任务表(每项带依赖/工作量/验收/风险/降级),单课与习题设计
