@@ -530,6 +530,15 @@ export type SolveMethod = 'exact' | 'numeric' | 'auto';
  */
 export interface ConstraintTaskBase {
     name: string;
+    /**
+     * 内核实际用的后端.
+     *
+     * - 求解:`method` 选项可指定 `auto` / `exact` / `numeric`,缺省 `auto`;
+     *   这里记的是**内核回报的实际方法**(请求 `auto` 时按问题形状落定);
+     * - 隐藏项没有调用内核,记的是**请求**的方法(见 `compiler/dsl/solves.ts`
+     *   的 `disabledTask`);
+     * - 求交:恒为 `numeric`(几何求交没有精确符号后端).
+     */
     method: SolveMethod;
     /** 任务是否参与计算.为 false 时仅保留列表项,不执行计算. */
     enabled: boolean;
@@ -627,25 +636,19 @@ export interface SolveStep {
  * 调用,`equationLatex` 为空串,行内回退显示方程原文.
  *
  * 统一词汇:`method` 是内核实际用的方法(单方程恒为 `exact`;联立线性为
- * `exact`,非线性落到 `numeric`),`unknowns` 是全部未知量(推断失败或隐藏时
- * 为空数组).
+ * `exact`,非线性落到 `numeric`,能力边界是"实际尝试过的那条路"),`unknowns`
+ * 是全部未知量(推断失败或隐藏时为空数组).展示用的 `, ` / `; ` 连接文案由
+ * UI 从 `unknowns` / `equations` 派生,IR 里不再各存一份派生字符串.
  */
 export interface SolveTask extends ConstraintTaskBase {
     /**
      * 全部方程原文(单方程时长度为 1;联立时按书写顺序).
      *
-     * 与 {@link equation} 的关系:单方程时 `equations[0] === equation`;联立时
-     * `equation` 是 `; ` 连接后的展示用原文.
+     * 纯文本回退(`equationLatex` 为空时)由 `equations.join('; ')` 得到--
+     * 单方程与联立的差别只在这里,不再需要第二个"equation 原文"字段
+     * (AST 里那个 `equation` 是**首条**,同名不同义,容易读错).
      */
     equations: string[];
-    /** 方程原文(单方程就是它;联立是 `; ` 连接的原文,仅供纯文本回退). */
-    equation: string;
-    /**
-     * 求解变量(单方程);联立时是全部未知量用 `, ` 连接后的展示文案.
-     *
-     * 结构化数据一律读 {@link ConstraintTaskBase.unknowns}.
-     */
-    variable: string;
     /** 题目 LaTeX(单方程是原方程;联立是 `cases` 方程组);隐藏项为空串. */
     equationLatex: string;
     /** 解集 LaTeX;无实数解时为 null;联立数值路径是 `\approx` 近似解. */

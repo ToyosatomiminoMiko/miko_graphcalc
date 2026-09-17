@@ -51,7 +51,7 @@
 //     gradient g = grad(c) at [a, 1] { show = [point, normal]; };
 //     gradient g2 = grad(S1) at spherical(2, pi / 2, 0);
 //     integral I = integral(c) { method = riemann; range = [-8, 8]; };
-//     intersect X = intersection(c, S1);
+//     intersection X = intersection(c, S1);
 //     derivative dc = derivative(c);
 //     antiderivative A = antiderivative(c, x);
 //     solve R = x^2 - 5*x + 6 = 0 { variable = x; };
@@ -308,22 +308,18 @@ integral_call = { "integral" ~ "(" ~ ident ~ ")" }
 
 
 // =============================================================================
-// 九,交集:intersection / intersect
+// 九,交集:intersection
 // =============================================================================
 
-// 交集关键字:`intersection` 与 `intersect` 等价(两种历史写法都保留).
-intersection_kind = { "intersection" | "intersect" }
-
+// 交集关键字:`intersection`
 // 交集调用:恰好两个对象名参数.
-intersection_call = { intersection_kind ~ "(" ~ ident ~ "," ~ ident ~ ")" }
+intersection_call = { "intersection" ~ "(" ~ ident ~ "," ~ ident ~ ")" }
 
 // 交集语句:`关键字 名 = 调用 收尾`.
 //   - 字段:`type: "intersection"` / `name` / `a` / `b`(按实参顺序的两个操作数名)/
 //     `options` / `span`;
-//   - 语句头与调用处的关键字各自匹配,语法不要求写成同一个
-//     (`intersect X = intersection(a, b);` 也能通过),字段按语句头的关键字取;
 //   - 下游 intersection_to_stmt.
-intersection_stmt = { intersection_kind ~ ident ~ "=" ~ intersection_call ~ stmt_end }
+intersection_stmt = { "intersection" ~ ident ~ "=" ~ intersection_call ~ stmt_end }
 
 
 // =============================================================================
@@ -364,8 +360,8 @@ derivative_call = { "derivative" ~ "(" ~ ident ~ ("," ~ ident)? ~ ")" }
 //     solve S = a*x^2 + b*x + c = 0 { variable = x; }
 //     solve S = { x + y = 3; x - y = 1; } { variables = x, y; }
 // 参数(a/b/c)按当前声明值代入,内核不做符号系数代数.
-//   - 字段:`type: "solve"` / `name` / `equation`(首条方程原文,兼容既有消费方)/
-//     `equations`(全部方程原文)/ `options` / `span`;
+//   - 字段:`type: "solve"` / `name` / `equations`(全部方程原文)/
+//    `options` / `span`;
 //   - 下游 solve_to_stmt 与 compiler/dsl/solves.ts.
 solve_stmt = { "solve" ~ ident ~ "=" ~ (solve_system_set | expr) ~ stmt_end }
 

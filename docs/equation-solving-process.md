@@ -401,6 +401,7 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 solve S = x^2 - 5*x + 6 = 0 { variable = x; };              // 单方程(原有)
 solve S = { x + y = 3; x - y = 1; };                        // 联立(新增)
 solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };
+solve S = { x^2 + y^2 = 1; x - y = 0; } { method = exact; }; // 只走精确后端
 ```
 
 理由:显隐集合,名查重,求值列表子项,过程页骨架,参数系数链路在 `solve` 上
@@ -412,13 +413,19 @@ solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };
 | 层 | 单方程 | 联立 |
 | --- | --- | --- |
 | 内核问题 | `ConstraintKind::Equation` | `ConstraintKind::System` |
-| 内核方法 | `exact` | `auto`(线性精确 / 非线性数值) |
+| 内核方法 | `exact` | `method` 选项:`auto`(缺省,线性精确 / 非线性数值)/ `exact` / `numeric` |
 | 结果 | `ConstraintOutcome`(统一) | 同左 |
+| IR 方程 | `equations = [原方程]` | `equations = [方程1, 方程2, ...]` |
 | IR 未知量 | `unknowns = [x]` | `unknowns = [x, y]` |
 | 题目 | `equationLatex`(原方程) | `equationLatex`(`cases` 方程组) |
 
-`equation` / `variable` 在联立时退化为 `; ` 与 `, ` 连接后的**展示用原文**;
-结构化数据一律读 `equations` / `unknowns`.
+IR 里只有 `equations` 与 `unknowns` 两个结构化字段:摘要的纯文本回退
+(`equations.join('; ')`)与细节的"求解 X"(`unknowns.join(', ')`)都由 UI 派生,
+不再并存"首条方程"与"连接串"这类同名不同义的派生字段.
+
+`method` 记的是**内核实际用的后端**:请求 `auto` 时,线性方程组回报 `exact`,
+非线性回报 `numeric`;能力边界回报"实际尝试过的那条路".单方程没有数值后端,
+`method = numeric` 在编译期就报错.
 
 ### 11.3 能力边界(刻意保守)
 
@@ -429,8 +436,10 @@ solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };
 | 方程数 > 未知量数(超定) | 能力边界:"方程数多于未知量数" |
 | 未知量数 > 方程数(欠定) | 能力边界:"解不唯一,暂不给通解" |
 | 系数矩阵奇异 | 能力边界:"无解或有无穷多解" |
-| 指定 `exact` 但方程非线性 | 能力边界,并提示去掉 `exact` 可试数值解 |
+| 指定 `method = exact` 但方程非线性 | 能力边界,并提示精确路径只解线性方程组 |
 | 区间内找不到数值解 | 能力边界,提示调整 `range`/`segments` |
+| 网格节点数 `(segments+1)^未知量` 超过上限 | 能力边界,提示减小 `segments`(见 11.4) |
+| 系数不是有限实数(如参数取负后开平方) | 能力边界,理由说明是哪一项;绝不把 `NaN`/`inf` 当解排版 |
 
 **不伪造消元推导**:非线性方程组的中间步骤与线性消元不是一回事,所以数值路径
 只给"数值解"这一步,并明确写出搜索区间与"不保证不漏根".
@@ -443,8 +452,16 @@ solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };
 - `numeric_core::linalg`:高斯消元(部分分式与线性联立共用);
 - `numeric_core::newton`:方阵系统阻尼 Newton + 盒域多起点扫描(联立数值路径).
 
-未知量超过 3 个,或网格节点数超过内核上限时,数值路径直接给能力边界而不是
-硬算(网格是 `(segments + 1)^未知量`).
+规模守卫在**求值之前**判:`newton::grid_node_count` 给出节点数 `(segments + 1)^未知量`,
+`symbolic::system` 拿它与上限(`MAX_NUMERIC_STARTS × 16 = 65536`)比较,超限直接给
+能力边界.为什么必须先判:网格节点是逐个求值的(每个节点还要为 Jacobian 再求若干次),
+只在选起点时截断等于先付了全部求值代价--实测 3 未知量 / `segments = 64`(274,625 个
+节点)单次编译约 190ms,峰值内存约 26MB,而联立求解跑在主线程上,参数滑块每动一次
+就重算一遍.
+
+起点选择(`newton::select_starts`)先按初始残差升序,再按盒域分格去偏(每格最多一个
+起点).只做前者的话,一个"残差平坦"的盆地会挤满小残差节点,吃光全部起点配额,
+另一个盆地的解连起点都轮不到.
 
 ### 11.5 明确不做(v1)
 
@@ -452,3 +469,6 @@ solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2]; segments = 24; };
 - 不给欠定方程组的通解参数化;
 - 不做数值解的几何下发(解点是 `x, y` 变量空间,不是三维世界坐标);
 - 不做高维(> 3 未知量)数值求解.
+
+`range` 支持两种写法:一条区间广播到全部未知量(`range = [-2, 2]`),或逐个未知量
+一条(`range = [-2, 2, -3, 3]`,条数必须与未知量数相等);条数不对由内核给理由.

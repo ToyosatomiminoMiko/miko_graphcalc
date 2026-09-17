@@ -40,8 +40,7 @@ describe('compileSolves:声明级求解', () => {
         const task = await solveTask('solve S = x^2 - 5*x + 6 = 0;');
 
         expect(task.name).toBe('S');
-        expect(task.variable).toBe('x');
-        // 统一词汇:求解恒为精确后端,未知量以列表形式给出(为联立留的接口).
+        // 统一词汇:求解恒为精确后端,未知量以列表形式给出(展示文案由 UI 派生).
         expect(task.method).toBe('exact');
         expect(task.unknowns).toEqual(['x']);
         expect(task.enabled).toBe(true);
@@ -115,7 +114,6 @@ describe('compileSolves:声明级求解', () => {
     it('variable 选项指定未知量', async () => {
         const task = await solveTask('solve S = t^2 - 9 = 0 { variable = t; };');
 
-        expect(task.variable).toBe('t');
         expect(task.unknowns).toEqual(['t']);
         expect(task.solutionLatex).toContain('t = 3');
     });
@@ -149,7 +147,7 @@ describe('compileSolves:声明级求解', () => {
         expect(task.method).toBe('exact');
         // 没调用内核就没有未知量可报.
         expect(task.unknowns).toEqual([]);
-        expect(task.equation).toBe('x^2 - 5*x + 6 = 0');
+        expect(task.equations).toEqual(['x^2 - 5*x + 6 = 0']);
         expect(task.equationLatex).toBe('');
         expect(task.steps).toEqual([]);
         expect(task.error).toBeNull();
@@ -177,9 +175,7 @@ describe('compileSolves:联立方程组(v1)', () => {
         expect(task.method).toBe('exact');
         expect(task.unknowns).toEqual(['x', 'y']);
         expect(task.equations).toEqual(['x + y = 3', 'x - y = 1']);
-        // `equation` / `variable` 是展示用的连接文案,结构化数据在 equations/unknowns.
-        expect(task.equation).toBe('x + y = 3; x - y = 1');
-        expect(task.variable).toBe('x, y');
+        expect(task.unknowns).toEqual(['x', 'y']);
         expect(task.solutionLatex).toBe('x = 2,\\quad y = 1');
         expect(task.realRootCount).toBe(1);
         expect(task.error).toBeNull();
@@ -246,6 +242,93 @@ describe('compileSolves:联立方程组(v1)', () => {
         await expect(
             compile('solve S = x - 1 = 0 { variables = x, y; };'),
         ).rejects.toThrow(/只有一个方程/);
+    });
+
+    it('隐藏不跳过形状校验(约定 1:先完整校验,后禁用)', async () => {
+        const hidden = new Set(['S']);
+        await expect(
+            compile('solve S = x - 1 = 0 { variables = x, y; };', {}, hidden),
+        ).rejects.toThrow(/只有一个方程/);
+        await expect(
+            compile('solve S = x - 1 = 0 { range = [-2, 2]; };', {}, hidden),
+        ).rejects.toThrow(/只对联立方程组有意义/);
+        await expect(
+            compile('solve S = { x + y = 3; x - y = 1; } { method = numric; };', {}, hidden),
+        ).rejects.toThrow(/method 只接受/);
+    });
+
+    it('method 选项:exact 让非线性方程组停在能力边界,numeric 才走数值路径', async () => {
+        const source = 'solve S = { x^2 + y^2 = 1; x - y = 0; }'
+            + ' { range = [-2, 2]; segments = 16; method = %s; };';
+
+        const auto = await solveTask(source.replace('%s', 'auto'));
+        expect(auto.method).toBe('numeric');
+        expect(auto.error).toBeNull();
+
+        const numeric = await solveTask(source.replace('%s', 'numeric'));
+        expect(numeric.method).toBe('numeric');
+        expect(numeric.realRootCount).toBe(2);
+
+        const exact = await solveTask(source.replace('%s', 'exact'));
+        expect(exact.error).toContain('只解线性方程组');
+        expect(exact.solutionLatex).toBeNull();
+    });
+
+    it('method 取值拼错必须报错,不能静默走 auto', async () => {
+        await expect(
+            compile('solve S = { x + y = 3; x - y = 1; } { method = nope; };'),
+        ).rejects.toThrow(/method 只接受 auto \/ exact \/ numeric/);
+        // 单方程没有数值后端.
+        await expect(
+            compile('solve S = x - 1 = 0 { method = numeric; };'),
+        ).rejects.toThrow(/还没有数值后端/);
+    });
+
+    it('range 支持成对给出多条区间(每条对应一个未知量)', async () => {
+        const perAxis = await solveTask(
+            'solve S = { x^2 + y^2 = 1; x - y = 0; }'
+            + ' { range = [-2, 2, -3, 3]; segments = 16; };',
+        );
+        expect(perAxis.method).toBe('numeric');
+        expect(perAxis.realRootCount).toBe(2);
+
+        // 成对之外的长度是源码写错,必须报错.
+        await expect(
+            compile('solve S = { x^2 + y^2 = 1; x - y = 0; } { range = [-2, 2, -3]; };'),
+        ).rejects.toThrow(/成对给出区间/);
+    });
+
+    it('3 未知量 + segments=64:节点数超过内核上限,给能力边界而不是硬算', async () => {
+        const source = (segments: number) =>
+            'solve S = { x^2 + y^2 + z^2 = 1; x - y = 0; y - z = 0; }'
+            + ` { range = [-2, 2]; segments = ${segments}; };`;
+
+        const oversized = await solveTask(source(64));
+        expect(oversized.method).toBe('numeric');
+        expect(oversized.error).toContain('超过上限');
+        expect(oversized.steps).toEqual([]);
+
+        // 同一道题把网格降下来照样能解(守卫只拦真的会爆的输入).
+        const ok = await solveTask(source(24));
+        expect(ok.error).toBeNull();
+        expect(ok.realRootCount).toBe(2);
+    });
+
+    it('能力边界不回填步骤:过程入口按 error 置灰', async () => {
+        const over = await solveTask('solve S = { x + y = 1; x - y = 0; x = 1; };');
+
+        expect(over.error).toContain('多于未知量数');
+        expect(over.steps).toEqual([]);
+    });
+
+    it('非有限系数(参数拖成负数 + 分数次幂)不产出解', async () => {
+        const task = await solveTask(
+            'param a = -1 in [-2, 2, 0.5];\nsolve S = { a^0.5 + x = 0; y = 1; };',
+        );
+
+        expect(task.solutionLatex).toBeNull();
+        expect(task.error).toContain('不是有限实数');
+        expect(task.steps).toEqual([]);
     });
 });
 

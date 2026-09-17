@@ -192,7 +192,7 @@ fn infer_variable(expr: &Expr, coefficients: &HashMap<String, f64>) -> Result<St
 }
 
 /// 负数加括号(幂底数与乘积因子位置),其余原样.
-pub(crate) fn parenthesize_number(value: f64) -> String {
+fn parenthesize_number(value: f64) -> String {
     if value < 0.0 {
         format!("({})", latex_number(value))
     } else {
@@ -249,7 +249,7 @@ pub(crate) fn rational_latex(numerator: f64, denominator: f64) -> Option<String>
     })
 }
 
-pub(crate) fn gcd(left: u64, right: u64) -> u64 {
+fn gcd(left: u64, right: u64) -> u64 {
     if right == 0 {
         left
     } else {

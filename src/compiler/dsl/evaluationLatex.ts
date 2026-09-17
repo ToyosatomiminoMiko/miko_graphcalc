@@ -287,10 +287,22 @@ export function intersectionLatexDetails(task: IntersectionTaskLike): Evaluation
 /**
  * 求解结果摘要:默认可见的一行,即**题目**(待求解的方程).
  *
- * 排不出 LaTeX(隐藏项或内核未给题目)时返回 null,调用方回退到方程原文.
+ * 排不出 LaTeX(隐藏项或内核未给题目)时返回 null,调用方回退到
+ * [`solvePlainText`].
  */
 export function solveLatexSummary(task: SolveTask): LatexLine | null {
     return task.equationLatex === '' ? null : task.equationLatex;
+}
+
+/**
+ * 求解题目的纯文本回退(排不出 LaTeX 时用).
+ *
+ * 联立用 `; ` 连接,读者能看出这是方程组而不是一条方程;单方程就是它自己.
+ * 从 `equations` 派生而不在 IR 里再存一份,是为了避免同一件事有"首条"与
+ * "连接串"两个同名同义不同值的字段并存(见 contract/ir.ts 的 SolveTask).
+ */
+export function solvePlainText(task: SolveTask): string {
+    return task.equations.join('; ');
 }
 
 /**
@@ -302,7 +314,7 @@ export function solveLatexSummary(task: SolveTask): LatexLine | null {
  *
  * 末尾一律给"求解的是哪个量 + 步骤计数":求解变量可以是内核推断出来的
  * (DSL 里没写 `variable` 选项),不写出来学生无法确认解的是哪个符号;计数
- * 把读者引到右栏过程页(完整推导在那里逐行展开).
+ * 把读者引到右栏过程页(完整推导在那里逐行展开).联立时这里列出全部未知量.
  */
 export function solveLatexDetails(task: SolveTask): EvaluationDetailLine[] {
     if (task.error !== null) {
@@ -317,7 +329,8 @@ export function solveLatexDetails(task: SolveTask): EvaluationDetailLine[] {
     } else {
         lines.push({ kind: 'text', text: '无实数解' });
     }
-    const about = task.variable === '' ? '' : `求解 ${task.variable}: `;
+    const unknowns = task.unknowns.join(', ');
+    const about = unknowns === '' ? '' : `求解 ${unknowns}: `;
     lines.push({
         kind: 'text',
         text: `${about}共 ${task.steps.length} 步(见右栏"过程")`,

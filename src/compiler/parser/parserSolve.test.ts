@@ -23,8 +23,7 @@ describe('parseMiko 方程求解语句', () => {
         expect(statement).toMatchObject({
             type: 'solve',
             name: 'S',
-            equation: 'x^2 - 5*x + 6 = 0',
-            // 单方程时 `equations` 长度为 1,与 `equation` 同源.
+            // 单方程就是长度为 1 的列表:AST 里只有这一个方程字段.
             equations: ['x^2 - 5*x + 6 = 0'],
             options: [],
         });
@@ -38,8 +37,6 @@ describe('parseMiko 方程求解语句', () => {
 
         const statement = findSolve(program);
         expect(statement?.equations).toEqual(['x + y = 3', 'x - y = 1']);
-        // 兼容字段取首条.
-        expect(statement?.equation).toBe('x + y = 3');
         expect(statement?.options).toEqual([{ name: 'variables', value: 'x, y' }]);
     });
 
@@ -51,6 +48,17 @@ describe('parseMiko 方程求解语句', () => {
 
     it('空方程组 `{}` 是语法错误', async () => {
         await expect(parseMiko('solve S = { };')).rejects.toThrow();
+    });
+
+    it('交集关键字只认全名 `intersection`,历史别名 `intersect` 已删除', async () => {
+        await expect(
+            parseMiko('curve c = x;\nsphere S = [0,0,0,1];\nintersect X = intersection(c, S);'),
+        ).rejects.toThrow();
+
+        const program = await parseMiko(
+            'curve c = x;\nsphere S = [0,0,0,1];\nintersection X = intersection(c, S);',
+        );
+        expect(program.statements.some((entry) => entry.type === 'intersection')).toBe(true);
     });
 
     it('接受选项块里的 variable', async () => {
@@ -83,6 +91,6 @@ describe('parseMiko 方程求解语句', () => {
     it('方程里出现多个等号时语法仍接受(由内核报"多个等号")', async () => {
         const program = await parseMiko('solve S = x = y = 0;');
 
-        expect(findSolve(program)?.equation).toBe('x = y = 0');
+        expect(findSolve(program)?.equations).toEqual(['x = y = 0']);
     });
 });

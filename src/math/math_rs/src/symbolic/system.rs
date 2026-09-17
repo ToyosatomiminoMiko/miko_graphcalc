@@ -29,7 +29,7 @@ use super::solve::{
     without_negative_zero, SolveStep, KIND_ALGEBRA, KIND_DEFINITION, KIND_NUMERIC, KIND_RULE,
 };
 use super::{collect_symbols, BinOp, Expr, UnaryOp};
-use crate::numeric_core::linalg::solve_system as solve_linear_system;
+use crate::numeric_core::linalg::{solve_system as solve_linear_system, upper_triangle};
 use crate::numeric_core::newton::scan_roots;
 
 /// 数值路径未给 `range` 时的默认搜索区间(每个未知量一条).
@@ -40,6 +40,17 @@ const DEFAULT_SEGMENTS: usize = 24;
 const MAX_NUMERIC_DIMENSION: usize = 3;
 /// 多起点 Newton 的起点上限(防止高维网格把工作量顶爆).
 const MAX_NUMERIC_STARTS: usize = 4096;
+/// 数值网格的节点数上限:`(segments + 1)^未知量`.
+///
+/// 这个上限是**必须**的:网格节点在选起点之前要逐个求值(每个节点还要为
+/// Jacobian 再求若干次),而联立求解跑在主线程上,参数滑块每动一次就重算一遍.
+/// 实测 3 未知量 / `segments = 64`(274,625 个节点)单次编译约 190ms,峰值
+/// 内存约 26MB;按一次拖动上百帧算,不设上限就是明确的卡顿与内存尖峰.
+///
+/// 取 `MAX_NUMERIC_STARTS × 16`:保证每个起点平均有 16 个候选节点可选,
+/// 规模守卫只拦"真的会爆"的输入,常规 2 维 64 段(4225)与 3 维 32 段(35937)
+/// 都照常求解.
+const MAX_NUMERIC_NODES: usize = MAX_NUMERIC_STARTS * 16;
 
 /// 方程组求解方法(内核内部;与 `crate::solve_core::SolveMethod` 一一对应).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +115,15 @@ impl AffineForm {
 
     fn is_constant(&self) -> bool {
         self.coeffs.iter().all(|value| *value == 0.0)
+    }
+
+    /// 系数与常数项是否都是有限实数.
+    ///
+    /// 消元本身不拦 NaN/inf(NaN 参与的比较恒为 false,会绕过奇异判据),
+    /// 所以抽完仿射式后必须在这里统一验一次;否则非有限值会一路算到 `values`,
+    /// 最后作为"解"排版出去.
+    fn is_finite(&self) -> bool {
+        self.constant.is_finite() && self.coeffs.iter().all(|value| value.is_finite())
     }
 
     fn add(&self, other: &Self) -> Self {
@@ -307,10 +327,19 @@ fn affine_from_expr(
             }
             let base = affine_from_expr(base, unknown_index, coefficients, dimension)?;
             if base.is_constant() {
-                return Ok(AffineForm::constant(
-                    real_pow(base.constant, power),
-                    dimension,
-                ));
+                // 常量底数的幂在这里折成系数:结果必须是**有限实数**.
+                // `(-1)^0.5`(无实值)与 `0^-1` 分别给出 NaN / inf,一旦当成系数
+                // 进了消元,NaN 会绕过奇异判据(`NaN < 阈值` 恒为 false),最后
+                // 把 `x = NaN` 印成"解".与单方程内核同一条底线:宁可不给,
+                // 也不给看起来像解的东西.
+                let value = real_pow(base.constant, power);
+                if !value.is_finite() {
+                    return Err(AffineError::Invalid(format!(
+                        "方程的系数 {}^{power} 不是有限实数",
+                        base.constant
+                    )));
+                }
+                return Ok(AffineForm::constant(value, dimension));
             }
             Err(AffineError::Nonlinear(
                 "方程含未知量的幂,不是线性方程".to_string(),
@@ -354,7 +383,34 @@ fn infer_variables(
     Ok(unknown)
 }
 
-/// 能力边界结果:题目 LaTeX 照给(方程都解析成功了),步骤留空.
+/// 方程组里第一个"既不是未知量也不是已声明参数"的自由符号(按出现顺序).
+///
+/// 显式给了 `variables` 时,`infer_variables` 不会执行,也就没人检查未声明
+/// 符号;线性路径由 `affine_from_expr` 兜住,非线性路径必须在这里兜住
+/// (见 `solve_numeric` 的说明).
+fn first_undeclared_symbol(
+    residuals: &[Expr],
+    unknown_index: &HashMap<String, usize>,
+    coefficients: &HashMap<String, f64>,
+) -> Option<String> {
+    for residual in residuals {
+        let mut names = Vec::new();
+        collect_symbols(residual, &mut names);
+        for name in names {
+            if !unknown_index.contains_key(&name) && !coefficients.contains_key(&name) {
+                return Some(name);
+            }
+        }
+    }
+    None
+}
+
+/// 能力边界结果:题目 LaTeX 照给,步骤留空.
+///
+/// 步骤必须为空:IR 契约(`contract/ir.ts` 的 `SolveTask.steps`)写明
+/// "`error !== null` 时为空",而 UI 的"过程"入口正是按 `steps.length === 0`
+/// 判断"内核拒绝就置灰并给明文理由".能力边界带着半截推导回去,入口会变成
+/// 可点但只显示"原式"的假过程.
 ///
 /// `method` 是**实际尝试过的方法**("auto" / "exact" / "numeric"):能力边界也
 /// 要如实说明内核走的是哪条路,否则调用方与 UI 只能猜.
@@ -363,46 +419,16 @@ fn failure(
     variables: Vec<String>,
     problem_latex: String,
     message: &str,
-    steps: Vec<SolveStep>,
 ) -> SystemOutcome {
     SystemOutcome {
         variables,
         problem_latex,
         solution_latex: None,
         solution_count: 0,
-        steps,
+        steps: Vec::new(),
         error: Some(message.to_string()),
         method: method.to_string(),
     }
-}
-
-/// 高斯消元后的上三角增广矩阵(只用于板书展示,数值解由 `solve_system` 给).
-fn upper_triangular(mut matrix: Vec<Vec<f64>>, columns: usize) -> Vec<Vec<f64>> {
-    let rows = matrix.len();
-    for column in 0..columns {
-        let mut pivot = column;
-        for row in column + 1..rows {
-            if matrix[row][column].abs() > matrix[pivot][column].abs() {
-                pivot = row;
-            }
-        }
-        if matrix[pivot][column].abs() < 1e-12 {
-            continue;
-        }
-        matrix.swap(column, pivot);
-        for row in column + 1..rows {
-            let factor = matrix[row][column] / matrix[column][column];
-            if factor.abs() < 1e-15 {
-                continue;
-            }
-            // 先把主元行拷出来:同一矩阵的两行不能同时可变借用.
-            let pivot_row: Vec<f64> = matrix[column][column..=columns].to_vec();
-            for (offset, cell) in matrix[row][column..=columns].iter_mut().enumerate() {
-                *cell -= factor * pivot_row[offset];
-            }
-        }
-    }
-    matrix
 }
 
 /// 线性方程组的精确求解(方阵):返回(解集 LaTeX, 板书步骤).
@@ -432,6 +458,12 @@ fn solve_exact(
     let Some(values) = solve_linear_system(matrix, columns) else {
         return Err("系数矩阵奇异:该方程组无解或有无穷多解".to_string());
     };
+    // 最后一道有限性防线:消元里除以极小主元同样能溢出成 inf.
+    // 到这一步还不是有限实数,就说明这道题超出了"能给精确解"的范围 --
+    // 绝不能把 NaN/inf 当成解排版出去.
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err("方程组的解不是有限实数:请检查参数取值与系数数量级".to_string());
+    }
 
     let mut steps = Vec::new();
 
@@ -446,16 +478,18 @@ fn solve_exact(
         KIND_ALGEBRA,
     ));
 
-    // 消元:上三角化之后回显(只展示非零行).
+    // 消元:上三角化之后回显(只展示非零行).上三角化与求解共用
+    // `numeric_core::linalg` 的主元策略,这里拿不到结果就不展示"消元结果".
     if columns >= 2 {
-        let triangular = upper_triangular(display_matrix, columns);
-        let lines: Vec<String> = triangular
-            .iter()
-            .filter(|row| row[..columns].iter().any(|value| *value != 0.0))
-            .map(|row| linear_row_latex(&row[..columns], row[columns], unknowns))
-            .collect();
-        if !lines.is_empty() {
-            steps.push(step(cases_latex(&lines), "加减消元", KIND_RULE));
+        if let Some(triangular) = upper_triangle(display_matrix, columns) {
+            let lines: Vec<String> = triangular
+                .iter()
+                .filter(|row| row[..columns].iter().any(|value| *value != 0.0))
+                .map(|row| linear_row_latex(&row[..columns], row[columns], unknowns))
+                .collect();
+            if !lines.is_empty() {
+                steps.push(step(cases_latex(&lines), "加减消元", KIND_RULE));
+            }
         }
     }
 
@@ -522,7 +556,6 @@ fn solve_numeric(
                 residuals.len(),
                 dimension
             ),
-            steps,
         );
     }
     if dimension > MAX_NUMERIC_DIMENSION {
@@ -531,7 +564,19 @@ fn solve_numeric(
             unknowns.to_vec(),
             problem_latex,
             &format!("数值路径目前最多支持 {MAX_NUMERIC_DIMENSION} 个未知量"),
-            steps,
+        );
+    }
+
+    // 未声明符号必须在这里拦下来.数值残差求值时它只会让该点"不可求值",
+    // 所有网格点被跳过,最后报成"区间内没有找到数值解",让用户去调
+    // range/segments -- 理由完全不对(线性路径在 `affine_from_expr` 里报的是
+    // "方程组含未声明参数",两条路径必须给同一个理由).
+    if let Some(name) = first_undeclared_symbol(residuals, unknown_index, coefficients) {
+        return failure(
+            "numeric",
+            unknowns.to_vec(),
+            problem_latex,
+            &format!("方程组含未声明参数 {name}:请先用 param 声明,或用 variables 选项指定未知量"),
         );
     }
 
@@ -545,19 +590,37 @@ fn solve_numeric(
                 unknowns.to_vec(),
                 problem_latex,
                 &format!("range 选项给了 {length} 条区间,需要 1 条或 {dimension} 条"),
-                steps,
             );
         }
     };
-    let Some(scan_box) = crate::numeric_core::newton::ScanBox::new(axes.clone()) else {
+    let Some(scan_box) = crate::numeric_core::newton::ScanBox::new(axes) else {
         return failure(
             "numeric",
             unknowns.to_vec(),
             problem_latex,
             "range 选项的区间非法(需要上界大于下界的有限区间)",
-            steps,
         );
     };
+
+    let segments = if segments == 0 {
+        DEFAULT_SEGMENTS
+    } else {
+        segments
+    };
+    // 网格规模守卫:节点数是 `(segments + 1)^未知量`,不做这一步就会在主线程上
+    // 凭空求值几十万个点(见 docs/equation-solving-process.md §11.4 的同一条承诺).
+    let node_count = crate::numeric_core::newton::grid_node_count(dimension, segments);
+    if node_count > MAX_NUMERIC_NODES {
+        return failure(
+            "numeric",
+            unknowns.to_vec(),
+            problem_latex,
+            &format!(
+                "数值网格 {node_count} 个节点超过上限 {MAX_NUMERIC_NODES}\
+                 (节点数是 (segments+1)^未知量):请减小 segments,或缩小 range 的维度"
+            ),
+        );
+    }
 
     // 区间先如实写进过程:数值解只在区间内有效,读者必须知道搜了哪儿.
     let box_latex = unknowns
@@ -591,11 +654,6 @@ fn solve_numeric(
         Some(values)
     };
 
-    let segments = if segments == 0 {
-        DEFAULT_SEGMENTS
-    } else {
-        segments
-    };
     let solutions = scan_roots(&mut residual_fn, &scan_box, segments, MAX_NUMERIC_STARTS);
 
     if solutions.is_empty() {
@@ -604,7 +662,6 @@ fn solve_numeric(
             unknowns.to_vec(),
             problem_latex,
             "在给定区间内没有找到数值解:可调整 range 与 segments 后重试(数值搜索不保证不漏根)",
-            steps,
         );
     }
 
@@ -640,13 +697,7 @@ pub fn solve_system(
     segments: usize,
 ) -> Result<SystemOutcome, String> {
     if equations.is_empty() {
-        return Ok(failure(
-            "auto",
-            Vec::new(),
-            String::new(),
-            "方程组不能为空",
-            Vec::new(),
-        ));
+        return Ok(failure("auto", Vec::new(), String::new(), "方程组不能为空"));
     }
 
     let coefficient_map: HashMap<String, f64> = coefficients.iter().cloned().collect();
@@ -661,7 +712,6 @@ pub fn solve_system(
                 Vec::new(),
                 String::new(),
                 "方程组里有空方程",
-                Vec::new(),
             ));
         }
         let (lhs_text, rhs_text) = split_equation(trimmed)?;
@@ -681,13 +731,15 @@ pub fn solve_system(
         });
     }
 
+    // 先取排版行,再把残差**移出** `forms`:留着 `forms` 只为拼题目,不必再深拷
+    // 一份 AST(每条方程的表达式都要克隆一次,方程组越大越亏).
     let problem_latex = cases_latex(
         &forms
             .iter()
             .map(|form| form.latex.clone())
             .collect::<Vec<_>>(),
     );
-    let residuals: Vec<Expr> = forms.iter().map(|form| form.residual.clone()).collect();
+    let residuals: Vec<Expr> = forms.into_iter().map(|form| form.residual).collect();
 
     // 未知量:显式 `variables` 优先,否则从方程组推断.
     let unknowns = match variables {
@@ -704,7 +756,6 @@ pub fn solve_system(
                         Vec::new(),
                         problem_latex,
                         &format!("变量 {name} 与已声明参数同名,无法区分"),
-                        Vec::new(),
                     ));
                 }
                 if !cleaned.iter().any(|existing| existing == name) {
@@ -717,22 +768,13 @@ pub fn solve_system(
                     Vec::new(),
                     problem_latex,
                     "variables 选项没有给出任何变量",
-                    Vec::new(),
                 ));
             }
             cleaned
         }
         _ => match infer_variables(&residuals, &coefficient_map) {
             Ok(names) => names,
-            Err(message) => {
-                return Ok(failure(
-                    "auto",
-                    Vec::new(),
-                    problem_latex,
-                    &message,
-                    Vec::new(),
-                ))
-            }
+            Err(message) => return Ok(failure("auto", Vec::new(), problem_latex, &message)),
         },
     };
 
@@ -768,17 +810,29 @@ pub fn solve_system(
     let mut affine_forms = Vec::with_capacity(residuals.len());
     let mut nonlinear_reason: Option<String> = None;
     for residual in &residuals {
-        match affine_from_expr(residual, &unknown_index, &coefficient_map, dimension) {
-            Ok(form) => affine_forms.push(form),
+        let form = match affine_from_expr(residual, &unknown_index, &coefficient_map, dimension) {
+            Ok(form) => form,
             // 输入本身有问题:两条路径都救不了,直接给能力边界.
             Err(AffineError::Invalid(message)) => {
-                return Ok(failure("auto", unknowns, problem_latex, &message, steps));
+                return Ok(failure("auto", unknowns, problem_latex, &message));
             }
             Err(AffineError::Nonlinear(message)) => {
                 nonlinear_reason = Some(message);
                 break;
             }
+        };
+        // 系数必须全有限:NaN/inf 会在消元里传递并绕过奇异判据,最后当成解印出去.
+        // 常量幂只堵住了 `(-1)^0.5` / `0^-1` 这一类来源,加减乘与除法同样能
+        // 溢出成 inf,所以这里统一再验一次(两道防线都要有).
+        if !form.is_finite() {
+            return Ok(failure(
+                "auto",
+                unknowns,
+                problem_latex,
+                "方程的系数不是有限实数(参数取值或幂指数可能导致 NaN/inf)",
+            ));
         }
+        affine_forms.push(form);
     }
 
     if let Some(reason) = nonlinear_reason {
@@ -788,7 +842,6 @@ pub fn solve_system(
                 unknowns,
                 problem_latex,
                 &format!("{reason};联立 v1 的精确路径只解线性方程组"),
-                steps,
             ),
             SystemMethod::Numeric | SystemMethod::Auto => solve_numeric(
                 &residuals,
@@ -816,7 +869,7 @@ pub fn solve_system(
                 method: "exact".to_string(),
             })
         }
-        Err(message) => Ok(failure("exact", unknowns, problem_latex, &message, steps)),
+        Err(message) => Ok(failure("exact", unknowns, problem_latex, &message)),
     }
 }
 
@@ -990,6 +1043,149 @@ mod tests {
         assert!(outcome.solution_latex.is_none());
         let message = outcome.error.expect("应当给理由");
         assert!(message.contains("没有找到数值解"), "{message}");
+    }
+
+    /// 非有限系数不得变成"解":`(-1)^0.5` 无实值,`0^-1` 为 inf.
+    ///
+    /// 这两条都曾经一路算到板书里,输出 `x = NaN` / `x = -inf` 且 `error`
+    /// 为 `None` -- 比"解不出来"坏得多.
+    #[test]
+    fn non_finite_coefficients_are_a_capability_boundary_not_a_solution() {
+        for source in ["x + (-1)^0.5 = 0", "x + 0^(-1) = 0", "x + (-1)^(1/2) = 0"] {
+            let outcome = solve(&[source, "y = 1"]);
+            let message = outcome.error.unwrap_or_default();
+            assert!(
+                message.contains("不是有限实数"),
+                "{source} 应当给能力边界理由: {message:?}"
+            );
+            assert!(outcome.solution_latex.is_none(), "{source}");
+            assert!(outcome.steps.is_empty(), "{source} 失败时不得留下板书步骤");
+        }
+    }
+
+    /// 参数把底数拖成负数 + 分数次幂:同一类非有限系数的真实触发路径.
+    #[test]
+    fn negative_parameter_with_fractional_power_is_reported() {
+        let outcome = solve_system(
+            &equations(&["a^0.5 + x = 0", "y = 1"]),
+            None,
+            &[("a".to_string(), -1.0)],
+            SystemMethod::Auto,
+            &[],
+            0,
+        )
+        .expect("可解析");
+
+        assert!(
+            outcome
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("不是有限实数"),
+            "{:?}",
+            outcome.error
+        );
+        assert!(outcome.solution_latex.is_none());
+    }
+
+    /// 常量底数的**有限**分数次幂仍然照常折成系数,不能一并误杀.
+    #[test]
+    fn finite_fractional_powers_still_fold_into_coefficients() {
+        let outcome = solve(&["x + (-8)^(1/3) = 0", "y = 1"]);
+
+        assert!(outcome.error.is_none(), "{:?}", outcome.error);
+        let solution = outcome.solution_latex.as_deref().expect("应当有解");
+        assert!(solution.contains("x = 2"), "{solution}");
+    }
+
+    /// 显式 `variables` 漏掉方程里的自由符号:非线性路径必须与线性路径
+    /// 给同一个理由,而不是报"区间内没有找到数值解".
+    #[test]
+    fn nonlinear_undeclared_symbol_is_reported_like_the_linear_path() {
+        let unknowns = vec!["x".to_string(), "y".to_string()];
+        // 线性对照:理由是"未声明参数 z".
+        let linear = solve_system(
+            &equations(&["x + y = 1", "x - y = z"]),
+            Some(&unknowns),
+            &[],
+            SystemMethod::Auto,
+            &[],
+            0,
+        )
+        .expect("可解析");
+        let linear_reason = linear.error.clone().unwrap_or_default();
+        assert!(linear_reason.contains("未声明参数 z"), "{linear_reason}");
+
+        // 非线性:同一句话,不能退化成"没有找到数值解".
+        let nonlinear = solve_system(
+            &equations(&["x^2 + y^2 = 1", "x - y = z"]),
+            Some(&unknowns),
+            &[],
+            SystemMethod::Auto,
+            &[[-2.0, 2.0], [-2.0, 2.0]],
+            16,
+        )
+        .expect("可解析");
+        let reason = nonlinear.error.unwrap_or_default();
+        assert!(reason.contains("未声明参数 z"), "{reason}");
+        assert!(!reason.contains("没有找到数值解"), "{reason}");
+        assert_eq!(nonlinear.method, "numeric", "仍要如实标注走的是数值路径");
+    }
+
+    /// 网格规模守卫:节点数在**求值之前**就要判掉.
+    #[test]
+    fn oversized_numeric_grid_is_a_capability_boundary() {
+        let unknowns = vec!["x".to_string(), "y".to_string(), "z".to_string()];
+        let outcome = solve_system(
+            &equations(&["x^2 + y^2 + z^2 = 1", "x - y = 0", "y - z = 0"]),
+            Some(&unknowns),
+            &[],
+            SystemMethod::Auto,
+            &[[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0]],
+            64,
+        )
+        .expect("可解析");
+
+        let message = outcome.error.unwrap_or_default();
+        assert!(message.contains("超过上限"), "{message}");
+        assert!(outcome.solution_latex.is_none());
+        assert!(outcome.steps.is_empty());
+
+        // 同一道题把 segments 降下来照样能解(守卫只拦真的会爆的输入).
+        let ok = solve_system(
+            &equations(&["x^2 + y^2 + z^2 = 1", "x - y = 0", "y - z = 0"]),
+            Some(&unknowns),
+            &[],
+            SystemMethod::Auto,
+            &[[-2.0, 2.0], [-2.0, 2.0], [-2.0, 2.0]],
+            24,
+        )
+        .expect("可解析");
+        assert!(ok.error.is_none(), "{:?}", ok.error);
+        assert_eq!(ok.method, "numeric");
+    }
+
+    /// 能力边界不得回填步骤:IR 契约写明 `error !== null` 时步骤为空,
+    /// UI 的"过程"入口正是按此置灰.
+    #[test]
+    fn capability_boundaries_carry_no_steps() {
+        for outcome in [
+            solve(&["x + y = 1", "x - y = 0", "x = 1"]),
+            solve(&["x + y = 1"]),
+            solve(&["x + y = 1", "2*x + 2*y = 2"]),
+            solve_system(
+                &equations(&["x^2 + y^2 = 1", "x - y = 0"]),
+                None,
+                &[],
+                SystemMethod::Exact,
+                &[],
+                0,
+            )
+            .expect("可解析"),
+        ] {
+            assert!(outcome.error.is_some());
+            assert!(outcome.steps.is_empty(), "{:?}", outcome.steps);
+        }
     }
 
     #[test]

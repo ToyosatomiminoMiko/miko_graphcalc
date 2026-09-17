@@ -215,15 +215,11 @@ export interface SolveStatement {
     type: 'solve';
     name: string;
     /**
-     * 首条方程原文(含一个顶层 `=`),兼容既有单方程消费方.
+     * 全部方程原文(单方程时长度为 1,联立时按书写顺序),每条含一个顶层 `=`.
      *
-     * 新代码一律读 {@link equations}:联立时这里只是第一条.
-     */
-    equation: string;
-    /**
-     * 全部方程原文(单方程时长度为 1,联立时按书写顺序).
-     *
-     * 与 `equation` 的关系:`equations[0] === equation`.
+     * 只有这一个字段:曾经并存的"首条方程"`equation` 与它同名不同义
+     * (IR 侧的 `equation` 是 `; ` 连接串),而 TS 侧没有任何消费方读它.
+     * 需要单方程原文时读 `equations[0]`.
      */
     equations: string[];
     options: OptionPair[];

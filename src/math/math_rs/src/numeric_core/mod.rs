@@ -15,9 +15,10 @@
 //! 依赖方向:`symbolic` 与 `intersection_core` 都可以依赖本层;本层**不**
 //! 依赖它们(只用 `transform_core` 之外什么都不用),因此不会成环.
 //!
-//! 未使用的项按需保留:`linalg` 的调用方是 `symbolic::integral` 与
-//! `symbolic::system`, `roots` 的调用方是 `intersection_core`,
-//! `newton` 的调用方是 `solve_core` 的联立数值路径.
+//! 调用方:`linalg` 是 `symbolic::integral`(部分分式定系数)与
+//! `symbolic::system`(线性联立精确解);`roots` 是 `intersection_core`;
+//! `newton` 是 `symbolic::system` 的联立数值路径(`solve_core` 只做统一词汇
+//! 分派,不在这一层选算法).
 
 pub(crate) mod linalg;
 pub(crate) mod newton;

@@ -14,16 +14,18 @@
  *   超出内核",不是源码写错.内核把它们作为**结果**给回来(Rust 的 `error`
  *   字段),落在 `SolveTask.error`,列表照常保留占位并给理由,**题目 LaTeX 照给**;
  *   隐藏与声明类错误(重复名,未知选项)仍按既有约定带语句 span 抛出.
- * - 隐藏语义沿用约定 1("先完整校验,后禁用,仅跳过计算"):选项/重名照常校验,
- *   只是不再调用求解内核,`equationLatex` 留空由 UI 回退成方程原文(纯文本)--
- *   隐藏项没算过,不该假装有排版产物.
+ * - 隐藏语义沿用约定 1("先完整校验,后禁用,仅跳过计算"):选项/重名/语句形状
+ *   照常校验(`assertSolveShape` 在 hidden 分支**之前**执行),只是不再调用求解
+ *   内核,`equationLatex` 留空由 UI 回退成方程原文(纯文本)--隐藏项没算过,
+ *   不该假装有排版产物.
  *
  * ## 单方程与联立的分派
  *
  * `equations.length === 1` 走既有单方程内核(`solve_equation`,保持原线格式与
  * 原步骤口径);多条走联立内核(`solve_system`,JSON payload).两者的产物映射到
- * 同一个 `SolveTask`:联立的未知量列表进 `unknowns`,`variable` 只是展示用的
- * `, ` 连接文案(见 contract/ir.ts 的 SolveTask).
+ * 同一个 `SolveTask`:`unknowns` 是未知量列表,`equations` 是方程原文列表
+ * (见 contract/ir.ts 的 SolveTask;展示用的连接文案由 UI 从这两个字段派生,
+ * IR 里不再各存一份派生字符串).
  */
 import type { AstProgram, SolveStatement } from '../../contract/ast';
 import type {
@@ -42,7 +44,7 @@ import { NUMERIC_CONFIG } from '../../config/numericConfig';
 import {
     findOption,
     parseCappedPositiveInteger,
-    parseNumberListOfSize,
+    parseRangeList,
 } from './options';
 import { buildParamScope } from './params';
 import { compileConstraintStatements } from './statementShell';
@@ -50,9 +52,13 @@ import { compileConstraintStatements } from './statementShell';
 /** 求解语句允许的选项.
  *
  * - `variable` / `variables`:未知量(单数与名单两种写法);
- * - `range` / `segments`:仅联立数值路径使用(搜索区间与网格分段数).
+ * - `range` / `segments`:仅联立数值路径使用(搜索区间与网格分段数);
+ * - `method`:后端选择(`auto` / `exact` / `numeric`),缺省 `auto`.
  */
-const SOLVE_OPTION_NAMES = ['variable', 'variables', 'range', 'segments'] as const;
+const SOLVE_OPTION_NAMES = ['variable', 'variables', 'range', 'segments', 'method'] as const;
+
+/** `method` 选项的取值域(与 Rust `solve_core::SolveMethod` 同域). */
+const SOLVE_METHODS: readonly SolveMethod[] = ['auto', 'exact', 'numeric'];
 
 /** WASM `solve_equation` 返回的 JSON 形状(与 Rust `SolveOutcome` 对齐). */
 interface SolveOutcomeJson {
@@ -104,6 +110,9 @@ function toSteps(raw: Array<{ latex: string; reason: string; kind: string }>): S
  *
  * 两种写法都接受,是因为单方程习惯写 `variable`,联立习惯写 `variables`;
  * 内核侧统一收成名单.
+ *
+ * `variables` 存在但一个名字都没写(如 `variables = ,`)时不回退到单数:
+ * 那会让"写错了"看起来像"没写".
  */
 function parseVariableNames(statement: SolveStatement): string[] {
     const plural = findOption(statement.options, 'variables');
@@ -117,16 +126,75 @@ function parseVariableNames(statement: SolveStatement): string[] {
     return single ? [single] : [];
 }
 
-/** 隐藏项的占位:保留方程原文与理由位,不调用内核. */
-function disabledTask(name: string, equations: string[]): SolveTask {
+/**
+ * 解析 `method` 选项;缺省 / 空串按 `auto`(由内核按问题形状选后端).
+ *
+ * 取值必须在 DSL 侧就报错:拼错 `method = numric` 却静默走 auto,比直接报错
+ * 难查得多(与未知选项同一条约定).
+ */
+function parseMethod(statement: SolveStatement): SolveMethod {
+    const raw = findOption(statement.options, 'method')?.trim();
+    if (raw === undefined || raw === '') return 'auto';
+    if (!(SOLVE_METHODS as readonly string[]).includes(raw)) {
+        throw new Error(
+            `求解 ${statement.name} 的 method 只接受 ${SOLVE_METHODS.join(' / ')},当前为 ${raw}`,
+        );
+    }
+    return raw as SolveMethod;
+}
+
+/**
+ * 语句形状校验:**与"算不算"无关**,所以 hidden 也必须过(约定 1).
+ *
+ * 这些是"源码写错",一律带语句 span 抛出;"读得出来但超出内核"的判断在 Rust
+ * 内核里,作为**结果**落在 `SolveTask.error`.两者不能混:源码写错被静默跳过
+ * (或超纲被当成语法错误)都会让用户按错误的方向改代码.
+ */
+function assertSolveShape(
+    statement: SolveStatement,
+    variables: string[],
+    method: SolveMethod,
+): void {
+    const isSystem = statement.equations.length > 1;
+    if (isSystem) return;
+
+    if (variables.length > 1) {
+        throw new Error(
+            `求解 ${statement.name} 只有一个方程,但给了 ${variables.length} 个变量`,
+        );
+    }
+    if (
+        findOption(statement.options, 'range') !== undefined
+        || findOption(statement.options, 'segments') !== undefined
+    ) {
+        throw new Error(
+            `求解 ${statement.name} 的 range/segments 只对联立方程组有意义`,
+        );
+    }
+    if (method === 'numeric') {
+        throw new Error(
+            `求解 ${statement.name} 的单方程还没有数值后端:method 只能用 auto / exact`,
+        );
+    }
+}
+
+/**
+ * 隐藏项的占位:保留方程原文与理由位,不调用内核.
+ *
+ * `method` 记**请求**的方法(隐藏项没调用内核,没有"实际方法"可报):
+ * 隐藏的联立保留选项值,隐藏的单方程恒为 `exact`(`assertSolveShape` 已经挡住
+ * 了单方程 + `numeric`).
+ */
+function disabledTask(
+    name: string,
+    equations: string[],
+    method: SolveMethod,
+): SolveTask {
     return {
         name,
-        // 隐藏项没有算过:单方程取保守的 exact,方程组取 auto(精确优先 + 数值回退).
-        method: equations.length > 1 ? 'auto' : 'exact',
+        method: equations.length > 1 ? method : 'exact',
         unknowns: [],
         equations: [...equations],
-        equation: equations.join('; '),
-        variable: '',
         equationLatex: '',
         solutionLatex: null,
         realRootCount: 0,
@@ -144,20 +212,6 @@ function compileSingleEquation(
     coefficientNames: string[],
     coefficientValues: Float64Array,
 ): SolveTask {
-    if (variables.length > 1) {
-        throw new Error(
-            `求解 ${statement.name} 只有一个方程,但给了 ${variables.length} 个变量`,
-        );
-    }
-    if (
-        findOption(statement.options, 'range') !== undefined
-        || findOption(statement.options, 'segments') !== undefined
-    ) {
-        throw new Error(
-            `求解 ${statement.name} 的 range/segments 只对联立方程组有意义`,
-        );
-    }
-
     const outcome = JSON.parse(
         wasmSolveEquation(
             statement.equations[0],
@@ -168,12 +222,10 @@ function compileSingleEquation(
     ) as SolveOutcomeJson;
     return {
         name: statement.name,
-        // 统一词汇:单方程恒为精确后端;`unknowns` 是 `variable` 的列表形式.
+        // 统一词汇:单方程只有精确后端(`numeric` 已被 assertSolveShape 挡住).
         method: 'exact',
         unknowns: outcome.variable === '' ? [] : [outcome.variable],
         equations: [...statement.equations],
-        equation: statement.equations[0],
-        variable: outcome.variable,
         equationLatex: outcome.equation_latex,
         solutionLatex: outcome.solution_latex,
         realRootCount: outcome.real_root_count,
@@ -186,16 +238,17 @@ function compileSingleEquation(
     };
 }
 
-/** 联立:走方程组内核,线性精确 / 非线性数值由内核按 `auto` 决定. */
+/** 联立:走方程组内核,线性精确 / 非线性数值由内核按 `method` 决定. */
 function compileEquationSystem(
     statement: SolveStatement,
     variables: string[],
     coefficientNames: string[],
     coefficientValues: Float64Array,
+    requestedMethod: SolveMethod,
 ): SolveTask {
     const rangeRaw = findOption(statement.options, 'range');
     const domain = rangeRaw !== undefined
-        ? parseNumberListOfSize(rangeRaw, 2, `联立 ${statement.name} 的 range`)
+        ? parseRangeList(rangeRaw, `联立 ${statement.name} 的 range`)
         : [];
     const segments =
         parseCappedPositiveInteger(
@@ -214,7 +267,7 @@ function compileEquationSystem(
                 coeff_values: [...coefficientValues],
                 domain,
                 segments,
-                method: 'auto',
+                method: requestedMethod,
             }),
         ),
     ) as SystemOutcomeJson;
@@ -231,9 +284,6 @@ function compileEquationSystem(
         method,
         unknowns: outcome.variables,
         equations: [...statement.equations],
-        // 展示用原文:联立用 `; ` 连接,纯文本回退时读者能看出是方程组.
-        equation: statement.equations.join('; '),
-        variable: outcome.variables.join(', '),
         equationLatex: outcome.problem_latex,
         solutionLatex: outcome.solution_latex,
         realRootCount: outcome.solution_count,
@@ -251,7 +301,8 @@ function compileEquationSystem(
  * 内核会明确报"未声明参数",而不是静默当成 0.
  *
  * 查重 / 选项校验 / 语句级错误定位 / hidden 语义由
- * `compileConstraintStatements` 统一提供(与求交同一外壳).
+ * `compileConstraintStatements` 统一提供(与求交同一外壳);**形状校验在
+ * hidden 分支之前**,这样隐藏项与显示项报同样的源码错误.
  */
 export function compileSolves(
     ast: AstProgram,
@@ -270,10 +321,12 @@ export function compileSolves(
         SOLVE_OPTION_NAMES,
         hiddenSolveNames,
         (statement, hidden) => {
-            if (hidden) {
-                return disabledTask(statement.name, statement.equations);
-            }
             const variables = parseVariableNames(statement);
+            const method = parseMethod(statement);
+            assertSolveShape(statement, variables, method);
+            if (hidden) {
+                return disabledTask(statement.name, statement.equations, method);
+            }
             return statement.equations.length <= 1
                 ? compileSingleEquation(
                     statement,
@@ -286,6 +339,7 @@ export function compileSolves(
                     variables,
                     coefficientNames,
                     coefficientValues,
+                    method,
                 );
         },
     );

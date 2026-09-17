@@ -17,6 +17,7 @@ import type { SolveTask } from '../../contract/ir';
 import {
     solveLatexDetails,
     solveLatexSummary,
+    solvePlainText,
 } from '../../compiler/dsl/evaluationLatex';
 import { createRowActions, createVisibilityButton } from '../shared/rowDom';
 import { buildSolveProcess } from '../process/processData';
@@ -36,12 +37,14 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
      * 不罗列 IR 字段清单:键跟着渲染内容走,内核新增一步求解说明时,
      * 行也会跟着刷新(与 analysisItem 同一条约定).`realRootCount`/`identity`
      * 不在键里:前者不参与渲染,后者已经由 `solutionLatex` 的有无体现--
-     * 把不渲染的字段算进来只会让行白重建一遍.
+     * 把不渲染的字段算进来只会让行白重建一遍.`equations` 与 `unknowns` 在键里,
+     * 因为摘要的纯文本回退与细节的"求解 X"都由它们派生.
      */
     static cacheKey(task: SolveTask): string {
         return JSON.stringify([
             task.name,
-            task.equation,
+            task.equations,
+            task.unknowns,
             task.equationLatex,
             task.solutionLatex,
             task.error,
@@ -58,7 +61,7 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
                 badgeClass: 'kind-solve',
                 badgeLabel: '求解',
                 latex: solveLatexSummary(task),
-                text: task.equation,
+                text: solvePlainText(task),
             },
             task.name,
         );

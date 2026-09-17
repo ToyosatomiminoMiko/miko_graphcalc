@@ -79,6 +79,25 @@ export function parseNumberListOfSize(
     return values;
 }
 
+/**
+ * 区间列表解析:`[lo, hi]`(单条,广播到每个未知量)或
+ * `[lo1, hi1, lo2, hi2, ...]`(逐个未知量一条).
+ *
+ * 与其他定长列表不同,这里**不收长度**:该给几条区间取决于未知量个数,而未知量
+ * 可能在更下游才推断出来(Rust 内核按"1 条广播 / 与未知量数相等"校验并给出具体
+ * 理由).TS 侧只保证"成对给出"这一条能提前判定的约束,不把内核支持的多条区间
+ * 挡在门外.
+ */
+export function parseRangeList(raw: string, context: string): number[] {
+    const values = parseNumberList(raw, context);
+    if (values.length < 2 || values.length % 2 !== 0) {
+        throw new Error(
+            `${context} 需要成对给出区间(下界, 上界),当前为 ${values.length} 个数值`,
+        );
+    }
+    return values;
+}
+
 export function optionalNumber(
     raw: string | undefined,
     context: string,

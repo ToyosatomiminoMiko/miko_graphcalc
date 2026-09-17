@@ -67,9 +67,9 @@ kind = { "alpha" }
 });
 
 describe('真实 miko.pest', () => {
-    it('四个枚举规则的关键字与独立正则读法一致', async () => {
+    it('枚举规则的关键字与独立正则读法一致', async () => {
         const pest = await readPest();
-        for (const rule of ['tensor_kind', 'object_kind', 'analysis_op', 'intersection_kind']) {
+        for (const rule of ['tensor_kind', 'object_kind', 'analysis_op']) {
             expect(DSL_KEYWORD_GROUPS[rule], `miko.pest 里找不到规则 ${rule}`).toBeDefined();
             expect([...DSL_KEYWORD_GROUPS[rule]], rule).toEqual(ruleLiterals(pest, rule));
         }
@@ -87,7 +87,6 @@ describe('真实 miko.pest', () => {
             'spherical',
             'integral',
             'intersection',
-            'intersect',
             'derivative',
             'solve',
             'antiderivative',

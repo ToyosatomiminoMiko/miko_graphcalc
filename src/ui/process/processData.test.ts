@@ -142,8 +142,6 @@ describe('题目(problem)与求解过程', () => {
         method: 'exact',
         unknowns: ['x'],
         equations: ['x^2 - 5*x + 6 = 0'],
-        equation: 'x^2 - 5*x + 6 = 0',
-        variable: 'x',
         equationLatex: 'x^{2}-5x+6=0',
         solutionLatex: 'x = 2 \\quad\\text{或}\\quad x = 3',
         realRootCount: 2,

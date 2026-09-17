@@ -481,9 +481,9 @@ fn intersection_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 /// - 单方程 `solve S = 左 = 右 [选项];` -> `equations` 长度为 1;
 /// - 联立 `solve S = { 方程; 方程; } [选项];` -> `equations` 是全部方程原文.
 ///
-/// `equation` 始终是**首条**方程原文,给既有单方程消费方兜底;新代码一律读
-/// `equations`.变量缺省由求解内核从方程推断,也可用 `variable` / `variables`
-/// 选项显式给出.
+/// 只给 `equations`:曾经另有一个"首条方程"的 `equation` 兼容字段,TS 侧没有任何
+/// 消费方,却与 IR 的 `equation`(连接串)同名不同义.变量缺省由求解内核从方程
+/// 推断,也可用 `variable` / `variables` 选项显式给出.
 fn solve_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let mut name = String::new();
     let mut equations: Vec<String> = Vec::new();
@@ -508,11 +508,9 @@ fn solve_to_stmt(pair: &Pair<'_, Rule>) -> Value {
         }
     }
 
-    let equation = equations.first().cloned().unwrap_or_default();
     json!({
         "type": "solve",
         "name": name,
-        "equation": equation,
         "equations": equations,
         "options": options,
         "span": span_of(pair),
@@ -754,7 +752,7 @@ intersection X = intersection(c1, s1) {
     color = "#ffffff";
     segments = 96;
 };
-intersect Y = intersect(s1, S);
+intersection Y = intersection(s1, S);
 "##;
         let json = parse_to_json(src).unwrap();
         assert!(json.contains("\"type\":\"param\""));
