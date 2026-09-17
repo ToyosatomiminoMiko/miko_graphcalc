@@ -21,8 +21,8 @@ import type {
     SceneObject,
     SolveStep,
     SolveTask,
-} from '../../contract/ir';
-import { UI_CONFIG } from '../../config/uiConfig';
+} from '@/contract/ir';
+import { UI_CONFIG } from '@/config/uiConfig';
 import {
     analysisLatexDetailEntries,
     analysisLatexSummary,
@@ -30,7 +30,7 @@ import {
     integralLatexSummary,
     type EvaluationDetailEntry,
     type EvaluationDetailRole,
-} from '../../compiler/dsl/evaluationLatex';
+} from '@/compiler/dsl/evaluationLatex';
 import {
     truncateProcessSteps,
     type ProcessDocument,

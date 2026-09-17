@@ -10,8 +10,8 @@
  * 本类不再自建任何点几何体(旧的独立 SphereGeometry 已移除).
  */
 import * as THREE from 'three';
-import type { AnalysisResult, PointObject } from '../../../contract/ir';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
+import type { AnalysisResult, PointObject } from '@/contract/ir';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 import { PointRenderer, type PointStyle } from './PointRenderer';
 
 /** 分析测量点颜色(黄),与 docs/derivatives-guide.md 描述的"黄色圆点"一致. */

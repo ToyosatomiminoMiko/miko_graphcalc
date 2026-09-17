@@ -10,12 +10,12 @@
 import type {
     IntersectionOutput,
     IntersectionTask,
-} from '../../contract/ir';
+} from '@/contract/ir';
 import {
     intersectionLatexDetails,
     intersectionLatexSummary,
-} from '../../compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '../shared/rowDom';
+} from '@/compiler/dsl/evaluationLatex';
+import { createRowActions, createVisibilityButton } from '@/ui/shared/rowDom';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

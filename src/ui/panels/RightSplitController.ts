@@ -19,8 +19,8 @@
  * 回到默认比例(见 README 的"代码区字体与 KaTeX 字号"一节).
  */
 
-import { UI_CONFIG } from '../../config/uiConfig';
-import { bindDragGesture } from '../shared/dragGesture';
+import { UI_CONFIG } from '@/config/uiConfig';
+import { bindDragGesture } from '@/ui/shared/dragGesture';
 
 /**
  * 参数区占右面板高度的比例边界:两边都必须留出可点可看的一块.

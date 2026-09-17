@@ -1,7 +1,7 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { SurfaceStyle } from '../../../contract/view';
-import type { SurfaceControls } from '../ViewPanel';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { SurfaceStyle } from '@/contract/view';
+import type { SurfaceControls } from '@/ui/view/ViewPanel';
 
 /**
  * 曲面全局样式控制(右侧"视图"面板的"曲面"小节).

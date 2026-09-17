@@ -12,28 +12,28 @@
  * 源码仍然是唯一真相源:
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
-import type { SceneIR } from '../contract/ir';
-import { EventBus } from '../core/EventBus';
-import { KeyboardController } from '../ui/shared/KeyboardController';
-import type { GraphCalcEvents } from '../contract/events';
+import type { SceneIR } from '@/contract/ir';
+import { EventBus } from '@/core/EventBus';
+import { KeyboardController } from '@/ui/shared/KeyboardController';
+import type { GraphCalcEvents } from '@/contract/events';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
 import { RenderController } from './RenderController';
-import { ParamPanelController } from '../ui/params/ParamPanelController';
-import { DiagnosticsController } from '../ui/diagnostics/DiagnosticsController';
-import { EditorLineNumbers } from '../ui/editor/EditorLineNumbers';
-import { EditorHighlight } from '../ui/editor/EditorHighlight';
-import { FormulaCopyController } from '../ui/formula/FormulaCopyController';
-import { ObjectListController } from '../ui/objects/ObjectListController';
-import { PanelController } from '../ui/panels/PanelController';
-import { RightPanelTabs } from '../ui/panels/RightPanelTabs';
-import { RightSplitController } from '../ui/panels/RightSplitController';
-import { ProcessPanel, formatProcessParamEcho } from '../ui/process/ProcessPanel';
-import type { ProcessRequest } from '../ui/evaluation/EvaluationItem';
-import { ExampleLoaderController } from '../ui/examples/ExampleLoaderController';
-import { exampleSource, type ExampleEntry } from '../ui/examples/exampleCatalog';
-import { replaceTextareaSource } from '../ui/examples/replaceEditorSource';
-import { createViewPanel, type ViewPanel } from '../ui/view/ViewPanel';
+import { ParamPanelController } from '@/ui/params/ParamPanelController';
+import { DiagnosticsController } from '@/ui/diagnostics/DiagnosticsController';
+import { EditorLineNumbers } from '@/ui/editor/EditorLineNumbers';
+import { EditorHighlight } from '@/ui/editor/EditorHighlight';
+import { FormulaCopyController } from '@/ui/formula/FormulaCopyController';
+import { ObjectListController } from '@/ui/objects/ObjectListController';
+import { PanelController } from '@/ui/panels/PanelController';
+import { RightPanelTabs } from '@/ui/panels/RightPanelTabs';
+import { RightSplitController } from '@/ui/panels/RightSplitController';
+import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
+import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
+import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
+import { exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
+import { replaceTextareaSource } from '@/ui/examples/replaceEditorSource';
+import { createViewPanel, type ViewPanel } from '@/ui/view/ViewPanel';
 
 export class DslApp {
     private readonly eventBus = new EventBus<GraphCalcEvents>();

@@ -13,8 +13,8 @@
  *
  * `testing/setupWasm.ts` 已在启动时同步初始化 WASM,所以模块级构造即可直接调用.
  */
-import { createWasmMatrixOps } from '../wasm/matrixOps';
-import type { MatrixOps } from '../math/matrix/MatrixOps';
+import { createWasmMatrixOps } from '@/wasm/matrixOps';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
 
 /** 与生产同源的矩阵后端,供测试注入 `compileScene`/`AnimationPlayer`. */
 export const testMatrixOps: MatrixOps = createWasmMatrixOps();

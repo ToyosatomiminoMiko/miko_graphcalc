@@ -8,8 +8,8 @@
 // 本文件不触碰场景与缓存,构建结果返回 null 表示无可绘制内容.
 // ============================================================
 import * as THREE from 'three';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { wrapSolid } from '../solidPrimitives';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { wrapSolid } from '@/render/visualization/solidPrimitives';
 
 const { depth2D: DEPTH_2D } = RENDER_CONFIG.integralVisualizer;
 

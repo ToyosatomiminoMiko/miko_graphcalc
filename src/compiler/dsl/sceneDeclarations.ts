@@ -13,11 +13,11 @@
  * 3. `collectAnimationDeclarations`:animation 引用上面两张表,单矩阵限制与
  *    duration 正数校验在这里完成.
  */
-import type { AstProgram, ObjectStatement } from '../../contract/ast';
-import type { AnimationClip } from '../../contract/ir';
-import { type Mat4 } from '../../math/matrix/rowMajorMatrix';
-import type { MatrixOps } from '../../math/matrix/MatrixOps';
-import { withStatementSpan } from '../errors';
+import type { AstProgram, ObjectStatement } from '@/contract/ast';
+import type { AnimationClip } from '@/contract/ir';
+import { type Mat4 } from '@/math/matrix/rowMajorMatrix';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
+import { withStatementSpan } from '@/compiler/errors';
 import { assertKnownOptions, findOption, toFiniteNumber } from './options';
 import {
     evaluateMatrix,

@@ -12,7 +12,7 @@ import type {
     OdeTask,
     SceneObject,
     SolveTask,
-} from '../../contract/ir';
+} from '@/contract/ir';
 import {
     buildGradientProcess,
     buildIntegralProcess,

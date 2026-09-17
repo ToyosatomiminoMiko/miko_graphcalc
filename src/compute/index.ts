@@ -1,7 +1,7 @@
 /**
  * compute 层对外入口(信息隐藏的收口处).
  *
- * 这一层负责"IR 里的表达式 -> Worker + Rust/WASM 的数值结果":调度原语、
+ * 这一层负责"IR 里的表达式 -> Worker + Rust/WASM 的数值结果":调度原语,
  * WASM 粘合与领域编组都在内部(`scheduling/` 内部调度,`domain/` 领域编组,
  * Worker 粘合在 `wasm/` 与各 `*Worker` 模块).渲染层/应用层只需要记住这一条
  * import 路径,不必知道内部分目录.
@@ -13,7 +13,7 @@
  *
  * 刻意**不**导出 `ComputeWorkerClient` 这类调度内部实现:它们只在 compute 层
  * 内部与单元测试的深路径里出现(测试 mock 具体 client 时继续用
- * `vi.mock('../domain/...')`,barrel 只是 re-export,按路径拦截依然生效).
+ * `vi.mock('@/compute/domain/...')`,barrel 只是 re-export,按路径拦截依然生效).
  * 通用的 latest-only 调度原语 `LatestRequestExecutor` / `RequestClient` 属
  * 跨层原语,已上移到 `core/LatestRequestExecutor`,需要时直接从那里导入.
  *

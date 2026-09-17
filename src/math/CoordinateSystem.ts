@@ -22,7 +22,7 @@
  * 约定由 `numericConfig.analysis.sphericalAngleConvention` 全局配置.
  */
 
-import type { SphericalAngleConvention } from '../config/numericConfig';
+import type { SphericalAngleConvention } from '@/config/numericConfig';
 
 /** 坐标值三元组;`dim = 2` 时只读前两位,第三位恒为 0. */
 export type CoordinateTriple = [number, number, number];

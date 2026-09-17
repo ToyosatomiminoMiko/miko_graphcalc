@@ -2,8 +2,8 @@
  * 三级披露判据单测:边界(恰好等于阈值)归 L1,严格大于才进 L2.
  */
 import { describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../../config/uiConfig';
-import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { EvaluationDetailLine } from '@/compiler/dsl/evaluationLatex';
 import { needsProcessPage } from './disclosure';
 
 function lines(count: number): EvaluationDetailLine[] {

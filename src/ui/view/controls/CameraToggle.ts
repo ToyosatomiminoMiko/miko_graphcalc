@@ -1,12 +1,12 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { CamMode } from '../../../contract/view';
-import type { CameraControls } from '../ViewPanel';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { CamMode } from '@/contract/view';
+import type { CameraControls } from '@/ui/view/ViewPanel';
 import {
     CAM_MODE_WHEN_CHECKED,
     CAM_MODE_WHEN_UNCHECKED,
-} from '../ViewPanel';
-import type { SwitchHandle } from '../../widgets/Switch';
+} from '@/ui/view/ViewPanel';
+import type { SwitchHandle } from '@/ui/widgets/Switch';
 
 /**
  * 相机投影模式切换开关 透视 <-> 正交

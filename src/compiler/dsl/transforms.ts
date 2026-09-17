@@ -27,14 +27,14 @@
  *
  * 这样同一份引用解析不存在第二个实现,语境差异只剩"能否组合/能否用函数".
  */
-import type { MatrixOps } from '../../math/matrix/MatrixOps';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
 import {
     cloneMat4,
     mat4FromFlat,
     type Mat4,
-} from '../../math/matrix/rowMajorMatrix';
+} from '@/math/matrix/rowMajorMatrix';
 import { evaluateMatrixExpr, evaluateNumber } from './expression';
-import { splitTopLevel } from '../text';
+import { splitTopLevel } from '@/compiler/text';
 
 export function evaluateMatrix(raw: string): Mat4 | null {
     try {

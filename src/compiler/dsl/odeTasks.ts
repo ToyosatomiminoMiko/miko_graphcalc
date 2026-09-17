@@ -11,9 +11,9 @@
  * ("先完整校验,后禁用,仅跳过计算"):选项/重名照常校验,只是不再下发对象与
  * 求值条目,列表保留占位.
  */
-import type { AstProgram } from '../../contract/ast';
-import type { OdeTask } from '../../contract/ir';
-import { withStatementSpan } from '../errors';
+import type { AstProgram } from '@/contract/ast';
+import type { OdeTask } from '@/contract/ir';
+import { withStatementSpan } from '@/compiler/errors';
 import { assertKnownOptions } from './options';
 import { ODE_OPTION_NAMES } from './odeExpressions';
 import type { OdeFact } from './odeBlueprint';

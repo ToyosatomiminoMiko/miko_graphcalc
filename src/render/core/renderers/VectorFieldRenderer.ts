@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import type { IRenderer } from './IRenderer';
-import type { VectorFieldObject } from '../../../contract/ir';
-import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import { VectorFieldMesh } from '../../visualization/VectorFieldMesh';
-import { LatestRequestExecutor } from '../../../core/LatestRequestExecutor';
+import type { VectorFieldObject } from '@/contract/ir';
+import { splitCoefficients } from '@/math/adapters/coefficientUtils';
+import { VectorFieldMesh } from '@/render/visualization/VectorFieldMesh';
+import { LatestRequestExecutor } from '@/core/LatestRequestExecutor';
 import {
     vectorFieldComputeClient,
     type VectorFieldWorkerRequest,
-} from '../../../compute';
-import { reportSamplingFailure } from '../samplingErrors';
+} from '@/compute';
+import { reportSamplingFailure } from '@/render/core/samplingErrors';
 
 /**
  * 向量场渲染器

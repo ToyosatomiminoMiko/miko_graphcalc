@@ -10,7 +10,7 @@
 // 返回 null 表示没有可绘制单元,调用方不应登记缓存.
 // ============================================================
 import * as THREE from 'three';
-import { wrapSolid } from '../solidPrimitives';
+import { wrapSolid } from '@/render/visualization/solidPrimitives';
 
 /**
  * 生成二维梯形可视化的"实体柱阵"组:每个网格单元是一根下底贴 xy 平面,

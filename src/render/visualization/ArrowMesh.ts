@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 
 /**
- * ArrowMesh — 3D 箭头封装
+ * ArrowMesh - 3D 箭头封装
  *
  * 内部由圆柱体(杆)和圆锥体(头)组成,统一挂在一个 Group 下
  * 外部通过 setTransform 设置起点和方向,自动计算缩放/旋转

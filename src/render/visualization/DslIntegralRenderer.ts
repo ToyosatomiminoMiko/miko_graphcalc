@@ -3,18 +3,18 @@ import type {
     IntegralTask,
     RiemannSide,
     SceneObject,
-} from '../../contract/ir';
-import type { Mat4 } from '../../math/matrix/rowMajorMatrix';
+} from '@/contract/ir';
+import type { Mat4 } from '@/math/matrix/rowMajorMatrix';
 import { IntegralVisualizer } from './integral/IntegralVisualizer';
 import { makeFn1D, makeFn2D } from './integral/sampleLookup';
-import type { ComputeFacade, IntegralResult } from '../../compute';
+import type { ComputeFacade, IntegralResult } from '@/compute';
 import {
     clampIntegral1DVisualization,
     clampIntegral2DVisualization,
     clampIntegral3DVisualization,
     clampLebesgue1DVisualization,
     clampLebesgue2DVisualization,
-} from '../../config/resourceBudget';
+} from '@/config/resourceBudget';
 
 export type IntegralResultCallback = (name: string, value: number) => void;
 export type IntegralErrorCallback = (name: string, message: string) => void;

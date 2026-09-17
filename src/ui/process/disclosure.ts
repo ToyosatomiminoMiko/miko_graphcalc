@@ -9,8 +9,8 @@
  * `N` 直接对应"留在 L1 最多占多少行",而不是一个需要换算的代理量.
  * 长等式仍然会横向滚动,那是宽度问题,与"要不要换一页"无关.
  */
-import { UI_CONFIG } from '../../config/uiConfig';
-import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { EvaluationDetailLine } from '@/compiler/dsl/evaluationLatex';
 
 /**
  * 细节行数是否超过阈值(严格大于).

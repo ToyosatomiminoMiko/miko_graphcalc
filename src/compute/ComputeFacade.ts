@@ -21,17 +21,17 @@ import type {
     BoxObject,
     ConicSolidObject,
     SurfaceObject,
-} from '../contract/ir';
-import type { Mat4 } from '../math/matrix/rowMajorMatrix';
-import { invertMat4 } from '../math/matrix/rowMajorMatrix';
-import { coefficientsToRecord } from '../math/adapters/coefficientUtils';
+} from '@/contract/ir';
+import type { Mat4 } from '@/math/matrix/rowMajorMatrix';
+import { invertMat4 } from '@/math/matrix/rowMajorMatrix';
+import { coefficientsToRecord } from '@/math/adapters/coefficientUtils';
 import {
     integrate as runIntegral,
     type IntegralResult,
     type IntegralSpec,
     disposeIntegralWorker,
 } from './domain/integral/IntegralCompute';
-import { describeSide } from '../math/adapters/IntersectionMath';
+import { describeSide } from '@/math/adapters/IntersectionMath';
 import {
     curveComputeClient,
     type CurveSampleResult,

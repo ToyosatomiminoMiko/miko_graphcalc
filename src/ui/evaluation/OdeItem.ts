@@ -11,10 +11,10 @@
  * - 行末动作:"过程"入口(载入右栏过程页)+ 显隐按钮(隐藏 = 不下发它下发的
  *   斜率场与解曲线,列表保留占位).
  */
-import type { OdeTask } from '../../contract/ir';
-import { detailLinesOf, odeLatexDetailEntries, odeLatexSummary } from '../../compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '../shared/rowDom';
-import { buildOdeProcess } from '../process/processData';
+import type { OdeTask } from '@/contract/ir';
+import { detailLinesOf, odeLatexDetailEntries, odeLatexSummary } from '@/compiler/dsl/evaluationLatex';
+import { createRowActions, createVisibilityButton } from '@/ui/shared/rowDom';
+import { buildOdeProcess } from '@/ui/process/processData';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

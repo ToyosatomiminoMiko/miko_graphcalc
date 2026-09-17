@@ -24,8 +24,8 @@ import type {
     OdeTask,
     SceneObject,
     SolveTask,
-} from '../../contract/ir';
-import { latexResultNumber } from '../../math/latexNumber';
+} from '@/contract/ir';
+import { latexResultNumber } from '@/math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
 
 /** 一行公式片段(LaTeX 字符串). */

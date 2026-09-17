@@ -15,7 +15,7 @@ const wasm = vi.hoisted(() => ({
     sampleAndProcessSurface: vi.fn(),
 }));
 
-vi.mock('../../../generated/render_rs/render_rs', () => ({
+vi.mock('@/generated/render_rs/render_rs', () => ({
     default: vi.fn(() => Promise.resolve()),
     sample_and_process_surface: wasm.sampleAndProcessSurface,
 }));

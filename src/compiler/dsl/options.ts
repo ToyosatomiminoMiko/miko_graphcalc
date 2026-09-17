@@ -2,9 +2,9 @@
  * 选项与列表解析辅助函数.
  * 从 DslCompiler 拆出,负责 DSL 选项/数字列表解析.
  */
-import type { OptionPair } from '../../contract/ast';
-import type { AnalysisShow } from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+import type { OptionPair } from '@/contract/ast';
+import type { AnalysisShow } from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import { evaluateNumber, extractSymbolNames } from './expression';
 
 const SHOW_KINDS = new Set<AnalysisShow>(['point', 'normal', 'tangent', 'tangent_plane']);

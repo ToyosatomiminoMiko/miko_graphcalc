@@ -12,7 +12,7 @@
  * 不经过语句循环,保持普通 Error--它们的文案已含对象/上下文,不必强行
  * 回溯声明语句,避免在 blueprint 上额外保存 span.
  */
-import type { SourceSpan } from '../contract/ast';
+import type { SourceSpan } from '@/contract/ast';
 
 /** 语句级编译错误:携带触发该错误的 DSL 语句 span. */
 export class CompileError extends Error {

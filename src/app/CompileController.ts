@@ -12,11 +12,11 @@
  *
  * 真正的编译细节仍由 compiler/dsl 下的 DslCompiler 和静态场景缓存负责.
  */
-import { compileScene } from '../compiler/dsl/DslCompiler';
-import { parseMiko } from '../compiler/parser';
-import { createWasmMatrixOps } from '../wasm/matrixOps';
-import type { SceneIR } from '../contract/ir';
-import { CompileError, formatLocatedError } from '../compiler/errors';
+import { compileScene } from '@/compiler/dsl/DslCompiler';
+import { parseMiko } from '@/compiler/parser';
+import { createWasmMatrixOps } from '@/wasm/matrixOps';
+import type { SceneIR } from '@/contract/ir';
+import { CompileError, formatLocatedError } from '@/compiler/errors';
 import { SceneStore } from './SceneStore';
 
 export class CompileController {

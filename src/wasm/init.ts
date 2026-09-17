@@ -1,5 +1,5 @@
-import initCompiler from '../generated/compiler_rs/compiler_rs';
-import initMath from '../generated/math_rs/math_rs';
+import initCompiler from '@/generated/compiler_rs/compiler_rs';
+import initMath from '@/generated/math_rs/math_rs';
 
 /**
  * @cache

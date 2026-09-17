@@ -18,7 +18,24 @@
         "checkJs": false,
         "types": [
             "node"
-        ]
+        ],
+        /**
+         * `src/` 内的跨目录导入统一走根别名 `@/`.
+         *
+         * 三条约束,改这里前先读:
+         * 1. 本仓库是 TypeScript 7,`baseUrl` 已被移除(会报 TS5102),所以
+         *    `paths` 的目标必须写成 `./src/*` 这种带 `./` 的相对模式,
+         *    写成 `src/*` 会报 TS5090;
+         * 2. Vite/Vitest 不读 tsconfig,别名的另一半在 `vite.config.ts` 的
+         *    `resolve.alias`(同一份 `@ -> ./src` 约定,改一处必须同步另一处);
+         * 3. 别名只覆盖 `src/` 下的模块解析. `new URL(..., import.meta.url)`
+         *    和动态拼接的路径是**物理文件定位**,不走模块解析,必须保持相对写法.
+         */
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ]
+        }
     },
     "include": [
         "src/**/*.ts",

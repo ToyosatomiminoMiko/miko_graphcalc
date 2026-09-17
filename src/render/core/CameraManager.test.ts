@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CameraManager } from './CameraManager';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 
 /** CameraManager 只读取容器的像素尺寸,不需要真实 DOM. */
 const viewport = { clientWidth: 800, clientHeight: 600 } as HTMLElement;

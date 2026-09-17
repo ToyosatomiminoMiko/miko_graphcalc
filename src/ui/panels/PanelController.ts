@@ -1,5 +1,5 @@
-import { UI_CONFIG } from '../../config/uiConfig';
-import { bindDragGesture } from '../shared/dragGesture';
+import { UI_CONFIG } from '@/config/uiConfig';
+import { bindDragGesture } from '@/ui/shared/dragGesture';
 
 type PanelId = 'left-panel' | 'right-panel' | 'bottom-panel';
 

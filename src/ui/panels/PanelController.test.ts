@@ -12,8 +12,8 @@
  * 与"拖高度"可以在单测里完整走一遍,不必再依赖真机.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../../config/uiConfig';
-import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
+import { UI_CONFIG } from '@/config/uiConfig';
+import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
 import { PanelController } from './PanelController';
 
 interface FakePanel {

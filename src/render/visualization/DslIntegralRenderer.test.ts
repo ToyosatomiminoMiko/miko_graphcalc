@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { DslIntegralRenderer } from './DslIntegralRenderer';
-import type { ComputeFacade } from '../../compute/ComputeFacade';
-import type { IntegralResult } from '../../compute/domain/integral/IntegralCompute';
-import type { CurveObject, IntegralTask, SceneObject } from '../../contract/ir';
+import type { ComputeFacade } from '@/compute/ComputeFacade';
+import type { IntegralResult } from '@/compute/domain/integral/IntegralCompute';
+import type { CurveObject, IntegralTask, SceneObject } from '@/contract/ir';
 
 type Deferred = { resolve: (r: IntegralResult) => void; reject: (e: Error) => void };
 

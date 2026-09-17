@@ -1,7 +1,7 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { ViewHome } from '../../../contract/view';
-import type { SegmentedHandle } from '../../widgets/Segmented';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { ViewHome } from '@/contract/view';
+import type { SegmentedHandle } from '@/ui/widgets/Segmented';
 
 /**
  * ViewCube 控制器:统一 3D 场景下的预置观察方向切换.

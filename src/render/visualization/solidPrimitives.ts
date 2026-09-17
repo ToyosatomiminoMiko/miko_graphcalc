@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 
 /**
  * 共享的体积几何 / 材质工具.

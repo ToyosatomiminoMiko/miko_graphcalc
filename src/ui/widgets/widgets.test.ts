@@ -10,7 +10,7 @@
  *    会让"dispose 后仍响应事件"的回归暴露出来.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, StubElement } from '../../testing/domStub';
+import { installDomStub, StubElement } from '@/testing/domStub';
 import { createButton } from './Button';
 import { el } from './dom';
 import { createNumberField } from './NumberField';

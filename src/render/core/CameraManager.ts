@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { RENDER_CONFIG } from '../../config/renderConfig';
-import type { CamMode, UpAxis, ViewHome } from '../../contract/view';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import type { CamMode, UpAxis, ViewHome } from '@/contract/view';
 // OrbitControls 没有独立类型包,从 three/examples 导入类型
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 

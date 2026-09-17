@@ -12,13 +12,13 @@ import type {
     IntegralTask,
     OdeTask,
     SceneObject,
-} from '../../contract/ir';
+} from '@/contract/ir';
 
 /**
  * 表达式 -> LaTeX 由 Rust 符号引擎负责(真机上是 wasm),展示层测试只需要
  * 一个恒等实现:本文件断言的是"拼装"顺序与内容,不是 Rust 的排版规则.
  */
-vi.mock('../../generated/math_rs/math_rs', () => ({
+vi.mock('@/generated/math_rs/math_rs', () => ({
     latex_expression: vi.fn((expr: string) => expr),
     normalize_expression: vi.fn((expr: string) => expr),
 }));

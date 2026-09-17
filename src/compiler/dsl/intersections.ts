@@ -14,16 +14,16 @@
  * 求交名查重 / 选项校验 / 语句级错误定位由 `statementShell.ts` 的
  * `compileConstraintStatements` 统一提供(与求解同一外壳,契约一致).
  */
-import type { AstProgram, IntersectionStatement } from '../../contract/ast';
-import type { IntersectionTask, SceneObject } from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+import type { AstProgram, IntersectionStatement } from '@/contract/ast';
+import type { IntersectionTask, SceneObject } from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import {
     findOption,
     parseCappedPositiveInteger,
     stripQuotes,
 } from './options';
 import { compileConstraintStatements } from './statementShell';
-import { invertMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
+import { invertMat4, type Mat4 } from '@/math/matrix/rowMajorMatrix';
 
 const INTERSECTION_OPTION_NAMES = ['color', 'segments'] as const;
 const SUPPORTED_KINDS = new Set<SceneObject['kind']>([

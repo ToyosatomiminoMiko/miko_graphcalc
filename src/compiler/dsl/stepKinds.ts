@@ -8,7 +8,7 @@
  * 单独成一个叶子模块:两个 blueprint 构建器(antiderivativeBlueprint.ts 与
  * odeBlueprint.ts)都要用,放在任意一边都会让另一边反向依赖.
  */
-import { SOLVE_STEP_KINDS, type SolveStepKind } from '../../contract/ir';
+import { SOLVE_STEP_KINDS, type SolveStepKind } from '@/contract/ir';
 
 export function toSolveStepKind(raw: string): SolveStepKind {
     return (SOLVE_STEP_KINDS as readonly string[]).includes(raw)

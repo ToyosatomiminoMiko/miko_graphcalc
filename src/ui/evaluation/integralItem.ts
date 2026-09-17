@@ -15,20 +15,20 @@
  * `bodyLatex` 与当前状态行 `result`:异步回填是 `renderValue`/`renderError`
  * 两个实例方法,不再需要一份与行为分离的句柄数据.
  */
-import type { IntegralTask, SceneObject } from '../../contract/ir';
+import type { IntegralTask, SceneObject } from '@/contract/ir';
 import {
     detailLinesOf,
     integralLatexDetailEntries,
     integralLatexSummary,
-} from '../../compiler/dsl/evaluationLatex';
-import { latexResultNumber } from '../../math/latexNumber';
-import { formatNumber } from '../shared/numberText';
-import { createFormulaElement } from '../formula/FormulaView';
+} from '@/compiler/dsl/evaluationLatex';
+import { latexResultNumber } from '@/math/latexNumber';
+import { formatNumber } from '@/ui/shared/numberText';
+import { createFormulaElement } from '@/ui/formula/FormulaView';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
-import { createRowActions, createVisibilityButton } from '../shared/rowDom';
-import { buildIntegralProcess } from '../process/processData';
-import { needsProcessPage } from '../process/disclosure';
-import { el } from '../widgets/dom';
+import { createRowActions, createVisibilityButton } from '@/ui/shared/rowDom';
+import { buildIntegralProcess } from '@/ui/process/processData';
+import { needsProcessPage } from '@/ui/process/disclosure';
+import { el } from '@/ui/widgets/dom';
 import {
     createDetailSections,
     createEvaluationRow,

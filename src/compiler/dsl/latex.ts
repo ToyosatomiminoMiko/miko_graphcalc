@@ -13,7 +13,7 @@ import type {
     IntegralTask,
     OdeOrigin,
     SceneObject,
-} from '../../contract/ir';
+} from '@/contract/ir';
 import { cachedLatexExpression } from './expression';
 
 function latexNumber(value: number): string {

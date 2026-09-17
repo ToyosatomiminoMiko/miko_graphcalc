@@ -7,7 +7,7 @@
  * - 页头元信息与参数只读回显各走各的刷新入口.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type StubElement } from '../../testing/domStub';
+import { installDomStub, type StubElement } from '@/testing/domStub';
 
 vi.mock('katex', () => ({
     default: {

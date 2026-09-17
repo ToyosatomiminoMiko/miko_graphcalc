@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import {
     createSolidEdgeMaterial,
     createSolidMaterial,
-} from '../solidPrimitives';
+} from '@/render/visualization/solidPrimitives';
 
 /**
  * @cache

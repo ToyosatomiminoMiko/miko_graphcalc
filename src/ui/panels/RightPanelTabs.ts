@@ -14,7 +14,7 @@
  * `dispose()` 把页归属复位成参数页:否则再次 `bind()` 会得到一个"模型在参数
  * 页,DOM 停在过程页"的自相矛盾面板(与 `PanelController` 的复位同一条理由).
  */
-import { createTabs, type TabsHandle } from '../widgets/Tabs';
+import { createTabs, type TabsHandle } from '@/ui/widgets/Tabs';
 
 /** 右栏两个标签页. */
 export type RightTab = 'params' | 'process';

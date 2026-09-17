@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { NUMERIC_CONFIG } from '../../../config/numericConfig';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { SurfaceMesh } from '../../visualization/SurfaceMesh';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { SurfaceMesh } from '@/render/visualization/SurfaceMesh';
 import type { IRenderer } from './IRenderer';
-import type { SurfaceObject } from '../../../contract/ir';
-import type { SurfaceStyle } from '../../../contract/view';
+import type { SurfaceObject } from '@/contract/ir';
+import type { SurfaceStyle } from '@/contract/view';
 
 /**
  * 曲面渲染器

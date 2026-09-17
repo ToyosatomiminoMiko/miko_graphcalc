@@ -8,16 +8,16 @@
  * 存在定义域空洞的函数,会被一条横跨空洞的伪连接线错误地连起来.
  */
 import * as THREE from 'three';
-import { NUMERIC_CONFIG } from '../../../config/numericConfig';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import type { IRenderer } from './IRenderer';
-import type { CurveObject } from '../../../contract/ir';
-import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import { LatestRequestExecutor, type RequestClient } from '../../../core/LatestRequestExecutor';
+import type { CurveObject } from '@/contract/ir';
+import { splitCoefficients } from '@/math/adapters/coefficientUtils';
+import { LatestRequestExecutor, type RequestClient } from '@/core/LatestRequestExecutor';
 import {
     sharedComputeFacade as curveComputeEngine,
     type CurveSampleResult,
-} from '../../../compute';
-import { reportSamplingFailure } from '../samplingErrors';
+} from '@/compute';
+import { reportSamplingFailure } from '@/render/core/samplingErrors';
 
 type CurveRendererRequest = {
     id: number;

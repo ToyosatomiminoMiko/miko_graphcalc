@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     LatestRequestExecutor,
     type RequestClient,
-} from '../../core/LatestRequestExecutor';
+} from '@/core/LatestRequestExecutor';
 
 type TestRequest = { id: number; value: number };
 type TestResponse = { value: number };

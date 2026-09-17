@@ -22,8 +22,8 @@ import type {
     SceneIR,
     SceneObject,
     SolveTask,
-} from '../../contract/ir';
-import { installDomStub, StubElement } from '../../testing/domStub';
+} from '@/contract/ir';
+import { installDomStub, StubElement } from '@/testing/domStub';
 
 vi.mock('katex', () => ({
     default: {

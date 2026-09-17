@@ -12,9 +12,9 @@
  * 表达式工具(坐标轴重命名/常数符号替换/解族取值)在叶子模块
  * odeExpressions.ts,本模块与求值层共用它,避免互相 import 成环.
  */
-import type { OdeStatement, OptionPair } from '../../contract/ast';
-import type { ParamDeclaration, SolveStepKind } from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+import type { OdeStatement, OptionPair } from '@/contract/ast';
+import type { ParamDeclaration, SolveStepKind } from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import {
     assertKnownOptions,
     findOption,
@@ -32,7 +32,7 @@ import {
     renameCoordinateSymbols,
     substituteConstantSymbols,
 } from './odeExpressions';
-import { solve_ode as wasmSolveOde } from '../../generated/math_rs/math_rs';
+import { solve_ode as wasmSolveOde } from '@/generated/math_rs/math_rs';
 import { toSolveStepKind } from './stepKinds';
 import type { CurveBlueprint, SurfaceBlueprint } from './objects/types';
 

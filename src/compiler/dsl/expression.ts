@@ -12,7 +12,7 @@ import {
     parse_array_strings as wasmParseArrayStrings,
     symbolic_derivative as wasmSymbolicDerivative,
     symbolic_variables as wasmSymbolicVariables,
-} from '../../generated/math_rs/math_rs';
+} from '@/generated/math_rs/math_rs';
 
 export type ExpressionArray = string | ExpressionArray[];
 

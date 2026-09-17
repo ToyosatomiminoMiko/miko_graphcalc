@@ -17,13 +17,13 @@
  * 校验也一并删除了.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, StubElement } from '../../../testing/domStub';
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { CamMode, ViewHome } from '../../../contract/view';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { UI_CONFIG } from '../../../config/uiConfig';
-import { createViewPanel, type ViewPanel } from '../ViewPanel';
+import { installDomStub, StubElement } from '@/testing/domStub';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { CamMode, ViewHome } from '@/contract/view';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
+import { createViewPanel, type ViewPanel } from '@/ui/view/ViewPanel';
 import { CameraToggle } from './CameraToggle';
 import { RotationLockController } from './RotationLockController';
 import { ViewCubeController } from './ViewCubeController';

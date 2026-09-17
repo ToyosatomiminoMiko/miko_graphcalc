@@ -22,10 +22,10 @@
  * 后续规划(roadmap):区域 y 型 / 极坐标 r-θ / 多曲线边界 / region 参与求交 /
  * region 作为曲面底域等,见 `contract/ir.ts` RegionObject 注释.
  */
-import type { IntegralStatement } from '../../contract/ast';
+import type { IntegralStatement } from '@/contract/ast';
 import {
     INTEGRAL_METHOD_NAMES,
-} from '../../contract/ir';
+} from '@/contract/ir';
 import type {
     Coefficient,
     IntegralDomainKind,
@@ -33,8 +33,8 @@ import type {
     IntegralTask,
     ParamDeclaration,
     SceneObject,
-} from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+} from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import { normalizeExpression, extractSymbolNames } from './expression';
 import { buildParamScope, requireDeclaredCoefficient } from './params';
 import {

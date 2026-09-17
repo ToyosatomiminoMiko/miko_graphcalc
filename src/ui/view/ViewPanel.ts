@@ -28,11 +28,11 @@
  * 由 `<span>` 变成 `<label for>`(见 `widgets/Row.ts`),以及去掉了那些只给
  * `getElementById` 用的 id.
  */
-import { RENDER_CONFIG } from '../../config/renderConfig';
-import { UI_CONFIG } from '../../config/uiConfig';
-import type { AxisName, CamMode, GridPlane, PointMode, UpAxis, ViewHome } from '../../contract/view';
-import { el } from '../widgets/dom';
-import { createNumberField, type NumberFieldHandle } from '../widgets/NumberField';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { AxisName, CamMode, GridPlane, PointMode, UpAxis, ViewHome } from '@/contract/view';
+import { el } from '@/ui/widgets/dom';
+import { createNumberField, type NumberFieldHandle } from '@/ui/widgets/NumberField';
 import {
     createControlGroup,
     createFieldLabel,
@@ -40,9 +40,9 @@ import {
     createNumberRow,
     createRow,
     createSwitchRow,
-} from '../widgets/Row';
-import { createSegmented, type SegmentedHandle } from '../widgets/Segmented';
-import { createSwitch, type SwitchHandle } from '../widgets/Switch';
+} from '@/ui/widgets/Row';
+import { createSegmented, type SegmentedHandle } from '@/ui/widgets/Segmented';
+import { createSwitch, type SwitchHandle } from '@/ui/widgets/Switch';
 
 /**
  * 相机模式复选框的语义:勾选 = 正交.

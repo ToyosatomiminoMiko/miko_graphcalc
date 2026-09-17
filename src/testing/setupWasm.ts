@@ -11,8 +11,8 @@
  * `initCompiler()/initMath()` 会因实例已存在而立刻返回,不会重复实例化.
  */
 import { readFile } from 'node:fs/promises';
-import { initSync as initCompilerSync } from '../generated/compiler_rs/compiler_rs';
-import { initSync as initMathSync } from '../generated/math_rs/math_rs';
+import { initSync as initCompilerSync } from '@/generated/compiler_rs/compiler_rs';
+import { initSync as initMathSync } from '@/generated/math_rs/math_rs';
 
 const compilerWasm = await readFile(
     new URL('../generated/compiler_rs/compiler_rs_bg.wasm', import.meta.url),

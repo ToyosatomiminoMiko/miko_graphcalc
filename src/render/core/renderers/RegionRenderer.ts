@@ -14,15 +14,15 @@
  * 区域参与求交,见 contract/ir.ts RegionObject 注释.
  */
 import * as THREE from 'three';
-import type { IRenderer } from '../renderers/IRenderer';
-import type { CurveObject, RegionObject } from '../../../contract/ir';
-import { splitCoefficients } from '../../../math/adapters/coefficientUtils';
-import { LatestRequestExecutor, type RequestClient } from '../../../core/LatestRequestExecutor';
+import type { IRenderer } from '@/render/core/renderers/IRenderer';
+import type { CurveObject, RegionObject } from '@/contract/ir';
+import { splitCoefficients } from '@/math/adapters/coefficientUtils';
+import { LatestRequestExecutor, type RequestClient } from '@/core/LatestRequestExecutor';
 import {
     sharedComputeFacade as regionComputeEngine,
     type CurveSampleResult,
-} from '../../../compute';
-import { reportSamplingFailure } from '../samplingErrors';
+} from '@/compute';
+import { reportSamplingFailure } from '@/render/core/samplingErrors';
 
 type RegionSampleRequest = {
     id: number;

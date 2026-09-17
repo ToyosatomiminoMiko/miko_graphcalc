@@ -13,14 +13,14 @@
  * 求解是声明级编译:隐藏项在 `compileSolves` 里就不再调用内核,因此这里
  * 只需按 `enabled` 决定显隐与入口可用性,没有别的异步状态.
  */
-import type { SolveTask } from '../../contract/ir';
+import type { SolveTask } from '@/contract/ir';
 import {
     solveLatexDetails,
     solveLatexSummary,
     solvePlainText,
-} from '../../compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '../shared/rowDom';
-import { buildSolveProcess } from '../process/processData';
+} from '@/compiler/dsl/evaluationLatex';
+import { createRowActions, createVisibilityButton } from '@/ui/shared/rowDom';
+import { buildSolveProcess } from '@/ui/process/processData';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

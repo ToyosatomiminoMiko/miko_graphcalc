@@ -26,9 +26,9 @@
  * 物化是对象子系统的两个独立 switch(各自按 9 种 kind 分派),只共享
  * ./types.ts 的 blueprint 类型.
  */
-import { NUMERIC_CONFIG } from '../../../config/numericConfig';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import type { ObjectStatement } from '../../../contract/ast';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import type { ObjectStatement } from '@/contract/ast';
 import {
     assertKnownOptions,
     findOption,
@@ -37,13 +37,13 @@ import {
     parseCappedPositiveIntegerList,
     parseNumberListOfSize,
     stripQuotes,
-} from '../options';
+} from '@/compiler/dsl/options';
 import {
     extractSymbolNames,
     normalizeExpression,
     parseArrayStrings,
     type ExpressionArray,
-} from '../expression';
+} from '@/compiler/dsl/expression';
 import type {
     ObjectReferenceResolver,
     ResolvedObjectExpression,

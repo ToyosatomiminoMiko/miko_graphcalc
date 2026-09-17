@@ -10,9 +10,9 @@
  * 所以配置错了会在这一层先暴露.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, StubElement } from '../../testing/domStub';
-import { RENDER_CONFIG } from '../../config/renderConfig';
-import { UI_CONFIG } from '../../config/uiConfig';
+import { installDomStub, StubElement } from '@/testing/domStub';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
 import { createViewPanel, type ViewPanel } from './ViewPanel';
 
 let panel: ViewPanel;

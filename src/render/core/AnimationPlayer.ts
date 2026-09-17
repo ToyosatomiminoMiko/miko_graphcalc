@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import type { AnimationClip } from '../../contract/ir';
+import type { AnimationClip } from '@/contract/ir';
 import {
     cloneMat4,
     type Mat4,
-} from '../../math/matrix/rowMajorMatrix';
-import type { MatrixOps } from '../../math/matrix/MatrixOps';
+} from '@/math/matrix/rowMajorMatrix';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
 
 interface ObjectAnimationTimeline {
     base: Mat4 | null;

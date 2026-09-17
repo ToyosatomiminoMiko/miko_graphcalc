@@ -9,32 +9,32 @@
  * - `toggleObject`:切换单个实体的可见性.
  */
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { SceneManager } from '../render/core/SceneManager';
-import { CameraManager } from '../render/core/CameraManager';
-import { Plotter } from '../render/core/Plotter';
-import { AnimationPlayer } from '../render/core/AnimationPlayer';
-import { AnalysisRenderer } from '../render/core/renderers/AnalysisRenderer';
-import { IntersectionRenderer } from '../render/core/renderers/IntersectionRenderer';
-import { DslIntegralRenderer } from '../render/visualization/DslIntegralRenderer';
-import { ComputeFacade } from '../compute';
-import { CameraToggle } from '../ui/view/controls/CameraToggle';
-import { ViewCubeController } from '../ui/view/controls/ViewCubeController';
-import { RotationLockController } from '../ui/view/controls/RotationLockController';
-import { PointStyleController } from '../ui/view/controls/PointStyleController';
-import { SurfaceStyleController } from '../ui/view/controls/SurfaceStyleController';
-import { AxisLineWidthController } from '../ui/view/controls/AxisLineWidthController';
-import { GridTicksController } from '../ui/view/controls/GridTicksController';
-import { AxisLabelController } from '../ui/view/controls/AxisLabelController';
-import { AxisUpController } from '../ui/view/controls/AxisUpController';
-import type { SceneIR, SceneObject } from '../contract/ir';
-import type { GraphCalcEvents } from '../contract/events';
-import { EventBus } from '../core/EventBus';
-import { onSamplingFailure } from '../render/core/samplingErrors';
+import { SceneManager } from '@/render/core/SceneManager';
+import { CameraManager } from '@/render/core/CameraManager';
+import { Plotter } from '@/render/core/Plotter';
+import { AnimationPlayer } from '@/render/core/AnimationPlayer';
+import { AnalysisRenderer } from '@/render/core/renderers/AnalysisRenderer';
+import { IntersectionRenderer } from '@/render/core/renderers/IntersectionRenderer';
+import { DslIntegralRenderer } from '@/render/visualization/DslIntegralRenderer';
+import { ComputeFacade } from '@/compute';
+import { CameraToggle } from '@/ui/view/controls/CameraToggle';
+import { ViewCubeController } from '@/ui/view/controls/ViewCubeController';
+import { RotationLockController } from '@/ui/view/controls/RotationLockController';
+import { PointStyleController } from '@/ui/view/controls/PointStyleController';
+import { SurfaceStyleController } from '@/ui/view/controls/SurfaceStyleController';
+import { AxisLineWidthController } from '@/ui/view/controls/AxisLineWidthController';
+import { GridTicksController } from '@/ui/view/controls/GridTicksController';
+import { AxisLabelController } from '@/ui/view/controls/AxisLabelController';
+import { AxisUpController } from '@/ui/view/controls/AxisUpController';
+import type { SceneIR, SceneObject } from '@/contract/ir';
+import type { GraphCalcEvents } from '@/contract/events';
+import { EventBus } from '@/core/EventBus';
+import { onSamplingFailure } from '@/render/core/samplingErrors';
 import { SceneStore } from './SceneStore';
-import { DiagnosticsController } from '../ui/diagnostics/DiagnosticsController';
-import type { DiagnosticEntry } from '../ui/diagnostics/DiagnosticsController';
-import { ObjectListController } from '../ui/objects/ObjectListController';
-import type { ViewPanel } from '../ui/view/ViewPanel';
+import { DiagnosticsController } from '@/ui/diagnostics/DiagnosticsController';
+import type { DiagnosticEntry } from '@/ui/diagnostics/DiagnosticsController';
+import { ObjectListController } from '@/ui/objects/ObjectListController';
+import type { ViewPanel } from '@/ui/view/ViewPanel';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;

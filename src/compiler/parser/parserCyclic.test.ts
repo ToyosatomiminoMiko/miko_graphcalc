@@ -8,8 +8,8 @@
  * 编译期语义(回绕,scope)仍在 DslCompiler.test.ts / paramValue.test.ts 覆盖.
  */
 import { describe, expect, it } from 'vitest';
-import { parseMiko } from '../parser';
-import type { ParamStatement } from '../../contract/ast';
+import { parseMiko } from '@/compiler/parser';
+import type { ParamStatement } from '@/contract/ast';
 
 /** 只取 param 语句,便于按位置断言. */
 function paramsOf(

@@ -13,10 +13,10 @@
  * 覆盖;这里只验编译与 IR 契约.
  */
 import { describe, expect, it } from 'vitest';
-import type { SceneIR } from '../../contract/ir';
-import { parseMiko } from '../parser';
+import type { SceneIR } from '@/contract/ir';
+import { parseMiko } from '@/compiler/parser';
 import { compileScene } from './DslCompiler';
-import { testMatrixOps } from '../../testing/matrixOps';
+import { testMatrixOps } from '@/testing/matrixOps';
 
 async function compile(
     source: string,

@@ -9,7 +9,7 @@
  * 概念,混在一起学生会把前者当成求导法则.`kind` 因此是步骤的一等字段,
  * 一期由数据源标注,三期由内核产物给出,UI 不变.
  */
-import { SOLVE_STEP_KINDS, type SolveStepKind } from '../../contract/ir';
+import { SOLVE_STEP_KINDS, type SolveStepKind } from '@/contract/ir';
 
 /**
  * 步骤类型:决定依据徽章的视觉分区(样式归 CSS,见 css/process.css).

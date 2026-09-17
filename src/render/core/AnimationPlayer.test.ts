@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AnimationPlayer } from './AnimationPlayer';
-import { testMatrixOps } from '../../testing/matrixOps';
+import { testMatrixOps } from '@/testing/matrixOps';
 
 const identity = [
     [1, 0, 0, 0],

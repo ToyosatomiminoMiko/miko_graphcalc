@@ -4,7 +4,7 @@ import {
     resolveGridSteps,
     stepCount,
 } from './axisSteps';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 import { formatTickLabel } from './tickLabel';
 
 const grid = RENDER_CONFIG.scene.grid;

@@ -1,13 +1,13 @@
-import type { AstProgram } from '../../contract/ast';
+import type { AstProgram } from '@/contract/ast';
 import type {
     AntiderivativeTask,
     IntegralTask,
     OdeTask,
     SceneIR,
     SceneObject,
-} from '../../contract/ir';
-import type { MatrixOps } from '../../math/matrix/MatrixOps';
-import { withStatementSpan } from '../errors';
+} from '@/contract/ir';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
+import { withStatementSpan } from '@/compiler/errors';
 import { materializeObject } from './objects/materialize';
 import { applyParamOverrides } from './params';
 import { compileIntegralTask } from './integrals';

@@ -6,7 +6,7 @@
  * 把 blueprint 求值成 contract/ir.ts 的 SceneObject.静态场景/构建/物化三处
  * 都只经由这里共享类型与 type guard.
  */
-import type { AntiderivativeOrigin, DerivativeOrigin, OdeOrigin } from '../../../contract/ir';
+import type { AntiderivativeOrigin, DerivativeOrigin, OdeOrigin } from '@/contract/ir';
 
 export type CurveBlueprint = {
     name: string;

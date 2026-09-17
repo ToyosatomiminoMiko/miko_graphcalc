@@ -15,11 +15,11 @@
  * 每个 region 里重建一次全对象索引.已上收到 buildStaticScene 末尾一次性
  * 执行(见 finalizeRegionBlueprints),编译缓存命中后不再重复.
  */
-import type { AstProgram, ObjectStatement } from '../../contract/ast';
-import type { AnimationClip, ParamDeclaration } from '../../contract/ir';
-import type { MatrixOps } from '../../math/matrix/MatrixOps';
-import { cloneMat4, type Mat4 } from '../../math/matrix/rowMajorMatrix';
-import { withStatementSpan } from '../errors';
+import type { AstProgram, ObjectStatement } from '@/contract/ast';
+import type { AnimationClip, ParamDeclaration } from '@/contract/ir';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
+import { cloneMat4, type Mat4 } from '@/math/matrix/rowMajorMatrix';
+import { withStatementSpan } from '@/compiler/errors';
 import { buildObjectBlueprint } from './objects/build';
 import {
     blueprintHasCoefficients,

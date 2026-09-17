@@ -40,10 +40,10 @@
  * CurveBlueprint/SurfaceBlueprint,下游完全无感(见 ./build.ts 与
  * ../staticScene.ts).
  */
-import { NUMERIC_CONFIG } from '../../../config/numericConfig';
-import type { ObjectStatement } from '../../../contract/ast';
-import { extractSymbolNames, normalizeExpression } from '../expression';
-import { findOption, parseNumberListOfSize } from '../options';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
+import type { ObjectStatement } from '@/contract/ast';
+import { extractSymbolNames, normalizeExpression } from '@/compiler/dsl/expression';
+import { findOption, parseNumberListOfSize } from '@/compiler/dsl/options';
 
 export type FunctionObjectKind = 'curve' | 'surface';
 

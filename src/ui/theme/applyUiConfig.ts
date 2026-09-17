@@ -9,7 +9,7 @@
  * 调用时机:`src/main.ts` 在 `new DslApp()` **之前**调用.原因是
  * `EditorLineNumbers` 构造时会按最终字体度量行号宽度,晚一步就会量到兜底字体.
  */
-import { UI_CONFIG } from '../../config/uiConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
 
 /**
  * 配置值 -> CSS 变量名.

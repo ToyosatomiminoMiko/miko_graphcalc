@@ -12,8 +12,8 @@
  * `stub.document.dispatch`,事件 target 显式带上"当前聚焦元素".
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
-import { FormulaCopyController } from '../formula/FormulaCopyController';
+import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
+import { FormulaCopyController } from '@/ui/formula/FormulaCopyController';
 import { KeyboardController, type KeyboardBinding } from './KeyboardController';
 
 interface Harness {

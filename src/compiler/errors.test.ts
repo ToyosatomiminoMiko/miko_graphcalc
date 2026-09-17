@@ -11,7 +11,7 @@ import {
     lineAndColumnAt,
     withStatementSpan,
 } from './errors';
-import type { SourceSpan } from '../contract/ast';
+import type { SourceSpan } from '@/contract/ast';
 
 const SPAN: SourceSpan = { start: 0, end: 4 };
 

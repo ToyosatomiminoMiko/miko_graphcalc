@@ -6,7 +6,7 @@
  * 此前各渲染器/求交/计算门面各自写一份 `.map(c => c.name)` 转换,这里收口
  * 成一套工具,避免同一语义在多处各写一遍.
  */
-import type { Coefficient } from '../../contract/ir';
+import type { Coefficient } from '@/contract/ir';
 
 export type CoefficientNamesAndValues = {
     names: string[];

@@ -8,9 +8,9 @@
  * - body 抛出的普通错误升级为携带**该语句 span** 的 `CompileError`.
  */
 import { describe, expect, it } from 'vitest';
-import type { SolveStatement } from '../../contract/ast';
-import { CompileError } from '../errors';
-import { parseMiko } from '../parser';
+import type { SolveStatement } from '@/contract/ast';
+import { CompileError } from '@/compiler/errors';
+import { parseMiko } from '@/compiler/parser';
 import { compileConstraintStatements } from './statementShell';
 
 const isSolve = (statement: { type: string }): statement is SolveStatement =>

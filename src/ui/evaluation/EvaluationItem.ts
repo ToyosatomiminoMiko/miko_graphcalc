@@ -14,9 +14,9 @@
  * `name(task)` 不在契约里:三类求值任务的 IR 都有 `name` 字段,列表引擎直接用
  * 字段取,不再要求每个 kind 各写一遍同样的函数.
  */
-import type { SceneObject } from '../../contract/ir';
-import type { ProcessDocument } from '../process/processSteps';
-import { carryDetailsOpen } from '../shared/rowDom';
+import type { SceneObject } from '@/contract/ir';
+import type { ProcessDocument } from '@/ui/process/processSteps';
+import { carryDetailsOpen } from '@/ui/shared/rowDom';
 
 /**
  * 打开过程页的请求:已经重组好的过程文档.

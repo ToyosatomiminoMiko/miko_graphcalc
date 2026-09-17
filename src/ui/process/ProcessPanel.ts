@@ -13,10 +13,10 @@
  * 公式沿用 `FormulaView`(KaTeX 不换行,排不下由该行横向滚动),模板缓存上限
  * 不在这里扩:步骤 LaTeX 键是"表达式签名 × 步数",是有限集合.
  */
-import { UI_CONFIG } from '../../config/uiConfig';
-import { createFormulaElement } from '../formula/FormulaView';
-import { KeyedRowList, type KeyedRowHandles } from '../shared/keyedRowList';
-import { el } from '../widgets/dom';
+import { UI_CONFIG } from '@/config/uiConfig';
+import { createFormulaElement } from '@/ui/formula/FormulaView';
+import { KeyedRowList, type KeyedRowHandles } from '@/ui/shared/keyedRowList';
+import { el } from '@/ui/widgets/dom';
 import {
     PROCESS_STEP_KIND_LABELS,
     partitionStepsByKind,

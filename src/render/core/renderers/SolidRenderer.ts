@@ -4,14 +4,14 @@ import type {
     BoxObject,
     ConicSolidObject,
     SphereObject,
-} from '../../../contract/ir';
+} from '@/contract/ir';
 import {
     buildBoxGeometry,
     buildConicGeometry,
     buildSphereGeometry,
     disposeSolidGroup,
     wrapSolid,
-} from '../../visualization/solidPrimitives';
+} from '@/render/visualization/solidPrimitives';
 
 /**
  * 球体 / 方块 / 旋转体的统一渲染器.

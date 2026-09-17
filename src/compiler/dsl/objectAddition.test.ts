@@ -9,10 +9,10 @@
  * 这条完整路径.
  */
 import { describe, expect, it } from 'vitest';
-import { parseMiko } from '../parser';
+import { parseMiko } from '@/compiler/parser';
 import { compileScene } from './DslCompiler';
-import { testMatrixOps } from '../../testing/matrixOps';
-import type { CurveObject, SurfaceObject } from '../../contract/ir';
+import { testMatrixOps } from '@/testing/matrixOps';
+import type { CurveObject, SurfaceObject } from '@/contract/ir';
 
 async function compile(source: string) {
     return compileScene(await parseMiko(source), {}, testMatrixOps);

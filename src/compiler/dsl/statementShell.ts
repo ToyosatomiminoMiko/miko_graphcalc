@@ -19,8 +19,8 @@ import type {
     AstStatement,
     OptionPair,
     SourceSpan,
-} from '../../contract/ast';
-import { withStatementSpan } from '../errors';
+} from '@/contract/ast';
+import { withStatementSpan } from '@/compiler/errors';
 import { assertKnownOptions } from './options';
 
 /**

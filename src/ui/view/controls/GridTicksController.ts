@@ -1,10 +1,10 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { UI_CONFIG } from '../../../config/uiConfig';
-import type { GridPlane } from '../../../contract/view';
-import type { AxisControls } from '../ViewPanel';
-import type { NumberFieldHandle } from '../../widgets/NumberField';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { GridPlane } from '@/contract/view';
+import type { AxisControls } from '@/ui/view/ViewPanel';
+import type { NumberFieldHandle } from '@/ui/widgets/NumberField';
 
 /** 遍历三个坐标平面时的固定顺序;类型上就是 `GridPlane` 的全集. */
 const PLANES: readonly GridPlane[] = ['xz', 'xy', 'yz'];

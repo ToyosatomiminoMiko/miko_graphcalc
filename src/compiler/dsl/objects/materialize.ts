@@ -21,9 +21,9 @@ import type {
     SurfaceObject,
     VectorFieldObject,
     VectorObject,
-} from '../../../contract/ir';
-import { evaluateRequiredNumber } from '../expression';
-import { buildParamScope, materializeCoefficient } from '../params';
+} from '@/contract/ir';
+import { evaluateRequiredNumber } from '@/compiler/dsl/expression';
+import { buildParamScope, materializeCoefficient } from '@/compiler/dsl/params';
 import type { ObjectBlueprint } from './types';
 
 /**

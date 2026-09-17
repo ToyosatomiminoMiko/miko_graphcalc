@@ -1,5 +1,19 @@
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * `src/` 内跨目录导入的根别名.
+ *
+ * 单一来源约束:Vite/Vitest 不读 `tsconfig.json`,所以这行是
+ * `tsconfig.json` 里 `paths: { "@/*": ["./src/*"] }` 的**另一半**,
+ * 改一处必须同步另一处(TS 侧管类型检查与编辑器,Vite 侧管 dev/build/test
+ * 的实际解析;只改一边的表现是"编辑器不报错但构建失败"或反之).
+ *
+ * 不覆盖 `new URL(..., import.meta.url)`:那是物理文件定位,不走模块解析.
+ * `src/generated/` 刻意不做别名,构建产物不该伪装成源码层.
+ */
+const SRC_ALIAS = fileURLToPath(new URL('./src', import.meta.url));
 
 /**
  * 独立仓库配置: 本仓库是 GitHub Pages 的"项目页",站点根是
@@ -38,6 +52,9 @@ function injectChromeColor(): Plugin {
 
 export default defineConfig({
     base: '/miko_graphcalc/',
+    resolve: {
+        alias: [{ find: /^@\//, replacement: `${SRC_ALIAS}/` }],
+    },
     optimizeDeps: {
         include: ['three'],
     },

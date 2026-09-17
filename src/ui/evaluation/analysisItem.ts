@@ -11,15 +11,15 @@
  * 隐藏项例外:细节根本不生成,此时挂一条"已隐藏,不参与计算"的状态行,
  * 让"不渲染 + 不参与计算"在列表里有明文,而不是只靠透明度.
  */
-import type { AnalysisResult } from '../../contract/ir';
+import type { AnalysisResult } from '@/contract/ir';
 import {
     analysisLatexDetailEntries,
     analysisLatexSummary,
     detailLinesOf,
-} from '../../compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '../shared/rowDom';
-import { buildGradientProcess } from '../process/processData';
-import { needsProcessPage } from '../process/disclosure';
+} from '@/compiler/dsl/evaluationLatex';
+import { createRowActions, createVisibilityButton } from '@/ui/shared/rowDom';
+import { buildGradientProcess } from '@/ui/process/processData';
+import { needsProcessPage } from '@/ui/process/disclosure';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

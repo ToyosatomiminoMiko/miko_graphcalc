@@ -1,8 +1,8 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { UI_CONFIG } from '../../../config/uiConfig';
-import type { NumberFieldHandle } from '../../widgets/NumberField';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { NumberFieldHandle } from '@/ui/widgets/NumberField';
 
 /**
  * 坐标轴线宽控制.

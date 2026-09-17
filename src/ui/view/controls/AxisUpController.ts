@@ -1,7 +1,7 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { UpAxis } from '../../../contract/view';
-import type { SegmentedHandle } from '../../widgets/Segmented';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { UpAxis } from '@/contract/view';
+import type { SegmentedHandle } from '@/ui/widgets/Segmented';
 
 /**
  * 坐标轴"向上"方向控制.

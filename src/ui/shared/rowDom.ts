@@ -24,8 +24,8 @@
  * 求值行自己的骨架(摘要/细节/结果行怎么拼)不在这里,见
  * `evaluation/evaluationDom.ts`.
  */
-import { createButton } from '../widgets/Button';
-import { el } from '../widgets/dom';
+import { createButton } from '@/ui/widgets/Button';
+import { el } from '@/ui/widgets/dom';
 
 /**
  * 行外壳:`<article class="object-row <rowClass>">`,内容分两层.

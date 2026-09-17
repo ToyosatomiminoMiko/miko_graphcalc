@@ -12,10 +12,10 @@ import init, {
     integrate2d,
     integrate_region,
     integrate_solid,
-} from "../../../generated/math_rs/math_rs";
-import type { IntegralDomainKind, IntegralMethod } from '../../../contract/ir';
-import { recordToCoefficientArgs } from '../../../math/adapters/coefficientUtils';
-import { createWasmWorker } from '../../../wasm/workerRuntime';
+} from "@/generated/math_rs/math_rs";
+import type { IntegralDomainKind, IntegralMethod } from '@/contract/ir';
+import { recordToCoefficientArgs } from '@/math/adapters/coefficientUtils';
+import { createWasmWorker } from '@/wasm/workerRuntime';
 
 export type IntegralBoundaryDesc = {
     expr: string;

@@ -1,6 +1,6 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { SwitchHandle } from '../../widgets/Switch';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { SwitchHandle } from '@/ui/widgets/Switch';
 
 /**
  * 旋转锁定开关:锁定旋转时仍允许平移和缩放.

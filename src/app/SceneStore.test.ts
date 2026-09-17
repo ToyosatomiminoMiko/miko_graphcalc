@@ -8,8 +8,8 @@
  * 2. 只有源码内容真的变了才清空.
  */
 import { describe, expect, it } from 'vitest';
-import type { AstProgram } from '../contract/ast';
-import type { MatrixOps } from '../math/matrix/MatrixOps';
+import type { AstProgram } from '@/contract/ast';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
 import { SceneStore } from './SceneStore';
 
 // commitSource 只保存引用,不解释 AST/矩阵后端,桩对象足够.

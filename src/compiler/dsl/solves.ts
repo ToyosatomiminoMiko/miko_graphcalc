@@ -27,20 +27,20 @@
  * (见 contract/ir.ts 的 SolveTask;展示用的连接文案由 UI 从这两个字段派生,
  * IR 里不再各存一份派生字符串).
  */
-import type { AstProgram, SolveStatement } from '../../contract/ast';
+import type { AstProgram, SolveStatement } from '@/contract/ast';
 import type {
     ParamDeclaration,
     SolveMethod,
     SolveStep,
     SolveStepKind,
     SolveTask,
-} from '../../contract/ir';
-import { SOLVE_STEP_KINDS } from '../../contract/ir';
+} from '@/contract/ir';
+import { SOLVE_STEP_KINDS } from '@/contract/ir';
 import {
     solve_equation as wasmSolveEquation,
     solve_system as wasmSolveSystem,
-} from '../../generated/math_rs/math_rs';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+} from '@/generated/math_rs/math_rs';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import {
     findOption,
     parseCappedPositiveInteger,

@@ -27,7 +27,7 @@
  *   这通常正是期望(它确实是语法关键字);若某个字面量只是占位而非关键字,
  *   需要在抽取器里显式排除.
  */
-import pestSource from '../compiler_rs/src/miko.pest?raw';
+import pestSource from '@/compiler/compiler_rs/src/miko.pest?raw';
 
 /** pest 源码里的一个字符串字面量;`[start, end)` 是含引号的原文区间. */
 interface PestLiteral {

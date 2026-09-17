@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { UI_CONFIG } from '../../config/uiConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
 import { applyUiConfig, uiConfigCssVariables } from './applyUiConfig';
 
 /**

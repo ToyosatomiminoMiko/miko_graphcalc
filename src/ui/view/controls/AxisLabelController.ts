@@ -1,7 +1,7 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import type { AxisName } from '../../../contract/view';
-import type { SwitchHandle } from '../../widgets/Switch';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import type { AxisName } from '@/contract/view';
+import type { SwitchHandle } from '@/ui/widgets/Switch';
 
 /** 遍历三条轴时的固定顺序;类型上就是 `AxisName` 的全集. */
 const AXES: readonly AxisName[] = ['x', 'y', 'z'];

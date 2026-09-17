@@ -9,8 +9,8 @@
  * 4. 消失的对象连行一起删除.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SceneObject } from '../../contract/ir';
-import { installDomStub, StubElement } from '../../testing/domStub';
+import type { SceneObject } from '@/contract/ir';
+import { installDomStub, StubElement } from '@/testing/domStub';
 
 vi.mock('katex', () => ({
     default: {

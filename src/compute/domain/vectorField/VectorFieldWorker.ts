@@ -1,5 +1,5 @@
-import init, { sample_vector_field } from '../../../generated/math_rs/math_rs';
-import { createWasmWorker } from '../../../wasm/workerRuntime';
+import init, { sample_vector_field } from '@/generated/math_rs/math_rs';
+import { createWasmWorker } from '@/wasm/workerRuntime';
 
 export type VectorFieldWorkerRequest = {
     id: number;

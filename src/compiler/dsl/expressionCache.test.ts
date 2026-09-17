@@ -17,7 +17,7 @@ const wasm = vi.hoisted(() => ({
     derivative: vi.fn((expr: string, variable: string) => `d(${expr})/d(${variable})`),
 }));
 
-vi.mock('../../generated/math_rs/math_rs', () => ({
+vi.mock('@/generated/math_rs/math_rs', () => ({
     evaluate_scalar: vi.fn(),
     latex_expression: wasm.latex,
     matrix4_from_expr: vi.fn(),

@@ -25,26 +25,26 @@ import type {
     AnalysisOpKind,
     AnalysisStatement,
     AstProgram,
-} from '../../contract/ast';
+} from '@/contract/ast';
 import type {
     AnalysisResult,
     AnalysisShow,
     ParamDeclaration,
     SceneObject,
-} from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+} from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import {
     evaluate_curl_point as wasmEvaluateCurlPoint,
     evaluate_divergence_point as wasmEvaluateDivergencePoint,
     evaluate_gradient_point as wasmEvaluateGradientPoint,
     evaluate_laplacian_point as wasmEvaluateLaplacianPoint,
-} from '../../generated/math_rs/math_rs';
-import { splitCoefficients } from '../../math/adapters/coefficientUtils';
+} from '@/generated/math_rs/math_rs';
+import { splitCoefficients } from '@/math/adapters/coefficientUtils';
 import {
     CoordinateSystem,
     type CoordinateTriple,
-} from '../../math/CoordinateSystem';
-import { withStatementSpan } from '../errors';
+} from '@/math/CoordinateSystem';
+import { withStatementSpan } from '@/compiler/errors';
 import { assertKnownOptions, parseShowOption } from './options';
 import { buildParamScope } from './params';
 import {

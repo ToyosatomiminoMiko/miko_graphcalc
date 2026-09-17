@@ -4,9 +4,9 @@
  * 接收已经由 TS 适配层序列化好的对象描述符,在 Worker 内调用 Rust
  * `intersect_pair`;表达式只在 Rust 侧编译一次,后续网格/二分都复用上下文.
  */
-import init, { intersect_pair } from '../../../generated/math_rs/math_rs';
-import type { IntersectionComputeSide } from '../../../math/adapters/IntersectionMath';
-import { createWasmWorker } from '../../../wasm/workerRuntime';
+import init, { intersect_pair } from '@/generated/math_rs/math_rs';
+import type { IntersectionComputeSide } from '@/math/adapters/IntersectionMath';
+import { createWasmWorker } from '@/wasm/workerRuntime';
 
 export type IntersectionWorkerRequest = {
     id: number;

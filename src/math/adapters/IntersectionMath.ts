@@ -13,14 +13,14 @@ import type {
     IntersectionTask,
     SceneObject,
     Vec3,
-} from '../../contract/ir';
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
+} from '@/contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
 import { splitCoefficients } from './coefficientUtils';
 import {
     flattenOptionalMat4,
     invertMat4,
     type Mat4,
-} from '../matrix/rowMajorMatrix';
+} from '@/math/matrix/rowMajorMatrix';
 
 const SUPPORTED_INTERSECTION_KINDS = new Set<SceneObject['kind']>([
     'curve',

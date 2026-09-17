@@ -1,6 +1,6 @@
-import { parse_miko } from '../../generated/compiler_rs/compiler_rs';
-import { ensureWasmReady } from '../../wasm/init';
-import type { AstProgram } from '../../contract/ast';
+import { parse_miko } from '@/generated/compiler_rs/compiler_rs';
+import { ensureWasmReady } from '@/wasm/init';
+import type { AstProgram } from '@/contract/ast';
 
 /**
  * parser (compiler/compiler_rs/src/lib.rs) 包对外的唯一解析入口:

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { IRenderer } from './IRenderer';
-import type { VectorObject } from '../../../contract/ir';
-import { ArrowMesh } from '../../visualization/ArrowMesh';
+import type { VectorObject } from '@/contract/ir';
+import { ArrowMesh } from '@/render/visualization/ArrowMesh';
 
 /**
  * 空间向量渲染器

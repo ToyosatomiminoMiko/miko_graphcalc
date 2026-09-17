@@ -10,7 +10,7 @@
  * 对齐靠 CSS 常量与同源字体变量保证,像素级验证留给真机.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
+import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
 import { EditorHighlight, HIGHLIGHT_ENABLED_CLASS } from './EditorHighlight';
 
 interface Harness {

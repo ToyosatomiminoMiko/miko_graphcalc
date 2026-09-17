@@ -14,7 +14,7 @@
  * 派生,语法里新增一个 `object_kind` 分支会自动出现在高亮里,不存在
  * "语法改了忘了同步"这回事(派生规则见 `extractKeywordGroups`).
  */
-import { DSL_KEYWORDS } from '../../compiler/dsl/keywords';
+import { DSL_KEYWORDS } from '@/compiler/dsl/keywords';
 
 /** 关键字表仍以 `miko.pest` 为源;这里转出,保持既有的导入路径可用. */
 export { DSL_KEYWORDS };

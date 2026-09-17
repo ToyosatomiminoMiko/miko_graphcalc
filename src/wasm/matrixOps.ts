@@ -2,7 +2,7 @@
  * WASM 矩阵运算后端.
  *
  * 位置:本目录(`wasm/`)是**手写 WASM 粘合层**,与 `generated/`(wasm-pack
- * 产物)配对.凡是必须直接调用 wasm-bindgen 导出、又在主线程或 Worker 里被
+ * 产物)配对.凡是必须直接调用 wasm-bindgen 导出,又在主线程或 Worker 里被
  * 复用的粘合代码都收敛在这里:主线程初始化 `wasm/init.ts`,Worker 侧消息壳
  * `wasm/workerRuntime.ts`,矩阵后端就是本文件.
  *
@@ -22,13 +22,13 @@ import {
     mat4_rotate as wasmMat4Rotate,
     mat4_scale as wasmMat4Scale,
     mat4_translate as wasmMat4Translate,
-} from '../generated/math_rs/math_rs';
-import type { MatrixOps } from '../math/matrix/MatrixOps';
+} from '@/generated/math_rs/math_rs';
+import type { MatrixOps } from '@/math/matrix/MatrixOps';
 import {
     flattenMat4,
     mat4FromFlat,
     type Mat4,
-} from '../math/matrix/rowMajorMatrix';
+} from '@/math/matrix/rowMajorMatrix';
 
 function toMat4(values: Float64Array): Mat4 {
     const matrix = mat4FromFlat(Array.from(values));

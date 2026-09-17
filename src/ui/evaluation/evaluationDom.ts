@@ -38,11 +38,11 @@
  * `ui/widgets/dom.ts` 的 `el`,显隐按钮与行外壳这类两栏通用件在
  * `ui/shared/rowDom.ts`.
  */
-import { createObjectRow } from '../shared/rowDom';
-import { createButton } from '../widgets/Button';
-import { el } from '../widgets/dom';
-import { createFormulaElement } from '../formula/FormulaView';
-import type { EvaluationDetailLine } from '../../compiler/dsl/evaluationLatex';
+import { createObjectRow } from '@/ui/shared/rowDom';
+import { createButton } from '@/ui/widgets/Button';
+import { el } from '@/ui/widgets/dom';
+import { createFormulaElement } from '@/ui/formula/FormulaView';
+import type { EvaluationDetailLine } from '@/compiler/dsl/evaluationLatex';
 
 /**
  * 折叠态摘要:彩色类型标签 + 变量名 + 一行公式.

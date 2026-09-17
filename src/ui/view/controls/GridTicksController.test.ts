@@ -13,11 +13,11 @@
  * - dispose 后不再响应输入(控件内部 AbortController 已解绑).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, StubElement } from '../../../testing/domStub';
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { createViewPanel, type ViewPanel } from '../ViewPanel';
+import { installDomStub, StubElement } from '@/testing/domStub';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { createViewPanel, type ViewPanel } from '@/ui/view/ViewPanel';
 import { GridTicksController } from './GridTicksController';
 
 let panel: ViewPanel;

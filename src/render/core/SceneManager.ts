@@ -4,7 +4,7 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 import { formatTickLabel } from './tickLabel';
 import {
     positiveStepPositions,

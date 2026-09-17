@@ -1,9 +1,9 @@
-import { EventBus } from '../../../core/EventBus';
-import type { GraphCalcEvents } from '../../../contract/events';
-import { RENDER_CONFIG } from '../../../config/renderConfig';
-import { UI_CONFIG } from '../../../config/uiConfig';
-import type { PointMode } from '../../../contract/view';
-import type { PointControls } from '../ViewPanel';
+import { EventBus } from '@/core/EventBus';
+import type { GraphCalcEvents } from '@/contract/events';
+import { RENDER_CONFIG } from '@/config/renderConfig';
+import { UI_CONFIG } from '@/config/uiConfig';
+import type { PointMode } from '@/contract/view';
+import type { PointControls } from '@/ui/view/ViewPanel';
 
 /**
  * 点样式控制(场景 point 对象与分析测量点共用).

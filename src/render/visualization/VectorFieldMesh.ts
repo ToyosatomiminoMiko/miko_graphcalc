@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RENDER_CONFIG } from '../../config/renderConfig';
+import { RENDER_CONFIG } from '@/config/renderConfig';
 
 export class VectorFieldMesh {
     public group: THREE.Group;

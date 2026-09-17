@@ -21,7 +21,7 @@
  * 行号栏/预览即可(见 `EditorLineNumbers.refresh()`,它本就是为程序化改写
  * 编辑器准备的).
  */
-import { runLegacyEditorCommand } from '../editor/legacyEditorCommand';
+import { runLegacyEditorCommand } from '@/ui/editor/legacyEditorCommand';
 
 export function replaceTextareaSource(
     editor: HTMLTextAreaElement,

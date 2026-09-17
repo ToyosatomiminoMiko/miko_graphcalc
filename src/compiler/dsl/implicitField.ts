@@ -20,9 +20,9 @@
  * - 投影与法向都在**对象局部坐标**里进行;与 curve/surface 的既有分析
  *   一致,静态 transform 不参与分析(见 docs/derivatives-impl.md).
  */
-import { NUMERIC_CONFIG } from '../../config/numericConfig';
-import { splitCoefficients } from '../../math/adapters/coefficientUtils';
-import type { ImplicitObject, SceneObject, SphereObject } from '../../contract/ir';
+import { NUMERIC_CONFIG } from '@/config/numericConfig';
+import { splitCoefficients } from '@/math/adapters/coefficientUtils';
+import type { ImplicitObject, SceneObject, SphereObject } from '@/contract/ir';
 import { cachedDerivativeExpression, evaluateExpressionAt } from './expression';
 
 /** 隐式场的点求值器;返回 null 表示该点不可求值(定义域外/符号未声明). */

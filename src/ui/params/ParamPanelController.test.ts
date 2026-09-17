@@ -14,8 +14,8 @@
  * `dispatch('input'/'change'/'click')` 模拟事件.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ParamDeclaration } from '../../contract/ir';
-import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
+import type { ParamDeclaration } from '@/contract/ir';
+import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
 import { ParamPanelController } from './ParamPanelController';
 
 const NUMERIC: ParamDeclaration = {

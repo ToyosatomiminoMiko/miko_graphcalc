@@ -12,8 +12,8 @@
  * KeyboardController.test.ts 覆盖).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type DomStub, type StubElement } from '../../testing/domStub';
-import type { KeyboardBinding } from '../shared/KeyboardController';
+import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
+import type { KeyboardBinding } from '@/ui/shared/KeyboardController';
 import { ExampleLoaderController } from './ExampleLoaderController';
 import { EXAMPLE_CATALOG } from './exampleCatalog';
 
