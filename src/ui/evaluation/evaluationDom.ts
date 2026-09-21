@@ -165,13 +165,17 @@ export interface ProcessEntrySpec {
  * 行末"过程"入口按钮:三级披露里 L2 的入口.
  *
  * - 可用:点击后由应用层切到右栏过程页并载入该条目的过程;
- * - 不可用(`disabledReason !== null`,目前只有"已隐藏,不参与计算"):**仍然
- *   渲染**但置灰,并把理由写进 `title`/`aria-label`.隐藏对象不参与计算,也就
- *   没有过程可展示,但"为什么点不了"必须有明文,与列表里"已隐藏,不参与计算"
- *   的文案口径一致(见设计文档 4.4).
+ * - 不可用(`disabledReason !== null`,目前是"已隐藏,不参与计算"与"内核拒绝
+ *   所以没有步骤"两种):**仍然渲染**但置灰,并把理由写进 `title`/`aria-label`.
+ *   "为什么点不了"必须有明文,与列表里"已隐藏,不参与计算"的文案口径一致
+ *   (见设计文档 4.5).
  *
- * 由各 item 按披露判据决定是否创建;它与显隐按钮同处行末动作容器,显隐按钮
- * 排在它**之后**,保持"显隐按钮仍在行末"这条既有位置语义.
+ * 入口的**有无**由各 item 按披露判据决定,且与条目是否隐藏无关:隐藏只把本来
+ * 存在的入口置灰,绝不凭空多出一颗点不动的按钮(见 `EvaluationItem` 的
+ * `processEntryOffered`).
+ *
+ * 它与显隐按钮同处行末动作容器,显隐按钮排在它**之后**,保持"显隐按钮仍在行末"
+ * 这条既有位置语义.
  */
 export function createProcessEntryButton(spec: ProcessEntrySpec): HTMLElement {
     const disabled = spec.disabledReason !== null;

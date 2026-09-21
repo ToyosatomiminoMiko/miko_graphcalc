@@ -365,12 +365,14 @@ describe('随仓库分发的求解示例', () => {
         expect(byName.get('S6')?.realRootCount).toBe(2);
     });
 
-    it('默认场景里的两条 solve 也产出步骤', async () => {
-        const html = await readFile(new URL('../../../index.html', import.meta.url), 'utf8');
-        const match = html.match(/<textarea id="dsl-editor"[^>]*>([\s\S]*?)<\/textarea>/);
-        expect(match).not.toBeNull();
-
-        const scene = await compile(match![1]);
+    it('默认场景 example/test.miko 里的两条 solve 也产出步骤', async () => {
+        // 默认场景原先在 index.html 的 <textarea> 里,现已整体移入
+        // `example/test.miko`(并登记进示例清单),这里读的是同一个真相源.
+        const source = await readFile(
+            new URL('../../../example/test.miko', import.meta.url),
+            'utf8',
+        );
+        const scene = await compile(source);
         expect(scene.solves.map((task) => task.name)).toEqual(['S1', 'S2']);
         for (const task of scene.solves) {
             expect(task.error).toBeNull();

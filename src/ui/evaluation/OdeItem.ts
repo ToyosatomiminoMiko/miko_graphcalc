@@ -105,5 +105,8 @@ export class OdeItem extends EvaluationItem<OdeTask, void> {
         );
         row.classList.toggle('is-hidden', !task.enabled);
         super(task, row);
+        // 微分方程的推导天然在 L2,入口常驻:有无与是否隐藏无关,隐藏只置灰
+        // (见基类 processEntryOffered).
+        this.processEntryOffered = true;
     }
 }

@@ -38,6 +38,15 @@ const ANALYSIS_KIND_LABELS: Record<AnalysisResult['op'], string> = {
 };
 
 export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
+    /** 行末动作容器:补挂的"过程"入口 prepend 进来,显隐按钮仍留在末位. */
+    private actions: HTMLElement | null = null;
+
+    /** 构造之后补挂入口时,点击回调要用到的上下文(构造期拿不到实例字段). */
+    private context: EvaluationContext | null = null;
+
+    /** 已挂上的"过程"入口;null = 本行没有. */
+    private processEntry: HTMLElement | null = null;
+
     /**
      * 内容键:直接取**会被渲染的公式/文本**.
      *
@@ -82,22 +91,6 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
             () => context.toggleHidden(analysis.name),
         );
 
-        // "过程"入口(三级披露的 L2):一期只接梯度(其余算子没有可看的中间
-        // 步骤);隐藏项入口置灰并给理由--不参与计算也就没有过程可展示,但
-        // "为什么点不了"要有明文.
-        const processDisabledReason = analysis.enabled ? null : '已隐藏,不参与计算';
-        const hasProcess = analysis.op === 'gradient';
-        const processEntry = hasProcess
-            && (processDisabledReason !== null || needsProcessPage(detailLines))
-            ? createProcessEntryButton({
-                name: analysis.name,
-                disabledReason: processDisabledReason,
-                onOpen: () => context.openProcess({
-                    document: buildGradientProcess(analysis),
-                }),
-            })
-            : null;
-
         // 隐藏项没有细节可展开(detail=null),状态行会直接落在 main 里,
         // 屏幕上有"已隐藏,不参与计算"这句明文--不能只靠 is-hidden 的透明度.
         const status = analysis.enabled
@@ -107,14 +100,63 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
                 text: '已隐藏,不参与计算',
             });
 
-        // 显隐按钮排在"过程"之后:它的位置语义(仍在行末)不因多一个入口而变.
-        const { row } = createEvaluationRow(
-            summary,
-            detail,
-            status,
-            createRowActions(processEntry, toggle),
-        );
+        // "过程"入口(三级披露的 L2):一期只接梯度(其余算子没有可看的中间
+        // 步骤).入口的有无**只**由披露判据决定,与是否隐藏无关;但隐藏项不生成
+        // 细节行(数值在编译期被跳过),判据无从重算,所以隐藏时留给
+        // preserveExpandedStateFrom 从同名旧行继承--否则点一下"隐藏"就会凭空
+        // 多出一颗按钮.容器先建好,入口由 addProcessEntry 挂(显隐按钮仍在末位).
+        const actions = createRowActions(toggle);
+        const { row } = createEvaluationRow(summary, detail, status, actions);
         row.classList.toggle('is-hidden', !analysis.enabled);
         super(analysis, row);
+        this.context = context;
+        this.actions = actions;
+        this.processEntryOffered = analysis.op === 'gradient'
+            && analysis.enabled
+            && needsProcessPage(detailLines);
+        if (this.processEntryOffered) this.addProcessEntry(null);
+    }
+
+    /**
+     * 隐藏时把"本行有'过程'入口"这一事实从同名旧行带过来.
+     *
+     * 披露判据读的是**会被渲染的细节行数**,而隐藏项在编译期就跳过了数值计算
+     * (`analyses.ts` 的隐藏分支只留占位),同一套判据对隐藏后的 IR 只会得出
+     * "没有入口".若照此重建,点一下"隐藏"就会让行末动作容器少一颗按钮--与
+     * "隐藏只改变按钮状态,不改变动作集合"相反(将来的绘图/关联入口同样要守
+     * 这条).因此这里继承旧行的决定,并把它置灰.
+     *
+     * 首次渲染就隐藏的条目没有旧行可继承:按"无入口"处理--判据本身来自渲染
+     * 内容,算不出来就不摆一颗点不动的按钮;状态行的"已隐藏,不参与计算"已经
+     * 把那句话说清了.
+     */
+    override preserveExpandedStateFrom(previous: AnalysisItem): void {
+        super.preserveExpandedStateFrom(previous);
+        // 只有梯度这一类有 L2 入口(见构造函数);其余算子的旧行本来就不会有,
+        // 这里的 `op` 判断同时挡住"名字沿用但算子换了"这种改写.
+        if (this.task.enabled || this.task.op !== 'gradient') return;
+        if (!previous.processEntryOffered) return;
+        this.processEntryOffered = true;
+        this.addProcessEntry('已隐藏,不参与计算');
+    }
+
+    /**
+     * 把"过程"入口挂进行末动作容器,排在显隐按钮**之前**(显隐按钮仍在行末).
+     *
+     * 入口可能在构造期挂上(可用),也可能在行重建后补挂(隐藏时从旧行继承);
+     * 后者在构造期拿不到 `context`,所以回调读实例上记下的那一份.
+     */
+    private addProcessEntry(disabledReason: string | null): void {
+        const context = this.context;
+        if (this.processEntry !== null || this.actions === null || context === null) return;
+        const entry = createProcessEntryButton({
+            name: this.task.name,
+            disabledReason,
+            onOpen: () => context.openProcess({
+                document: buildGradientProcess(this.task),
+            }),
+        });
+        this.actions.prepend(entry);
+        this.processEntry = entry;
     }
 }

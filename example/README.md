@@ -8,7 +8,8 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名统一为 DSL 自己的 `.m
 (不使用序号),并在文件头注释说明所演示的功能与可调参数.
 
 > **新增示例**:在 `example/` 放 `.miko` 文件,并在
-> `src/ui/examples/exampleCatalog.ts` 里登记一行(标题 + 分组).
+> `src/ui/examples/exampleCatalog.ts` 的对应**分组键**下登记一项
+> (`{ file, title }`;新分组要同时补 `EXAMPLE_GROUP_TITLES` 里的中文显示名).
 > 两边对不上会被 `src/ui/examples/exampleCatalog.test.ts` 挡住;示例本身
 > 能否编译由 `src/compiler/dsl/exampleScenes.test.ts` 全量跑一遍.
 
@@ -54,3 +55,4 @@ Ctrl+Z 就能退回载入前的代码.文件扩展名统一为 DSL 自己的 `.m
 | `ode_linear_first_order.miko` | 微分方程:一阶线性 `y' + p*y = q` 的积分因子解 `y = q/p + C*e^(-p*x)`;`param p`/`param q` 联动(解式与斜率场保持符号,拖滑块一起重算),含平衡解 `y = q/p` 与上下两条趋近曲线 |
 | `ode_second_order.miko` | 微分方程:二阶常系数齐次 `a*y'' + b*y' + c*y = 0` 的三种特征根型--两相异实根(`y''-3*y'+2*y=0`,带两个初值给特解)/ 二重根(`y''-2*y'+y=0`)/ 共轭复根(`y''+y=0`) |
 | `ode_with_initial.miko` | 微分方程:同一条语句既写 `curves = 3` 的解族,又写初值 `y(0) = 1` 的特解,展示"初值把族收成一条"(特解与族中 C=1 那条重合);并补 `y' = y*(y+1)` 的**隐式解**示例(只给斜率场,不下发解曲线) |
+| `test.miko` | 全部功能一览(原 `index.html` 默认场景整体移入):点/向量/矩阵与变换,曲线与曲面,曲线/曲面/区域/体积积分,向量场与散度旋度,球体/区域/方块/圆柱/圆锥/圆台,求交与方程求解 |

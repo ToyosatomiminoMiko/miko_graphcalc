@@ -5,6 +5,9 @@
  * - 新增 `example/*.miko` 忘了登记 -> 文件多出来,失败;
  * - 清单里写了不存在的文件,或 glob 没内联到文本 -> 取不到源码,失败.
  *
+ * 另外锁住清单的形状:分组键是 ASCII 标识符(中文只做显示名),每个键都有
+ * 显示名,没有空组,分组前后一项不丢.
+ *
  * 与 compiler/dsl/exampleScenes.test.ts 的分工:那个文件锁"示例在当下编译器里
  * 仍能编译",本文件锁"示例清单与文件集一致".两侧都从 `example/` 目录本身出发,
  * 所以谁也不会被另一侧的遗漏糊弄过去.
@@ -13,9 +16,11 @@ import { describe, expect, it } from 'vitest';
 import { readdir } from 'node:fs/promises';
 import {
     EXAMPLE_CATALOG,
-    EXAMPLE_GROUPS,
+    EXAMPLE_GROUP_TITLES,
+    allExamples,
     exampleSource,
     groupedExamples,
+    type ExampleGroup,
 } from './exampleCatalog';
 
 const EXAMPLE_DIR = new URL('../../../example/', import.meta.url);
@@ -25,31 +30,45 @@ describe('示例目录', () => {
         const files = (await readdir(EXAMPLE_DIR))
             .filter((name) => name.endsWith('.miko'))
             .sort();
-        const listed = EXAMPLE_CATALOG.map((entry) => entry.file).sort();
+        const listed = allExamples().map((entry) => entry.file).sort();
 
         expect(listed).toEqual(files);
     });
 
     it('每一项都能取到非空的示例源码', () => {
-        for (const entry of EXAMPLE_CATALOG) {
+        for (const entry of allExamples()) {
             const source = exampleSource(entry.file);
             expect(source, `${entry.file} 没有内联源码`).not.toBeNull();
             expect(source!.trim().length, `${entry.file} 源码为空`).toBeGreaterThan(0);
         }
     });
 
-    it('分组取值合法,且分组后一项不丢', () => {
-        for (const entry of EXAMPLE_CATALOG) {
-            expect(EXAMPLE_GROUPS, `${entry.file} 的分组不在 EXAMPLE_GROUPS 里`)
-                .toContain(entry.group);
+    it('分组键是 ASCII 标识符,且每个键都有显示名', () => {
+        const groups = Object.keys(EXAMPLE_CATALOG) as ExampleGroup[];
+        expect(groups.length).toBeGreaterThan(0);
+
+        for (const group of groups) {
+            // 键要能直接进 data-*/选择器/持久化,所以不用中文;中文只做显示名.
+            expect(group, `分组键 ${group} 不是 ASCII 标识符`)
+                .toMatch(/^[a-z][A-Za-z0-9]*$/);
+            expect(EXAMPLE_GROUP_TITLES[group], `分组 ${group} 没有显示名`).toBeTruthy();
+        }
+    });
+
+    it('分组后一项不丢,且没有空组', () => {
+        const groups = Object.keys(EXAMPLE_CATALOG) as ExampleGroup[];
+        for (const group of groups) {
+            expect(EXAMPLE_CATALOG[group].length, `分组 ${group} 是空组`).toBeGreaterThan(0);
         }
 
         const grouped = groupedExamples().flatMap((section) => section.entries);
-        expect(grouped.length).toBe(EXAMPLE_CATALOG.length);
+        expect(grouped.length).toBe(allExamples().length);
+        // 菜单顺序 = 键的书写顺序:没有空组时,分组数与顺序都应原样保留.
+        expect(groupedExamples().map((section) => section.group)).toEqual(groups);
     });
 
     it('文件名不重复:菜单项靠 data-example 定位,重复会点错示例', () => {
-        const files = EXAMPLE_CATALOG.map((entry) => entry.file);
+        const files = allExamples().map((entry) => entry.file);
         expect(new Set(files).size).toBe(files.length);
     });
 

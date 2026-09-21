@@ -1,0 +1,167 @@
+point P = [0, 0, 0];
+
+// 临时示例,后续统一加入文档
+
+// 定义系数
+param a = 1 in [-5, 5, 0.1];
+param b = 1 in [-5, 5, 0.1];
+param j = 0 in [-5, 5, 0.1];
+param k = 0 in [-5, 5, 0.1];
+
+// 点
+point Q = [a, b, 3] {
+    color = "#6dd5ff";
+}
+
+// 向量
+vector V = [[0, j, 0], [1, k, 0]] {
+    color = "#ff6b8a";
+}
+
+// 矩阵
+matrix M = [
+    [1, 0, 0, 2],
+    [0, 1, 0, 3],
+    [0, 0, 1, 4],
+    [0, 0, 0, 1],
+];
+
+
+curve c1 = sin(x * a) * cos(x * b) {
+    color = "#6dd5ff";
+    range = [-8, 8];
+    segments = 256;
+}
+
+curve c2 = 1 {
+    color = "#ffffff";
+    range = [-8, 8];
+    segments = 1;
+}
+
+// 曲线积分
+integral I1 = integral(c1) {
+    method = riemann:mid;
+    range = [-4, 4];
+    segments = 32;
+};
+
+surface s1 = sin(x * a) * cos(y * b) {
+    color = "#ff6b8a";
+    range = [-6, 6, -6, 6];
+    segments = 96;
+}
+
+// 梯度计算
+gradient g = grad(s1) at [j, k] {
+    show = [point, normal, tangent_plane];
+}
+
+// 曲面积分
+integral I2 = integral(s1) {
+    method = lebesgue;
+    range = [-3, 3, -3, 3];
+    segments = 32;
+    layers = 16;
+};
+// 曲面积分:梯形法
+integral I3 = integral(s1) {
+    method = trapezoid;
+    range = [-3, 3, -3, 3];
+    segments = 32;
+    layers = 16;
+};
+
+// 向量场
+vector_field VF = [y*a, x*b, a*j] {
+    range = [-4, 4, -4, 4, -4, 4];
+    grid = [8, 8, 8];
+    scale = 1.2;
+}
+
+divergence d = div(VF) at [1, 2, 3];
+
+curl c = curl(VF) at [1, 2, 3];
+
+// 三维变换
+transform T = as_transform(M);
+
+// 动画:每次只给一个矩阵,复杂动画用列表按顺序播放
+animation spin = rotate([0, 0, pi / 2]) {
+    duration = 3;
+};
+
+animation orbit = translate([3, 0, 0]) {
+    duration = 2;
+};
+
+sphere S = [0, 1, 0] {
+    radius = 2;
+    color = "#6dd5ff";
+    opacity = 0.55;
+    animation = [spin, orbit];
+};
+
+// 区域:由两条曲线围成的 z=0 平面图形(面积图形),可被积分引用为域 D
+region R = region(c1, c2) {
+    range    = [-4, 4];     // x 区间;缺省取两曲线 x-range 交集
+    color    = "#6bffb8";
+    opacity  = 0.35;
+};
+
+// 二重积分:∬_D integrand dA;缺省 integrand=1 即求区域面积
+integral I = integral(R) {
+    method    = simpson;
+    integrand = x*x + y*y;  // 缺省 "1"
+    segments  = 64;
+};
+
+// 实体积分:三重积分:∭_V integrand dV;缺省 integrand=1 即求体积
+integral W = integral(S) {
+    method    = simpson;
+    integrand = x*y + z*z;  // 缺省 "1";x,y,z 为世界坐标
+    segments  = 48;
+};
+
+box B = [1, 2, 3] {
+    size = [2, 1, 1];
+    color = "#ff6b8a";
+    transform = T;
+};
+
+cylinder C = [0, 0, 0] {
+    base = 1;
+    height = 2;
+};
+
+cone K = [0, 0, 1] {
+    base = 2;
+    height = 3;
+};
+
+frustum F = [0, 0, -1] {
+    base = 2;
+    height = 3;
+    top = 1;
+};
+
+transform T2 = translate([2, 1, 0]) 
+    * rotate([0, 0, pi / 4]) 
+    * scale([1.5, 1, 1]);
+
+// 求交示例:曲面与曲面
+surface s2 = j {
+    color = "#ffd93d";
+    range = [-4, 4, -4, 4];
+    segments = 64;
+}
+
+intersection X = intersection(s1, s2) {
+    color = "#ffffff";
+    segments = 96;
+};
+
+// 方程求解:在编译期解单变量一次/二次方程,解集与步骤进"求解"子列表;
+// 点条目行末的"过程",右栏过程页先给题目再逐步推导.
+solve S1 = x^2 - 5*x + 6 = 0;   // 因式分解路径
+solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)

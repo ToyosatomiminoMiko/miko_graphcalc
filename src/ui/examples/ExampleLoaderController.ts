@@ -10,9 +10,8 @@
  * 本文件只剩这一块自己的内容:**菜单项怎么渲染**(来自 `exampleCatalog`),
  * **选中后干什么**(回调装配层),以及**键盘导航**(上下键在菜单项间移动).
  *
- * 为什么是浮层而不是一个 `<select>`:13 个示例要分「求导·偏导」「其他主题」
- * 两组,每项还要显示中文标题;面板默认宽只有 300px,下拉里标题只能截断,
- * 也没有分组.
+ * 为什么是浮层而不是一个 `<select>`:示例要按主题分成多组,每项还要显示中文
+ * 标题;面板默认宽只有 300px,下拉里标题只能截断,也没有分组.
  *
  * 键盘不在这里绑监听:全应用只有 `KeyboardController` 对 document 绑一次
  * keydown,本控制器用 `keyboardBindings()` 把 Esc / 上下键两条规则注册进去,
@@ -25,7 +24,7 @@
 import type { KeyboardBinding } from '@/ui/shared/KeyboardController';
 import { el } from '@/ui/widgets/dom';
 import { createPopover, type PopoverHandle } from '@/ui/widgets/Popover';
-import { EXAMPLE_CATALOG, groupedExamples, type ExampleEntry } from './exampleCatalog';
+import { allExamples, groupedExamples, type ExampleEntry } from './exampleCatalog';
 
 /** 菜单依赖的两个节点;由装配层取好传入(取不到时构造即报错). */
 export interface ExampleLoaderElements {
@@ -123,16 +122,19 @@ export class ExampleLoaderController {
         this.abortController.abort();
     }
 
-    /** 按分组渲染菜单项;`groupedExamples()` 已保证顺序与"空组不出现". */
+    /**
+     * 按分组渲染菜单项;`groupedExamples()` 已保证顺序,"空组不出现",并把分组键
+     * 翻成显示名(`section.title`)--本控制器不碰"键 -> 中文名"这份映射.
+     */
     private _render(): void {
         const sections = groupedExamples().map((section) => {
             const group = el('div', {
                 class: 'example-menu-group',
-                attrs: { role: 'group', 'aria-label': section.group },
+                attrs: { role: 'group', 'aria-label': section.title },
             });
             group.append(el('div', {
                 class: 'example-menu-group-title',
-                text: section.group,
+                text: section.title,
             }));
 
             for (const entry of section.entries) {
@@ -169,7 +171,7 @@ export class ExampleLoaderController {
         const file = this._fileFrom(event.target);
         if (file === null) return;
 
-        const entry = EXAMPLE_CATALOG.find((candidate) => candidate.file === file);
+        const entry = allExamples().find((candidate) => candidate.file === file);
         if (!entry) return;
 
         // 先关再回调:载入若抛错,浮层也不会僵在屏幕上.

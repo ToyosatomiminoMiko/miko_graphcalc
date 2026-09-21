@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
 import type { KeyboardBinding } from '@/ui/shared/KeyboardController';
 import { ExampleLoaderController } from './ExampleLoaderController';
-import { EXAMPLE_CATALOG } from './exampleCatalog';
+import { allExamples } from './exampleCatalog';
 
 interface Harness {
     readonly stub: DomStub;
@@ -76,7 +76,7 @@ describe('菜单渲染', () => {
         const files = h.menu
             .querySelectorAll<StubElement>('[data-example]')
             .map((item) => item.dataset.example);
-        expect(files).toEqual(EXAMPLE_CATALOG.map((entry) => entry.file));
+        expect(files).toEqual(allExamples().map((entry) => entry.file));
 
         // 分组标题是可读文本,不是菜单项
         const titles = h.menu

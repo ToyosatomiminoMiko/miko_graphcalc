@@ -141,15 +141,18 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         // 展开细节第一行就是完整等式;数值尚未回填时省略右端(纯文本元信息
         // 由各类型的细节生成函数决定,这里不需要额外判断).细节行只算一次,
         // 披露判据与公式块消费同一份.
+        //
+        // 细节行**一直算**(不再按 enabled 分叉):披露判据要用它决定"过程"
+        // 入口的有无,而入口的有无不该随隐藏变化.隐藏时数值按 null(等式不带
+        // 右端),行数不变--积分的细节行来自声明级事实(积分式/域/方法/分段/
+        // 分层),不依赖计算结果,所以判据天然稳定,不需要像分析条目那样继承旧行.
         const methodLabel = INTEGRAL_METHOD_LABELS[task.method];
-        const detailLines = task.enabled
-            ? detailLinesOf(integralLatexDetailEntries(
-                task,
-                context.objects,
-                methodLabel,
-                value,
-            ))
-            : [];
+        const detailLines = detailLinesOf(integralLatexDetailEntries(
+            task,
+            context.objects,
+            methodLabel,
+            value,
+        ));
         const details = task.enabled ? createDetailSections(detailLines) : null;
 
         // 状态行只在"没有等式可挂"或"还没算出/已禁用"时需要:
@@ -180,17 +183,17 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             () => context.toggleHidden(task.name),
         );
 
-        // "过程"入口(三级披露的 L2):积分条目只在细节行超过披露阈值时才给;
-        // 隐藏项入口置灰并给理由(不参与计算也就没有过程可展示).
+        // "过程"入口(三级披露的 L2):积分条目只在细节行超过披露阈值时才给.
+        // 有无**只**由披露判据决定,与是否隐藏无关:隐藏只把入口由可用变置灰
+        // (理由进 title/aria-label),不会凭空多出一颗按钮.
         //
         // 数值在点击时**现读** `this.latestValue`,不捕获构造期的 `value`:
         // 异步结果走 `renderValue` 直接改 DOM(见 EvaluationSection.resolve),
         // 行不会重建,闭包里的 `value` 会停在构造时那个值(往往是 null).
-        const processDisabledReason = task.enabled ? null : '已隐藏,不参与计算';
-        const processEntry = (processDisabledReason !== null || needsProcessPage(detailLines))
+        const processEntry = needsProcessPage(detailLines)
             ? createProcessEntryButton({
                 name: task.name,
-                disabledReason: processDisabledReason,
+                disabledReason: task.enabled ? null : '已隐藏,不参与计算',
                 onOpen: () => context.openProcess({
                     document: buildIntegralProcess(
                         task,
@@ -215,6 +218,9 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         this.main = main;
         this.result = status;
         this.latestValue = value;
+        // 披露判据不随隐藏变化(细节行照算),入口有无直接记下来(见基类
+        // processEntryOffered):隐藏只把入口置灰,不会凭空多出一颗.
+        this.processEntryOffered = processEntry !== null;
         // 已有数值时把数值排好(行重建但键一致时走这条路径).
         if (value !== null) this.renderValue(value);
     }

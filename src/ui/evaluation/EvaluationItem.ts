@@ -79,6 +79,22 @@ export abstract class EvaluationItem<
     TTask extends { name: string },
     TResult = void,
 > {
+    /**
+     * 本行是否给出 L2"过程"入口(即 `.row-actions` 里有没有那颗"过程"按钮).
+     *
+     * 入口的**有无**由三级披露判据决定(见 `ui/process/disclosure.ts`),与
+     * 条目是否隐藏无关:隐藏只把本来存在的入口置灰,绝不凭空多出一颗按钮.
+     *
+     * 为什么是实例状态而不是构造参数:分析条目的判据来自**会被渲染的细节行数**,
+     * 而隐藏项在编译期就跳过数值计算,隐藏后的 IR 里已经算不出这个长度.行重建
+     * 时由 {@link preserveExpandedStateFrom} 从同名旧行继承这一事实--它正是
+     * "重建行时带走与内容无关的用户可见状态"这条既有约定的第二个用例(第一个
+     * 是 `<details>` 展开态).
+     *
+     * 默认 false:行末没有"过程"入口的条目(求交,实体)不必声明.
+     */
+    protected processEntryOffered = false;
+
     protected constructor(
         readonly task: TTask,
         readonly row: HTMLElement,
@@ -90,6 +106,9 @@ export abstract class EvaluationItem<
      * 数值变化必然重建行,但"用户把它展开了"与内容无关,不该在拖动滑块时被
      * 每帧重置.这条过去散在 `EvaluationSection` 里,现在任何 item 子类(以及
      * 将来的实体行,若它也有展开态)都直接用基类这一份.
+     *
+     * 子类可以覆写它多带一件同类状态(如"本行有没有'过程'入口",见
+     * {@link processEntryOffered}),覆写时先调 `super`.
      */
     preserveExpandedStateFrom(previous: EvaluationItem<TTask, TResult>): void {
         carryDetailsOpen(previous.row, this.row);

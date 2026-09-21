@@ -614,21 +614,85 @@ describe('三级披露:长过程的 L2 入口', () => {
         expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
     });
 
-    it('隐藏对象的过程入口置灰并给出明文理由,点击不触发', () => {
+    it('长过程对象隐藏后入口保留但置灰:动作集合不随隐藏改变', () => {
         const { analysisList, calls, controller } = createController();
+        // 先以"可见的长过程梯度"渲染:入口存在且可用.
+        controller.renderScene({ ...scene, analyses: [longGradient] } as SceneIR);
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(1);
+        expect(analysisList.querySelector<StubElement>('.row-process-btn')!.disabled).toBe(false);
+
+        // 再渲染同一个条目的隐藏态:入口**不消失**,只是置灰.隐藏项没有细节行
+        // (数值在编译期被跳过),披露判据算不出来,所以行重建时从同名旧行继承
+        // "本行有入口"这一事实--否则点一下"隐藏"就会凭空多出一颗按钮,或让
+        // 已有入口凭空消失.
         controller.renderScene({
             ...scene,
             analyses: [{ ...longGradient, enabled: false }],
         } as SceneIR);
 
         const entry = analysisList.querySelector<StubElement>('.row-process-btn')!;
+        expect(entry).not.toBeNull();
         expect(entry.disabled).toBe(true);
         // 理由写在 title 与 aria-label 上:鼠标悬停与读屏都能拿到.
         expect(entry.title).toBe('已隐藏,不参与计算');
         expect(entry.getAttribute('aria-label')).toContain('已隐藏,不参与计算');
+        // 入口仍排在显隐按钮之前,显隐按钮仍在行末(位置语义不随状态变).
+        const actions = analysisList.querySelector<StubElement>('.row-actions')!;
+        expect(actions.children[0]).toBe(entry);
+        const last = actions.children[actions.children.length - 1] as StubElement;
+        expect(last.className).toBe('row-visibility-btn');
 
         entry.dispatch('click');
         expect(calls.process).toEqual([]);
+
+        // 显示回来:披露判据在 enabled 时能重算,入口重新可用.
+        controller.renderScene({ ...scene, analyses: [longGradient] } as SceneIR);
+        expect(analysisList.querySelector<StubElement>('.row-process-btn')!.disabled).toBe(false);
+    });
+
+    it('短过程对象隐藏后不会凭空多出"过程"入口', () => {
+        const { analysisList, controller } = createController();
+        // 短过程(默认场景的梯度)本来就没有 L2 入口:留在行内 <details>.
+        controller.renderScene(scene);
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+
+        // 隐藏后也不该多出一颗点不动的按钮:披露判据与是否隐藏无关.
+        controller.renderScene({
+            ...scene,
+            analyses: [{ ...analysis, enabled: false }],
+        } as SceneIR);
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+        // 隐藏的明文理由仍由状态行承担.
+        expect(analysisList.querySelector<StubElement>('.eval-result')!.textContent)
+            .toBe('已隐藏,不参与计算');
+    });
+
+    it('积分条目隐藏后也不会凭空多出"过程"入口', () => {
+        const { integralList, controller } = createController();
+        // 积分细节固定 3 行(积分式 + 域/方法 + 分段/分层),默认阈值下本就没有
+        // L2 入口;隐藏前后都不该出现.
+        controller.renderScene(scene);
+        expect(integralList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+
+        controller.renderScene({
+            ...scene,
+            integrals: [{ ...scene.integrals[0], enabled: false }],
+        } as SceneIR);
+        expect(integralList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
+    });
+
+    it('同名条目换了算子(梯度->散度)并隐藏时,不继承旧行的入口', () => {
+        const { analysisList, controller } = createController();
+        controller.renderScene({ ...scene, analyses: [longGradient] } as SceneIR);
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(1);
+
+        // 一期只接梯度:散度没有可看的过程页,即使继承了同名旧行"有入口"这一
+        // 事实也不该摆出按钮.
+        controller.renderScene({
+            ...scene,
+            analyses: [{ ...longGradient, op: 'divergence', enabled: false }],
+        } as SceneIR);
+        expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
     });
 });
 
