@@ -59,6 +59,14 @@ export default defineConfig({
         include: ['three'],
     },
     test: {
+        // 只收本仓库自己的测试.
+        //
+        // 不写这一条的话 Vitest 用默认 glob(`**/*.test.ts`),会把磁盘上任何
+        // 位置的测试都收进来.分离之后 `packages/miko_ui/` 仍可能是本地那份库
+        // 的工作副本(gitignored,CI 的干净 clone 里不存在),于是本地跑 77 个
+        // 文件,CI 只跑 58 个,数字对不上还看不出来.库的测试现在由库自己的
+        // 仓库和 CI 负责,不该在这里重复跑一遍.
+        include: ['src/**/*.test.ts'],
         // 解析器集成测试要跑真正的 Rust/WASM 解析器;wasm-bindgen 的默认
         // 初始化在 Node 里走 `fetch(new URL(..., import.meta.url))`,Node 的
         // fetch 不认 file://,会直接 "fetch failed".setup 文件用 initSync

@@ -5,7 +5,7 @@
  * 全部示例(清单见 `exampleCatalog.ts`).选中一项即回调装配层去替换编辑器
  * 源码并运行--本控制器不碰编辑器,只管"渲染 / 开合 / 选中 / 键盘"四件事.
  *
- * 其中"开合"整体交给 `packages/miko_ui/src/widgets/Popover.ts`:开合态与 `.is-open`/aria 的同步,
+ * 其中"开合"整体交给 `@miko/ui/src/widgets/Popover.ts`:开合态与 `.is-open`/aria 的同步,
  * 点外部关闭,Esc 后把焦点交还按钮,都是任何浮层都要有,写第二遍必错的部分.
  * 本文件只剩这一块自己的内容:**菜单项怎么渲染**(来自 `exampleCatalog`),
  * **选中后干什么**(回调装配层),以及**键盘导航**(上下键在菜单项间移动).
@@ -46,7 +46,7 @@ export class ExampleLoaderController {
         private readonly onSelect: (entry: ExampleEntry) => void,
     ) {
         if (!elements.button || !elements.menu) {
-            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 packages/miko_ui/src/desktop/windowChrome.ts)');
+            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 @miko/ui/src/desktop/windowChrome.ts)');
         }
 
         this.popover = createPopover({ trigger: elements.button, panel: elements.menu });
