@@ -46,7 +46,7 @@
     overflow: hidden;
     background: var(--color-bg-sunken);
     border: 1px solid var(--color-border-panel);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
 }
 
 /* 输入区包裹层:唯一职责是给"高亮层 + textarea"提供一个共同的定位参照,

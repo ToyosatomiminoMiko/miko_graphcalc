@@ -116,7 +116,7 @@
 
 .process-steps::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--color-scrollbar);
     background-clip: content-box;
 }
@@ -134,7 +134,7 @@
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-fill-row);
 }
 

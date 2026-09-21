@@ -58,7 +58,7 @@
 #params-panel::-webkit-scrollbar-thumb,
 #view-controls::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--color-scrollbar);
     background-clip: content-box;
 }
@@ -90,7 +90,7 @@
     background: var(--color-bg-sunken);
     color: var(--color-text-strong);
     border: 1px solid var(--color-border-input);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 4px 6px;
     font-size: 12px;
 }
@@ -107,7 +107,7 @@
     padding: 0;
     background: transparent;
     border: 1px solid var(--color-border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--color-text-muted);
     font-size: 12px;
     line-height: 1;
@@ -155,7 +155,7 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--color-border-panel);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--color-bg-sunken);
     overflow: hidden;
 }
@@ -214,7 +214,7 @@
     gap: 8px;
     padding: 7px 8px;
     border: 1px solid var(--color-border-faint);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-fill-row);
 }
 
@@ -272,7 +272,7 @@
 .row-state {
     align-self: center;
     padding: 1px 6px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: 10px;
     color: var(--color-warning);
     background: var(--color-warning-bg);
@@ -291,7 +291,7 @@
     align-self: flex-start;
     padding: 3px 7px;
     border: 1px solid var(--color-border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--color-fill-control-strong);
     color: var(--color-text-muted);
     font-size: 12px;
@@ -329,7 +329,7 @@
 .row-process-btn {
     padding: 3px 7px;
     border: 1px solid var(--color-border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--color-text-muted);
     font-size: 12px;
@@ -357,7 +357,7 @@
     flex: 0 0 auto;
     min-width: 40px;
     padding: 2px 6px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     font-size: 10px;
     text-align: center;
     color: var(--color-badge-ink);
@@ -382,7 +382,7 @@
     width: 10px;
     height: 10px;
     border: 1px solid var(--color-border-swatch);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     /* 值由 EntityItem 用内联 CSS 变量写入,渲染层不改写颜色字符串. */
     background: var(--object-color, transparent);
 }
@@ -614,7 +614,7 @@
 .eval-detail-line[data-tex]:focus-visible {
     outline: 1px solid var(--color-accent-focus-soft);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     color: var(--color-text-strong);
 }
 
@@ -629,7 +629,7 @@
     margin: 4px 0 2px;
     padding: 6px 8px;
     border-left: 2px solid var(--color-accent-line);
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     background: var(--color-fill-inset);
 }
 
@@ -679,7 +679,7 @@
     background: var(--color-bg-popover);
     border: 1px solid var(--color-border-strong);
     border-top: none;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
     box-shadow: 0 12px 28px var(--color-shadow-popover);
 }
 
@@ -712,7 +712,7 @@
     padding: 6px 8px;
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--color-text-menu);
     font: inherit;
     font-size: 12px;
