@@ -27,17 +27,16 @@ export function uiConfigCssVariables(): Record<string, string> {
         '--katex-font-size': `${UI_CONFIG.formula.katexFontSize}em`,
         '--code-gutter-width': `${UI_CONFIG.editor.gutterMinWidth}px`,
 
-        // 面板几何:这里只映射"CSS 首帧要消费"的那部分.拖拽的夹取上下限
-        // (sideMin/MaxWidth 等)CSS 用不到,不进这张表,避免多出一份副本.
-        // --side-default-width / --footer-default-height 由 base.css 的 #app
-        // 派生成 --left/right-panel-width 与 --footer-height 的初值.
-        '--side-default-width': `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        '--footer-default-height': `${UI_CONFIG.panel.footerDefaultHeight}px`,
-        '--collapsed-side-width': `${UI_CONFIG.panel.collapsedSideWidth}px`,
-        '--collapsed-footer-height': `${UI_CONFIG.panel.collapsedFooterHeight}px`,
-        '--right-split-basis': `${UI_CONFIG.panel.splitDefaultRatio * 100}%`,
+        // 面板内容的最小高度:窗口再矮,这两块也保留下限并自己出滚动条.
         '--params-panel-min-height': `${UI_CONFIG.panel.paramsMinHeight}px`,
         '--view-controls-min-height': `${UI_CONFIG.panel.viewControlsMinHeight}px`,
+
+        // 窗口外壳的两个样式常量(窗口几何本身不进 CSS,见 uiConfig.window 的说明):
+        // - 标题栏高度:`.window-header` 消费它,夹取 `headerMinVisible` 与它同源;
+        // - Dock 预留高度:`.window.is-maximized` 的 `bottom` 消费它,否则最大化会
+        //   盖住 Dock.
+        '--window-header-height': `${UI_CONFIG.window.headerHeight}px`,
+        '--dock-reserve': `${UI_CONFIG.window.dockReserve}px`,
     };
 }
 

@@ -2,18 +2,28 @@
 
 本文回答:**现在三个贴边固定面板的布局,怎么变成"桌面 + 浮动窗口 + Dock"?**
 
-状态:**方案文档,不动代码**.本文件是本次窗口化工作的唯一交付物;所有分期
-都是待立项,阶段 0 之前的任何改动都不应发生.
+状态:**已落地(阶段 0–4)**.本文件仍是设计与口径的唯一真相源;实现见
+`src/ui/desktop/`(`WindowGeometry` / `WindowFrame` / `WindowResize` /
+`WindowManager` / `Dock` / `SnapPreview`)与 `css/window.css`.落地过程中发现
+的偏差与补充记在 §11.2(表后的"实现记录").阶段 4 的收尾项(文档同步,残留
+清理)也在本稿内完成;阶段 5(键盘窗口管理)仍然暂缓.
+
+§9 的验收清单已经在**真实浏览器**上跑过一遍(见 §13 的验收记录):headless
+Chromium + DevTools Protocol,1280×800 与 1920×1080 两组视口,用真实鼠标/键盘
+事件覆盖拖动,八向缩放,最小化/恢复,Dock,最大化/全屏/`Esc`,边缘吸附与预览,
+示例菜单完整展开,"点过程即抬窗口",空桌面穿透与视口 resize,34 项断言全过;
+这一轮查出并修掉了 §11.2 的 E29/E30 两条.
 
 已拍板的口径(用户 2026-09 指定):
 
 | # | 决定 | 内容 |
 | --- | --- | --- |
-| W1 | 形态 | **浮动窗口 + 3D 铺满背景**.Three.js 视口仍是铺满 `#app` 的一层,现有面板与右栏两个标签页变成悬在它上面的浮窗(共四个窗口) |
+| W1 | 形态 | **浮动窗口 + 3D 铺满背景**.Three.js 视口仍是铺满 `#app` 的一层,现有面板与右栏两页变成悬在它上面的浮窗(**共五个窗口**) |
 | W2 | 窗口外壳功能(一期) | 焦点/z-order 提升,关闭与最小化,**Dock/任务栏**,边缘吸附与磁吸对齐,最大化/单窗口全屏 |
 | W3 | 键盘窗口管理 | **暂缓**,列入本文件的设计与阶段 5,一期不实现 |
 | W4 | 布局持久化 | **不做**.README 已明确"界面偏好不落 localStorage";本方案不推翻该约定 |
 | W5 | 启用方式 | 替换现有固定布局,不做新旧两套布局的运行时开关 |
+| W6 | 窗口数量与标题 | **五个窗口**:`source code`(源码) / `参数` / `视图` / `过程` / `对象`.窗口标题栏直接沿用现有面板标题文案,面板自带的那层 `.panel-header` 删除(B8 的 A 案);`参数` 与 `视图` 之间的分隔条(`RightSplitController`)随之删除 |
 
 参考物:`/mnt/IVSTINIANVS/__projects_web/xxx_VaporwaveDP/`(用户指定的方向).
 该项目的窗口观感可用,但实现不严谨,本文**只借观感与交互骨架,不借其实现**;
@@ -24,7 +34,7 @@
 | 要干什么 | 读哪几节 |
 | --- | --- |
 | 先摸清现状与要替换的耦合点 | §1 |
-| 知道最终长什么样,四个窗口的几何 | §2 -> §3 |
+| 知道最终长什么样,五个窗口的几何 | §2 -> §3 |
 | **动手写**:类型,函数签名,算法,写入点 | §4(照抄即可) |
 | 文件放哪,改哪些文件,DOM 契约,样式契约 | §5 |
 | **动编辑器之前必读**(高亮层对齐) | §5.6 |
@@ -32,13 +42,25 @@
 | 按阶段推进 + 每阶段验收 | §7 |
 | 测试写什么,什么只能真机 | §8(含 §8.1 测试策略) |
 | 真机回归清单 | §9 |
-| **动手前先看**:硬性阻碍 B1–B7,方案已订正的错误 E1–E7,查过但不是阻碍的 | §11 |
+| **动手前先看**:硬性阻碍 B1–B9,方案已订正的错误 E1–E18,查过但不是阻碍的 | §11 |
 | 风险登记 | §12 |
 
-一句话总结形态:`#viewport`(three.js)继续铺满当背景,四个浮动窗口
-(源码 / 参数·视图 / 过程 / 对象)悬在它上面,Dock 在底部;窗口可拖可缩放可
-最小化/关闭/最大化;固定布局的 `PanelController` 与右栏标签页
-`RightPanelTabs` 一并删除,面板本体与其全部控制器不动.
+> **本稿是修订版**.2026-09 的第二轮核对逐条对着代码查过一遍,补上了硬性阻碍
+> (B8/B9 新增,B1 降级并订正)与方案自身写错的地方(E8–E18),其中 E8/E9/E13
+> 三条属于"照抄 §4 就会出 bug":几何写入清掉 `z-index`,最大化不清行内几何,
+> 默认几何三处底边线不一致.改动都标了编号,便于逐条核对.现在的总数是
+> **B1–B10 十条阻碍 + E1–E20 二十条订正**.
+>
+> 第三轮按用户新拍板的 **W6(五个窗口)** 改了窗口数量与默认几何:参数与视图
+> 拆成两个窗口,`RightSplitController` 及其整条链路(`#right-splitter`,
+> `--right-split-basis`,`UI_CONFIG.panel.split*`)进删除清单,`source code`
+> 不再是通高窗口.连带订正记在 §11.2 E19/E20.
+
+一句话总结形态:`#viewport`(three.js)继续铺满当背景,**五个**浮动窗口
+(`source code` / `参数` / `视图` / `过程` / `对象`)悬在它上面,Dock 在底部;
+窗口可拖可缩放可最小化/关闭/最大化;固定布局的 `PanelController`,右栏标签页
+`RightPanelTabs` 与"参数区/视图区"分隔条 `RightSplitController` 一并删除,
+面板本体(编辑器/参数行/视图控件/过程视图/对象列表)与其全部控制器不动.
 
 ---
 
@@ -52,7 +74,7 @@
 | --- | --- | --- | --- |
 | `#viewport` | `inset: 0`,z-index 0 | 铺满 `#app` | three.js canvas(`SceneManager` 构造时 `container.appendChild`) |
 | `#left-panel` | 贴左通高 | `--left-panel-width` | 源码编辑器(textarea + 行号槽 + 高亮层)+ 示例浮层 |
-| `#right-panel` | 贴右通高 | `--right-panel-width` | 标签页:参数/视图(带 `#right-splitter` 上下分割)与过程 |
+| `#right-panel` | 贴右通高 | `--right-panel-width` | 标签页:参数/视图(带 `#right-splitter` 上下分割,**`#params-panel` + `#diagnostics` 与 `#view-controls` 共用这一栏的高度**)与过程 |
 | `#bottom-panel` | 底部横条 | `--footer-height` | 对象列表(实体/求值两栏) |
 
 尺寸与折叠的唯一写入点是 `PanelController._applyLayout()`(写 `#app` 上的三个
@@ -61,10 +83,13 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 `[data-resize-panel]` 分隔条与 `[data-panel-toggle]` 折叠按钮是标记与控制器
 之间的连接点.全部拖动走全应用唯一一份 `src/ui/shared/dragGesture.ts`.
 
-注意右栏这一格是**两件事共用一个栏位**:`#right-page-params`(滑块 + 视图控件)
-与 `#right-page-process`(求解过程)是同一根侧栏的两个标签页,共用一份宽度,
-一次只能看一页.窗口化把它们拆成两个独立窗口(§2.1),这是本次唯一一处
-**结构净增**(三个窗口变四个),也是 `RightPanelTabs` 被删除的原因.
+注意右栏这一格经历了**两次共用**:`#right-page-params` 与
+`#right-page-process` 是同一根侧栏的两个标签页(共用一份宽度,一次只能看一页);
+而 `#right-page-params` 内部又是**参数区与视图区共用一份高度**,比例由
+`#right-splitter`(`data-split-page="right-page-params"`)上下拖动决定.
+窗口化把这两层"共用"都拆开:三页各自独立成窗口(§2.1),这是本次唯一一处
+**结构净增**(三个面板变**五个**窗口),也是 `RightPanelTabs` 与
+`RightSplitController` 被删除的原因.
 
 ### 1.2 窗口化要替换的耦合点(逐条可查)
 
@@ -74,23 +99,28 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 | C2 | 折叠 = 收成窄边 + 隐藏正文直接子元素 | `PanelController._applyLayout` | **删除**.最小化/关闭由窗口态表达,不再是"面板折叠";`_collectBindings` / `_bindToggleButtons` 随 `[data-panel-toggle]` 一起消失 |
 | C3 | 拖动宽度/高度 | `PanelController._bindResizeHandles` | 换成窗口拖动与八向缩放(仍走 `bindDragGesture`) |
 | C4 | `.panel.collapsed ...` 一整组 CSS | `css/panels.css` 57–66,830 | 换成 `.window.is-minimized` 等窗口态选择器 |
-| C5 | 面板标题栏 `.panel-header`(含"示例/RUN/收起"按钮) | `index.html` + `css/panels.css` 14–67 | 变成**窗口标题栏**:拖动区 + 窗口按钮;"示例/RUN"移入窗口标题栏,标题栏本体不再是拖动区 |
+| C5 | 面板标题栏 `.panel-header`(含"示例/RUN/收起"按钮) | `index.html` + `css/panels.css` 14–67 | 变成**窗口标题栏**:拖动区 + 窗口按钮;"示例/RUN"移入窗口标题栏(`.window-actions`),`#formula-copy-hint` 移入对象窗口的 `titleContent`.面板自带的那层 `.panel-header` **整个删除**(W6 的 A 案,§11.1 B8) |
 | C6 | 右栏标签栏留在面板 header 内部(为折叠逻辑) | `index.html` 244 注释,`RightPanelTabs` | **整个删除**.参数页与过程页各自独立成窗口,`RightPanelTabs` 与 `#right-tabs` 一并消失;`.right-page[hidden]` 那条 `display:none` 也没了存在理由 |
 | C7 | 面板通高 / 通宽靠绝对定位的 `top/bottom/left` | `css/layout.css` 32–55 | 窗口正文给确定高度,`.panel` 改成"填满窗口正文"(`flex:1;min-height:0`) |
 | C8 | 示例浮层按视口高度留余量,折叠时隐藏 | `css/panels.css` 806–833 | 锚点改窗口标题栏;`max-height` 按窗口正文高度算 |
-| C9 | 面板尺寸/夹取范围在 `UI_CONFIG.panel` | `src/config/uiConfig.ts` 66–85 | 换成 `UI_CONFIG.window` 的各窗口默认几何与最小尺寸;`panel` 里只留 `split*`(参数窗口内部"参数区/视图区"分割) |
+| C9 | 面板尺寸/夹取范围在 `UI_CONFIG.panel` | `src/config/uiConfig.ts` 66–85 | 换成 `UI_CONFIG.window` 的各窗口默认几何与最小尺寸;`panel` 段只留 `paramsMinHeight` / `viewControlsMinHeight`(CSS 消费),`split*` 随 `RightSplitController` 一起删除(C14) |
 | C10 | 面板尺寸初值的 CSS 兜底 + 测试锁一致性 | `css/base.css` 174–186,`applyUiConfig.test.ts` | **整套删掉**:窗口几何改由 `UI_CONFIG.window` + 行内样式给出,CSS 不再有副本(§11.2 E3) |
 | C11 | "点条目行末的过程"= 切标签页 | `DslApp._openProcess` -> `rightPanelTabs.show('process')` | 改成"显示并聚焦过程窗口"(§3.7):源数据没变,变的只是"切页"->"抬窗口" |
+| C12 | 面板自带的标题栏与边框/阴影 | `index.html` 三个 `.panel-header`,`.panel-title`;`css/layout.css` 的 `.panel`(含 `overflow: hidden`) | **已按 W6 拍板**:窗口标题栏取代它,**三处 `.panel-header` 全删**(`source code` / `对象` / `视图` 三个文案上移为窗口标题);`.panel` 的 border/阴影留给窗口外壳那一层,不再叠两层.见 §11.1 B8 |
+| C13 | `.panel { overflow: hidden }` 裁掉示例浮层 | `css/layout.css`:28 | 裁切职责下沉到 `.window-body`;`.panel` 那条规则搬走后**不带 `overflow`**;浮层从 `.panel-header` 移进窗口标题栏(见 §11.1 B2) |
+| C14 | "参数区/视图区"共用参数页的高度,比例由分隔条拖 | `#right-splitter` + `RightSplitController` + `--right-split-basis`(`panels.css:143–185`,`applyUiConfig.ts:38`,`uiConfig.ts` 的 `split*`) | **删除整条链路**:参数与视图各自成窗口,高度由窗口正文给出;`#params-panel` 的 `flex: 0 0 var(--right-split-basis)` 改成 `flex: 1; min-height: 0`;`#view-controls` 变成视图窗口的宿主 |
 
-**不动的**:`RightSplitController`,`EditorLineNumbers`,
+**不动的**:`EditorLineNumbers`,
 `EditorHighlight`,`ObjectListController`,`ParamPanelController`,
 `DiagnosticsController`,`ProcessPanel`,`FormulaCopyController`,
 `ExampleLoaderController`,`ViewPanel`.它们全部通过 `document.getElementById`
 或构造参数拿节点,窗口化只改**节点在树里的位置与祖先尺寸**,不改节点自身.
 
-**删掉的**:`PanelController`(C1–C4)与 `RightPanelTabs`(C6).两者都是
-"布局/页面归属"的控制器,而这两件事在窗口化之后分别由**窗口几何**与
-**窗口显隐**表达,不再需要独立控制器.
+**删掉的**:`PanelController`(C1–C4),`RightPanelTabs`(C6)与
+`RightSplitController`(C14).三者都是"布局/页面归属/分栏比例"的控制器,而这三
+件事在窗口化之后分别由**窗口几何**,**窗口显隐**与**窗口正文高度**表达,不再需要
+独立控制器.注意 `RightSplitController` 是 W6 之后才进入删除清单的:只要
+参数与视图还共用一栏,它就必须留着.
 
 这是本方案能收敛的前提:**窗口化是"给现有面板换一个容器",不是重写面板**.
 
@@ -99,24 +129,28 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 ## 2 目标形态
 
 ```text
-┌─ #app (desktop) ───────────────────────────────────────────────┐
-│  #viewport            铺满,z-index 0      ← three.js canvas    │
-│                                                                │
-│  #window-layer        inset:0,z-index 100,pointer-events:none  │
-│  ┌ source ────────┐   ┌ params ────────┐                       │
-│  │ 源码 + 示例/RUN │   │ 参数 / 视图     │                       │
-│  │ #left-panel    │   ├ process ───────┤                       │
-│  └────────────────┘   │ 过程            │                       │
-│         ┌ objects ───┐│ #right-page-...  │                       │
-│         │ 对象列表    │└────────────────┘                       │
-│         └────────────┘                                         │
-│  #dock                z-index 200,pointer-events:auto          │
-└────────────────────────────────────────────────────────────────┘
+┌─ #app (desktop) ────────────────────────────────────────────────┐
+│  #viewport            铺满,z-index 0      ← three.js canvas     │
+│                                                                 │
+│  #window-layer        inset:0,z-index 100,pointer-events:none   │
+│  ┌ source code ───┐   ┌ 参数 ──────────┐                        │
+│  │ 源码 + 示例/RUN │   │ #right-page-   │                        │
+│  │ #left-panel    │   │   params       │                        │
+│  ├ 视图 ───────────┤   ├ 过程 ──────────┤                        │
+│  │ 视图控件        │   │ #right-page-   │                        │
+│  │ #view-controls │   │   process      │                        │
+│  └────────────────┘   └────────────────┘                        │
+│         ┌ 对象 ──────┐                                          │
+│         │ 对象列表    │                                          │
+│         │ #bottom-... │                                          │
+│         └────────────┘                                          │
+│  #dock                z-index 200,pointer-events:auto           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 每个 `.window` 的结构都相同:`.window-header`(标题 + 标题栏动作 +
 窗口按钮,标题是拖动起手区)/ `.window-body`(承载上表里的宿主)/ 八根缩放
-手柄.四个窗口的位置尺寸都来自 `UI_CONFIG.window.windows`(§2.1).
+手柄.**五个**窗口的位置尺寸都来自 `UI_CONFIG.window.windows`(§2.1).
 
 三层,职责互不重叠:
 
@@ -135,58 +169,98 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 `index.html` 只留面板本体与几个空宿主.装配形状,命名与 DOM 契约见
 §5.3 / §5.4;这条不是风格偏好,它有测试守卫(§7 的 `WindowFrame.test.ts`).
 
-### 2.1 四个窗口的默认几何
+### 2.1 五个窗口的默认几何
 
-窗口数从三个变**四个**:右栏那两个标签页("参数 / 视图"与"过程")不再分页,
-各自成一个窗口.这一步的目的与代价见 §2.2.
+窗口数从三个变**五个**(W1/W6):右栏那两个标签页("参数 / 视图"与"过程")不再
+分页,而且"参数"与"视图"也不再共用一栏高度.拆分口径与代价见 §2.2.
 
 `#app` 的可用区(`desktopW × desktopH`).以下为真实 px(桌面端按窗口大小
 重排,见 §3.4 的夹取规则).
 
 | 窗口 | 标题 | 正文宿主 | 默认位置/尺寸 | 最小尺寸 |
 | --- | --- | --- | --- | --- |
-| `source` | 源码 | `#left-panel` | 左上,`x=16 y=16 w=420 h=dH-116` | 300 × 220 |
-| `params` | 参数 / 视图 | `#right-page-params` | 右上,`x=dW-436 y=16 w=420 h=round((dH-116)*0.55)` | 280 × 200 |
-| `process` | 过程 | `#right-page-process` | 右下,`x=dW-436 y=16+round((dH-116)*0.55)+12 w=420 h=余高` | 280 × 180 |
-| `objects` | 对象 | `#bottom-panel` | 中下,居中 `y=dH-292 w=clamp(360, 720, dW-2*436-32) h=260` | 360 × 160 |
+| `source` | `source code` | `#left-panel` | 左上,`x=16 y=16 w=420 h=round((dH-116)*0.68)` | 300 × 220 |
+| `view` | `视图` | `#view-controls` | 左下,`x=16 y=source.y+source.h+12 w=420 h=余高` | 280 × 180 |
+| `params` | `参数` | `#right-page-params` | 右上,`x=dW-436 y=16 w=420 h=round((dH-116)*0.55)` | 280 × 200 |
+| `process` | `过程` | `#right-page-process` | 右下,`x=dW-436 y=params.y+params.h+12 w=420 h=余高` | 280 × 180 |
+| `objects` | `对象` | `#bottom-panel` | 中下,居中 `y=dH-376 w=clamp(360, 720, dW-2*436-32) h=260` | 360 × 160 |
 
-`dW`/`dH` 是桌面宽高;底部统一让出 100px 给 Dock(`--dock-reserve`).
-`params` / `process` 上下叠在同一列(默认恰好填满右列),两列之外中间留出
-3D 视口.**中列宽度是算出来的**,不是写死的:`dW-2*436-32` 是"两侧窗口各
+`dW`/`dH` 是桌面宽高.**五个窗口共用同一条底边线 `dH-116`**,
+它等于 `dH - dockReserve(100) - edgeGap(16)`:Dock 占底部 100px,再留 16px 间隙.
+表里所有"余高"与 `objects` 的 `y=dH-376` 都是这条底边线的推论,不是各写各的
+数字--旧稿把 `source` 写成通高 `dH-116`,把 `objects` 写成 `y=dH-292`,于是出现
+了三条不同的底边(100 / 116 / 32),`objects` 的底边甚至落进 Dock 的 100px 里.
+
+> 这条底边线是硬约束,不是审美:`objects` 与 Dock 都是居中一条,`objects`
+> 的底边一旦进 Dock 的范围,它的南边手柄就正好压在 Dock 底下,§11.1 B4 的
+> "两侧留空"救不了它.阶段 0 的单测要把五个窗口的底边一起断言(§7).
+
+**分栏**:左列 = `source` 上 / `view` 下,右列 = `params` 上 / `process` 下,
+两列之外中间留出 3D 视口,`objects` 居中占底部.这样分组是有意的:
+左列是"写与看"(源码 + 视图),右列是"算与解"(参数 + 过程),对象列表横跨中下.
+
+编辑器高度要让出来:旧稿的 `source` 是通高,现在被 `view` 分走 32%.
+`h=round((dH-116)*0.68)` 这个比例是**为了让编辑器在小视口下也够用**定的
+(1920×1080 -> 656px,1280×800 -> 465px,都还有 ~69% 的列高);
+`view` 拿"余高",在 1280×800 下是 191px,刚好过它的最小高 180.
+
+> 换一种摆法也可以(比如把 `view` 放进右列与 `params`,`process` 三明治),
+> 但右列三段在 1280×800 下每段只剩 ~190px,`params` 的滑块与 `process` 的
+> 递等式都会很难受.默认几何是"一期的起点"而不是"布局引擎",用户拖一次就
+> 改了;真正要守的是底边线与不越界,见下面那张核对表.§10 的"不做自动平铺"
+> 也适用于这里.
+
+**中列宽度是算出来的**,不是写死的:`dW-2*436-32` 是"两侧窗口各
 420 加左右各 16 的间隙"之后剩下的宽度,再夹到 `[360, 720]`
 (1280 -> 376,1920 -> 720).这条换算与 §3.4 的夹取共用同一组纯函数.
 
 > **关于"不重叠"这条,核过一次**(数字可以直接当单测断言):
 >
 > ```text
-> 1280×800: source 16...436 | objects 452...828 | right 列 844...1264   -> 无重叠
-> 1920×1080: source 16...436 | objects 600...1320 | right 列 1484...1904 -> 无重叠
+> 1280×800: 左列 16...436 | objects 452...828 | 右列 844...1264   -> 无重叠
+> 1920×1080: 左列 16...436 | objects 600...1320 | 右列 1484...1904 -> 无重叠
+> 底边线(五个窗口共用,一起断言):1280×800 全部 = 684;1920×1080 全部 = 964
+> 左列内部:source 底 481 / view 顶 493(1280×800),source 底 672 / view 顶 684(1920×1080)
 > ```
 >
-> 两条结论:**① 两个目标视口下都不重叠**;**② 更窄的视口下允许重叠**--窗口可以
-> 拖,用户自己摆,这与 §10「明确不做」里的"不做自动平铺"是同一条取舍.真正
-> 必须守住的不变量只有两条:**窗口不越界** 与 **标题栏永远在桌内**,它们由
-> §3.4 的夹取保证.`x: 'center'` 的换算是
+> 三条结论:**① 两个目标视口下都不重叠**;**② 更窄的视口下允许重叠**;**③ 五个
+> 窗口的底边线一致,且都在 Dock 的 100px 之上**.② 的取舍是窗口可以拖,用户
+> 自己摆,与 §10「明确不做」里的"不做自动平铺"是同一条取舍.真正必须守住的不
+> 变量只有两条:**窗口不越界** 与 **标题栏永远在桌内**,它们由 §3.4 的夹取保证.
+> `x: 'center'` 的换算是
 > `x = clamp(round((dW - w) / 2), 0, dW - w)`,窄视口下自然退化成贴边.
 
 默认几何写在 `UI_CONFIG.window.windows`(锚点式描述,见 E4),由
 `WindowGeometry.resolveDefaultGeometry()` 按当前桌面尺寸算出 px,在
 `WindowFrame` 建完元素后立即写行内样式.**CSS 侧不留副本**,理由见 §11.2 E3.
 
-### 2.2 为什么把"参数/视图"与"过程"拆开
+### 2.2 为什么把三页拆成三个窗口(以及参数/视图为什么也拆)
 
 当年把求解过程做成右栏**第二个标签页**(提交 `456daef`),理由是空间不够:
 右栏一份宽度,一次只能看一页,好处是"手不动的东西可以让位给过程板书"
 (`docs/equation-solving-process.md` 第 1 节).窗口化之后这条约束消失了:
 
-- **一次只能看一页** -> 两个窗口可以同时看,拖滑块时过程里的"系数取值"那一步
-  就在旁边,这正是求解示例(`example/solve_equations.miko`)最想让人看到的东西;
+- **一次只能看一页** -> 多个窗口可以同时看,拖参数滑块时过程里的"系数取值"
+  那一步就在旁边,这正是求解示例(`example/solve_equations.miko`)最想让人
+  看到的东西;
 - **共用一份宽度** -> 过程窗口可以单独拖宽.当年文档 §3.3 记的"过程页默认
   300px 对递等式偏窄(一条链式展开要 400–500px)"由此有了出路:不用加"板书
   模式"按钮,也不用连累参数窗口(它 300px 就够);
-- **切页** -> 两个窗口各自有最小/最大化/关闭,可以只要过程不要参数.
+- **切页** -> 每个窗口各自有最小/最大化/关闭,可以只要过程不要参数.
 
-代价要写清楚:默认布局多一个窗口(小视口下四块可能重叠,但窗口可拖,用户
+**"参数"与"视图"为什么也拆**(W6,用户 2026-09 追加拍板):它们本来就是同一栏
+里的**上下两块**,靠 `#right-splitter` 抢高度--这是三页里唯一还在"共用"的
+一对.拆开之后:
+
+- 视图窗口可以整块收起或最大化,调相机/坐标轴时不必把参数挤成一条;
+- `#params-panel` 不再需要 `flex: 0 0 var(--right-split-basis)`,也不再有
+  "参数区最小高度 / 视图区最小高度"互相牵制的那套下限;
+- 代价是删除整条分栏链路:`RightSplitController`,`#right-splitter`,
+  `--right-split-basis`,`UI_CONFIG.panel.split*`,以及对应测试(§1.2 C14);
+- 另一个代价:`source code` 不再是通高窗口(视图窗口占左列下方,§2.1).
+  编辑器拿到约 69% 的列高,这是刻意的取舍.
+
+代价要写清楚:默认布局多两个窗口(小视口下五块可能重叠,但窗口可拖,用户
 自己摆,见 §2.1 的说明);过程窗口不再"切过去就自动在前",改成**显式抬升焦点**
 (§3.7).
 
@@ -207,25 +281,30 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 
 ### 3.1 状态与唯一写入点
 
-一个窗口的状态收敛成四个字段,全部由 `WindowManager` 持有:
+一个窗口的状态收敛成五个字段,全部由 `WindowManager` 持有:
 
 ```text
 geometry   { x, y, w, h }          // 普通态几何(px,相对 #app)
-state      'normal' | 'maximized' | 'minimized' | 'closed'
-restore    geometry | null         // 进入 maximized 前的几何,还原用
+state      'normal' | 'maximized' | 'fullscreen' | 'minimized' | 'closed'
+restore    geometry | null         // 进入 maximized/fullscreen 前的几何,还原用
 focused    boolean                 // 与 z-order 一起维护
+zIndex     number                  // 该窗口当前的 z-index(焦点独占写入)
 ```
 
-- **几何的唯一写入点**是 `WindowManager._applyGeometry(id)`:把
-  `geometry` 写成该元素的行内 `left/top/width/height`,并在
-  `state !== 'normal'` 时按状态改写(最大化走 CSS 类,不再写行内几何).
-- **状态的唯一写入点**是 `WindowManager._applyState(id)`:切 class
-  (`.is-maximized` / `.is-minimized` / `.is-closed`),刷新
-  `aria-hidden`,刷新 Dock 按钮的激活态与文案.拖动,按钮,Dock,
-  键盘(阶段 5)全部只改状态,由这两个函数落地.
+- **几何的唯一写入点**是 `WindowManager._applyGeometry(id)`:普通态把
+  `geometry` 逐条写进该元素的 `left/top/width/height`;`maximized` /
+  `fullscreen` 态则**清掉这四条行内属性**,几何交给 CSS 类的 `inset: 0`.
+  它不写类名,也不碰 `z-index`(行内属性压过类规则,清不干净就是"最大化没反应").
+- **状态的唯一写入点**是 `WindowManager._applyState(id)`:`.window` 上的
+  **每一个类**(`.is-maximized` / `.is-fullscreen` / `.is-hidden` /
+  `.is-closed` / `.is-focused` 除外--后者归 `focus()`)都在这里切,并刷新
+  `inert` / `aria-hidden` / 窗口按钮文案 / Dock 按钮的激活态.拖动,按钮,
+  Dock,键盘(阶段 5)全部只改状态,由这两个函数落地.
+- `z-index` 有**第三**个写入点,就是 `focus()`:几何写入会清行内样式,两者
+  必须分开,否则会出现"拖动时窗口掉到后面"(§11.2 E8).
 - 这条"一个状态源 + 一个写入点"的约定是从 `PanelController` 继承的
   (它当年就是为了修 `UI-P3.3` 的分叉),必须照搬:窗口化把状态从 1 个
-  布尔扩成 4 态 + 几何 + z-order,没有这条,分叉会成倍出现.
+  布尔扩成 5 态 + 几何 + z-order,没有这条,分叉会成倍出现.
 
 **状态转移**:
 
@@ -233,13 +312,21 @@ focused    boolean                 // 与 z-order 一起维护
 | --- | --- | --- | --- |
 | normal | 拖标题栏 | normal | 只改 `geometry` |
 | normal | 最大化按钮 / 拖到上边缘 / 标题栏双击 | maximized | 存 `restore` |
+| normal | 全屏按钮 | fullscreen | 存 `restore`;`Esc` 退出 |
 | normal | 最小化按钮 | minimized | `focused = false`,焦点下移 |
 | normal | 关闭按钮 | closed | 同上;Dock 按钮保留 |
 | maximized | 还原按钮 / 拖标题栏(拖即还原并跟手) | normal | 用 `restore` |
-| maximized | 最小化 / 关闭 | minimized / closed | `restore` **保留**,再开还是最大化前的尺寸 |
+| maximized | 全屏按钮 | fullscreen | `restore` **保留**(不覆盖) |
+| fullscreen | `Esc` / 退出按钮 | normal | 用 `restore` |
+| maximized / fullscreen | 最小化 / 关闭 | minimized / closed | `restore` **保留**,再开还是最大化前的尺寸 |
 | minimized | Dock 按钮 | normal | 回 `geometry` |
-| closed | Dock 按钮 | normal | 同上;`closed` 与 `minimized` 在 Dock 上等价,只差动画与语义 |
-| 任意 | 容器 `resize` | 同态 | 几何按比例夹回桌内,最大化重算 |
+| closed | Dock 按钮 | normal | 同上 |
+| 任意 | 桌面 `resize` | 同态 | normal 按夹取规则收进桌内;maximized/fullscreen 只需重算类(几何被 CSS 接管) |
+
+`minimized` 与 `closed` 的行为目前**完全等价**(都进 `is-hidden` + `inert`),
+只差 `.is-closed` 这个类.这是刻意的:留着它给后续"关闭=释放内容"留口,但
+一期不许任何逻辑去区分两者(若实现时发现确实没有区别,合并成一个 `hidden`
+态也是可接受的收敛,§10 的"明确不做"不受影响).
 
 ### 3.2 焦点与 z-order
 
@@ -264,7 +351,7 @@ focused    boolean                 // 与 z-order 一起维护
 
 | 档 | 触发 | 效果 |
 | --- | --- | --- |
-| **最大化** | 标题栏右上的 `▣` 按钮;标题栏双击;拖到桌面上边缘 | 填满 `#app` 减去 `--dock-reserve` 的底部余量,**保留**窗口标题栏与 Dock |
+| **最大化** | 标题栏右上的 `▣` 按钮;标题栏双击;拖到桌面上边缘 | 填满 `#app` 减去 `dockReserve`(100px)的底部余量,**保留**窗口标题栏与 Dock |
 | **单窗口全屏** | 标题栏右上的 `⤢` 按钮(或 `F11` 语义) | 填满整个 `#app`,标题栏变成一条可悬停浮现的窄条,Dock 自动隐藏,`Esc` 退出 |
 
 两者都只写一个 CSS 类(`.is-maximized` / `.is-fullscreen`),几何从类里
@@ -380,9 +467,9 @@ y ∈ [0, desktopH - HEADER_MIN]                   // 标题栏绝不能被拖�
   还原到 `normal`.
 - 当前焦点窗口的按钮带 `.is-active`.
 - Dock 右侧另放一个**桌面动作区**:单窗口全屏退出(`Esc` 同样可退),以及
-  一个"全部还原"入口(把四个窗口一键复位到默认几何,对应参考项目的
+  一个"全部还原"入口(把五个窗口一键复位到默认几何,对应参考项目的
   "恢复默认").
-- Dock 常驻:即使四个窗口全关也必须在,否则用户没有回到窗口的入口.
+- Dock 常驻:即使五个窗口全关也必须在,否则用户没有回到窗口的入口.
   窗口全关时桌面只剩 3D 视口,`:empty` 之外的提示不必做.
 
 ### 3.7 过程窗口的"打开"语义(替代切标签页)
@@ -459,18 +546,32 @@ type AxisSpec =
     | { readonly clamp: readonly [min: number, max: number];
         readonly inset: number };                                    // 夹取(中列宽度)
 
+/**
+ * `from: 'bottom'` 的语义**写死成一条**(旧稿没写,于是同一份 spec 算不出
+ * §2.1 的两组期望值):
+ *
+ *   x: { from: 'right',  inset }  ->  x = dW - inset - w   // 右边贴到 dW-inset
+ *   y: { from: 'bottom', inset }  ->  y = dH - inset - h   // 底边贴到 dH-inset
+ *   h: { from: 'bottom', inset }  ->  h = dH - inset - y   // 同上,解出高度
+ *
+ * 三个都读作"**该窗口的这条边落在距桌面该侧 inset 处**".于是 `view` 与
+ * `process` 用同一个 `inset: 116` 就自动落在同一条底边线上,不需要两套规则.
+ * `x: 'center'` 用算出来的 `w`;`usableHeight = desktop.h - dH的底边余量(116)`
+ * (source / params 用 `fraction` 拿它的一档).
+ */
+
 /** 默认几何:写"锚点",不写算出来的数字(见 E4). */
 type WindowGeometrySpec = {
     readonly x: AxisSpec;
     readonly y: AxisSpec;
     readonly w: AxisSpec;
     readonly h: AxisSpec;
-    /** 依赖另一个窗口:`y` 接在 `after` 的下方 `gap` 像素处. */
+    /** 依赖另一个窗口:`y` 接在 `after` 的下方 `gap` 像素处(`y` 被忽略). */
     readonly after?: { readonly id: string; readonly gap: number };
 };
 
 interface WindowConfigEntry {
-    readonly id: 'source' | 'params' | 'process' | 'objects';
+    readonly id: 'source' | 'view' | 'params' | 'process' | 'objects';
     /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
     readonly title: string;
     /** 正文宿主 id:WindowManager 用 document.getElementById 取(见 E1). */
@@ -481,7 +582,7 @@ interface WindowConfigEntry {
 }
 
 window: {
-    windows: readonly WindowConfigEntry[];   // 四个,顺序即 z 初始序与 Dock 顺序
+    windows: readonly WindowConfigEntry[];   // 五个,顺序即 z 初始序与 Dock 顺序
     /** 标题栏上的窗口按钮:顺序即显示顺序,glyph 进配置不散在 TS 里. */
     actions: readonly {
         readonly id: 'minimize' | 'maximize' | 'fullscreen' | 'close';
@@ -490,56 +591,82 @@ window: {
     }[];
     /** 桌面几何常量(单位 px). */
     edgeKeep: number;      // 移动/缩放时至少留在桌内的宽度,建议 80
+    edgeGap: number;       // 窗口与桌面边缘的间隙,建议 16
     headerMinVisible: number;  // 标题栏至少可见高度,建议 HEADER_HEIGHT
     dockReserve: number;   // 底部为 Dock 留出的高度,建议 100
-    headerHeight: number;  // .window-header 高度,与 css/window.css 一致
+    /** 底边线 = desktop.h - (dockReserve + edgeGap) = dH-116:五个窗口共用,
+     *  由 §4.1 里各窗口的 `inset: 116` 表达(数值写在各窗口 spec 里,
+     *  不在这里再造一个派生常量,避免"改了一处忘了另一处"). */
+    /** `.window-header` 高度:经 applyUiConfig 写成 `--window-header-height`,
+     *  css/window.css 用 `height: var(--window-header-height)` 消费.数值只有
+     *  这一处,另加一条测试锁住(与 `--side-default-width` 那批同一处理). */
+    headerHeight: number;
     z: { windowLayer: number; first: number; snapPreview: number; dock: number };
     snap: { edge: number; magnet: number };   // 16 / 8
 }
 ```
 
-**四个窗口的数值**(就是 §2.1 那张表的机器可读版):
+**五个窗口的数值**(就是 §2.1 那张表的机器可读版;数组顺序 = Dock 顺序 =
+依赖顺序,不能随意调):
 
 ```ts
-{ id: 'source',  title: '源码',      hostId: 'left-panel',
+{ id: 'source',  title: 'source code', hostId: 'left-panel',
   dock: { icon: '✎', label: '源码' },
   defaultGeometry: { x: { at: 16 }, y: { at: 16 }, w: { at: 420 },
-                     h: { from: 'bottom', inset: 116 } },        // = dH - 116
+                     h: { fraction: 0.68, of: 'usableHeight' } },  // = round((dH-116)*0.68)
   minSize: { w: 300, h: 220 } }
 
-{ id: 'params',  title: '参数 / 视图', hostId: 'right-page-params',
+{ id: 'view',    title: '视图',       hostId: 'view-controls',
+  dock: { icon: '◫', label: '视图' },
+  defaultGeometry: { x: { at: 16 }, y: { at: 0 },
+                     w: { at: 420 }, h: { from: 'bottom', inset: 116 },
+                     after: { id: 'source', gap: 12 } },           // y = source.y + source.h + 12
+  minSize: { w: 280, h: 180 } }                                    // h = dH - 116 - y(与 process 同一条底边)
+
+{ id: 'params',  title: '参数',       hostId: 'right-page-params',
   dock: { icon: '▤', label: '参数' },
   defaultGeometry: { x: { from: 'right', inset: 16 }, y: { at: 16 }, w: { at: 420 },
                      h: { fraction: 0.55, of: 'usableHeight' } }, // = round((dH-116)*0.55)
   minSize: { w: 280, h: 200 } }
 
-{ id: 'process', title: '过程',      hostId: 'right-page-process',
+{ id: 'process', title: '过程',       hostId: 'right-page-process',
   dock: { icon: '≡', label: '过程' },
   defaultGeometry: { x: { from: 'right', inset: 16 }, y: { at: 0 },
                      w: { at: 420 }, h: { from: 'bottom', inset: 116 },
                      after: { id: 'params', gap: 12 } },          // y = params.y + params.h + 12
-  minSize: { w: 280, h: 180 } }
+  minSize: { w: 280, h: 180 } }                                   // h = dH - 116 - y(与 view 同一条底边)
 
-{ id: 'objects', title: '对象',      hostId: 'bottom-panel',
+{ id: 'objects', title: '对象',       hostId: 'bottom-panel',
   dock: { icon: '☰', label: '对象' },
-  defaultGeometry: { x: 'center', y: { from: 'bottom', inset: 292 },
+  defaultGeometry: { x: 'center', y: { from: 'bottom', inset: 116 },  // = dH - 116 - h = dH - 376
                      w: { clamp: [360, 720], inset: 2 * 436 + 32 },  // = dW - 904
                      h: { at: 260 } },
   minSize: { w: 360, h: 160 } }
 ```
 
-`params` 的 `h` 与 `process` 的 `y` 有依赖,**计算顺序固定**:数组顺序即依赖
-顺序(§4.5 的 `bind()` 就是按数组顺序遍历的),`process` 用 `after: { id: 'params' }`
-表达"接在它下面".**不要**同时写死 `y` 数字又写 `after`--二选一.
+`source` 的 `h`,`params` 的 `h` 用 `fraction`,`view` / `process` 的 `y` 用
+`after` 接在上面那个窗口的下方 `gap` 像素处,**计算顺序固定**:数组顺序即依赖
+顺序(§4.5 的 `bind()` 就是按数组顺序遍历的).先把数组排成
+`source -> view -> params -> process -> objects`,两条 `after` 的前置窗口就都在
+它前面(`view` 依赖 `source`,`process` 依赖 `params`).
+`y` 在类型上是必填,所以 `view` / `process` 各写了一个占位的 `y: { at: 0 }`;
+**存在 `after` 时以 `after` 为准,`y` 被忽略**(不要两边都写真值,否则读的人
+不知道哪个生效).`view` / `process` 的 `h` 照旧按 §4.1 的语义解出:
+`h = dH - inset - y`,其中 `y` 是 `after` 算出来的那个值.
 `resolveDefaultGeometry(spec, desktop, resolved)` 的第三个参数就是"已经算出来的
 前几个窗口",`after` 从里面取.
 
-两条换算例子(可以直接当单测用例):
+两条换算例子(可以直接当单测用例;五个窗口的底边都在同一条线上):
 
 ```text
-1920×1080: source h=964 | params h=530 y=16 | process y=558 h=406 | objects w=720
-1280×800 : source h=684 | params h=376 y=16 | process y=404 h=280 | objects w=376
+1920×1080: 底边 964 | source h=656 底672 | view y=684 h=280 | params h=530 底546 | process y=558 h=406 | objects y=704 w=720
+1280×800 : 底边 684 | source h=465 底481 | view y=493 h=191 | params h=376 底392 | process y=404 h=280 | objects y=424 w=376
 ```
+
+三个容易算错的点,阶段 0 的用例要盯住:①`source`/`params` 的 `fraction` 取的是
+`usableHeight = dH-116`,不是桌面高(`0.68*964=655.5 -> 656`,不是 `734`);
+②`view`/`process` 的 `h` 是"从自己的 `y` 到 `dH-116`",所以两列的 `y` 值相同
+时高度也相同(`558 -> 406`);③`objects` 的 `y` 用 `h` 反推(`964-260=704`).
 
 ### 4.2 `WindowGeometry.ts`(纯函数,阶段 0)
 
@@ -557,7 +684,7 @@ export interface Limits {
     readonly headerMinVisible: number;
 }
 
-/** 默认几何:锚点/夹取 -> px.四个窗口的依赖顺序由调用方保证(见 §5.1). */
+/** 默认几何:锚点/夹取 -> px.五个窗口的依赖顺序由调用方保证(见 §5.1). */
 export function resolveDefaultGeometry(
     spec: WindowGeometrySpec, desktop: Desktop, resolved: ReadonlyMap<string, Geometry>,
 ): Geometry;
@@ -582,6 +709,17 @@ export function resolveEdgeSnap(
 export function magnetize(
     g: Geometry, others: readonly Geometry[], magnet: number,
 ): Geometry;
+
+/**
+ * 几何的四条行内属性:窗口几何**唯一允许的写入形状**
+ * (`WindowManager` 逐条 `style.setProperty`,见 §4.5).
+ */
+export function geometryStyle(
+    g: Geometry,
+): Readonly<Record<'left' | 'top' | 'width' | 'height', string>>;
+
+/** 上面四条的拼接,只用于单测断言与日志(不要拿它去写 `style.cssText`). */
+export function geometryToCss(g: Geometry): string;
 ```
 
 **夹取公式(唯一一份)**:
@@ -632,8 +770,9 @@ export function applyResize(
 /** 绑定:把某根手柄接到上面那个函数.DOM 部分只做这一件事. */
 export function bindWindowResize(
     handle: HTMLElement, signal: AbortSignal,
+    direction: ResizeDirection,
     onGeometry: (next: Geometry) => void,
-    read: { geometry(): Geometry; limits(): Limits },
+    read: { geometry(): Geometry; state(): WindowState },
 ): void;
 ```
 
@@ -663,7 +802,10 @@ bindDragGesture(handle, signal, {
 三条注意:
 
 1. `canStart` 用**状态**判断,不要用"元素上有没有某个类"判断--状态是唯一
-   真相源(§3.1).
+   真相源(§3.1).因此 `read` 里必须有 `state()`,`WindowManager` 也要把它
+   暴露成公开方法(§4.5);`direction` 由调用方绑定手柄时传入,不从 DOM 属性
+   现读.**`read` 里不需要 `limits()`**:夹取统一由调用方在 `onGeometry` 之后
+   做一次,本模块不认识上下限.
 2. `applyResize` 返回的是**未夹取**的几何,调用方(`WindowManager`)必须过一遍
    `clampGeometry`.这是 §3.4 第 2 条的落地方式:`west` 撞到 `min.w` 时,
    `x` 与 `w` 是同一次 `clampGeometry` 里一起夹的,不会互相推.
@@ -677,8 +819,9 @@ bindDragGesture(handle, signal, {
 export interface WindowFrameSpec {
     readonly id: string;
     readonly title: string;
-    readonly titleContent: readonly Child[];   // 一期为空
+    readonly titleContent: readonly Child[];   // 标题里的额外内容(对象窗口放 #formula-copy-hint)
     readonly actions: readonly Child[];        // 现成节点:示例按钮 / RUN
+    readonly overlays: readonly Child[];       // 现成节点:标题栏浮层(#example-menu)
     readonly controls: readonly WindowActionButton[];  // 由 UI_CONFIG.window.actions 生成
     readonly geometry: Geometry;               // 建好即刻写入行内样式
 }
@@ -708,7 +851,7 @@ export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle;
 const element = el('section', { class: 'window', attrs: { 'data-window': spec.id } });
 element.tabIndex = -1;
 element.hidden = false;               // 由状态类控制显隐,不用 hidden
-element.style.cssText = geometryToCss(spec.geometry);   // 立即写,避免一帧闪在左上角
+writeGeometry(element, spec.geometry);   // 立即写,避免一帧闪在左上角;见下面的"唯一写入形状"
 
 const title = el('span', { class: 'window-title' }, el('span', { text: spec.title }), ...spec.titleContent);
 const actions = el('div', { class: 'window-actions' }, ...spec.actions);
@@ -716,7 +859,7 @@ const controls = el('div', { class: 'window-controls' },
     ...spec.controls.map(c => createButton({ class: 'window-control-btn', text: c.glyph,
                                              ariaLabel: c.label, title: c.label })
         .also(b => b.onClick(c.onClick)).element));
-const header = el('header', { class: 'window-header' }, title, actions, controls);
+const header = el('header', { class: 'window-header' }, title, actions, controls, ...spec.overlays);
 const body = el('div', { class: 'window-body' });
 element.append(header, body, ...RESIZE_HANDLES.map(direction => {
     const handle = el('div', { class: 'resize-handle', attrs: { 'data-window-resize': direction } });
@@ -724,26 +867,43 @@ element.append(header, body, ...RESIZE_HANDLES.map(direction => {
 }));
 ```
 
-两个必须做的细节:
+三个必须做的细节:
 
-- **`el()` 不支持 `style`**:几何用 `element.style.cssText = ...` 或逐条
-  `style.setProperty`,与现有代码一致.
-- **`spec.actions` 里的节点是搬过来的,不是重建的**(`#run-btn` 的监听不能丢).
-  用 `append` 而不是 `replaceChildren`.
+- **`el()` 不支持 `style`**:几何**只能**经 `writeGeometry()` 逐条
+  `style.setProperty` 落地.不要用 `element.style.cssText = geometryToCss(...)`--
+  `cssText` 赋值会**清空整个行内声明块**,把 `focus()` 写的 `z-index` 一起清掉,
+  被拖的窗口会当场掉到其它窗口后面(旧稿就是 `cssText` 写法,见 §11.2 E8).
+- **`spec.overlays` 是标题栏里的浮层**(`#example-menu`),它是 `.window-header`
+  的直接子节点,不是 `.window-actions` 的(那一层是按钮行).浮层的定位锚点是
+  `.window-header`(`position: relative`),且必须在 `.window-body` **之外**,
+  否则会被正文的裁切切掉(§11.1 B2).
+- **`spec.actions` / `spec.overlays` 里的节点是搬过来的,不是重建的**
+  (`#run-btn` 的监听不能丢).用 `append` / `replaceChildren` 都要保留节点身份.
 
-`geometryToCss` 是唯一把几何写成 CSS 的地方(与 `WindowGeometry` 一起放,
-便于单测):
+几何的两个 DOM 侧助手(`writeGeometry` / `clearGeometry`)放在 `WindowFrame.ts`
+并导出,由 `createWindowFrame` 与 `WindowManager.applyGeometry` 共用;
+`geometryStyle` / `geometryToCss`(纯字符串)留在 `WindowGeometry.ts`:
 
 ```ts
-export function geometryToCss(g: Geometry): string {
-    return `left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px`;
+/** 逐条写四条几何属性.唯一允许的几何落地方式(不碰 z-index). */
+export function writeGeometry(element: HTMLElement, g: Geometry): void {
+    for (const [name, value] of Object.entries(geometryStyle(g))) {
+        element.style.setProperty(name, value);
+    }
+}
+
+/** 清掉四条行内几何;进入 maximized/fullscreen 前必须调它. */
+export function clearGeometry(element: HTMLElement): void {
+    for (const name of ['left', 'top', 'width', 'height'] as const) {
+        element.style.removeProperty(name);
+    }
 }
 ```
 
 ### 4.5 `WindowManager.ts`(状态与写入点)
 
 ```ts
-export type WindowState = 'normal' | 'maximized' | 'minimized' | 'closed';
+export type WindowState = 'normal' | 'maximized' | 'fullscreen' | 'minimized' | 'closed';
 
 interface Entry {
     readonly spec: WindowConfigEntry;
@@ -756,6 +916,8 @@ interface Entry {
     state: WindowState;
     /** 每个窗口一份:拖动/缩放的指针监听在它上面 abort. */
     gesture: AbortController;
+    /** 该窗口当前的 z-index(`focus()` 写;几何写入**不得**碰它). */
+    zIndex: number;
 }
 
 export class WindowManager {
@@ -773,113 +935,146 @@ export class WindowManager {
         private readonly snapPreview: HTMLElement,
     ) {}
 
-    bind(): void;                  // 建 frame + 搬宿主 + 建 Dock + 起初始焦点
+    bind(): void;                  // 建 frame + 搬宿主 + 建 Dock + 起初始焦点 + 挂 resize
     focus(id: string, options?: { takeDomFocus?: boolean }): void;   // 唯一抬升入口(§3.2)
     reveal(id: string): void;      // 恢复可见 + focus(id, { takeDomFocus: true })(§3.7)
-    getState(id: string): WindowState;
+    getState(id: string): WindowState;   // WindowResize 的 canStart 读它(§4.3)
     getGeometry(id: string): Geometry;
     onGeometryChange(listener: (id: string) => void): () => void;
+    onDesktopResize(): void;       // bind() 已挂到 window.resize;留公开入口给测试
     dispose(): void;
 }
 ```
 
 `layer` / `dock` / `snapPreview` 三个节点由调用方传入(与 `EditorHighlight`
 "节点由装配层取好传入"同一约定),本类不自己去 `getElementById` 找它们;
-宿主节点则相反,**必须**由本类按 `spec.hostId` 走 `document.getElementById`
-(见 E1:两个页容器搬进 `.window` 后不再是 `#app` 的后代,用 `layer.querySelector`
-找不到).
+宿主节点则相反,**必须**由本类按 `spec.hostId` 走 `document.getElementById`:
+`bind()` 是**先取宿主,再把宿主 append 进 frame**,那一刻宿主还在 `#app` 里,
+用 `layer.querySelector` 查不到它(旧稿把理由写成"搬进 `.window` 后不再是
+`#app` 的后代",那是错的:`#window-layer` 就在 `#app` 里;见 §11.2 E1).
+取不到宿主时必须**抛一条带 id 的错误**,不要 `!` 硬断言后让
+`frame.body.append(null)` 报一个读不懂的 TypeError.
 
 `bind()` 的顺序(不能换):
 
 ```text
+0. window.addEventListener('resize', this.onDesktopResize, { signal })  // 旧稿漏了这条
 1. desktop = { w: root.clientWidth, h: root.clientHeight }
 2. resolved = new Map()
    for spec of UI_CONFIG.window.windows:          // 数组顺序即依赖顺序
        g = resolveDefaultGeometry(spec, desktop, resolved)
        resolved.set(spec.id, g)
-3. for spec: createWindowFrame({ ..., geometry: g })   // actions 里的现成节点在这里被 append
-       host = document.getElementById(spec.hostId)     // 见 E1,不是 layer.querySelector
+3. for spec: createWindowFrame({ ..., geometry: g })   // actions/overlays 里的现成节点在这里被 append
+       host = document.getElementById(spec.hostId)     // 取不到就抛带 id 的错
        frame.body.append(host)                          // 宿主是搬过来的,不是重建
-       frame.element.appendTo(layer)
+       layer.append(frame.element)
        bindWindowMove(id)                               // .window-title 上的拖动
-       bindWindowResize(每根手柄, ...)                   // 八向缩放(§4.3)
+       bindWindowRaise(id)                              // 窗口上 capture 阶段 pointerdown -> focus(id)
+       bindWindowResize(每根手柄, id, direction, ...)      // 八向缩放(§4.3)
        applyGeometry(id); applyState(id)                 // 立即写,避免首帧闪在左上角
 4. buildDock()      // 每个窗口一个按钮,点击调 focus/reveal/setMinimized
 5. focus('source', { takeDomFocus: false })  // 初始焦点必须有一个,否则 z 序没有参照
 ```
+
+`bindWindowRaise` 是 §3.2 的落地:`pointerdown` 在**捕获阶段**触发,只调
+`focus(id)`(默认不夺 DOM 焦点),不 `preventDefault`,不 `stopPropagation`,
+所以 `bindDragGesture` 与正文输入框照常收到事件.旧稿的 `bind()` 清单里
+没有这一步,"提升规则"写了却没接.
 
 **几何的唯一写入点**:
 
 ```ts
 private applyGeometry(id: string): void {
     const entry = this.entries.get(id)!;
-    // 最大化/全屏的几何由 CSS 类负责(inset:0),这里只在 normal 态写行内样式,
-    // 但要先把行内样式清干净,否则退出最大化后会带着旧值.
+    // 最大化/全屏的几何由 CSS 类负责(inset:0).这里必须**先清掉四条行内几何**,
+    // 因为行内 left/top/width/height 会压过类规则里的 inset:0--不清就是
+    // "点了最大化没反应"(旧稿就漏了这一步,见 §11.2 E9).
     if (entry.state === 'maximized' || entry.state === 'fullscreen') {
-        entry.frame.element.classList.toggle('is-maximized', entry.state === 'maximized');
-        entry.frame.element.classList.toggle('is-fullscreen', entry.state === 'fullscreen');
-        return;
+        clearGeometry(entry.frame.element);
+    } else {
+        writeGeometry(entry.frame.element, entry.geometry);   // 逐条 setProperty
     }
-    entry.frame.element.classList.remove('is-maximized', 'is-fullscreen');
-    entry.frame.element.style.cssText = geometryToCss(entry.geometry);
     for (const listener of this.geometryListeners) listener(id);
 }
 ```
 
-**状态的唯一写入点**(与 `PanelController._applyLayout` 同一条理由):
+`applyGeometry` **不碰任何类名**:`.window` 上的类(含 `is-maximized` /
+`is-fullscreen`)全部由 `applyState` 独占.`clearGeometry` / `writeGeometry`
+也只碰 `left/top/width/height` 四条属性--`z-index` 归 `focus()` 独占.
+这条是硬约束:旧稿用 `element.style.cssText = geometryToCss(...)` 写几何,
+`cssText` 赋值会清空整个行内声明块,于是拖动第一帧就把 `z-index` 清成 `auto`,
+被拖的窗口当场掉到其它窗口后面(§11.2 E8).
+
+**状态的唯一写入点**(与 `PanelController._applyLayout` 同一条理由;
+`.window` 上的**每一个类**都在这里写):
 
 ```ts
 private applyState(id: string): void {
     const entry = this.entries.get(id)!;
+    const element = entry.frame.element;
     const hidden = entry.state === 'minimized' || entry.state === 'closed';
-    entry.frame.element.classList.toggle('is-hidden', hidden);
-    entry.frame.element.classList.toggle('is-closed', entry.state === 'closed');
-    entry.frame.element.toggleAttribute('inert', hidden);     // 挡 Tab 序与点击
-    entry.frame.element.setAttribute('aria-hidden', String(hidden));
-    // 最大化/最小化按钮的文案在最大化态要变成"还原",两个入口(按钮/双击)共用这里
+    // 五个状态类一起在这里刷新:normal 态全部移除.
+    element.classList.toggle('is-maximized', entry.state === 'maximized');
+    element.classList.toggle('is-fullscreen', entry.state === 'fullscreen');
+    element.classList.toggle('is-hidden', hidden);
+    element.classList.toggle('is-closed', entry.state === 'closed');
+    element.toggleAttribute('inert', hidden);     // 挡 Tab 序与点击
+    element.setAttribute('aria-hidden', String(hidden));
+    // 最大化 / 全屏两个按钮的文案在对应态要变成"退出",两个入口(按钮/双击)
+    // 共用这里;不在这里写,双击最大化后按钮还是"最大化".
     entry.frame.controls.get('maximize')?.setText(
         entry.state === 'maximized' ? '❐' : '▣');
-    ...
+    entry.frame.controls.get('fullscreen')?.setText(
+        entry.state === 'fullscreen' ? '⤡' : '⤢');
     // Dock 按钮的激活态与 aria-pressed 也在这里刷新(唯一写入点)
 }
 ```
 
+`toggleAttribute` 是 `src/testing/domStub.ts` 目前**没有**的 API,阶段 0 要
+一并补上(§5.2 的 `domStub.ts` 行),否则 `WindowManager.test.ts` 直接抛
+"toggleAttribute is not a function".
+
 **焦点与 z**(`focus` 与 `reveal` 的唯一区别就是后者先恢复可见):
 
 ```ts
-focus(id) {
+focus(id, options: { takeDomFocus?: boolean } = {}) {
     const e = this.entries.get(id)!;
     if (e.state === 'minimized' || e.state === 'closed') return;   // reveal 才有权改状态
     this.focusedId = id;
-    e.frame.element.style.zIndex = String(++this.z);
+    e.zIndex = ++this.z;
+    e.frame.element.style.zIndex = String(e.zIndex);   // z-index 只在这里写
     for (const other of this.entries.values())
         other.frame.element.classList.toggle('is-focused', other.spec.id === id);
-    e.frame.element.focus({ preventScroll: true });
+    // 指针路径默认 false:点了编辑器/输入框就不该被窗口抢走 DOM 焦点.
+    if (options.takeDomFocus === true) e.frame.element.focus({ preventScroll: true });
 }
 
 reveal(id) {
     const e = this.entries.get(id)!;
     if (e.state === 'minimized' || e.state === 'closed') {
         e.state = 'normal';
-        this.applyState(id);
+        this.applyState(id);        // 先恢复可见
     }
-    this.focus(id);
+    this.focus(id, { takeDomFocus: true });   // 再抬升并取 DOM 焦点
 }
 ```
 
-**注意 `focus()` 里的 `element.focus()`**:`pointerdown` 落在正文输入框上时,
-浏览器的默认聚焦行为会把焦点交给那个输入框;而 `focus()` 是**指针路径**上被
-调用的,如果它无条件抢焦点,编辑器光标就会丢.所以规则是:
+**`takeDomFocus` 这个开关不能省**(旧稿的 `focus()` 无条件调
+`element.focus()`,与 §3.2/§6 的口径直接矛盾,照抄就会把编辑器光标弄丢):
+`pointerdown` 落在正文输入框上时,浏览器的默认聚焦行为会把焦点交给那个
+输入框;`bindWindowRaise` 调的是 `focus(id)`(默认 `false`),不干预它.规则是:
 
-- **指针路径**(`pointerdown` 提升)只改 z 与类,**不**调 `element.focus()`;
+- **指针路径**(`pointerdown` 提升,`bindWindowRaise`)只改 z 与类,**不**调
+  `element.focus()`;
 - **程序路径**(`reveal()`,Dock 点击)才调 `element.focus()`.
 
-实现上让 `focus(id, options?: { takeDomFocus?: boolean })` 带上这个开关,默认
-`false`(指针路径用默认值),`reveal()` 传 `true`.这条是 §6 表格里"点击正文
-不夺焦点"的落地方式,别省.
+`bindWindowRaise` 也**不** `preventDefault`,不 `stopPropagation`--拖动与
+正文的默认行为都得原样收到.
 
-**状态转移**(§3.1 那张表的代码化,每个方法都是"改状态 + 调
-`applyGeometry`/`applyState`"):
+**状态转移**(§3.1 那张表的代码化,每个方法都是"改状态 -> `applyState` ->
+`applyGeometry`"**这个顺序**):先落地状态类,几何写入再按新状态决定"写四条
+行内属性"还是"清掉它们";反过来虽然也能出正确结果,但中间会有一帧
+`is-maximized` 已加,行内几何还没清的过渡态,不值得冒.
 
 ```ts
 setMinimized(id, minimized: boolean): void
@@ -888,12 +1083,20 @@ setMinimized(id, minimized: boolean): void
 setMaximized(id, maximized: boolean): void
     // 进入:restore ??= geometry;state='maximized'
     // 退出:geometry = restore ?? geometry;state='normal'
-setFullscreen(id, on: boolean): void      // 同 setMaximized,但用 'fullscreen'
+setFullscreen(id, on: boolean): void
+    // 同 setMaximized,但用 'fullscreen';从 maximized 进 fullscreen 时
+    // restore **不覆盖**(否则退出全屏会回到全屏尺寸而不是最大化前的尺寸)
 setClosed(id, closed: boolean): void      // 与 setMinimized 同形,state 用 'closed'
 setGeometry(id, next: Geometry): void     // 过 clampGeometry,写回 entry.geometry
 onDesktopResize(): void                   // 重算 desktop,所有 normal 窗口重新夹取;
                                           // maximized/fullscreen 只需重算 CSS 类
 ```
+
+`bind()` 里已经用同一个 `AbortController` 把 `window.resize` 挂到
+`onDesktopResize`(见 `bind()` 第 0 步),`dispose()` 随 signal 一起摘掉;
+`DslApp.onResize` 不需要改--它继续只负责 `renderController.resize()`.
+把这条监听放进 `WindowManager` 而不是 `DslApp`,是因为"重新夹取"要用到
+桌面尺寸与五个窗口的几何,那些状态只在这里.
 
 `dispose()`:对每个 entry `gesture.abort()` + `frame.dispose()` +
 把宿主**还回 `#app`**(不是留在已删除的窗口里).最后清 `entries` /
@@ -911,14 +1114,16 @@ onDesktopResize(): void                   // 重算 desktop,所有 normal 窗口
 | 规则 | 现状 | 去向 |
 | --- | --- | --- |
 | `#viewport { position:absolute; inset:0; z-index:0 }` | `layout.css` | `css/window.css`(它现在是"窗口层的底"),或留在 `panels.css` |
-| `.panel { position:absolute; z-index:10; display:flex; flex-direction:column; background/border/box-shadow }` | `layout.css` | **拆开**:`position/z-index` 删掉(几何归窗口);`display:flex` 等留成 `.window-body > *`;颜色/边框/阴影保留在这条规则里 |
+| `.panel { position:absolute; z-index:10; display:flex; flex-direction:column; background/border/box-shadow; overflow:hidden }` | `layout.css` | **拆开**:`position/z-index` 删掉(几何归窗口);`display:flex` 等留成 `.window-body > *`;**`overflow: hidden` 也要删掉**(裁切下沉到 `.window-body`);颜色/边框/阴影是否保留取决于 §11.1 B8 的拍板(窗口外壳已有一层边框/阴影,两层会叠) |
 | `#left-panel / #right-panel / #bottom-panel` 的 `top/left/right/bottom/width/height` | `layout.css` | 全删(几何由 JS 写).`#right-panel` 整个删除(B6) |
 | `.panel.collapsed *` | `layout.css` + `panels.css` | 全删(折叠语义不存在了) |
 | `.resize-handle` + `.resize-handle-{right,left,top}` | `layout.css` | 基类保留并搬到 `css/window.css`,三条方向类删除;新增八条 `[data-window-resize="..."]` 的 `cursor` 与命中区 |
 | `#app { --left-panel-width ... }` 与 `:root` 的 `--side-default-width` 等 | `base.css` | 全删(B7) |
-| `.window-header` / `.window-body` / `.window` / `.window-controls` / `.window-actions` | 新 | `css/window.css` |
+| `.window-header` / `.window-body` / `.window` / `.window-controls` / `.window-actions` | 新 | `css/window.css`.`.window { overflow: visible }`,`.window-body { overflow: hidden }`(B2) |
 | `#right-tabs` 全部规则,`.right-page[hidden]` | `panels.css` | 删除 |
-| `.example-menu` 的锚点与 `max-height` | `panels.css` | 改锚点(`.window-header` 需要 `position: relative`)与 `max-height`(E5) |
+| `.example-menu` 的锚点与 `max-height` | `panels.css` | 浮层节点从 `#left-panel > .panel-header` 移进 `.window-header`(见 §11.1 B2),锚点改成 `.window-header`(`position: relative`),`max-height` 改按窗口正文高度算(E5) |
+| `#snap-preview` | 新 | `pointer-events: none` + `aria-hidden`(漏了它会挡住桌面拖拽) |
+| `.window-header` 的高度 | 新 | `height: var(--window-header-height)`,由 `applyUiConfig` 从 `UI_CONFIG.window.headerHeight` 写入(唯一副本) |
 
 `css/window.css` 是新文件,**必须加进 `cssPalette.test.ts` 的 `CSS_FILES`**
 (§5.5 硬约束 1),否则新文件里的颜色不受色板约束.
@@ -962,28 +1167,32 @@ measureText 里那 15px 的 chrome(canvas 以外的边距).同一个词再加"�
 
 两个纯逻辑文件(`WindowGeometry.ts` 与 `WindowResize.ts`)刻意**不碰 DOM**:
 夹取,吸附,最大化换算,八向解释全部能在单测里穷举边界;`WindowFrame` 只管
-建结构,`WindowManager` 只管把结果写进 DOM.这条分工与 `RightSplitController`
-把 `computeSplitRatio` 导出成纯函数,`ViewPanel` 只建控件不订阅 EventBus 是
-同一手法.
+建结构,`WindowManager` 只管把结果写进 DOM.这条分工与 `ViewPanel` 只建控件,
+不订阅 EventBus 是同一手法:能在单测里穷举的部分不碰 DOM.
 
 ### 5.2 修改
 
 | 文件 | 改动 |
 | --- | --- |
-| `index.html` | 新增 `#window-layer` / `#dock` / `#snap-preview` 三个空宿主(§5.3);面板本体留原处,删三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]` 分隔条,右栏标签栏 `#right-tabs`(§2.2),外层空壳 `#right-panel`(§11.1 B6),并摘掉两个页容器身上的 `hidden`(§11.1 **B1**);`.window` 外壳**不写进 HTML**,由 `createWindowFrame` 建 |
-| `css/layout.css` | **删除**.三件事各有去向:三个面板的绝对定位 -> 窗口几何(§3.1);`.resize-handle` 基类与四向光标规则 -> **`.resize-handle` 类名保留**,连同八向光标一起搬进 `css/window.css`;`.panel` 的底色/边框/阴影 -> `css/panels.css`(或 `window.css` 的 `.window-body > *`) |
-| `css/window.css` | 新增(见上),含保留的 `.resize-handle` 与八向 `cursor`;`.window` 保持 `overflow: visible`,`.window-body` 负责裁切(**B2**) |
-| `css/panels.css` | 删 `.panel.collapsed` 组(57–66,830)与 `#right-tabs` 全部规则,`.right-page[hidden]`;示例浮层锚点改 `.window-header`,`max-height` 改按窗口正文算(E5);新增 `.window-body` 的 flex 列与 `.window-body > * { flex: 1; min-height: 0 }`(B5) |
-| `css/base.css` | **只删不加**:`--side-default-width` / `--footer-default-height` / `--collapsed-*` 与 `#app` 的三个派生变量(`--left/right-panel-width`,`--footer-height`)全部删除(B7,E3).**不新增 `--window-*`**:窗口是 JS 建的,没有"CSS 首帧"这回事 |
+| `index.html` | 新增 `#window-layer` / `#dock` / `#snap-preview` 三个空宿主(§5.3);面板本体留原处,删三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]` 分隔条,右栏标签栏 `#right-tabs`(§2.2),**"参数区/视图区"分隔条 `#right-splitter`**(§1.2 C14),外层空壳 `#right-panel`(§11.1 B6);**删掉三处面板自带的 `.panel-header`**(W6/B8:两个标题上移为窗口标题,`#example-menu` 与 `#formula-copy-hint` 分别改挂窗口标题栏的 `overlays` / `titleContent`);**把 `#view-controls` 从 `#right-page-params` 里挪出来当独立宿主**(§11.1 B10);`.window` 外壳**不写进 HTML**,由 `createWindowFrame` 建 |
+| `css/layout.css` | **删除**.三件事各有去向:`#left-panel` / `#right-panel` / `#bottom-panel` 的绝对定位 -> 窗口几何(§3.1);`.resize-handle` 基类与四向光标规则 -> **`.resize-handle` 类名保留**,连同八向光标一起搬进 `css/window.css`;`.panel` 的底色/边框/阴影 -> `css/panels.css`(或 `window.css` 的 `.window-body > *`).**`.panel` 那条规则搬走时不要带上 `overflow: hidden`**(裁切归 `.window-body`) |
+| `css/window.css` | 新增(见上),含保留的 `.resize-handle` 与八向 `cursor`;`.window { overflow: visible }`,`.window-body { overflow: hidden }` 负责裁切(**B2**);`.window-header { height: var(--window-header-height) }` |
+| `css/panels.css` | 删 `.panel.collapsed` 组(57–66,830)与 `#right-tabs` 全部规则,`.right-page[hidden]`,**`.right-splitter` 全部规则(156–185)**,**`#params-panel { flex: 0 0 var(--right-split-basis) }` 改成 `flex: 1; min-height: 0`**;示例浮层锚点改 `.window-header`,`max-height` 改按窗口正文算(E5);新增 `.window-body` 的 flex 列与 `.window-body > * { flex: 1; min-height: 0 }`(B5) |
+| `css/controls.css` | `#view-controls` 变成视图窗口的宿主:`flex: 1 1 auto` 保留,`min-height: var(--view-controls-min-height)` 保留(窗口太矮时它自己出滚动条);**注释里"高度由分隔条分配"那句要改**(分隔条不存在了) |
+| `css/base.css` | **只删不加**:`--side-default-width` / `--footer-default-height` / `--collapsed-*` / **`--right-split-basis`** 与 `#app` 的三个派生变量(`--left/right-panel-width`,`--footer-height`)全部删除(B7,E3,C14).窗口几何**仍不新增 `--window-*`**(窗口是 JS 建的,没有"CSS 首帧"这回事);唯一例外是 `--window-header-height`(§4.1) |
 | `css/diagnostics.css` | 高度基准随参数窗口变矮,`max-height: 34%` 是否合适要真机看过再定(B3) |
 | `css/editor.css` | **只改高度基准的来源,不改任何对齐规则**(§5.6 的清单).编辑器窗口的正文高度由 `.window-body` 给出,`#editor-panel { flex: 1; min-height: 0 }` 与 `#dsl-editor-box { height: 100% }` 原样保留 |
-| `src/config/uiConfig.ts` | `panel` 段收敛为 `split*` 三个比例;新增 `window` 段(窗口清单 / 默认几何的锚点描述 / 最小尺寸 / 吸附阈值 / 桌面余量 / 标题栏按钮清单,§4.1 与 E4) |
-| `src/ui/theme/applyUiConfig.ts` | 变量映射表**删掉**面板几何那几条(没有 `--window-*` 要写,见 E3) |
+| `src/config/uiConfig.ts` | `panel` 段**只留** `paramsMinHeight` / `viewControlsMinHeight`(CSS 消费),`splitMinRatio` / `splitMaxRatio` / `splitDefaultRatio` 删除(C14);新增 `window` 段(五个窗口的清单 / 默认几何的锚点描述 / 最小尺寸 / 吸附阈值 / 桌面余量 / 标题栏按钮清单,§4.1 与 E4) |
+| `src/ui/theme/applyUiConfig.ts` | 变量映射表**删掉**面板几何那几条(没有 `--window-*` 要写,见 E3)与 **`--right-split-basis`**,**新增 `--window-header-height`** 一条 |
+| `src/ui/theme/applyUiConfig.test.ts` | 删面板几何与 `--right-split-basis` 断言,新增 `--window-header-height` 的一致性断言 |
+| `src/testing/domStub.ts` | **旧稿漏了这个文件,不补 `WindowManager.test.ts` 跑不起来**:`StubElement` 加 `toggleAttribute`;`StubStyle` 加 `removeProperty`(几何写入用 `setProperty`/`removeProperty`,不再用 `cssText`);`hidden` / `inert` 按属性语义可读回.`getComputedStyle` 只认行内 `cursor` 这条现状不变 |
 | `src/app/DslApp.ts` | 见下面的接线清单 |
 | `src/ui/panels/PanelController.ts` | **删除**.职责被窗口态吸收:宽度/高度 -> 窗口几何(§3.1),折叠 -> 最小化/关闭(§3.3,§3.6) |
 | `src/ui/panels/PanelController.test.ts` | **删除**;两条有价值的断言迁进 `WindowManager.test.ts`(§8) |
-| `src/ui/panels/RightPanelTabs.ts` | **删除**(拆页后不存在).`#right-tabs` 与两个页容器的 `hidden` 写入点是它,删它的同时处理 §11.1 B1 |
+| `src/ui/panels/RightPanelTabs.ts` | **删除**(拆页后不存在).两个页容器的 `hidden` 写入点随它一起消失(§11.1 B1) |
 | `src/ui/panels/RightPanelTabs.test.ts` | **删除**;两条断言换对象继续守,见 §8 |
+| `src/ui/panels/RightSplitController.ts` | **删除**(W6/C14:参数与视图不再共用一栏高度,没有比例可管).`computeSplitRatio` 是它导出的纯函数,一起走 |
+| `src/ui/panels/RightSplitController.test.ts` | **删除**.没有替代物:`--right-split-basis` 这个写入点本身不存在了(§8 的"必须保留"清单同步去掉它) |
 
 **`DslApp.ts` 的具体接线**(逐条,照做):
 
@@ -998,10 +1207,10 @@ this.windowManager = new WindowManager(
     document.getElementById('snap-preview')!,
 );
 
-// start():窗口装配 + 右栏内部分割(标签页那两行删掉)
+// start():窗口装配(标签页与分栏那几行全删)
 this.windowManager.bind();          // 建 frame + 搬宿主 + 建 Dock + 初始焦点
-this.rightSplitController.bind(document.getElementById('app')!);   // 不变
 // 删:this.panelController = new PanelController(); panelController.bind(...);
+// 删:this.rightSplitController = new RightSplitController(); rightSplitController.bind(...);
 // 删:this.rightPanelTabs = new RightPanelTabs(...); rightPanelTabs.bind();
 
 // 过程入口:从"切页"改成"抬窗口"(§3.7)
@@ -1021,10 +1230,19 @@ this.windowManager.onGeometryChange(() => {
 });
 ```
 
-`#example-btn` / `#run-btn` **不需要在这里搬**:它们是"窗口清单里 source 那一项
-的 `actions`",由 `WindowFrame` 按 `UI_CONFIG` 组装时 append 进
-`.window-actions`(§4.4).`ExampleLoaderController` 与 `_wireEditor()` 拿这两个
-节点的时机(构造函数里 `getElementById`)不受影响,监听也照旧.
+`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint` **不需要在这里
+搬**:它们是"窗口清单里 source 那一项的 `actions` / `overlays`"与"objects 那一项
+的 `titleContent`",由 `WindowFrame` 按 `UI_CONFIG` 组装时 append 进
+`.window-actions` / `.window-header` / `.window-title`(§4.4).
+`ExampleLoaderController` / `FormulaCopyController` 与 `_wireEditor()` 拿这几个
+节点的时机(构造函数里 `getElementById`)不受影响,监听也照旧--但**节点必须在
+`new DslApp()` 之前都还在文档里**(它们现在分别在 `#left-panel` 与
+`#bottom-panel` 的 `.panel-header` 内,搬动发生在 `start()` 的
+`windowManager.bind()`).
+
+`DslApp` 的 `window.addEventListener('resize', this.onResize)` **保持不动**:
+窗口的重新夹取由 `WindowManager` 自己在 `bind()` 里挂的 `resize` 监听负责
+(§4.5 第 0 步),两条监听各管各的,不合并.
 
 **顺序上的两条约束**(错了会在启动时报"缺少结构"或量到 0):
 
@@ -1032,11 +1250,11 @@ this.windowManager.onGeometryChange(() => {
    但宿主的搬运发生在 `bind()` 里,也就是 `start()` 阶段,那时代码都已经拿到
    了节点引用--所以 `EditorLineNumbers` / `EditorHighlight` 的构造期度量
    (它们读 `#dsl-editor` 的字体)不受影响.
-2. `windowManager.bind()` 必须在 `rightSplitController.bind(#app)` **之前或
-   之后都行**,但**必须在 `processPanel` 构造之后**--`_openProcess` 会用到它.
-   推荐顺序:`windowManager.bind()` -> `rightSplitController.bind()` ->
-   `processPanel = new ProcessPanel(...)`,与现在的顺序一致,只把标签页那两行
-   换掉.
+2. `windowManager.bind()` 必须在 `processPanel` 构造**之前或之后都行**
+   (`_openProcess` 只在运行时用它,那时 `bind()` 早已完成);但 `processPanel`
+   必须在 `start()` 里建完,`KeyboardController` 与 `_openProcess` 都依赖它.
+   推荐顺序:`windowManager.bind()` -> `processPanel = new ProcessPanel(...)`,
+   `rightSplitController` 那一行整条删除.
 
 ### 5.3 构造方式:全程声明式(硬约束)
 
@@ -1058,19 +1276,21 @@ window: {
     windows: [
         {
             id: 'source',
-            title: '源码',
+            title: 'source code',           // 窗户标题沿用原面板标题(W6)
             hostId: 'left-panel',          // 已存在的元素,原样搬进窗口正文
             dock: { icon: '✎', label: '源码' },
-            // 默认几何是**锚点 + 夹取**,不是写死的数字:右列高度与中列宽度
-            // 都依赖桌面尺寸,由 WindowGeometry.defaultGeometry() 算出 px
-            // (见 §11.2 E4).h: { anchor: 'bottom', inset: 116 } 即 dH-116.
-            defaultGeometry: { x: 16, y: 16, w: 420, h: { anchor: 'bottom', inset: 116 } },
+            // 默认几何是**锚点 + 夹取**,不是写死的数字:列高与中列宽度
+            // 都依赖桌面尺寸,由 WindowGeometry.resolveDefaultGeometry() 算出 px
+            // (见 §11.2 E4).锚点的语义只有一条,写在 §4.1 的 AxisSpec 注释里.
+            defaultGeometry: { x: { at: 16 }, y: { at: 16 }, w: { at: 420 },
+                               h: { fraction: 0.68, of: 'usableHeight' } },
             minSize: { w: 300, h: 220 },
         },
-        { id: 'params',  title: '参数 / 视图', hostId: 'right-page-params', ... },
-        { id: 'process', title: '过程',        hostId: 'right-page-process', ... },
-        { id: 'objects', title: '对象',        hostId: 'bottom-panel', ... },
-    ],
+        { id: 'view',    title: '视图',      hostId: 'view-controls',         ... },
+        { id: 'params',  title: '参数',      hostId: 'right-page-params',     ... },
+        { id: 'process', title: '过程',      hostId: 'right-page-process',    ... },
+        { id: 'objects', title: '对象',      hostId: 'bottom-panel',          ... },
+    ],                                       // 数组顺序 = Dock 顺序 = 依赖顺序
     actions: [                                // 标题栏上的窗口按钮,顺序即显示顺序
         { id: 'minimize',   label: '最小化', glyph: '─' },
         { id: 'maximize',   label: '最大化', glyph: '▣' },
@@ -1083,57 +1303,30 @@ window: {
 字符字形进配置,不在 TS 里散落**字面量**(与 `UI_CONFIG.view.viewCube` 的
 `label` 同一处理;`DOM_ICONS` 那类"TS 里一堆字符常量"的写法不引入).
 
-装配 API 与现有控件同一副骨架(`element` / `get` / `on...` / `dispose`),
-具体形状:
-
-```ts
-// WindowFrame.ts -- 唯一的窗口结构入口
-export interface WindowFrameSpec {
-    readonly id: string;
-    readonly title: string;
-    readonly titleContent: readonly Child[];   // 标题里的额外内容(一期没有,留口)
-    readonly actions: readonly Child[];        // 标题栏动作,如"示例"/"RUN"(HTML 里的节点)
-    readonly controls: readonly WindowActionButton[];  // 窗口按钮,由 UI_CONFIG 生成
-    readonly handles: readonly WindowResizeDirection[];
-}
-export interface WindowFrameHandle {
-    readonly element: HTMLElement;
-    readonly header: HTMLElement;   // 拖动起手元素就是它的 .window-title
-    readonly body: HTMLElement;
-    readonly controls: ReadonlyMap<WindowActionId, ButtonHandle>;
-    dispose(): void;
-}
-export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle;
-
-// WindowManager.ts -- 状态与几何,不建结构
-export class WindowManager {
-    constructor(root: HTMLElement);
-    bind(): void;                                  // 按 UI_CONFIG 建 frame + 挂 Dock
-    /** 抬升并聚焦(唯一入口;`_openProcess` 与 Dock 点击都走这里). */
-    focus(id: string): void;
-    /** 显示并抬升:被最小化/关闭时先恢复可见,再抬升. */
-    reveal(id: string): void;
-    onGeometryChange(listener: (id: string) => void): () => void;
-    dispose(): void;
-}
-```
-
-三个要点:
+装配 API 与现有控件同一副骨架(`element` / `get` / `on...` / `dispose`).
+**签名只有一份,在 §4.4**;这里只重复三条最容易写错的约定,避免两处签名
+各自漂移(旧稿在这节又抄了一份不完全一样的 `WindowFrameSpec`,见 §11.2 E10):
 
 - `createWindowFrame` 建出 `.window` / `.window-header` / `.window-body` /
-  八根手柄,并把 `spec.actions` 里的**已存在节点**(如 `#run-btn`)原样 append
-  进去--不是按 innerHTML 重建一份.这样 `#run-btn` / `#example-menu` /
-  `#params-panel` 这些既有节点与其监听全部原样保留,`DslApp` 拿它们的方式不变.
-- 宿主节点(`#left-panel` / `#right-page-params` / `#right-page-process` /
-  `#bottom-panel`)由 `WindowManager` 从 `document` 取到后 `body.append(host)`;
-  宿主与其全部内容一行不改(§1.2).
+  八根手柄,并把 `spec.actions`(标题栏动作,如"示例"/"RUN"),
+  `spec.overlays`(标题栏浮层,如 `#example-menu`)与 `spec.titleContent`
+  (标题里的额外内容,如对象窗口的 `#formula-copy-hint`)里的**已存在节点**
+  原样 append 进去--不是按 innerHTML 重建一份.这样 `#run-btn` /
+  `#example-menu` / `#formula-copy-hint` / `#params-panel` 这些既有节点与其
+  监听全部原样保留,`DslApp` 拿它们的方式不变.
+- 宿主节点(`#left-panel` / `#view-controls` / `#right-page-params` /
+  `#right-page-process` / `#bottom-panel`)由 `WindowManager` 从 `document`
+  取到后 `body.append(host)`;宿主与其全部内容一行不改(§1.2).
+  `#view-controls` 这一条是 W6 新增的:它原先在 `#right-page-params` 内部,
+  现在是**视图窗口**的宿主,必须从参数页里挪出来(§11.1 B10).
 - `data-*` 属性统一走 `el()` 的 `attrs`(`el('section', { attrs: { 'data-window': id } })`),
   与 `evaluationDom.ts` / `rowDom.ts` 一致;不用 `innerHTML`,不拼字符串标记.
   唯一允许 `document.createElement` 的地方是 `WindowFrame.ts` 内部若碰到
   `el()` 覆盖不到的标签(现状里没有),且必须像 `evaluationDom.ts` 那样就地
   写明理由.
 
-于是 `index.html` 的改动收成"删三个按钮 + 加三个空宿主 + 右栏拆页":
+于是 `index.html` 的改动收成"删三个折叠按钮 + 三根分隔条 + 三层面板 header,
+加三个空宿主,把 `#view-controls` 提出来当宿主":
 
 ```html
 <div id="app">
@@ -1144,14 +1337,18 @@ export class WindowManager {
     <div id="snap-preview" aria-hidden="true"></div>
     <div id="dock" role="toolbar" aria-label="窗口"></div>
 
-    <!-- 四个正文宿主留在这里;启动时由 WindowManager 搬进各自的
-         .window-body,内容一行不改(只删折叠按钮与三根分隔条) -->
-    <aside id="left-panel" class="panel"> ... </aside>
-    <!-- 右栏原来那层 #right-panel 删除(见 §11.1 B6):
-         两个页容器各自成为"参数"/"过程"窗口的正文 -->
-    <div id="right-page-params" class="right-page"> ...参数 + 视图... </div>
+    <!-- 五个正文宿主留在这里;启动时由 WindowManager 搬进各自的
+         .window-body.面板本体内容一行不改,只:
+         ① 删三个 [data-panel-toggle] 与三根 [data-resize-panel];
+         ② 删三处面板自带的 .panel-header(W6/B8:标题上移为窗口标题);
+         ③ 把 #example-menu / #formula-copy-hint 摘出来交给窗口标题栏;
+         ④ 把 #view-controls 从 #right-page-params 里提出来(视图窗口宿主) -->
+    <aside id="left-panel" class="panel"> ...编辑器... </aside>
+    <!-- 右栏原来那层 #right-panel 删除(见 §11.1 B6) -->
+    <div id="right-page-params" class="right-page"> ...参数滑块 + 诊断... </div>
+    <section id="view-controls"></section>          <!-- 视图窗口宿主 -->
     <div id="right-page-process" class="right-page"> ...过程... </div>
-    <footer id="bottom-panel" class="panel"> ... </footer>
+    <footer id="bottom-panel" class="panel"> ...对象列表... </footer>
 </div>
 ```
 
@@ -1161,8 +1358,23 @@ export class WindowManager {
   两个 `min-height`)一个字符都不用改.
 - 标签栏 `#right-tabs` 与它下面的"过程/参数"两个按钮整块删除;
   `.right-page[hidden]` 的 `display:none` 规则随之删除(两页不再互相隐藏,
-  它们在不同窗口里),同时两个页容器身上的 `hidden` 属性也要摘掉
-  (**§11.1 B1**,这是最容易漏的一条:不摘就是"打开窗口一片空白").
+  它们在不同窗口里).
+  **注意 B1 的真实情况**:`index.html` 里两个页容器**本来就没有 `hidden` 初值**,
+  唯一写它的是 `RightPanelTabs` 自己(构造期 `_applyPages(DEFAULT_RIGHT_TAB)`).
+  所以"删 `RightPanelTabs`"这一步本身就消除了全部写入者,不需要去摘一个不存在
+  的属性;旧稿把 B1 写成"必须显式摘掉 `hidden`"是不准确的(§11.1 B1 已订正).
+  唯一残留风险是 vite 开发态 HMR 不整页刷新时的旧 DOM,刷新即消失.
+- **`#example-menu` 必须在阶段 1 显式搬家**:它现在在
+  `#left-panel > .panel-header` 内,而窗口化把它画在窗口标题栏下(§5.4).
+  按"面板本体一行不改"照做会把它留在窗口正文里,再改 CSS 锚点就直接废掉浮层
+  (§11.1 B2).
+- **三个面板自带的 `.panel-header` 已按 W6/B8 拍板:全删**.窗口标题栏给出
+  `source code` / `参数` / `视图` / `过程` / `对象`,面板里不再留第二层标题
+  (`视图` 那条 header 更是直接变成了一个窗口标题).`.panel` 的 border/阴影也
+  交给窗口外壳那一层,不再叠两层(§11.1 B8).
+- **`#view-controls` 要提出来**:它原先在 `#right-page-params` 内部,是"参数页
+  下半块";现在是**视图窗口**的宿主,必须成为 `#app` 下的独立宿主(§11.1 B10).
+  `createViewPanel(#view-controls)` 的调用方式不变,变的只是它在树里的位置.
 
 三个要点:
 
@@ -1171,13 +1383,12 @@ export class WindowManager {
   缩进,不搬动"的约定守着它(§7 保留清单).面板本体留在原处,只由 JS 改挂载
   点,是最小改动且不触碰那条约定;窗口外壳这一层**没有**这类约束,所以它必须
   声明式地建.
-- **宿主节点由谁 append**:`WindowManager` 按 `hostId` 取到 `.panel`,再
-  `frame.body.append(host)`.`.panel` 与其内部一切一行不改,§1.2 那批控制器
-  照旧通过 `getElementById` 拿节点.
-- **删除清单**:三个 `[data-panel-toggle]` 按钮(在三个 `.panel-header` 里)
-  与三根 `[data-resize-panel]` 分隔条.删掉后 `.panel-header` 就不再是折叠
-  语义的承载者,源码面板的标题栏动作(示例 / RUN)改挂窗口标题栏的
-  `.window-actions`(见 §5.2).
+- **宿主节点由谁 append**:`WindowManager` 按 `hostId` 取到宿主(可能是
+  `.panel`,也可能是 `#view-controls`),再 `frame.body.append(host)`.宿主与其
+  内部一切一行不改,§1.2 那批控制器照旧通过 `getElementById` 拿节点.
+- **删除清单**:三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]`
+  分隔条,三处 `.panel-header`,`#right-splitter`,加上 `#example-menu` /
+  `#formula-copy-hint` 的**搬迁**与 `#view-controls` 的**上提**.
 
 窗外壳由 JS 生成带来的一个**新收益**要写清楚:`.window` 之间的层叠关系与
 `data-window` 连接全部由注册表给出,`index.html` 里不再有"三个面板的复制粘贴
@@ -1193,34 +1404,46 @@ export class WindowManager {
 表就是标记的真相源**,不在 HTML 与 JS 里各留一份:
 
 ```text
-section.window[data-window="<id>"][tabindex="-1"]
+section.window[data-window="<id>"][tabindex="-1"][role="region"]
 ├── header.window-header
 │   ├── span.window-title            ← 拖动起手元素(bindDragGesture)
-│   │   └── (titleContent,一期为空)
+│   │   └── (titleContent:对象窗口放 #formula-copy-hint,其余为空)
 │   ├── div.window-actions           ← 面板自带的动作(示例 / RUN),由调用方传入
 │   ├── div.window-controls          ← 最小化 / 最大化 / 全屏 / 关闭
-│   └── (actions 里的浮层,如 #example-menu)
+│   └── (overlays:标题栏浮层,如 #example-menu)
 ├── div.window-body
 │   └── <host>                        ← #left-panel / #right-page-params /
 │                                       #right-page-process / #bottom-panel
-├── div.resize-handle[data-window-resize="n|s|e|w|ne|nw|se|sw"]  × 8
-└── div.window-snap                   ← 半屏/全屏吸附高亮的落点
+└── div.resize-handle[data-window-resize="n|s|e|w|ne|nw|se|sw"]  × 8
 ```
 
+吸附高亮**不是**每个窗口里的元素:它是窗口层里的**一个** `#snap-preview`
+(§3.5),由 `SnapPreview.ts` 显示/隐藏.旧稿在这张表里画了一个
+`div.window-snap`,与 §3.5/§4.5 的构造参数冲突,已删(§11.2 E11).
+
 - **拖动起手就是 `.window-title` 元素本身**,不需要"覆盖整个标题栏的拖动层".
-  理由:标题里只有文字(一期 `titleContent` 为空),没有需要点击的按钮,
+  理由:标题里只有文字(对象窗口多一个只读的 `#formula-copy-hint`,仍然不可点),
   `bindDragGesture` 的 `preventDefault()` 不会踩到任何交互;`.window-actions`
   与 `.window-controls` 是它的**兄弟**而非子节点,天然不在拖动区内,
   `closest('button')` 这类运行期判断可以直接删掉.
 - 类名分工:`window-actions` 是**面板动作**(示例 / RUN),`window-controls` 是
   **窗口按钮**(最小化 / 最大化 / 全屏 / 关闭).两者不同名,避免"动作"一词
   同时指两件事.
-- `tabindex="-1"` 让窗口可被脚本聚焦(`reveal()` 的落点,§3.7),但不进 Tab 序.
-- `.window-body` 是 `display: flex; flex-direction: column; min-height: 0`(窗口
-  正文的确定高度由它给出),里面那个宿主由 `.window-body > * { flex: 1;
-  min-height: 0 }` 拉满--这是 §11.1 **B5** 的一条,漏了宿主会塌成 0 高.
+- **`overlays` 是 `.window-header` 的直接子节点**,不在 `.window-actions` 里
+  (那一层是按钮行),更不在 `.window-body` 里(会被正文的 `overflow: hidden`
+  切掉,§11.1 B2).
+- `tabindex="-1"` 让窗口可被脚本聚焦(`reveal()` 的落点,§3.7),但不进 Tab 序;
+  `role="region"` + `aria-labelledby` 指向 `.window-title` 给读屏一个名字.
+  窗口化顺手把 `#right-page-*` 的 `role="tabpanel"` 删掉--标签页不存在了,
+  留着就是指向空气的语义.
+- `.window-body` 是 `display: flex; flex-direction: column; min-height: 0;
+  overflow: hidden`(窗口正文的确定高度与裁切都由它给出),里面那个宿主由
+  `.window-body > * { flex: 1; min-height: 0 }` 拉满--这是 §11.1 **B5** 的
+  一条,漏了宿主会塌成 0 高.
+- `.window` 自身 `overflow: visible`(B2),窗口间的层叠靠 `z-index`
+  (`focus()` 独占写入),不靠 DOM 顺序.
 
-### 5.5 样式契约(必须遵守现有两条硬约束)
+### 5.5 样式契约(必须遵守现有两条硬约束,外加一条例外)
 
 1. **颜色单一来源**:`css/window.css` 里**不允许**出现任何颜色字面量,一律
    `var(--...)`;新增的窗口专用色(标题栏激活底,吸附高亮)在 `css/base.css`
@@ -1232,6 +1455,13 @@ section.window[data-window="<id>"][tabindex="-1"]
    (窗口是 JS 建的,不存在"CSS 首帧",这条与现有 `panel` 的做法刻意不同,
    理由见 §11.2 E3).CSS 只负责 `.window` / `.window-body` / `.resize-handle`
    的样式与光标,不写 `left/top/width/height` 的具体数字.
+3. **唯一的例外是标题栏高度**:`UI_CONFIG.window.headerHeight` 经
+   `applyUiConfig` 写成 `--window-header-height`,由 `css/window.css` 消费
+   (`height: var(--window-header-height)`),并由 `applyUiConfig.test.ts`
+   按现有方式锁一致性.理由:`headerMinVisible` 的夹取要用这个数(§3.4),
+   而它在 CSS 里也必须可读;放两份却没有守卫,将来改一处会出现"标题栏被
+   夹到只剩半行".这与 `--code-gutter-width` 的处理同类,不违反第 2 条
+   (那是几何,这是样式常量).
 
 ### 5.6 源码高亮层的定位契约(动窗口前必须先读这节)
 
@@ -1299,7 +1529,7 @@ section.window[data-window="<id>"][tabindex="-1"]
 | 拖动窗口时指针经过其它窗口 | `pointer-events` 只在拖动中的窗口上保留,其余照常;不触发悬停样式 |
 | 窗口缩到比正文最小高度还小 | 夹在最小尺寸上,正文内部自己出滚动条(现有 `#params-panel` / `#view-controls` 的 `min-height` 与滚动规则继续生效) |
 | 编辑器窗口被缩放 | 高亮层与行号都靠 `ResizeObserver` 补同步,尺寸变化本来就已覆盖;但**必须保证窗口的隐藏态不用 `display: none`**(见下两行) |
-| 右栏"参数区/视图区"分割 | `RightSplitController` 的基准是 `#right-page-params` 的实际高度,窗口化后它就是"参数"窗口正文高度,逻辑不需要改;窗口太矮时两条 `min-height` 先夹住,与现在一致 |
+| 参数与视图两个窗口 | 各自独立,没有分隔条可拖;参数窗口太矮时 `#params-panel` 自己出滚动条,视图窗口太矮时 `#view-controls` 自己出滚动条(两条 `min-height` 保留) |
 | 点条目行末的"过程" | 走 `WindowManager.reveal('process')`(§3.7):被最小化/关闭先恢复,再抬升聚焦;不最大化,不改几何,不碰参数窗口 |
 | 示例浮层 | 锚点从 `.panel-header` 移到 `.window-header`;`max-height` 按窗口正文高度而不是 `100vh` 算,避免浮层超出窗口 |
 | 窗口最小化后再点 Dock | 回到原几何;若最小化前是最大化状态,回到最大化(`restore` 保留) |
@@ -1315,46 +1545,70 @@ section.window[data-window="<id>"][tabindex="-1"]
 
 每期都是可独立验收的一小步,前一期不通过不进下一期.
 
-### 阶段 0:几何纯函数(零 DOM 风险)
+### 阶段 0:几何纯函数 + 测试基建(零 DOM 风险)
 
 **内容**:`WindowGeometry.ts`(夹取 / 最大化换算 / 吸附判定 /
-`defaultGeometry(desktop, spec)` 锚点换算)+ 单测.
+`resolveDefaultGeometry(desktop, spec, resolved)` 锚点换算)+ 单测;
+顺手把 `src/testing/domStub.ts` 缺的 API 补上(`toggleAttribute`,
+`StubStyle.removeProperty`),否则阶段 1 的 `WindowManager.test.ts` 跑不起来.
 
 **验收**:边界穷举用例全绿:窗口比桌面大,桌面比最小尺寸小,负位移,吸附
-阈值开闭,最大化往返几何一致,**以及四个窗口在 1280×800 / 1920×1080 下的
-默认几何互不重叠,不越界**(§2.1 的断言是纯函数用例,不需要打开浏览器).
+阈值开闭,最大化往返几何一致,**以及五个窗口在 1280×800 / 1920×1080 下的
+默认几何互不重叠,不越界,且五个窗口的底边线同为 `dH-116`**
+(§2.1 的断言是纯函数用例,不需要打开浏览器).两组期望值就是 §4.1 末尾
+那张表(注意 `source`/`params` 用 `fraction`,`view`/`process` 用 `after`,
+两列的 `y` 相同则 `h` 也相同).
 
 **为何先做**:这一步没有任何 DOM 与样式风险,却把最容易算错的几个公式
 (含 E4 的锚点换算)先钉死.后面阶段都是在它之上接线.
 
-### 阶段 1:窗口骨架,拆页与焦点
+### 阶段 1:窗口骨架,Dock 最小版,拆三页与焦点
 
-**内容**:`#window-layer`,四个 `.window` 包装,`css/window.css`,窗口
-标题栏与四个窗口按钮,拖动(标题栏),z-order 与焦点,`WindowManager` 接管
-`DslApp` 的装配/释放;**拆页**(§2.2:删除 `RightPanelTabs`,把
-`#right-page-params` / `#right-page-process` 分别挂进两个窗口,`_openProcess`
-改走 `reveal()`,并处理 §11.1 的 **B1/B2/B5/B6**);删除 `PanelController`
-与 `#right-panel`.**缩放,吸附,Dock 暂不做**(窗口用默认几何,关掉就回不来,
-先只做最小化,或给一个临时的"全部还原"按钮).
+这一阶段本身拆成三小步,**每步结束后 `npm test` 都必须全绿**;不要一次
+把 HTML/CSS/装配层与三个控制器的删除同时改完(旧稿把几件事压成一步,
+是这一期最大的返工来源):
 
-**验收**:真机(浏览器)上:四个窗口可拖动,可提升,可最小化/还原;空桌面
-处能转 3D 视角;编辑器输入/行号/高亮/参数联动全部照常;**示例菜单能完整展开
-而不被窗口切掉**(B2);**参数窗口与过程窗口打开后都有内容**(B1);
-从对象列表点"过程"能让过程窗口可见并到最前;`npm test` 与 `npm run typecheck`
-全绿.
+```text
+1a  包窗口:#window-layer / .window / css/window.css / 拖动 / 焦点 / 几何
+    -- PanelController / RightPanelTabs / RightSplitController 暂不删,
+       分栏与标签页照旧,五个窗口先按默认几何摆着
+1b  拆三页:删 RightPanelTabs 与 RightSplitController,把参数 / 视图 / 过程
+    分别进三个窗口(视图窗口用 #view-controls 当宿主),_openProcess 走 reveal()
+1c  删 PanelController 与 #right-panel,收掉残留断言
+```
+
+**内容**:`#window-layer`,五个 `.window` 包装,`css/window.css`,窗口
+标题栏与标题栏上的四个窗口按钮,拖动(标题栏),z-order 与焦点,`WindowManager` 接管
+`DslApp` 的装配/释放;**Dock 的"最小版"**(每个窗口一个按钮 + 还原 +
+"全部还原",不做吸附/磁吸);**拆三页**(§2.2:删除 `RightPanelTabs` 与
+`RightSplitController`,把 `#right-page-params` / `#view-controls` /
+`#right-page-process` 分别挂进三个窗口,`_openProcess` 改走 `reveal()`,
+并处理 §11.1 的 **B2/B5/B6/B8/B10**);删除 `PanelController`,`#right-panel`
+与 `#right-splitter`.**缩放与吸附暂不做**.
+
+**Dock 最小版为什么必须在这一期**:窗口能最小化/关闭,就必须有回来的入口.
+旧稿把 Dock 全放到阶段 3,于是阶段 1 的验收句里出现了"可最小化/还原"却
+没有任何还原入口--这不是可验收的状态.
+
+**验收**:真机(浏览器)上:五个窗口可拖动,可提升,可最小化/还原;**关掉
+任意窗口后能从 Dock 恢复**;空桌面处能转 3D 视角;编辑器输入/行号/高亮/参数
+联动全部照常;**示例菜单能完整展开而不被窗口切掉**(B2);**参数 / 视图 / 过程
+三个窗口打开后都有内容**;从对象列表点"过程"能让过程窗口可见并到最前;
+`npm test` 与 `npm run typecheck` 全绿.
 
 **高亮层是这一阶段的红线**:编辑器窗口是唯一"内容对容器几何敏感"的窗口,
 `editorStyles.test.ts` 与 `EditorHighlight.test.ts` 必须保持绿;它们一红就说明
 动到了 §5.6 的五条对齐轴,先回退那一步再继续,不要在红的基线上往下走.
 
 **为什么把"拆页"放进阶段 1 而不是单独一期**:拆页本身就要求窗口已经存在
-(两页要各有各的窗口),而 `RightPanelTabs` 与 `PanelController` 又有共享的
-断言文件(§7),分两次动反而要动两遍测试.这一阶段结束后**新旧结构就切换完
-毕**,后面三个阶段都只是加交互能力.
+(三页要各有各的窗口),而 `RightPanelTabs` / `RightSplitController` /
+`PanelController` 又各有共享的断言文件(§8),分几次动反而要动几遍测试.
+按上面的 1a/1b/1c 走,这一阶段结束后**新旧结构就切换完毕**,后面几个阶段
+都只是加交互能力.
 
 **风险**:这是唯一会同时触到 HTML/CSS/装配层的阶段,最大风险是"某个控制器
-拿不到节点".缓解:先只改 DOM 包装与样式,一次性跑通 `DslApp` 的全部入口,
-再开始拆 `PanelController` 与 `RightPanelTabs`.
+拿不到节点".缓解就是上面的 1a/1b/1c:先只改 DOM 包装与样式,一次性跑通
+`DslApp` 的全部入口,再开始拆三个旧控制器.
 
 ### 阶段 2:调整窗口大小 + 最大化/全屏
 
@@ -1363,23 +1617,28 @@ section.window[data-window="<id>"][tabindex="-1"]
 机制仍走 `bindDragGesture`(§3.4),不新写手势实现.
 
 **验收**:每个窗口八个方向都能拖动且夹在最小尺寸上;西/北方向拖动时窗口
-"左边跟着走"而不是只往右长;最大化->还原的几何与最大化前逐像素一致;
+"左边跟着走"而不是只往右长;**最大化/全屏真的铺满**(进入这两种态时四条行内
+几何必须被清掉,否则行内属性压过 `.is-maximized { inset: 0 }`,表现为
+"点了没反应",见 §11.2 E9);最大化->还原的几何与最大化前逐像素一致;
 全屏按 `Esc` 能退出;窗口标题栏在任何拖动下都没被拖出桌顶;
 `WindowResize.test.ts` 的纯函数用例全绿.
 
-### 阶段 3:Dock 与吸附
+### 阶段 3:吸附与磁吸
 
-**内容**:`Dock.ts`,吸附高亮,半屏/最大化吸附,窗口间磁吸,"全部还原".
+**内容**:`SnapPreview.ts`,半屏/最大化吸附,窗口间磁吸;Dock 在这一期只补
+"吸附预览"与焦点联动,按钮与"全部还原"在阶段 1 已经做完.
 
-**验收**:四个窗口关光后能从 Dock 逐个恢复;拖动到左/右/上边缘的预览与落地
-结果一致;磁吸不会在窗口之间反复抖动.
+**验收**:拖动到左/右/上边缘的预览与落地结果一致;磁吸不会在窗口之间反复
+抖动;预览层不拦截指针(`pointer-events: none`).
 
 ### 阶段 4:收尾与回归
 
-**内容**:`PanelController` / `RightPanelTabs` 残留清理(含 `#right-tabs` 与
+**内容**:`PanelController` / `RightPanelTabs` / `RightSplitController` 残留清理
+(含 `#right-tabs`,`#right-splitter`,`--right-split-basis`,
 `.right-page[hidden]` 的样式回收),`css/layout.css` 删除,文档与 README
 同步(布局章节,`UI_CONFIG` 章节,`docs/equation-solving-process.md` 的
-"右栏标签页"口径),测试补齐(§7),真机回归(§8).
+"右栏标签页 / 参数区与视图区"口径--那两处的前提都被 W6 推翻了),测试补齐
+(§8),真机回归(§9).
 
 ### 阶段 5(暂缓,W3):键盘窗口管理
 
@@ -1388,7 +1647,7 @@ section.window[data-window="<id>"][tabindex="-1"]
 - 进现有 `KeyboardController` 的**唯一键盘出口**,不另绑 `keydown`.
 - 建议绑定:`Alt+方向键` 把焦点窗口按磁吸步长移动;`Alt+M` 最小化,
   `Alt+Enter` 最大化,`Alt+F` 单窗口全屏,`Alt+Tab` 在可见窗口间轮换焦点,
-  `Alt+1..4` 直取四个窗口(源码 / 参数 / 过程 / 对象);`Esc` 退出全屏
+  `Alt+1..5` 直取五个窗口(source code / 视图 / 参数 / 过程 / 对象);`Esc` 退出全屏
   (这条一期就要做,它属于全屏的出口而不是窗口管理).
 - 前提是先定义"窗口快捷键是否在编辑器获得焦点时生效"--`KeyboardController`
   现在对 textarea 有明确的键位策略,窗口快捷键必须与它对齐,否则 `Alt+方向键`
@@ -1402,22 +1661,25 @@ section.window[data-window="<id>"][tabindex="-1"]
 
 | 文件 | 锁什么 |
 | --- | --- |
-| `src/ui/desktop/WindowGeometry.test.ts` | 夹取边界,最大化往返,吸附判定(纯函数,穷举) |
-| `src/ui/desktop/WindowFrame.test.ts` | **DOM 契约**(§5.4):`.window` / `.window-header` / `.window-title` / `.window-actions` / `.window-controls` / `.window-body` / 八根 `[data-window-resize]` 齐全;传入的既有节点(如 `#run-btn`)是**被搬进去**而不是被重建;窗口按钮的 `aria-label` 来自 `UI_CONFIG.window.actions`.这条测试是"标记真相源在 TS"的守卫 |
-| `src/ui/desktop/WindowManager.test.ts` | 焦点/z-order 单调;最小化->还原回原几何;关闭后 `aria-hidden` 与 Dock 态;三种状态转移的分支;`reveal()` 对被最小化/关闭的窗口先恢复再抬升,对可见窗口只抬升;`dispose()` 复位(照搬 `PanelController.test.ts` 的桩式写法,它已经证明 `bindDragGesture` 能在 DOM 桩里完整走一遍拖动) |
-| `src/ui/desktop/WindowResize.test.ts` | 八个方向的"增量 -> 几何改变"解释(纯函数),以及**西/北方向同时动 `x/w`**,单轴方向只动一条,角 = 两轴之并这三条;最小尺寸与 `EDGE_KEEP` 夹取 |
-| `src/ui/desktop/Dock.test.ts` | Dock 按钮由清单生成(不是手写);按状态分派的点击语义;激活态跟随焦点 |
+| `src/ui/desktop/WindowGeometry.test.ts` | 夹取边界,最大化往返,吸附判定(纯函数,穷举);**五个窗口在两组视口下的默认几何:x 不重叠,不越界,底边线同为 `dH-116`,两条 `after` 的左右列对称**(§4.1 的期望值表) |
+| `src/ui/desktop/WindowFrame.test.ts` | **DOM 契约**(§5.4):`.window` / `.window-header` / `.window-title` / `.window-actions` / `.window-controls` / `.window-body` / `role="region"` / 八根 `[data-window-resize]` 齐全;传入的既有节点(`#run-btn`,`#example-menu`,`#formula-copy-hint`)是**被搬进去**而不是被重建,且 `#example-menu` 落在 `.window-header` 而不是 `.window-body`,`#formula-copy-hint` 落在 `.window-title`;窗口按钮的 `aria-label` 来自 `UI_CONFIG.window.actions`.这条测试是"标记真相源在 TS"的守卫 |
+| `src/ui/desktop/WindowManager.test.ts` | 焦点/z-order 单调;**拖动(几何写入)不会清掉 `z-index`**(拖动一帧后 `style.zIndex` 仍是焦点值,§11.2 E8);**进入 maximized/fullscreen 会清掉四条行内几何**,退出时按 `restore` 写回(§11.2 E9);最小化->还原回原几何;关闭后 `aria-hidden`/`inert` 与 Dock 态;五种状态转移的分支;`focus(id)` 默认不夺 DOM 焦点,`reveal()` 才夺(§3.2);`reveal()` 对被最小化/关闭的窗口先恢复再抬升,对可见窗口只抬升;`dispose()` 复位并把宿主还回 `#app`(照搬 `PanelController.test.ts` 的桩式写法,它已经证明 `bindDragGesture` 能在 DOM 桩里完整走一遍拖动,包括给手柄手工写 `style.cursor`) |
+| `src/ui/desktop/WindowResize.test.ts` | 八个方向的"增量 -> 几何改变"解释(纯函数),以及**西/北方向同时动 `x/w`**,单轴方向只动一条,角 = 两轴之并这三条;`canStart` 在 `state !== 'normal'` 时返回 false(用桩的 `getState`);最小尺寸与 `EDGE_KEEP` 夹取 |
+| `src/ui/desktop/Dock.test.ts` | Dock **五个**按钮由清单生成(不是手写),顺序与 `UI_CONFIG.window.windows` 一致;按状态分派的点击语义;激活态跟随焦点 |
 | `src/ui/editor/editorStyles.test.ts`(扩写,不是新建) | §5.6 的四条新守卫:高亮层与 textarea 的 `font-*`/`line-height`/`tab-size`/`padding` 逐项相等;`#dsl-editor.is-highlighted + #dsl-editor-highlight` 相邻兄弟选择器存在;`#dsl-editor-highlight` 是 `inset: 0` + `overflow: hidden`;`css/window.css` 的隐藏态不含 `display: none` |
+| `src/ui/desktop/desktopHosts.test.ts`(新建,可选但推荐) | 纯文本解析 `index.html`:每个 `UI_CONFIG.window.windows[].hostId` 都能在 HTML 里找到对应 id,且 `index.html` 里**没有任何 `.window` 结构**.这是一条不需要浏览器的守卫,堵住"配置与 HTML 漂移"(§11.1 B9) |
 
 **改写**:
 
 | 文件 | 改动 |
 | --- | --- |
 | `src/ui/panels/PanelController.test.ts` | 删除;其中"折叠态只有一个状态源 + 一个写入点""`dispose` 先复位 DOM"两条**有价值的断言迁进 `WindowManager.test.ts`** |
-| `src/ui/panels/RightPanelTabs.test.ts` | **整份删除**(`RightPanelTabs` 不存在了).其中两条断言换个对象继续守:`index.html` 的页容器不写 `hidden` 初值 -> 改成"`index.html` 里没有 `.window` 结构";`.panel.collapsed #right-tabs` 的隐藏清单 -> 改成"`.right-page` 不再有 `[hidden]` 规则"(防止有人把标签页逻辑残留下来) |
+| `src/ui/panels/RightPanelTabs.test.ts` | **整份删除**(`RightPanelTabs` 不存在了).其中两条断言换个对象继续守:页容器不写 `hidden` 初值 -> 归到上面那条 `index.html` 解析测试("没有 `.window` 结构" + hostId 存在);`.panel.collapsed #right-tabs` 的隐藏清单 -> 改成"`.right-page` 不再有 `[hidden]` 规则"(防止有人把标签页逻辑残留下来) |
+| `src/ui/panels/RightSplitController.test.ts` | **整份删除**(W6/C14:参数与视图已经拆成两个窗口).没有替代物可迁:`computeSplitRatio`,`--right-split-basis`,`#right-splitter` 三者一起消失.要防的是"有人把分栏逻辑加回来",归到上面那条 `index.html` 解析测试(断言 `#right-splitter` 与 `data-split-page` 都不存在) |
 | `src/ui/process/ProcessPanel.test.ts` | `refreshEcho()` 的触发点从"切回过程页"变成"参数值变化",需要确认它现在按哪个入口测(§3.7 第三条) |
 | `src/ui/theme/cssPalette.test.ts` | `CSS_FILES` 加 `window.css`,删 `layout.css` |
-| `src/ui/theme/applyUiConfig.test.ts` | 删掉 `--side-default-width` / `--footer-default-height` / `--collapsed-*` 那批断言与 `base.css` 兜底一致性检查(几何不再走 CSS,见 E3);`UI_CONFIG.panel` 的上下限顺序断言(`min ≤ default ≤ max`)保留 |
+| `src/ui/theme/applyUiConfig.test.ts` | 删掉 `--side-default-width` / `--footer-default-height` / `--collapsed-*` / **`--right-split-basis`** 那批断言与 `base.css` 兜底一致性检查(几何不再走 CSS,见 E3/C14);**新增 `--window-header-height` 的一致性断言**;`UI_CONFIG.panel` 里只剩两个最小高度,`split*` 的上下限顺序断言随之删除 |
+| `src/testing/domStub.ts` | **必须扩写**(旧稿没列):`StubElement.toggleAttribute`;`StubStyle.removeProperty`;`hidden` / `inert` 属性可读回.不补的话 `WindowManager.test.ts` 连第一次 `applyState` 都过不去 |
 
 **必须保留,且新加入"不许变红"清单的既有契约**:
 
@@ -1425,8 +1687,8 @@ section.window[data-window="<id>"][tabindex="-1"]
   `src/ui/editor/EditorHighlight.test.ts`(滚动同步 / 结构缺失即报错).这两条
   是高亮层唯一的自动守卫,窗口化把它们从"重要"升级为"阶段 1 的红线":它们一红
   就说明动到了 §5.6 的东西,必须先解决再继续.
-- `RightSplitController.test.ts`(分割比例),`widgets.test.ts`,以及全部 WASM
-  相关的解析/编译/渲染测试.
+- `widgets.test.ts`,以及全部 WASM 相关的解析/编译/渲染测试.
+  (`RightSplitController.test.ts` 不在此列:它随控制器一起删除,见上面的"改写"表.)
 
 ### 8.1 测试策略:什么能靠单测,什么只能真机
 
@@ -1437,15 +1699,20 @@ DOM 桩(`src/testing/domStub.ts`)上,它**不解析样式表,不做布局**:
 `element.style.cursor`,这就是 `PanelController.test.ts` 要在桩里手工
 `handle.style.cursor = 'ew-resize'` 的原因).
 
+两个前提要在阶段 0 先补:①桩现在**没有** `toggleAttribute`(`applyState` 必用)
+与 `removeProperty`(几何清空必用);②几何一律走 `setProperty` /
+`removeProperty`,**不要**用 `style.cssText`--`cssText` 在真 DOM 里会清空整个
+行内声明块(把 `z-index` 一起清掉),在桩里也只是一个普通属性,两条路都不可断言.
+
 所以分工是:
 
 | 能靠单测(而且应当写) | 只能真机 |
 | --- | --- |
 | `WindowGeometry` / `WindowResize` 的全部算术:夹取,最大化,吸附判定,锚点换算,八向映射(纯函数,穷举边界) | CSS 是否真的让 `.window` / `.window-body` / 宿主填满高度(B5) |
-| 状态机:四态转移,`restore` 往返,`reveal()` 的"先恢复可见再抬升",焦点下移,z 单调递增 | 编辑器高亮层与行号的对齐(§5.6) |
-| DOM 契约:标题栏/正文/八根手柄齐全,既有节点是搬进来的 | flex / `min-height: 0` / `overflow` 的实际表现 |
+| 状态机:五态转移,`restore` 往返,`reveal()` 的"先恢复可见再抬升",`focus(takeDomFocus)` 的两条路径,焦点下移,z 单调递增 | 编辑器高亮层与行号的对齐(§5.6) |
+| DOM 契约:标题栏/正文/八根手柄齐全,`overlays` 落在标题栏,既有节点是搬进来的 | flex / `min-height: 0` / `overflow` 的实际表现 |
 | Dock 按钮由清单生成,激活态跟随焦点 | 吸附预览的观感,拖动跟手性 |
-| `classList` / `aria-*` / `hidden` 的写入(`applyState` / `applyGeometry` 可断言类名与行内 `style.cssText`) | `cursor` 是否八向都对(桩不解析 CSS) |
+| `classList` / `aria-*` / `inert` 的写入,以及四条几何属性(`applyState` / `applyGeometry` 断言类名与 `style.getPropertyValue('left'/'top'/'width'/'height')`;`z-index` 由 `focus` 写,拖动后仍应存在) | `cursor` 是否八向都对(桩不解析 CSS) |
 
 **拖动路径可以在桩里跑**:`PanelController.test.ts` 已经证明
 `bindDragGesture` 能在桩里走完整套(桩实现了 `setPointerCapture` 的重定向语义,
@@ -1463,7 +1730,8 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 
 **真机回归清单**(浏览器,建议 1280×800 与 1920×1080 各一遍):
 
-1. 四个窗口默认几何互不重叠,不越界,Dock 不被窗口压住.
+1. 五个窗口默认几何互不重叠,不越界,**底边线都在 Dock 之上**(五个窗口的
+   底边应当齐平),Dock 不被窗口压住.
 2. 空桌面处拖拽转视角,滚轮缩放,右键平移全部照常(证明 `pointer-events`
    分层没做错).
 3. 编辑器:**高亮层逐项核对**(这是本方案最该慢慢看的一条,方法见下)--
@@ -1471,13 +1739,17 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
    滚到最底部与最右端,然后确认:着色文字与光标/选区始终重合(尤其**右下角**,
    当年那 15.1px 的偏差就是在那里暴露的);行号与源码行严格对齐;IME 候选框
    贴在光标处;示例菜单开合与 `Esc` 关闭,`RUN` 生效.
-4. 参数窗口:滑块拖动实时刷新 3D;"参数区/视图区"上下分割条在新高度下仍跟手;
-   诊断区在窗口只有半高时仍能看清错误文本(**B3**).
-5. **拆页**(§2.2):参数窗口与过程窗口**打开后都有内容**(B1--两个页容器的
-   `hidden` 必须已摘掉);两者可同屏;过程窗口能单独拖宽;从对象列表点"过程"时,
-   被最小化/关闭的过程窗口会先恢复再抬升聚焦,且参数窗口的几何与数值不变.
-6. **示例菜单完整展开**(B2):点"示例",菜单必须完整可见,不被窗口边缘切掉
-   (它有意超出标题栏),滚到底部能选中最后一项;`Esc` 关闭并归还焦点.
+4. 参数窗口:滑块拖动实时刷新 3D;窗口内只有参数行与诊断区,**没有**分隔条;
+   诊断区在窗口变矮时仍能看清错误文本(**B3**).视图窗口单独拖到很矮时,
+   视图控件自己出滚动条而不是把窗口撑破.
+5. **拆三页**(§2.2):参数 / 视图 / 过程三个窗口**打开后都有内容**;三者可
+   同屏;过程窗口能单独拖宽;**参数窗口里没有任何分隔条**(`#right-splitter`
+   已删除),`#view-controls` 出现在视图窗口而不是参数窗口里;从对象列表点
+   "过程"时,被最小化/关闭的过程窗口会先恢复再抬升聚焦,且参数窗口的几何与
+   数值不变.
+6. **示例菜单完整展开**(B2):点"示例",菜单必须完整可见,不被窗口边缘或
+   面板边缘切掉(它有意超出标题栏),滚到底部能选中最后一项;`Esc` 关闭并
+   归还焦点.
 7. **对象窗口的底边能拖**(B4):Dock 两侧的桌面区域与窗口南边手柄都要能命中,
    最小化/关闭后 Dock 仍可点.
 8. 对象列表:两栏,公式 KaTeX 渲染,点击复制 TeX,显隐开关生效.
@@ -1492,7 +1764,12 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
     `UI_CONFIG.window.windows` 里某个窗口的 `title` 改一行,刷新后标题栏与
     Dock 文案同时变(证明清单是唯一真相源).
 14. 拆页没有留下残留:界面上**没有任何**"参数/过程"标签按钮,
-    `#right-tabs` 与 `#right-panel` 都不出现在 DOM 里.
+    `#right-tabs` / `#right-panel` / `#right-splitter` 都不出现在 DOM 里,
+    两个 `.right-page` 上没有 `role="tabpanel"` 残留,`getComputedStyle` 里
+    也没有任何元素在消费 `--right-split-basis`.
+15. **标题栏只有一个**(B8):五个窗口各只有一层标题栏,界面上没有"窗口标题
+    + 面板标题"两行的重复,也没有两层边框/阴影;`source code` / `视图` /
+    `参数` / `过程` / `对象` 五个文案与 Dock 上的按钮文案对得上.
 
 **高亮层核对的具体做法**(比"看起来对"更可靠):把开发者工具的 Elements 面板
 里 `#dsl-editor-highlight` 与 `#dsl-editor` 并排选中,读各自的盒模型;两者的
@@ -1508,14 +1785,13 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
   量成 0 宽--这也正是 §5.6 要求不用 `display: none` 的原因.若真发现异常,
   `WindowManager.onGeometryChange` 就是给它预留的钩子,接一个
   `lineNumbers.refresh()` 即可.
-- 窗口正文高度变化后 `RightSplitController` 的比例基准是否仍是"页高度"
-  (它每次拖动现量 `clientHeight`,理论上自然正确;若发现冻结在旧比例,
-  检查是否有地方缓存了高度).
 - **拆页之后**:`#right-page-params` / `#right-page-process` 的父节点从
   `#right-panel` 的 flex 列换成"窗口正文"(`.window-body`),两个 `.right-page`
-  的 `flex: 1 1 auto; min-height: 0` 需要在新父节点下仍然生效.理论上没问题
-  (`.window-body` 也是 flex 列且给了确定高度),但这条要在阶段 1 真机确认;
-  若不生效,给 `.window-body > *` 显式补一条规则(§5.4 已写).
+  的 `flex: 1 1 auto; min-height: 0` 需要在新父节点下仍然生效;`#view-controls`
+  的宿主从"参数页下半块"变成"视图窗口正文",它自己的 `flex: 1 1 auto` 与
+  `min-height` 也要在新父节点下成立.理论上没问题(`.window-body` 也是 flex
+  列且给了确定高度),但这条要在阶段 1 真机确认;若不生效,给
+  `.window-body > *` 显式补一条规则(§5.4 已写).
 
 ---
 
@@ -1530,7 +1806,7 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 - **自动平铺**:小视口下允许窗口重叠,不做自动重排.
 - **触摸端的双击标题栏**:双击走 Pointer Events 的 `dblclick`,触屏不保证
   触发,可接受(按钮路径始终可用).
-- **窗口数量的运行期增长**:一期固定四个窗口(源码 / 参数 / 过程 / 对象).
+- **窗口数量的运行期增长**:一期固定五个窗口(source code / 视图 / 参数 / 过程 / 对象).
   `WindowManager` 的注册表按"可注册多个"设计,但不提供"新建自定义窗口"入口.
 - **把过程窗口做成参数窗口的附属面板**(内嵌/抽屉/跟随):两页已经拆开,不再
   引入"主窗 + 从窗"的联动关系,各自独立.
@@ -1546,35 +1822,46 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 
 ### 11.1 硬性阻碍(阶段 1 必须先处理)
 
-**B1(最硬的一条)两个页容器身上带着 `hidden` 属性,拆页后必须显式摘掉.**
+**B1 两个页容器的 `hidden` 只有一个写入者,就是 `RightPanelTabs` 自己.**
 
-`RightPanelTabs` 在构造期就调 `_applyPages(DEFAULT_RIGHT_TAB)`,它会写
-`#right-page-params` / `#right-page-process` 的 `hidden` 属性(`DslApp.start()`
-里 `new RightPanelTabs(...)` 之后才有 `bind()`,但构造已经写了).
-窗口化删掉 `RightPanelTabs` 之后,上一轮运行留在 DOM 上的 `hidden` 就成了
-**孤儿状态**:过程窗口打开后正文是一片空白,参数窗口正常.而
-`.right-page[hidden] { display: none }` 是 `css/panels.css` 的显式规则,不会
-靠 UA 默认值救回来.
+`RightPanelTabs` 在构造期就调 `_applyPages(DEFAULT_RIGHT_TAB)`,写
+`#right-page-params` / `#right-page-process` 的 `hidden` 属性.但**`index.html`
+里这两个页容器本来就没有 `hidden` 初值**(HTML 刻意不留副本,由
+`RightPanelTabs.test.ts` 守着).所以:
 
-处理:阶段 1 删 `RightPanelTabs` 的同时,删掉 `#index.html` 里两个页容器的
-`hidden` 属性(并删掉 `.right-page[hidden]` 规则).回归清单第 5,6 项专测:
-**两个窗口的内容都要有东西**.
+- 删掉 `RightPanelTabs` 就消除了全部写入者,**不需要**去摘一个不存在的属性;
+- 旧稿把这一条写成"必须显式摘掉 `index.html` 里的 `hidden`,最硬的一条",
+  是不准确的(§11.2 E12).它只在 vite 开发态 HMR **不整页刷新**,旧 DOM 残留
+  的情况下才会出现,刷新即消失;
+- 真正要做的是两件小事:①删 `.right-page[hidden] { display: none }`
+  这条规则(页容器不再互相隐藏);②`.right-page` 的 `role="tabpanel"` 也删掉,
+  标签页不存在了,留着就是指向空气的语义.
 
-**B2 `.example-menu` 的溢出会被窗口裁掉,必须让窗口层不裁切.**
+回归清单第 5 项继续测"两个窗口都有内容",这条不变.
+
+**B2 `#example-menu` 必须搬进窗口标题栏,而且窗口层不能裁切.**
 
 浮层由 CSS 定位:`.panel-header { position: relative }` +
 `.example-menu { position: absolute; top: 100% }`.它**有意超出标题栏**,盖住
-正文.窗口化之后:
+正文.窗口化之后有三件事同时成立才不会坏,缺一件就是"点示例没反应":
 
-- 锚点必须是 `.window-header`(它得是 `position: relative`);
-- 如果 `.window` 为了裁掉正文溢出而写 `overflow: hidden`,浮层会被**直接切掉**,
-  表现为"点示例没反应"(菜单实际上开着,只是看不见).
-  所以裁切职责必须下沉到 `.window-body`,`.window` 保持 `overflow: visible`.
+1. **节点要搬家**:`#example-menu` 现在在 `#left-panel > .panel-header` 里,
+   而窗口化把它画在窗口标题栏下(§5.4).按"面板本体一行不改"照做,它会留在
+   窗口正文里,再改 CSS 锚点就直接废掉浮层.做法:阶段 1 把它从
+   `.panel-header` 摘出来,经 `WindowFrameSpec.overlays` 挂到 `.window-header`
+   (`#example-btn` / `#run-btn` 同理,走 `spec.actions`).
+2. **`.window` 不能裁**:如果 `.window` 为了裁掉正文溢出而写 `overflow: hidden`,
+   浮层会被**直接切掉**.裁切职责下沉到 `.window-body`,`.window` 保持
+   `overflow: visible`.
+3. **`.panel` 也不能裁**:`css/layout.css:28` 现在是
+   `.panel { overflow: hidden }`.它是浮层的第一道裁切边界,就算 `.window`
+   不切,留在 `.panel` 里的浮层也出不去.`.panel` 那条规则搬进 `panels.css`
+   时**不要带上 `overflow`**(旧稿只提了 `.window`,漏了这条).
 
-(这一条是我核对 `Popover.ts` 之后才发现的:`Popover` 本身**不做任何定位计算**,
-它只管 `.is-open` / `aria-expanded` / 点外部关闭 / 焦点归还,位置全在 CSS 里.
-所以"窗口化会不会破坏浮层"这个问题,**答案完全取决于 CSS 的 overflow 与
-position**,而不是 JS.)
+(这一条是核对 `Popover.ts` 与 `layout.css` 之后才确认的:`Popover` 本身**不做
+任何定位计算**,它只管 `.is-open` / `aria-expanded` / 点外部关闭 / 焦点归还,
+位置全在 CSS 里.所以"窗口化会不会破坏浮层"这个问题,**答案完全取决于节点在
+哪棵树里 + CSS 的 overflow 与 position**,而不是 JS.)
 
 **B3 `#diagnostics` 的高度基准会变,需要重新判断.**
 
@@ -1584,30 +1871,38 @@ position**,而不是 JS.)
 34%"变成"半高窗口的 34%",可用行数明显变少.阶段 1 真机看过之后再决定是否
 调这个比例或给诊断区一条自己的最小高度(它是错误提示,不该被压到看不见).
 
-**B4 Dock 不能通栏,否则底部窗口的边抓不到.**
+**B4 Dock 不能通栏,且窗口底边必须留在 Dock 之上.**
 
-Dock 是 `z-index: 200` 的实心条.如果它铺满整个宽度,任何窗口的南边/角部手柄
-只要落在底边就会被它挡住(`pointer-events: auto`),表现为"底边拖不动".
-要求:Dock 用居中布局且**自身的盒子只占内容宽度**(`display: flex;
-justify-content: center` 的容器 + 内容宽度的内层,或直接 `width: fit-content;
-margin: auto`),两侧留出真正可点的桌面.单窗口全屏时 Dock 自动隐藏,这条才
-不会在最大化态下变成"整个底边都拖不动".
+两个条件要同时成立,少一个都会表现为"底边拖不动":
 
-**B5 宿主移出 `#right-panel` 后,`.right-page` 的尺寸来源要显式补齐.**
+1. Dock 是 `z-index: 200` 的实心条,如果它铺满整个宽度,任何窗口的南边/角部
+   手柄只要落在底边就会被它挡住(`pointer-events: auto`).要求:Dock 用居中
+   布局且**自身的盒子只占内容宽度**(`display: flex; justify-content: center`
+   的容器 + 内容宽度的内层,或直接 `width: fit-content; margin: auto`),
+   两侧留出真正可点的桌面.单窗口全屏时 Dock 自动隐藏,这条才不会在最大化
+   态下变成"整个底边都拖不动".
+2. **窗口默认几何的底边线必须在 Dock 的 100px 之上**(§2.1 规定五个窗口共用
+   `dH-116`).Dock 居中,`objects` 也居中,所以只要 `objects` 的底边落进
+   Dock 的范围,它的南边手柄就**正好**压在 Dock 底下,第 1 条救不了它.
+   旧稿的 `y=dH-292` 就是这个问题(§11.2 E13),已改成 `y=dH-376`.
+
+**B5 宿主移出 `#right-panel` 后,宿主自己的尺寸来源要显式补齐.**
 
 `#right-page-params` / `#right-page-process` 现在是 `#right-panel` 的 flex 子项,
-高度由父级给.搬进 `.window-body` 后需要三条同时成立,缺一条就塌成 0 高:
+`#view-controls` 是 `#right-page-params` 的 flex 子项,高度都由父级给.搬进
+`.window-body` 后需要同时成立,缺一条就塌成 0 高:
 
 | 宿主 | 需要的约束 |
 | --- | --- |
 | `#left-panel` | `flex: 1; min-height: 0`(它自己是 flex 列容器) |
+| `#view-controls` | `flex: 1 1 auto; min-height: 0`(它自己已有 `flex` 与 `overflow-y: auto`,只确认在新父节点下仍生效) |
 | `#right-page-params` | `flex: 1 1 auto; min-height: 0`(已有) |
 | `#right-page-process` | 同上 |
 | `#bottom-panel` | `flex: 1; min-height: 0` |
 
-外加 `.window-body { display: flex; flex-direction: column; min-height: 0 }`.
-这一条已经在 §5.4/§5.6 写过,这里重复是因为它是**最容易被漏的一条**:漏了不会
-报错,只是内容高度变成 0,看起来像"面板坏了".
+外加 `.window-body { display: flex; flex-direction: column; min-height: 0;
+overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为它是**最容易被
+漏的一条**:漏了不会报错,只是内容高度变成 0,看起来像"面板坏了".
 
 **B6 `#right-panel` 会变成空壳,应当从 DOM 里删掉.**
 
@@ -1623,29 +1918,106 @@ margin: auto`),两侧留出真正可点的桌面.单窗口全屏时 Dock 自动�
 是 `PanelController._applyLayout`,唯一消费者是 `layout.css`.三者一起走.
 留着它们会让人以为窗口几何还有 CSS 那一半.
 
+**B8 三个面板自带的 `.panel-header` 与窗口标题栏重复--已按 W6 拍板:全删.**
+
+窗口标题栏给出 `source code` / `参数` / `视图` / `过程` / `对象`,而面板本体里
+还各有一层 `.panel-header`:源码面板的 `.panel-title` 是 "source code",底部
+面板的是 "对象",参数页里还有一条 "视图".`#left-panel` / `#bottom-panel` 还带着
+`.panel` 的 border 与 box-shadow,与窗口外壳会叠成两层.
+
+**拍板(A 案,用户 2026-09)**:这三个文案直接上移为窗口标题,面板自带的那层
+`.panel-header` 整个删除;`.panel` 只保留"填满窗口正文"的骨架,底色/边框/阴影
+归窗口外壳那一层.于是:
+
+- `#left-panel` 的 `.panel-header` 整块删(示例/RUN 已在 `.window-actions`,
+  `#example-menu` 已在 `.window-header`);
+- `#bottom-panel` 的 `.panel-header` 整块删(`#formula-copy-hint` 移入对象窗口的
+  `titleContent`);
+- `#right-page-params` 里的 `<header class="panel-header">视图</header>` 整块删
+  (它变成**视图窗口**的标题,而 `#view-controls` 从参数页搬出去,见 B10).
+
+判据:**界面上不能出现两行功能重复的标题,也不能有两层边框/阴影**
+(回归清单第 15 项).
+
+**B9 配置里的 `hostId` 与 `index.html` 会静默漂移.**
+
+`UI_CONFIG.window.windows[].hostId` 是一个字符串,`WindowManager` 用
+`document.getElementById` 取它.`index.html` 里删/改名一个宿主,配置不会跟着
+报错;非空断言(`!`)只会让 `frame.body.append(null)` 抛一个读不懂的 TypeError.
+
+处理:①`bind()` 里取不到就抛一条带 `hostId` 的错误;②加一条不需要浏览器的
+守卫测试(§8 的 `desktopHosts.test.ts`),用纯文本解析 `index.html`,断言每个
+`hostId` 都存在.这也顺手把"配置是唯一真相源"从注释变成断言.
+
+**B10 `#view-controls` 要从参数页里搬出来当视图窗口的宿主.**
+
+`#view-controls` 现在是 `#right-page-params` 的第二个 flex 子项(在分隔条与
+"视图" header 之后).W6 之后它是**视图窗口**的宿主,必须:
+
+- 在 `index.html` 里成为 `#app` 下的独立宿主(与 `#left-panel` 同级),
+  不再嵌在 `#right-page-params` 里;
+- `css/panels.css` 里 `#right-page-params` 的注释与任何"参数区占多少,
+  视图区占多少"的规则一起清理(C14);
+- `createViewPanel(document.getElementById('view-controls')!)` 的调用不变,
+  但它的父节点从"参数页"变成"视图窗口正文",`flex` 约束按 B5 检查.
+- `#diagnostics` **留在参数窗口**(它是参数/编译诊断,不是视图控件);
+  这条要写进 §5.2,别顺手把它一起搬走.
+
+不搬的后果:`WindowManager` 会把整个 `#right-page-params`(含视图控件)塞进
+参数窗口,于是"视图窗口"要么是空的,要么两个窗口抢同一个节点--都是静默错.
+
 ### 11.2 订正:本方案自己写错的地方
 
 | # | 原稿写的 | 实际情况 | 订正 |
 | --- | --- | --- | --- |
-| E1 | "`WindowManager` 按 `hostId` 从文档里取宿主";`RightSplitController` 的绑定根不动 | 4.1 那版 API 里 `WindowManager` 的构造参数是 `root: HTMLElement` 并 `root.querySelector(hostId)`.两个页容器搬进 `.window` 之后,`#app` **不再是它们的祖先**,`querySelector` 找不到它们 | `WindowManager` 取宿主统一走 `document.getElementById(hostId)`;`RightSplitController.bind(#app)` 保持不变(它找的 `#right-page-params` 仍在 `#app` 子树内) |
+| E1 | "`WindowManager` 按 `hostId` 从文档里取宿主";理由写成"两个页容器搬进 `.window` 后不再是 `#app` 的后代" | **理由错了**:`#window-layer` 是 `#app` 的子节点,页容器搬进窗口后**仍然是** `#app` 的后代;`layer.querySelector` 取不到宿主,只是因为取宿主的时机在"把宿主 append 进 frame"**之前** | 结论不变(取宿主走 `document.getElementById`),理由订正为"先取宿主,再 append,那一刻它还没进窗口层".W6 之后 `RightSplitController` 已经删除,不再有"分栏根节点"这一说 |
 | E2 | "`#right-panel` 保留,只是不再是窗口本身" | 它会被清空,且 `layout.css` 删除后连定位规则都没了(见 B6) | 从 DOM 删除;两个 `.right-page` 直接进窗口正文 |
 | E3 | "默认几何写到 `base.css` 的 `:root` 兜底,`applyUiConfig.test.ts` 锁一致性" | **多此一举**:窗口是 JS 建的,在 JS 跑之前窗口层是空的,"CSS 首帧兜底"没有首帧可兜.而"默认几何 = 视口宽高的函数"本来也无法在 CSS 里表达(见 E4) | 删掉这套兜底与对应断言;默认几何只由 `UI_CONFIG.window.windows` + `WindowGeometry` 的行内样式给出,`WindowFrame` 建完元素,插入窗口层之后立即写几何 |
-| E4 | `UI_CONFIG.window.windows` 的 `defaultGeometry` 直接写死 `w/h` 数字 | 右列高度,中列宽度都依赖桌面尺寸(§2.1 的 `dH-116` / `clamp(360, 720, dW-2*436-32)`),写死的数字只能在某一个视口下正确 | 改成**比例/锚点 + 夹取**的描述(`{ x: 16, y: 16, w: 420, h: { anchor: 'bottom', inset: 116 } }` 这类),由 `WindowGeometry.defaultGeometry(desktop, spec)` 纯函数算出 px;这也让默认几何能被阶段 0 的穷举测试覆盖 |
+| E4 | `UI_CONFIG.window.windows` 的 `defaultGeometry` 直接写死 `w/h` 数字 | 右列高度,中列宽度都依赖桌面尺寸(§2.1 的 `dH-116` / `clamp(360, 720, dW-2*436-32)`),写死的数字只能在某一个视口下正确 | 改成**锚点 + 夹取**的描述(`{ x: { at: 16 }, y: { at: 16 }, w: { at: 420 }, h: { from: 'bottom', inset: 116 } }` 这类),由 `resolveDefaultGeometry(spec, desktop, resolved)` 纯函数算出 px;**`from: 'bottom'` 的语义只有一条,写在 §4.1 的 `AxisSpec` 注释里**;这也让默认几何能被阶段 0 的穷举测试覆盖 |
 | E5 | `#example-menu` 的 `max-height: calc(100vh - 64px)` | 浮层挂在窗口标题栏下,量的是**视口**高度:窗口比视口矮时浮层会超出窗口(配合 B2 的裁切问题,表现是"菜单被切一半") | 改按参数/所属窗口正文的高度算(`max-height: calc(100% - ...)` 或由 CSS 变量给出窗口正文高度);`panels.css` 那条注释"左面板通高,所以按视口高度留余量"随之作废 |
 | E6 | W3 写"列入本文件的设计与阶段 3" | 键盘窗口管理实际排在**阶段 5** | 已订正为阶段 5(本稿早前改过一处,漏了 W3 那一行) |
 | E7 | 第 11 章里"把 §3 的状态机与 §3.4/§3.5 的数值当成跨端口径" | 前提是"与桌面端对齐"那一章;该章已按作者要求删除(本次不考虑桌面端) | 整节删除,原来那条"与桌面端分叉"的风险行也一并删掉 |
+| E8 | §4.5 `applyGeometry` 用 `element.style.cssText = geometryToCss(...)` 写几何 | `cssText` 赋值会**清空整个行内声明块**,连同 `focus()` 写的 `z-index` 一起清掉--拖动第一帧,被拖的窗口就掉到其它窗口后面;`domStub` 里 `cssText` 也只是个普通属性,断言不到 | 几何改走 `writeGeometry()`(逐条 `setProperty`)与 `clearGeometry()`(逐条 `removeProperty`);`z-index` 归 `focus()` 独占;`geometryToCss` 只留作断言/日志,并写明"不要拿它写 `cssText`"(§4.4/§4.5) |
+| E9 | §4.5 最大化的分支直接 `return`,只清 / 切类,不动行内几何 | 行内 `left/top/width/height` **压过**类规则里的 `inset: 0`,所以"点最大化没反应"(代码注释写了要清,代码没清) | 进入 maximized/fullscreen 前先 `clearGeometry(element)`;`.window` 上的类统一由 `applyState` 独占写(§4.5/§3.1) |
+| E10 | §5.3 又抄了一份 `WindowFrameSpec` / `WindowManager` API,与 §4.4 不完全一样(有 `handles` 无 `geometry`,`focus(id)` 无选项,构造参数是 `root`) | 同一层结构两份签名,与本文自己"标记只有一份真相源"的硬约束冲突,实现时按哪份都可能 | §5.3 只留三条约定,签名**唯一一份在 §4.4** |
+| E11 | §5.4 的 DOM 契约里画了 `div.window-snap`(每个窗口一个吸附高亮) | 与 §3.5/§4.5 冲突:高亮是窗口层里的**一个** `#snap-preview`,由构造参数传入 | 从契约里删掉该节点,改为一句"吸附高亮是层里的 `#snap-preview`";并给 `#snap-preview` 补 `pointer-events: none`(§4.6) |
+| E12 | B1 被写成"最硬的一条:必须显式摘掉 `index.html` 上两个页容器的 `hidden`" | `index.html` 从来没写过 `hidden` 初值(由 `RightPanelTabs.test.ts` 守着);写它的只有 `RightPanelTabs` 自己,删掉控制器就消除了全部写入者 | B1 订正为"删规则 + 删 `role=tabpanel`",并说明只在 HMR 残留时才是问题(§11.1 B1) |
+| E13 | §2.1 的 `source h=dH-116`(通高)/ `objects y=dH-292`,以及 §4.1 的 `AxisSpec` 没定义 `from:'bottom'` 在 `h` 上的语义 | 同一份 spec 算不出自己给的两组期望值;三处底边线分别是 100 / 116 / 32,`objects` 的底边落进 Dock 的 100px 里(与 B4 冲突,南边手柄必被压住) | 定义唯一语义`该边落在距桌面该侧 inset 处`;所有窗口共用底边 `dH-116`;`objects y=dH-376`;阶段 0 的用例按新表写(§2.1/§4.1) |
+| E14 | §4.5 的 `WindowState` 没有 `'fullscreen'`;`focus()` 伪代码无条件 `element.focus()`;`bind()` 五步里没有"pointerdown 提升"与 `window.resize` | 前两条一条编译不过,一条与 §3.2/§6 的核心口径矛盾(照抄就把编辑器光标弄丢);第三条是"规则写了没接线",窗口 resize 后不重新夹取,点窗口不提升 | `window` 态加 `'fullscreen'`;`focus(id, { takeDomFocus })` 默认 `false`,`reveal` 传 `true`;`bind()` 补 `bindWindowRaise` 与 `window.resize -> onDesktopResize`(§3.1/§4.5/§5.2) |
+| E15 | §4.3 的 `bindWindowResize` 签名是 `read: { geometry(); limits() }`,实现里写 `read.state()` | 签名与实现不一致;`limits()` 在实现里根本没用;`direction` 在实现里是自由变量 | 签名改为 `(handle, signal, direction, onGeometry, read: { geometry(); state() })`,并写明夹取由调用方做,`limits` 不进本模块(§4.3) |
+| E16 | §5.2 的修改清单里没有 `src/testing/domStub.ts`,§8.1 却写"可断言行内 `style.cssText`" | 桩没有 `toggleAttribute`(`applyState` 必用)与 `removeProperty`,`WindowManager.test.ts` 第一次 `applyState` 就会抛异常;`cssText` 也断言不到 | 把 `domStub.ts` 列进修改清单与阶段 0;断言改为四个几何属性 + `z-index`(§5.2/§8/§8.1) |
+| E17 | 阶段 1 写"可最小化/还原",但 Dock 整块排在阶段 3 | 阶段 1 没有任何"还原"入口,这一期不可验收 | Dock 的**最小版**(按钮 + 还原 + 全部还原)进阶段 1,阶段 3 只留吸附/磁吸;阶段 1 再拆成 1a/1b/1c(§7) |
+| E18 | `UI_CONFIG.window.headerHeight` 注释写"与 css/window.css 一致" | 这是本仓库唯一没有守卫的 TS↔CSS 同值(别的同值都有测试锁),改一处会出现"标题栏被夹到只剩半行" | 改为经 `applyUiConfig` 写 `--window-header-height`,`css/window.css` 用 `var()` 消费,并加一致性断言(§4.1/§5.5) |
+| E19 | 全文按"四个窗口"写(§1/§2/§4.1/§5.2/§7/§8/§9/§11/§12),`source` 是通高窗口,`RightSplitController` 被列在"不动的"清单里 | W6 拍板**五个窗口**(`参数` 与 `视图` 也拆开)之后,这些全部失效:通高的 `source` 没有位置给 `view`;参数与视图不再共用一栏高度,分栏控制器与 `--right-split-basis` 没有存在理由;`#view-controls` 必须从参数页里提出来当宿主 | 全文按五个窗口重写:默认几何改成"左列 source/view,右列 params/process,底部 objects"(§2.1),`RightSplitController` / `#right-splitter` / `--right-split-basis` / `UI_CONFIG.panel.split*` 进删除清单(C14),`#view-controls` 列为新宿主(B10),窗口标题取原面板文案(W6/B8 A 案) |
+| E21 | §2.1 写"五个窗口共用同一条底边线 `dH-116`",并在 §7 阶段 0 的验收里要求"五个窗口的底边一起断言" | 与 §2.1/§4.1 自己给出的期望值表冲突:`source` 与 `params` 用 `fraction` 取高(0.68 / 0.55),它们的底边在 `dH-116` **之上**(1920×1080 下分别是 672 与 546,不是 964).真正常在底线上的只有 `view` / `process` / `objects` 三个 | 订正为:**三块的下沿共用底线 `dH-116`**,其余窗口的底边必须 `≤ dH-116`(不能进 Dock 的 `dockReserve`).阶段 0 的用例按这条写:`view` / `process` / `objects` 的 `y+h === dH-116`,`source` / `params` 只断言 `≤` |
+| E20 | `#formula-copy-hint`(在底部面板 header 里)与 `#example-menu` 只被当成"面板内部元素" | B8 A 案要删掉三处 `.panel-header`,这两条链路的载体正好都在里面:`FormulaCopyController` 要一个节点回显复制提示,`ExampleLoaderController` 要一个浮层容器;删 header 而不安置它们等于静默删功能 | `#example-menu` 走 `overlays` 挂窗口标题栏(B2),`#formula-copy-hint` 走 `titleContent` 挂对象窗口标题(§4.4/§5.4);两者的控制器与监听不变 |
+
+**实现记录(落地时新增,补在 E 系列之后)**:
+
+| # | 落地时的补充 | 说明 |
+| --- | --- | --- |
+| E22 | 三层容器的 `z-index` 必须由 `WindowManager.bind()` 从 `UI_CONFIG.window.z` 写成**行内样式** | 只靠 DOM 顺序不行:`#dock` 是 `z-index: auto`,而 `.window` 有正 `z-index`,CSS 的绘制顺序会让窗口整块盖住 Dock(而且点不到).另外 `snapPreview` 取 **50**:吸附预览是"窗口会落到哪里"的底图,画在窗口层(100)之上会盖住正在拖的窗口 |
+| E23 | §5.5 第 2 条的"唯一例外是标题栏高度"扩成**三条** | 除 `--window-header-height` 外,还必须有 `--dock-reserve`(`.window.is-maximized` 的 `bottom` 消费,否则最大化盖住 Dock)与 `--window-body-height`(示例浮层的 `max-height` 要按所属窗口正文算,而浮层在标题栏里,百分比解析不到窗口高度,见 E5).三者都由 JS 写入,CSS 只读,数值只有一份(前两条经 `applyUiConfig`,第三条由 `_applyGeometry` 写) |
+| E24 | `bindDragGesture` 的 `onStart` / `onDelta` 增加"原始 `PointerEvent`"参数 | §3.5 的吸附判据是"**指针**距桌面边缘 ≤ `SNAP_EDGE`",而拖动件的回调原本只有增量.给回调补上事件是向后兼容的(`onStart: () => {}` 这类实现照旧可编译),因此不需要第二份手势实现 |
+| E25 | 四个既有节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)在 `index.html` 里放进一个 `hidden` 的 `#window-staging` 暂存区 | 方案只说"交给窗口标题栏",没说它们在启动前待在哪儿.它们必须在 `new DslApp()` **之前**就在文档里(控制器按 id 取节点),所以先集中在暂存区,`WindowFrame` 建好外壳后原样搬走;搬完暂存区自然为空 |
+| E27 | 标题栏双击最大化不用 `dblclick`,改判"两次 `pointerdown` 的间隔" | 拖动件在 `pointerdown` 里 `preventDefault()`(为了不选中标题文字),浏览器正是在这一步决定要不要继续派发兼容鼠标事件,`dblclick` 能不能到就成了实现细节;按间隔判定不依赖兼容事件,触屏也成立(§10 原本担心的正是这个).另外"从最大化状态拖出来"改成**第一次真的移动时**才还原:单纯点一下标题栏不该把最大化窗口还原掉 |
+| E28 | 删除 `src/ui/widgets/Tabs.ts` 与其测试(`createTabs` 的唯一消费者是 `RightPanelTabs`) | 拆页之后它没有任何消费者,对应的 `.panel-header .tabs` 规则也已随标签栏删除.按本仓库"不留死代码"的惯例一并删除;要恢复标签页控件时从提交历史里取回即可 |
+| E26 | `.panel` 只保留"填满窗口正文"的骨架,连 `background` 与 `border-radius` 也不留 | B8 的 A 案要求"不要两层边框/阴影";底色由 `.window` 给,面板再写一遍是看不见的第二份来源 |
+
+| E29 | §4.5 的 `onDesktopResize()` 只写"所有 normal 窗口重新夹取",§3.4 的夹取又刻意允许窗口挂出桌面边缘(`x ≤ dW - edgeKeep`) | 两者合起来的行为是:视口变小之后,右列窗口**大半截留在屏幕外**(1280->1000 时 `params` 仍有 264px 在外面),而 §9 第 11 项要求"视口 resize:窗口不越界" | 新增纯函数 `fitGeometry(g, limits)`:在 `clampGeometry` 之后再尽量把窗口**整体**收进桌内(`x ∈ [0, max(0, dW - w)]`),`onDesktopResize` 与 `restoreAll` 用它.分工写清楚:**拖动**仍按 §3.4 的夹取(允许挂出去,否则"推到边上"做不到),**外部变化**(resize/复位)用 fit |
+| E30 | §4.2 写"半屏的高度与最大化一致(减去 `dockReserve`)",但 `resolveEdgeSnap` 的签名里没有 `dockReserve`,`Desktop` 又只有 `bottomReserve = dockReserve + edgeGap` | 照字面实现会算成 `dH - 116`(684),与最大化的 `dH - 100`(700)差 16px,半屏与最大化观感不一致 | `Desktop` 改成直接携带 `dockReserve` 与 `edgeGap`(`usableHeight = h - dockReserve - edgeGap`,数值仍是 `dH - 116`),半屏与最大化都用 `h - dockReserve`;`maximizedGeometry` 的签名不动 |
 
 ### 11.3 查过但**不是**阻碍的(留个记录,省得再查一遍)
 
 | 看起来可疑 | 结论 |
 | --- | --- |
-| `Popover` / `ExampleLoaderController` 会不会因为按钮换位置而失效 | 不会.`Popover` 不做定位计算,只认 `trigger` / `panel` 两个节点与 `bind(root)`;只要 `#example-btn`,`#example-menu` 仍在 `#app` 子树内,`.window-header` 给了 `position: relative` 就成立(位置问题见 B2) |
+| `Popover` / `ExampleLoaderController` 会不会因为按钮换位置而失效 | 不会.`Popover` 不做定位计算,只认 `trigger` / `panel` 两个节点与 `bind(root)`;只要 `#example-btn`,`#example-menu` 仍在 `#app` 子树内(搬进窗口标题栏后仍在),`.window-header` 给了 `position: relative` 就成立.**前提是浮层节点真的被搬进了 `.window-header`**,见 B2 第 1 条 |
 | `#viewport` 的 canvas 会不会盖住窗口 | 不会.canvas 无定位无 z-index,在 `#viewport`(`z-index: 0`)内绘制;窗口层是 100 |
 | `createViewPanel` / `ObjectListController` / `ProcessPanel` 会不会拿不到节点 | 不会.`ObjectListController` 用构造参数收容器,`ProcessPanel` 用 `root` 参数,`createViewPanel(host)` 用 `#view-controls` 元素--全都不依赖"节点的父级是谁",只依赖 id 仍在 |
 | `EditorLineNumbers` 的槽宽会不会随窗口变窄而变 | 不会.它按**字体度量与最大行号位数**定宽,与容器宽度无关;构造期还先写默认字体再 `refresh`,没有测量顺序陷阱 |
-| `RightSplitController` 在窗口被隐藏时会不会崩 | 不会.它每次拖动现量 `clientHeight` 并在 `<= 0` 时跳过;最小化态它根本不参与交互 |
+| 参数/视图原来那根分隔条会不会留下残留 | 不会.W6 已把它整条链路(`RightSplitController` / `#right-splitter` / `--right-split-basis` / `split*`)列入删除清单,回归清单第 14 项专测残留 |
 | 窗口拖动会不会触发 3D 的 `resize()` | 不会,也不该.`DslApp.onResize` 只挂在 `window.resize` 上;视口始终铺满,不需要跟着窗口动 |
-| `#formula-copy-hint` / 对象列表 / 参数滑块 会不会受影响 | 不会.它们都在下窗口 / 参数窗口正文里,id 与结构不变 |
+| `#formula-copy-hint` / 对象列表 / 参数滑块 / 视图控件 会不会受影响 | 不会.`#formula-copy-hint` 从底部面板 header 移进对象窗口标题,其余三者在各自窗口的正文里,id 与结构不变;`createViewPanel(#view-controls)` 的调用方式也不变 |
 
 ---
 
@@ -1654,7 +2026,7 @@ margin: auto`),两侧留出真正可点的桌面.单窗口全屏时 Dock 自动�
 | # | 风险 | 影响 | 缓解 |
 | --- | --- | --- | --- |
 | R1 | `#window-layer` 的 `pointer-events` 处理错 | 3D 完全不能转,是 W1 的致命伤 | 分层规则只有一条,阶段 1 的真机回归第 2 项专测 |
-| R2 | `PanelController` / `RightPanelTabs` 删除时漏改某个消费者 | 面板不再响应折叠/尺寸,或"模型与 DOM 分叉" | §1.2 的 C1–C11 表逐条核对;`grep` 清单见该表 |
+| R2 | `PanelController` / `RightPanelTabs` / `RightSplitController` 删除时漏改某个消费者 | 面板不再响应折叠/尺寸,或"模型与 DOM 分叉",或残留一根消费 `--right-split-basis` 的规则 | §1.2 的 C1–C14 表逐条核对;`grep` 清单见该表 |
 | R3 | 新增 `css/window.css` 漏进 `cssPalette.test.ts` 的 `CSS_FILES` | 新文件不受色板约束,颜色开始分叉 | §5.5 已写成硬约束;阶段 0 先改测试列表 |
 | R4 | 窗口 `hidden` 恢复后编辑器度量到 0 宽 | 行号槽宽错乱 | §8 待验点 1;`onGeometryChange` 是为此预留的挂钩 |
 | R5 | 最大化的"全屏高亮"与窗口状态不同步 | 预览与落地不一致,用户困惑 | 吸附判定是 `WindowGeometry` 的纯函数,预览与落地**调同一个函数** |
@@ -1662,9 +2034,45 @@ margin: auto`),两侧留出真正可点的桌面.单窗口全屏时 Dock 自动�
 | R7 | 窗口默认几何在小视口下越界 | 首次打开就抓不到某个窗口 | §3.4 的夹取规则 + `resize` 时重算;回归清单第 1 项 |
 | R10 | 窗外壳由 JS 建之后,有人"顺手"往 `index.html` 里手写一份 `.window` | 标记有两份真相源,改一处漏一处不报错 | §5.3 的硬约束 + §7 的 `WindowFrame.test.ts` DOM 契约守卫 |
 | R11 | 拆页只改了"谁在哪个窗口",漏改"点过程"那条链路 | 点"过程"没反应(窗口被最小化),或悄悄改掉了参数窗口的几何 | §3.7 的三步口径 + `reveal()` 是唯一入口;回归清单第 5 项专测 |
-| R12 | 有人把"两页共用一份宽度/一次只看一页"的旧口径当成仍需维护的约束 | 拆页被当成回退,或又加回标签页 | §2.2 写明当年(`456daef`)那条理由的前提是"右栏只有一份空间",窗口化后前提消失 |
+| R12 | 有人把"两页共用一份宽度/一次只看一页"或"参数区与视图区共用一个高度"的旧口径当成仍需维护的约束 | 拆页被当成回退,或又加回标签页 / 分隔条 | §2.2 写明那两条口径的前提都是"右栏只有一份空间",窗口化后前提消失;R24 是它的落地检查 |
 | R13 | 窗口化改动了编辑器外层容器,高亮层与 textarea 错位 | **最贵的一类 bug**:文字是透明的,错位直接表现为"编辑不了",而且不容易定位到是哪一层 | §5.6 的定位契约(五条对齐轴 + 不许碰清单)+ 阶段 1 把 `editorStyles.test.ts` / `EditorHighlight.test.ts` 列为红线;回归清单第 3 项与第 8 项专测(含右下角与隐藏后恢复) |
 | R14 | 西/北方向的缩放手势写错(只改尺寸不改坐标) | 窗口"看着不动,右边却在跑",并且撞到最小尺寸时窗口整体位移 | §3.4 的三条细节 + `WindowResize.test.ts` 按方向逐个断言 |
 | R15 | 窗口隐藏态被写成 `display: none` | 编辑器/行号在隐藏期间量到 0 尺寸,恢复后对齐错乱;且错误发生在"另一次交互之后",很难联想起是隐藏方式导致的 | §5.6 明确要求 `opacity` + `inert`;`editorStyles.test.ts` 扩写一条断言扫 `css/window.css` 不许出现该隐藏态下的 `display: none` |
-| R16 | 页容器身上残留的 `hidden` 没摘(B1) | **参数/过程窗口打开后一片空白**,而且不报错,控制台干净 | 阶段 1 清单里单列;回归清单第 5 项专测"两个窗口都有内容" |
+| R16 | 页容器上残留的 `hidden`(B1) | 参数/过程窗口打开后一片空白,而且不报错 | `index.html` 本无 `hidden` 初值,写入者只有 `RightPanelTabs`(随它删除);回归清单第 5 项专测"三个窗口都有内容" |
 | R17 | 有人给 `.window` 补一条 `overflow: hidden`(为了"干净地裁掉正文溢出") | 示例菜单被整块切掉,表现为"点示例没反应" | §11.1 B2 写明裁切职责在 `.window-body`;回归清单第 6 项专测菜单完整展开 |
+| R18 | 几何写入用 `style.cssText`(或将来有人图省事改回去) | **拖动时窗口掉到所有窗口后面**,而且只在"拖一下"时出现,极难联想到是样式写入方式 | §11.2 E8;`WindowManager.test.ts` 断言"拖动一帧后 `z-index` 仍在";几何写入只有 `writeGeometry` 一个入口 |
+| R19 | 最大化只切类不清行内几何 | 点最大化/全屏"没反应",窗口纹丝不动 | §11.2 E9;阶段 2 验收单列;`WindowManager.test.ts` 断言进入最大化后四条行内几何为空 |
+| R20 | 默认几何把某个窗口的底边压到 Dock 之下(B4 的第 2 条) | 该窗口的南边手柄抓不到,且不报错 | §11.2 E13 订正了数值;阶段 0 的纯函数用例断言五个窗口底边同为 `dH-116`;回归清单第 1,7 项 |
+| R21 | `.panel` 的 `overflow: hidden` 被原样搬进 `panels.css` | 示例菜单仍被裁掉(即使 `.window` 已放行),排查时会一直盯着 `.window` | §11.1 B2 第 3 条;搬运 `.panel` 规则时明确不带 `overflow` |
+| R22 | 面板自带 header 与窗口标题栏重复(B8) | 两层标题,两层边框,加窗口越多越乱 | 已按 W6 拍板 A 案(全删,文案上移);回归清单第 15 项;`#example-menu` / `#formula-copy-hint` 的安置见 B2/E20 |
+| R23 | `hostId` 与 `index.html` 漂移(B9) | 启动时抛一个读不懂的 TypeError,或宿主静默为空 | `bind()` 抛带 `hostId` 的错误 + `desktopHosts.test.ts` 纯文本守卫 |
+| R24 | 分栏链路只删了一半(`RightSplitController` 删了,`--right-split-basis` 或 `.right-splitter` 规则还在) | 要么一条死 CSS 让下一个人以为还有分栏,要么 `#params-panel` 拿不到高度而塌成 0 | §1.2 C14 列全四处写入点;回归清单第 14 项;`desktopHosts.test.ts` 断言 `#right-splitter` / `data-split-page` 不存在 |
+| R25 | `#view-controls` 没从参数页里搬出来(B10) | 视图窗口空白,或参数窗口与视图窗口抢同一个节点(后者更糟:节点只有一个父节点,先搬的赢) | §11.1 B10 + §5.2 的 `index.html` 行;阶段 1 验收要求"参数 / 视图 / 过程三个窗口都有内容" |
+
+---
+
+## 13 真机验收记录(阶段 0–4 之后)
+
+**方法**:headless Chromium + DevTools Protocol(SwiftShader 软件 WebGL),把
+`#app` 的视口用 `Emulation.setDeviceMetricsOverride` 钉成 1280×800 / 1920×1080
+后**重新加载**(默认几何只在启动时算一次,改视口只夹取不重排),再用
+`Input.dispatchMouseEvent` / `dispatchKeyEvent` 发**真实**指针与键盘事件,断言
+直接读 `getBoundingClientRect` / `getComputedStyle` / `elementFromPoint`.
+
+| 组 | 断言 | 结果 |
+| --- | --- | --- |
+| 默认几何 | 两组视口下五个窗口的 `x/y/w/h` 与 §4.1 的期望值表**逐像素相同**;`view`/`process`/`objects` 的底边同为 `dH-116`;`source`/`params` 不越过它;两列与中列不重叠 | 通过 |
+| 层级与穿透 | `#window-layer` 的 `pointer-events: none`,三层 z 为 100/50/200(canvas 上的空桌面命中 `CANVAS`);Dock 自身的盒子居中且只占内容宽,Dock 左侧的桌面命中 `CANVAS`(B4) | 通过 |
+| 拖动 | 标题栏拖动精确位移;拖动后 `z-index` 仍在(E8);松手摘掉 `.is-dragging` | 通过 |
+| 八向缩放 | 西/北同时动坐标与尺寸,东/南只动尺寸;东边一路拖到最小宽度夹在 300(R14) | 通过 |
+| 最小化/恢复 | 隐藏态 `opacity: 0` + `inert` + **`display: flex`**(R15);隐藏期间 `#dsl-editor` 的 `clientWidth/Height` 与行号槽宽仍然有效;Dock 恢复到原几何 | 通过 |
+| 高亮层对齐(§5.6) | textarea 与高亮层的矩形,`font-*`/`line-height`/`tab-size`/`padding` 逐项相同;滚到最右/最下后 `transform == translate(-scrollLeft, -scrollTop)`;高亮层 `overflow: hidden` 且两侧 `scrollHeight` 相等(当年那 15.1px 的坑) | 通过 |
+| 最大化/全屏 | 最大化 = `{0,0,dW,dH-100}` 且四条行内几何被清空(E9),`z-index` 仍在;还原逐像素一致;全屏 = `{0,0,dW,dH}`,Dock 自动隐藏,`Esc` 退出并还原 | 通过 |
+| 边缘吸附 | 拖到左边缘预览 `is-open is-left`,松手落到左半屏 `{0,0,640,700}`(与最大化同高,见 E30);松手后预览层复位 | 通过 |
+| 示例菜单(B2) | 打开后条目齐全,菜单完整可见(底线在窗口底边之上),内部可滚动,滚到底后最后一项可点中;`Esc` 关闭 | 通过 |
+| 过程窗口(§3.7) | 被最小化的过程窗口在点条目"过程"后恢复可见,聚焦并载入内容(不最大化,不改几何) | 通过 |
+| 视口 resize | 窗口整体收回桌内(E29),3D 画布尺寸跟着 `#app` 变 | 通过 |
+
+**没有覆盖到的**(仍然只能人工看):吸附/拖动的跟手感与动画观感,触屏双击标题栏,
+诊断区在变矮的参数窗口里是否够用(§11.1 B3),IME 候选框贴合,以及跨浏览器的
+`pointer-events`/`:hover` 细节.

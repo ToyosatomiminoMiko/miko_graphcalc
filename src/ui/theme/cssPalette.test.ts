@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 const CSS_FILES = [
     'base.css',
-    'layout.css',
+    'window.css',
     'panels.css',
     'editor.css',
     'controls.css',

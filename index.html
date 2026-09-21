@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-title" content="GraphCalc">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link href="css/base.css" rel="stylesheet" type="text/css">
-    <link href="css/layout.css" rel="stylesheet" type="text/css">
+    <link href="css/window.css" rel="stylesheet" type="text/css">
     <link href="css/panels.css" rel="stylesheet" type="text/css">
     <link href="css/editor.css" rel="stylesheet" type="text/css">
     <link href="css/controls.css" rel="stylesheet" type="text/css">
@@ -29,20 +29,13 @@
     <div id="app">
         <div id="viewport"></div>
 
+        <!-- 窗口化三层:窗口层与吸附高亮都不拦截指针,只有 .window 与 Dock 收指针
+             (见 css/window.css 的文件头);内容全部由 WindowManager 声明式装配 -->
+        <div id="window-layer"></div>
+        <div id="snap-preview" aria-hidden="true"></div>
+        <div id="dock" role="toolbar" aria-label="窗口"></div>
+
         <aside id="left-panel" class="panel">
-            <header class="panel-header">
-                <span class="panel-title">source code</span>
-                <div class="panel-header-actions">
-                    <button id="example-btn" type="button" aria-haspopup="true" aria-expanded="false"
-                        aria-controls="example-menu">示例</button>
-                    <button id="run-btn">RUN</button>
-                    <button data-panel-toggle="#left-panel">收起</button>
-                </div>
-                <!-- 示例浮层:分组与菜单项由 ExampleLoaderController 按
-                     src/ui/examples/exampleCatalog.ts 渲染,HTML 里不留清单副本 -->
-                <div id="example-menu" class="example-menu" role="menu"
-                    aria-labelledby="example-btn"></div>
-            </header>
             <section id="editor-panel">
                 <div id="dsl-editor-box">
                     <div id="dsl-editor-gutter" aria-hidden="true">
@@ -229,67 +222,25 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
                     </div>
                 </div>
             </section>
-            <div class="resize-handle resize-handle-right" data-resize-panel="left-panel"></div>
         </aside>
 
-        <aside id="right-panel" class="panel">
-            <header class="panel-header">
-                <!-- 右栏标签页(参数/视图 与 过程):标签栏本身就是这一栏的标题,
-                     不再另放一个 .panel-title(那会和"参数 / 视图"重复).
-                     两个标签按钮由 ui/panels/RightPanelTabs 经 ui/widgets/Tabs
-                     装配,HTML 里不留副本(与视图面板同一约定).标签栏必须留在
-                     header **内部**:PanelController 折叠时会隐藏除承载开合
-                     按钮的 header 以外的全部直接子元素,放进页容器里一折叠就
-                     再也切不回来(见 docs/equation-solving-process.md 3.2). -->
-                <div id="right-tabs"></div>
-                <button data-panel-toggle="#right-panel">收起</button>
-            </header>
+        <!-- 视图窗口的宿主:原先在参数页内部,现在是 #app 下的独立节点
+             (见 docs/windowing-plan.md §11.1 B10);内容由 createViewPanel 装配 -->
+        <section id="view-controls"></section>
 
-            <!-- 页1:参数 / 视图.两页各自包一层,与折叠逻辑的"直接子元素"
-                 判断互不干扰:折叠隐藏整页,页级 hidden 只藏另一页.
-                 分隔条的比例基准就是这一层,它恢复 flex 列布局,于是
-                 #params-panel 的 flex-basis 参照的是**页高度**(见
-                 RightSplitController). -->
-            <div id="right-page-params" class="right-page" role="tabpanel">
-                <section id="params-panel"></section>
-                <section id="diagnostics" aria-live="polite"></section>
+        <!-- 参数窗口宿主:参数列表 + 诊断区留在同一个窗口里(诊断不是视图控件).
+             页级 hidden / 标签页 / 分栏都已删除:两页各自独立成窗口 -->
+        <div id="right-page-params" class="right-page">
+            <section id="params-panel"></section>
+            <section id="diagnostics" aria-live="polite"></section>
+        </div>
 
-                <!-- 参数区/视图区的分隔条:上下拖动改变两块各占多少高度
-                     (见 RightSplitController).焦点在它上面时,上下方向键同样
-                     可以调整,所以它是可聚焦的 separator 而不是纯装饰.
-                     `data-split-page` 指向比例基准--参数**页容器**的 id,与面板
-                     拖拽手柄的 `data-resize-panel` 同一约定:控制器与标记的连接
-                     走数据属性,id 只留给锚点/无障碍.
-                     视觉与状态由 css/panels.css 的 .right-splitter 负责. -->
-                <div id="right-splitter" class="right-splitter" data-split-page="right-page-params"
-                    role="separator" aria-orientation="horizontal" aria-label="调整参数区与视图区的高度"
-                    tabindex="0" title="拖动调整参数区高度(或聚焦后按上下方向键)"></div>
-
-                <header class="panel-header">视图</header>
-                <!-- 视图面板的全部控件(相机/预置视角/点/坐标轴/曲面)由
-                     src/ui/view/ViewPanel.ts 声明式装配,HTML 里不再留手写副本;
-                     加控件只改那个文件,控制器通过句柄引用节点(见 DslApp). -->
-                <section id="view-controls"></section>
-            </div>
-
-            <!-- 页2:过程.通高的递等式视图,内容与交互由 ui/process/ProcessPanel
-                 装配;页级显隐(含"默认哪一页在前")由 RightPanelTabs 独占,
-                 HTML 不写 hidden 初值 -- 默认页只留一处声明;折叠仍归
-                 PanelController. -->
-            <div id="right-page-process" class="right-page" role="tabpanel">
-                <section id="process-panel" class="process-panel"></section>
-            </div>
-
-            <div class="resize-handle resize-handle-left" data-resize-panel="right-panel"></div>
-        </aside>
+        <!-- 过程窗口宿主:通高的递等式视图,内容与交互由 ui/process/ProcessPanel 装配 -->
+        <div id="right-page-process" class="right-page">
+            <section id="process-panel" class="process-panel"></section>
+        </div>
 
         <footer id="bottom-panel" class="panel">
-            <header class="panel-header">
-                <span class="panel-title">对象</span>
-                <!-- 复制提示只有这一处:公式可点,文案在这里回显 -->
-                <span id="formula-copy-hint" class="object-list-hint">点击公式复制 TeX</span>
-                <button data-panel-toggle="#bottom-panel">收起</button>
-            </header>
             <section id="object-panel">
                 <div class="object-list-column">
                     <header class="object-list-title">
@@ -309,8 +260,24 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
                     </div>
                 </div>
             </section>
-            <div class="resize-handle resize-handle-top" data-resize-panel="bottom-panel"></div>
         </footer>
+        <!-- 待搬迁节点:标题栏动作(示例 / RUN),示例浮层,复制提示.
+             它们的 id 与监听归各自的控制器,窗口外壳由 createWindowFrame 建好之后
+             把这些**现成节点**原样 append 进 .window-actions / .window-header /
+             .window-title(见 src/ui/desktop/WindowFrame.ts).
+             放在这个 hidden 的暂存区里,是为了让它们在脚本执行前不参与布局;
+             被搬走之后这个容器就空了. -->
+        <div id="window-staging" hidden>
+            <button id="example-btn" type="button" aria-haspopup="true" aria-expanded="false"
+                aria-controls="example-menu">示例</button>
+            <button id="run-btn">RUN</button>
+            <!-- 示例浮层:分组与菜单项由 ExampleLoaderController 按
+                 src/ui/examples/exampleCatalog.ts 渲染,HTML 里不留清单副本 -->
+            <div id="example-menu" class="example-menu" role="menu"
+                aria-labelledby="example-btn"></div>
+            <!-- 复制提示只有这一处:公式可点,文案在这里回显 -->
+            <span id="formula-copy-hint" class="object-list-hint">点击公式复制 TeX</span>
+        </div>
     </div>
 
     <script type="module" src="./src/main.ts"></script>

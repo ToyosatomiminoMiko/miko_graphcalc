@@ -2,7 +2,7 @@
  * GraphCalc 面板内部样式
  * --------------------------------------------------------------------------
  * 负责面板的内容结构:
- *   - 面板标题栏与折叠按钮
+ *   - 面板本体的骨架(标题栏与折叠按钮已经归窗口外壳)
  *   - 参数滑块列表
  *   - 底部输出区域
  *   - 左侧"示例"浮层
@@ -10,116 +10,20 @@
  * 左侧源码编辑区已独立到 css/editor.css;本文件不再包含编辑器的几何与配色.
  * ========================================================================== */
 
-/* 标题栏:显示面板名称,按钮靠右排列 */
-.panel-header {
-    /* 示例浮层以标题栏为定位参照(见文件末尾"示例浮层") */
-    position: relative;
+/* 面板本体:只保留"填满窗口正文"的骨架.
+   底色/边框/阴影归窗口外壳那一层(.window),不再叠两层;`position: absolute` /
+   `z-index` / `overflow` 全部删掉:几何归 WindowManager,裁切归 .window-body,
+   而 `overflow: hidden` 会把有意超出面板的浮层切掉(见 §11.1 B2).
+   面板里的标题栏(.panel-header)也整体删除:标题上移成窗口标题(W6/B8). */
+.panel {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--color-border-divider);
-    font-size: 12px;
-    color: var(--color-text-muted);
-    background: var(--color-bg-header);
+    flex-direction: column;
+    min-height: 0;
 }
 
-/* 标题栏按钮(运行/收起)使用统一的轻量边框样式 */
-.panel-header button {
-    margin-left: auto;
-    background: transparent;
-    border: 1px solid var(--color-border-strong);
-    color: var(--color-text-muted);
-    border-radius: 6px;
-    padding: 3px 8px;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-/* 标题栏右侧按钮组:整组靠右,组内按钮不再各自 auto 推右 */
-.panel-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: auto;
-}
-
-.panel-header-actions button {
-    margin-left: 0;
-}
-
-/* 面板标题保持单行,避免折叠时换行 */
-.panel-title {
-    white-space: nowrap;
-}
-
-/* 折叠时隐藏标题和左侧"运行"/"示例"按钮,仅保留展开按钮 */
-.panel.collapsed .panel-title,
-.panel.collapsed #right-tabs,
-.panel.collapsed #example-btn,
-.panel.collapsed #run-btn,
-.panel.collapsed .object-list-hint {
-    display: none;
-}
-
-/* 折叠后按钮不再需要 auto 推右,改为紧贴边缘 */
-.panel.collapsed .panel-header button {
-    margin-left: 0;
-}
-
-/* ==========================================================================
- * 右栏标签页(参数/视图 与 过程)
- * --------------------------------------------------------------------------
- * 标签按钮由 ui/widgets/Tabs.ts 生成;`#right-tabs` 是它们的容器(留在
- * 面板 header 内部,见 index.html 的说明).两页各包一层 `.right-page`,
- * 页级显隐写 `hidden` 属性(由 ui/panels/RightPanelTabs.ts 维护).
- * ========================================================================== */
-
-#right-tabs {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-}
-
-.tabs {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* header 里的通用规则是"按钮 margin-left:auto 推到最右",标签按钮不参与
-   推右:整组紧跟标题,只有"收起"按钮贴右. */
-.panel-header .tabs .tab {
-    margin-left: 0;
-    padding: 3px 10px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--color-text-muted);
-    font-size: 12px;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.panel-header .tabs .tab:hover {
-    color: var(--color-text-strong);
-    border-color: var(--color-accent-border);
-}
-
-.panel-header .tabs .tab.active {
-    color: var(--color-text-active);
-    background: var(--color-accent-active-bg);
-    border-color: var(--color-accent-border);
-}
-
-.panel-header .tabs .tab:focus-visible {
-    outline: 2px solid var(--color-accent-focus);
-    outline-offset: 1px;
-}
-
-/* 页容器:与右面板同一条"纵向 flex"骨架,并吃掉面板剩余高度.
-   `[hidden]` 必须显式写:`display:flex` 是作者样式,会盖掉 UA 对
-   `[hidden]` 的 `display:none`,不写这一条就藏不住另一页. */
+/* 右栏页容器:与窗口正文同一条"纵向 flex"骨架,并吃掉正文剩余高度.
+   标签栏与页级 hidden 都已删除(两页各自独立成窗口);这里的 flex 约束在
+   `.window-body` 这个新父节点下同样成立(B5). */
 .right-page {
     flex: 1 1 auto;
     min-height: 0;
@@ -127,60 +31,21 @@
     flex-direction: column;
 }
 
-.right-page[hidden] {
-    display: none;
-}
-
 /* ==========================================================================
  * 右侧参数面板
  * ========================================================================== */
 
 /* 参数列表容器:内容超出时纵向滚动.
-   高度由分隔条决定:`flex-basis` 取 `--right-split-basis`(参数区占右面板
-   高度的比例,由 RightSplitController 拖动写入),剩下的高度让给视图区.
-   比例再极端也会被 `min-height` 与视图区的 `min-height`/`max-height` 夹住,
-   所以拖动不会把任何一边压到看不见. */
+   高度来自"参数窗口"正文(不再有分隔条,也没有 --right-split-basis);
+   窗口被拖到太矮时先压到 min-height,再自己出滚动条. */
 #params-panel {
-    flex: 0 0 var(--right-split-basis);
+    flex: 1 1 auto;
     min-height: var(--params-panel-min-height);
     padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
-}
-
-/* 分隔条:夹在参数区与"视图"标题栏之间的一条细横条.
-   视觉上平时只有一条极浅的横线,悬停/拖动/聚焦时亮起来表达"可以上下拖";
-   命中区域由 6px 高本体 + 上下各 3px 的伪元素补足,免得目标太细难点. */
-.right-splitter {
-    flex: 0 0 auto;
-    position: relative;
-    height: 6px;
-    cursor: ns-resize;
-    touch-action: none;
-    background: var(--color-border-input);
-}
-
-.right-splitter::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -3px;
-    bottom: -3px;
-}
-
-.right-splitter:hover,
-.right-splitter.is-dragging,
-.right-splitter:focus-visible {
-    background: var(--color-accent-border);
-    outline: none;
-}
-
-/* 键盘用户:焦点环画在分隔条本身上(与悬停同一套配色). */
-.right-splitter:focus-visible {
-    box-shadow: 0 0 0 1px var(--color-accent-focus-strong);
 }
 
 /* 内部滚动条:参数区与视图区被压缩时都会出现滚动条,给一套不抢眼但看得见的
@@ -811,8 +676,10 @@
     z-index: 40;
     display: none;
     box-sizing: border-box;
-    /* 左面板通高,所以按视口高度留出标题栏与底部余量,超出时自己滚动 */
-    max-height: calc(100vh - 64px);
+    /* 高度按**所属窗口的正文**算(WindowManager 写 --window-body-height):
+       浮层挂在窗口标题栏下,按视口留余量会在窗口比视口矮时超出窗口,再被裁掉
+       就是"菜单被切一半"(见 §11.2 E5). */
+    max-height: calc(var(--window-body-height, 40vh) - 8px);
     overflow-y: auto;
     padding: 6px;
     background: var(--color-bg-popover);
@@ -824,11 +691,6 @@
 
 .example-menu.is-open {
     display: block;
-}
-
-/* 折叠时按钮已隐藏,浮层也不能留在屏幕上 */
-.panel.collapsed .example-menu {
-    display: none;
 }
 
 /* 分组:组标题 + 若干菜单项;组间用细分隔线,不再单独占一行留白 */

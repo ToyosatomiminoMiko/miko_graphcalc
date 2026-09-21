@@ -37,41 +37,34 @@ describe('uiConfigCssVariables', () => {
         expect(variables['--code-gutter-width']).toBe(
             `${UI_CONFIG.editor.gutterMinWidth}px`,
         );
-        expect(variables['--side-default-width']).toBe(
-            `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        );
-        expect(variables['--footer-default-height']).toBe(
-            `${UI_CONFIG.panel.footerDefaultHeight}px`,
-        );
-        expect(variables['--collapsed-side-width']).toBe(
-            `${UI_CONFIG.panel.collapsedSideWidth}px`,
-        );
-        expect(variables['--collapsed-footer-height']).toBe(
-            `${UI_CONFIG.panel.collapsedFooterHeight}px`,
-        );
-        expect(variables['--right-split-basis']).toBe(
-            `${UI_CONFIG.panel.splitDefaultRatio * 100}%`,
-        );
         expect(variables['--params-panel-min-height']).toBe(
             `${UI_CONFIG.panel.paramsMinHeight}px`,
         );
         expect(variables['--view-controls-min-height']).toBe(
             `${UI_CONFIG.panel.viewControlsMinHeight}px`,
         );
+        // 窗口外壳的两个样式常量(CSS 自己要读;窗口几何本身不进 CSS).
+        expect(variables['--window-header-height']).toBe(
+            `${UI_CONFIG.window.headerHeight}px`,
+        );
+        expect(variables['--dock-reserve']).toBe(
+            `${UI_CONFIG.window.dockReserve}px`,
+        );
     });
 
-    it('拖拽夹取上下限与视图控件参数都不进 CSS:它们只被控制器当数字用', () => {
+    it('窗口几何与视图控件参数都不进 CSS:它们只被 TS 当数字用', () => {
         const variables = uiConfigCssVariables();
 
-        // 上限只活在 UI_CONFIG.panel 里,CSS 没有同名变量也就没有第二处副本.
-        expect(Object.keys(variables)).not.toContain('--side-max-width');
-        expect(Object.keys(variables)).not.toContain('--side-min-width');
-        expect(Object.keys(variables)).not.toContain('--footer-max-height');
-        expect(Object.keys(variables)).not.toContain('--footer-min-height');
-        expect(Object.keys(variables)).not.toContain('--right-split-min');
-        expect(Object.keys(variables)).not.toContain('--right-split-max');
+        // 窗口几何的真相源是 UI_CONFIG.window + WindowGeometry,由 WindowManager
+        // 写成行内样式;CSS 里没有 --window-* 的几何副本(只有标题栏高度与
+        // Dock 预留这两个样式常量).
+        for (const name of Object.keys(variables)) {
+            expect(name).not.toMatch(/--window-\d/);
+        }
+        expect(Object.keys(variables)).not.toContain('--window-width');
+        expect(Object.keys(variables)).not.toContain('--window-left');
         // UI_CONFIG.view 整段同理(控件的 min/step 与 ViewCube 选项清单);
-        // "没有多出变量"由下面那条 13 条的计数断言兜底.
+        // "没有多出变量"由下面那条计数断言兜底.
         expect(Object.keys(variables).filter((name) => name.includes('segmented')))
             .toEqual([]);
     });
@@ -79,7 +72,7 @@ describe('uiConfigCssVariables', () => {
     it('整张映射表都是非空字符串(条数固定:新增变量必须同步 base.css 兜底)', () => {
         const variables = uiConfigCssVariables();
 
-        expect(Object.keys(variables)).toHaveLength(13);
+        expect(Object.keys(variables)).toHaveLength(10);
         for (const value of Object.values(variables)) {
             expect(typeof value).toBe('string');
             expect(value.length).toBeGreaterThan(0);
@@ -96,19 +89,9 @@ describe('UI_CONFIG', () => {
         expect(UI_CONFIG.formula.katexFontSize).toBeGreaterThan(0);
     });
 
-    it('面板尺寸自洽:上下限夹得住默认值', () => {
-        const panel = UI_CONFIG.panel;
-
-        expect(panel.sideMinWidth).toBeLessThanOrEqual(panel.sideDefaultWidth);
-        expect(panel.sideDefaultWidth).toBeLessThanOrEqual(panel.sideMaxWidth);
-        expect(panel.footerMinHeight).toBeLessThanOrEqual(panel.footerDefaultHeight);
-        expect(panel.footerDefaultHeight).toBeLessThanOrEqual(panel.footerMaxHeight);
-        expect(panel.collapsedSideWidth).toBeLessThan(panel.sideMinWidth);
-        expect(panel.collapsedFooterHeight).toBeLessThan(panel.footerMinHeight);
-        expect(panel.splitMinRatio).toBeGreaterThan(0);
-        expect(panel.splitMinRatio).toBeLessThanOrEqual(panel.splitDefaultRatio);
-        expect(panel.splitDefaultRatio).toBeLessThanOrEqual(panel.splitMaxRatio);
-        expect(panel.splitMaxRatio).toBeLessThan(1);
+    it('面板内容下限为正数(窗口几何已经归 UI_CONFIG.window)', () => {
+        expect(UI_CONFIG.panel.paramsMinHeight).toBeGreaterThan(0);
+        expect(UI_CONFIG.panel.viewControlsMinHeight).toBeGreaterThan(0);
     });
 
     it('视图控件参数自洽:步长为正,下限非负且小刻度不比大刻度粗', () => {
@@ -149,11 +132,9 @@ describe('applyUiConfig', () => {
 
         applyUiConfig(root);
 
-        expect(written.size).toBe(13);
+        expect(written.size).toBe(10);
         expect(written.get('--code-font-size')).toBe(`${UI_CONFIG.editor.fontSize}px`);
-        expect(written.get('--side-default-width')).toBe(
-            `${UI_CONFIG.panel.sideDefaultWidth}px`,
-        );
+        expect(written.get('--dock-reserve')).toBe(`${UI_CONFIG.window.dockReserve}px`);
     });
 });
 
@@ -170,15 +151,15 @@ describe('base.css 的 :root 兜底(UI-P3.14)', () => {
         expect(fallbacks).toMatchObject(uiConfigCssVariables());
     });
 
-    it('派生变量只引用 :root 数字,不重复写一遍同样的数', () => {
+    it('#app 上不再有面板几何的派生变量(几何归窗口系统)', () => {
         const css = readFileSync(
             new URL('../../../css/base.css', import.meta.url),
             'utf8',
         );
         const appBlock = /#app\s*\{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
 
-        expect(appBlock).toMatch(/--left-panel-width:\s*var\(--side-default-width\)/);
-        expect(appBlock).toMatch(/--right-panel-width:\s*var\(--side-default-width\)/);
-        expect(appBlock).toMatch(/--footer-height:\s*var\(--footer-default-height\)/);
+        expect(appBlock).not.toContain('--left-panel-width');
+        expect(appBlock).not.toContain('--right-panel-width');
+        expect(appBlock).not.toContain('--footer-height');
     });
 });

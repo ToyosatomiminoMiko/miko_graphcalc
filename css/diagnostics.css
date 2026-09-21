@@ -1,4 +1,6 @@
-/* 右侧参数面板下方的错误/警告提示区 */
+/* 参数窗口下方的错误/警告提示区.
+   高度基准是所在窗口正文 `.window-body` 的 34%:参数窗口默认只有约半个桌面高,
+   所以这个比例是否够用要真机看过再定(见 docs/windowing-plan.md §11.1 B3). */
 #diagnostics {
     flex: 0 1 auto;
     max-height: 34%;

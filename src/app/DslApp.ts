@@ -13,6 +13,7 @@
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
 import type { SceneIR } from '@/contract/ir';
+import type { WindowId } from '@/config/uiConfig';
 import { EventBus } from '@/core/EventBus';
 import { KeyboardController } from '@/ui/shared/KeyboardController';
 import type { GraphCalcEvents } from '@/contract/events';
@@ -25,9 +26,7 @@ import { EditorLineNumbers } from '@/ui/editor/EditorLineNumbers';
 import { EditorHighlight } from '@/ui/editor/EditorHighlight';
 import { FormulaCopyController } from '@/ui/formula/FormulaCopyController';
 import { ObjectListController } from '@/ui/objects/ObjectListController';
-import { PanelController } from '@/ui/panels/PanelController';
-import { RightPanelTabs } from '@/ui/panels/RightPanelTabs';
-import { RightSplitController } from '@/ui/panels/RightSplitController';
+import { WindowManager, type WindowContent } from '@/ui/desktop/WindowManager';
 import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
 import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
 import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
@@ -56,10 +55,16 @@ export class DslApp {
     private readonly runButton: HTMLButtonElement;
     private readonly lineNumbers: EditorLineNumbers;
     private readonly editorHighlight: EditorHighlight;
-    private panelController: PanelController | null = null;
-    private rightSplitController: RightSplitController | null = null;
-    /** 右栏标签页:页归属的状态源;页宽与页归属无关(两页共用一份宽度). */
-    private rightPanelTabs: RightPanelTabs | null = null;
+    /**
+     * 桌面窗口管理器:窗口外壳(标题栏/正文/八根手柄),状态机,z-order 与
+     * Dock 的唯一所有者.它替换了原来的 PanelController / RightPanelTabs /
+     * RightSplitController 三个"布局/页归属/分栏比例"控制器.
+     */
+    private readonly windowManager: WindowManager;
+    /** 搬进窗口标题栏的既有节点(见 `_windowContent`). */
+    private readonly exampleButton: HTMLButtonElement;
+    private readonly exampleMenu: HTMLElement;
+    private readonly formulaCopyHint: HTMLElement;
     /** 过程页视图:条目"过程"入口把文档交给它载入. */
     private processPanel: ProcessPanel | null = null;
 
@@ -142,6 +147,9 @@ export class DslApp {
             (name) => this._scheduleRefresh(name),
         );
         this.formulaCopyController = new FormulaCopyController(formulaCopyHint);
+        this.formulaCopyHint = formulaCopyHint;
+        this.exampleButton = document.getElementById('example-btn') as HTMLButtonElement;
+        this.exampleMenu = document.getElementById('example-menu')!;
         this.viewPanel = createViewPanel(document.getElementById('view-controls')!);
         this.exampleLoader = new ExampleLoaderController(
             {
@@ -156,6 +164,33 @@ export class DslApp {
             this.diagnosticsController,
             this.objectListController,
         );
+        // 三个容器节点由装配层取好传入(与 EditorHighlight 同一约定):
+        // 窗口层,Dock 与吸附高亮都留在 index.html 的空宿主里.
+        this.windowManager = new WindowManager(
+            document.getElementById('window-layer')!,
+            document.getElementById('dock')!,
+            document.getElementById('snap-preview')!,
+            (id) => this._windowContent(id),
+        );
+    }
+
+    /**
+     * 哪些既有节点搬进哪个窗口的标题栏.
+     *
+     * 这些节点(示例 / RUN / 示例浮层 / 复制提示)的 id 与监听归各自的控制器,
+     * 位置却归窗口外壳,所以由装配层在这里点名,而不是让 WindowManager 去猜.
+     */
+    private _windowContent(id: WindowId): WindowContent {
+        if (id === 'source') {
+            return {
+                actions: [this.exampleButton, this.runButton],
+                overlays: [this.exampleMenu],
+            };
+        }
+        if (id === 'objects') {
+            return { titleContent: [this.formulaCopyHint] };
+        }
+        return {};
     }
 
     /**
@@ -174,29 +209,11 @@ export class DslApp {
         this.renderController.wireViewControls(this.eventBus, this.viewPanel);
         this._wireEditor();
 
-        this.panelController = new PanelController();
-        this.panelController.bind(document.getElementById('app')!);
-        // 右面板内部"参数区 / 视图区"的分隔高度:与面板宽度/底部高度一样,
-        // 属于布局态,由控制器写到 #app 的 CSS 变量上.
-        this.rightSplitController = new RightSplitController();
-        this.rightSplitController.bind(document.getElementById('app')!);
-        // 右栏标签页:切页只改"哪一页在前",不碰宽度 -- 参数页与过程页共用
-        // 侧栏那一份宽度(`--right-panel-width` 的唯一写入点仍是 PanelController).
-        this.rightPanelTabs = new RightPanelTabs(
-            document.getElementById('right-tabs')!,
-            {
-                params: document.getElementById('right-page-params')!,
-                process: document.getElementById('right-page-process')!,
-            },
-            {
-                onTabChange: (tab) => {
-                    // 参数可能刚在另一页被改过:切回过程页时刷新只读回显,
-                    // 但不重载过程(那会白白重建整张步骤表).
-                    if (tab === 'process') this.processPanel?.refreshEcho();
-                },
-            },
-        );
-        this.rightPanelTabs.bind();
+        // 窗口装配:建五个窗口外壳,把五个正文宿主搬进各自的 .window-body,
+        // 建 Dock,起初始焦点.必须发生在取宿主之前的那一步之后,其余控制器
+        // 都能拿到节点之后(宿主的搬运不改节点身份,控制器按 id 拿到的还是同一个).
+        this.windowManager.bind();
+        this._wireEditorResize();
 
         // 过程页视图只装配一次;参数只读回显(R6)按需拉当前值,不在这里存副本.
         this.processPanel = new ProcessPanel(
@@ -221,6 +238,15 @@ export class DslApp {
         for (const binding of this.exampleLoader.keyboardBindings()) {
             this.keyboardController.register(binding);
         }
+        // 单窗口全屏的键盘出口:注册在示例浮层的 Esc **之后**,菜单开着时先关
+        // 菜单;没有全屏窗口时本条返回 null,把 Esc 原样放行(见 §3.3;完整键盘
+        // 窗口管理是阶段 5,不在这里做).
+        this.keyboardController.register({
+            keys: ['Escape'],
+            resolve: () => (this.windowManager.hasFullscreen()
+                ? () => this.windowManager.exitFullscreen()
+                : null),
+        });
         this.keyboardController.bind();
 
         window.addEventListener('resize', this.onResize);
@@ -243,10 +269,8 @@ export class DslApp {
 
         window.removeEventListener('resize', this.onResize);
 
-        this.panelController?.dispose();
-        this.rightSplitController?.dispose();
-        this.rightPanelTabs?.dispose();
-        this.rightPanelTabs = null;
+        // 窗口:摘监听,把宿主还回 #app,删掉窗口外壳(与 bind() 配对).
+        this.windowManager.dispose();
         this.processPanel?.dispose();
         this.processPanel = null;
         this.lineNumbers.dispose();
@@ -357,6 +381,9 @@ export class DslApp {
             const changedParams = new Set(this.pendingParamChanges);
             this.pendingParamChanges.clear();
             this._refreshObjects(changedParams);
+            // 参数变了就刷过程窗口顶部的只读回显:过程窗口与参数窗口同屏,
+            // 原来"切回过程页才刷新"的触发点已经不存在(见 §3.7 第三条).
+            this.processPanel?.refreshEcho();
         });
     }
 
@@ -452,14 +479,33 @@ export class DslApp {
     }
 
     /**
-     * 打开某条求值对象的过程页(三级披露的 L2).
+     * 打开某条求值对象的过程(三级披露的 L2).
      *
-     * 过程文档由条目在点击时构建(item 知道自己的 IR 字段),这里只做两件事:
-     * 切到过程页(右栏宽度不变,两页共用一份宽度),载入步骤.切页不清参数状态,
-     * 过程页顶部另有当前参数的只读回显(R6).
+     * 过程已经是独立窗口,所以"打开"的口径从**切页**变成**抬窗口**:
+     * ①被最小化/关闭就先恢复可见;②抬升并聚焦(唯一入口 `reveal`);③载入文档.
+     * 不最大化,不改几何,不碰参数窗口(见 docs/windowing-plan.md §3.7).
      */
     private _openProcess(request: ProcessRequest): void {
-        this.rightPanelTabs?.show('process');
+        this.windowManager.reveal('process');
         this.processPanel?.show(request.document);
+    }
+
+    /**
+     * 窗口尺寸变化后重排编辑器(行号槽宽与高亮层的滚动基准).
+     *
+     * 行号与高亮层各自都有 `ResizeObserver`,那是**主路径**;这条钩子是兜底:
+     * 最小化/关闭再恢复时,元素在隐藏期间量到的未必是最终尺寸(隐藏态刻意不用
+     * `display: none`,就是为了让测量始终有效).只改 x/y 的拖动不重复刷新.
+     */
+    private _wireEditorResize(): void {
+        const lastKey = new Map<string, string>();
+        this.windowManager.onGeometryChange((id) => {
+            const geometry = this.windowManager.getGeometry(id);
+            const key = `${geometry.w}x${geometry.h}:${this.windowManager.getState(id)}`;
+            if (lastKey.get(id) === key) return;
+            lastKey.set(id, key);
+            this.lineNumbers.refresh();
+            this.editorHighlight.refresh();
+        });
     }
 }

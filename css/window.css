@@ -1,0 +1,432 @@
+/* ==========================================================================
+ * GraphCalc 桌面窗口化样式
+ * --------------------------------------------------------------------------
+ * 负责:
+ *   - 三层容器与 3D 视口的堆叠(#viewport / #window-layer / #snap-preview / #dock)
+ *   - 窗口外壳(.window / .window-header / .window-title / .window-actions /
+ *     .window-controls / .window-body)
+ *   - 八向缩放手柄(.resize-handle + [data-window-resize])
+ *   - Dock(任务栏)与吸附高亮
+ *
+ * **这里没有窗口几何**:窗口的 left/top/width/height 由 WindowManager 按
+ * UI_CONFIG.window + WindowGeometry 写成行内样式;CSS 只有两个"必须自己读"的
+ * 常量(--window-header-height / --dock-reserve,真相源仍是 UI_CONFIG.window,
+ * 由 applyUiConfig 写进 :root).
+ *
+ * 三条必须守住的规则(见 docs/windowing-plan.md §11.1):
+ *   1. #window-layer 整层 pointer-events: none,只有 .window 自己 auto--
+ *      否则窗口层会挡住 canvas,OrbitControls 立刻失效(W1 的核心约束);
+ *   2. .window 不能 overflow: hidden(示例浮层要有意超出标题栏),裁切归
+ *      .window-body;
+ *   3. 窗口的隐藏态用 opacity + inert,不用 display: none--编辑器行号与高亮层
+ *      在隐藏期间会量到 0 尺寸,恢复后对齐错乱(见 §5.6).
+ * ========================================================================== */
+
+/* 3D 视口铺满整个应用,位于所有窗口下方 */
+#viewport {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
+/* 窗口层:建立窗口的定位参照与 z-order 层.
+   整层不拦截指针是 W1 能成立的关键:桌面空白处(窗口没盖住的地方)
+   OrbitControls 照常收到事件. */
+#window-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* 吸附高亮:一个绝对定位的层,几何由 SnapPreview 按同一个纯函数写行内样式.
+   不拦截指针,否则拖动一开始就再也收不到 pointermove. */
+#snap-preview {
+    position: absolute;
+    display: none;
+    pointer-events: none;
+    border: 1px solid var(--color-accent-border);
+    border-radius: 8px;
+    background: var(--color-accent-active-bg);
+}
+
+#snap-preview.is-open {
+    display: block;
+}
+
+/* ==========================================================================
+ * 窗口外壳
+ * ========================================================================== */
+
+/* 窗口自己收指针(父层是 none),并且**不能裁切**:示例浮层有意超出标题栏. */
+.window {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    pointer-events: auto;
+    background: var(--color-bg-panel);
+    border: 1px solid var(--color-border-panel);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px var(--color-shadow-panel);
+}
+
+/* 最大化:填满桌面,底部给 Dock 留出预留高度;全屏:铺满整个桌面.
+   两者都只靠一个类,不碰行内几何(进入这两种态时 WindowManager 会先清掉
+   left/top/width/height,否则行内属性会压过这里的 inset). */
+.window.is-maximized {
+    inset: 0 0 var(--dock-reserve) 0;
+}
+
+.window.is-fullscreen {
+    inset: 0;
+}
+
+/* 隐藏态(最小化 / 关闭):保留布局与尺寸,只做视觉与交互上的"消失".
+   必须 opacity 而不是 display: none--见文件头第 3 条. */
+.window.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* 聚焦窗口:只提亮描边与标题,不做参考项目那种两套配色互换. */
+.window.is-focused {
+    border-color: var(--color-accent-border);
+}
+
+.window.is-focused > .window-header {
+    color: var(--color-text-active);
+    border-bottom-color: var(--color-accent-line);
+}
+
+/* 拖动中:正文不接收指针(拖到数字输入框上方不会误触). */
+.window.is-dragging .window-body {
+    pointer-events: none;
+}
+
+.window-header {
+    /* 示例浮层的定位锚点就是这一层(浮层是 header 的直接子节点). */
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    height: var(--window-header-height);
+    padding: 0 10px;
+    border-bottom: 1px solid var(--color-border-divider);
+    border-radius: 8px 8px 0 0;
+    background: var(--color-bg-header);
+}
+
+/* 标题本身是拖动起手区:光标与"不可选中"都在这里表达.
+   它与 .window-actions / .window-controls 是**兄弟**,所以按钮天然不在拖动
+   区内,不需要运行期 closest('button') 判断. */
+.window-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    cursor: move;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 面板自带的动作(示例 / RUN):从 .panel-header 搬进窗口标题栏. */
+.window-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.window-actions button {
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.window-actions button:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}
+
+.window-actions button:focus-visible,
+.window-control-btn:focus-visible,
+.dock-btn:focus-visible,
+.dock-action:focus-visible {
+    outline: 2px solid var(--color-accent-focus);
+    outline-offset: 1px;
+}
+
+/* 窗口按钮:最小化 / 最大化 / 全屏 / 关闭. */
+.window-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.window-control-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.window-control-btn:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+    background: var(--color-fill-control);
+}
+
+/* 窗口正文:确定高度 + 裁切都归它;里面的宿主由 `.window-body > *` 拉满.
+   漏掉 flex/min-height 不会报错,只是内容高度变成 0(见 §11.1 B5). */
+.window-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 0 0 8px 8px;
+}
+
+.window-body > * {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* 全屏:标题栏收成一条悬停浮现的窄条(Dock 由 WindowManager 隐藏).
+   `:focus-within` 也要浮现:用键盘(或点过标题栏按钮之后)焦点落在标题栏里时,
+   退出按钮必须看得见,否则全屏只剩 `Esc` 一条出口. */
+.window.is-fullscreen > .window-header {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.window.is-fullscreen > .window-header:hover,
+.window.is-fullscreen > .window-header:focus-within {
+    opacity: 1;
+}
+
+/* ==========================================================================
+ * 八向缩放手柄
+ * --------------------------------------------------------------------------
+ * 手柄就是 `<div class="resize-handle" data-window-resize="e">`.类名保留原来
+ * 的 .resize-handle(命中区与光标仍然只由 CSS 给,拖动起手时读的就是
+ * getComputedStyle(handle).cursor),新增的只是八个方向.
+ * 手柄是 .window 的绝对定位子元素,不参与正文布局;负偏移让命中区跨在窗口
+ * 边界上,配合 .window 的 overflow: visible 才点得到.
+ * ========================================================================== */
+
+.resize-handle {
+    position: absolute;
+    z-index: 2;
+    background: transparent;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.resize-handle:hover {
+    background: var(--color-accent-weak);
+}
+
+.resize-handle[data-window-resize="n"],
+.resize-handle[data-window-resize="s"] {
+    left: 8px;
+    right: 8px;
+    height: 8px;
+    cursor: ns-resize;
+}
+
+.resize-handle[data-window-resize="n"] {
+    top: -3px;
+}
+
+.resize-handle[data-window-resize="s"] {
+    bottom: -3px;
+}
+
+.resize-handle[data-window-resize="e"],
+.resize-handle[data-window-resize="w"] {
+    top: 8px;
+    bottom: 8px;
+    width: 8px;
+    cursor: ew-resize;
+}
+
+.resize-handle[data-window-resize="e"] {
+    right: -3px;
+}
+
+.resize-handle[data-window-resize="w"] {
+    left: -3px;
+}
+
+.resize-handle[data-window-resize="ne"],
+.resize-handle[data-window-resize="nw"],
+.resize-handle[data-window-resize="se"],
+.resize-handle[data-window-resize="sw"] {
+    width: 14px;
+    height: 14px;
+}
+
+.resize-handle[data-window-resize="ne"] {
+    top: -3px;
+    right: -3px;
+    cursor: nesw-resize;
+}
+
+.resize-handle[data-window-resize="sw"] {
+    bottom: -3px;
+    left: -3px;
+    cursor: nesw-resize;
+}
+
+.resize-handle[data-window-resize="nw"] {
+    top: -3px;
+    left: -3px;
+    cursor: nwse-resize;
+}
+
+.resize-handle[data-window-resize="se"] {
+    bottom: -3px;
+    right: -3px;
+    cursor: nwse-resize;
+}
+
+/* ==========================================================================
+ * Dock(任务栏)
+ * --------------------------------------------------------------------------
+ * #dock 自身铺满底部一条但 pointer-events: none,真正可点的盒子是里面那个
+ * .dock-inner,只占内容宽度--两侧必须留出能点到的桌面,否则窗口南边的缩放
+ * 手柄会被一条通栏的实心条压住(见 §11.1 B4).
+ * ========================================================================== */
+
+#dock {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--dock-reserve);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+/* 单窗口全屏时 Dock 自动隐藏(退出全屏用 Esc 或标题栏按钮). */
+#dock.is-fullscreen {
+    display: none;
+}
+
+.dock-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    pointer-events: auto;
+    background: var(--color-bg-popover);
+    border: 1px solid var(--color-border-panel);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px var(--color-shadow-panel);
+}
+
+.dock-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dock-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.dock-btn:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}
+
+.dock-btn.is-active {
+    color: var(--color-text-active);
+    border-color: var(--color-accent-border);
+    background: var(--color-accent-active-bg);
+}
+
+.dock-btn[data-state="minimized"],
+.dock-btn[data-state="closed"] {
+    opacity: 0.6;
+}
+
+.dock-btn-icon {
+    font-size: 12px;
+}
+
+.dock-btn-state {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-neutral);
+}
+
+.dock-btn-state.is-minimized,
+.dock-btn-state.is-closed {
+    background: var(--color-text-faint);
+}
+
+.dock-btn-state.is-maximized,
+.dock-btn-state.is-fullscreen {
+    background: var(--color-accent);
+}
+
+.dock-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 8px;
+    border-left: 1px solid var(--color-border-divider);
+}
+
+.dock-action {
+    padding: 5px 9px;
+    background: transparent;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 8px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.dock-action:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-accent-border);
+}

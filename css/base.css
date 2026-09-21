@@ -21,7 +21,7 @@
  *    真相源就在本文件,消费者全是 CSS,没有任何 TS 读取方.
  *    规则见那节注释,由 src/ui/theme/cssPalette.test.ts 断言.
  *
- * 2. **代码字体 / KaTeX 字号 / 面板几何**:
+ * 2. **代码字体 / KaTeX 字号 / 面板内容下限 / 窗口外壳常量**:
  *    真相源是 src/config/uiConfig.ts,启动时由 src/ui/theme/applyUiConfig.ts
  *    写到 :root 上并覆盖这里的值.下面这些只是"脚本执行前"的兜底,
  *    必须与 UI_CONFIG 保持一致,否则首帧会闪一下旧样式--这条约定由
@@ -105,7 +105,6 @@
     --color-accent-border: rgba(109, 213, 255, 0.45);       /* 悬停时的控件描边/分隔条 */
     --color-accent-focus: rgba(109, 213, 255, 0.6);        /* 键盘焦点环(2px outline) */
     --color-accent-focus-soft: rgba(109, 213, 255, 0.65);   /* 公式焦点环(1px) */
-    --color-accent-focus-strong: rgba(109, 213, 255, 0.7); /* 分隔条聚焦外发光 */
 
     /* -- 选中态(偏蓝一档,与主色区分开) ---------------------------------- */
     --color-select-bg: rgba(70, 130, 255, 0.25);    /* 选中按钮底 */
@@ -164,25 +163,20 @@
     --katex-font-size: 1.5em;
     --code-gutter-width: 32px;
 
-    /* 右侧面板上下两块内容的最小可视高度(消费者是 panels.css 的
-       #params-panel 与 controls.css 的 #view-controls).
-       右面板是通高的:两块的"舒适高度"之和超过它时,先压到各自的下限,
-       再各自出现内部滚动条,谁都不会被压没. */
+    /* 参数窗口/视图窗口里内容的最小可视高度(消费者是 panels.css 的
+       #params-panel 与 controls.css 的 #view-controls).窗口被拖到比下限还矮
+       时,由这两块自己出内部滚动条,谁都不会被压没. */
     --params-panel-min-height: 120px;
     --view-controls-min-height: 120px;
 
-    /* 面板尺寸初值(消费者是下面 #app 的派生变量与 layout.css 的 .collapsed).
-       PanelController 在 bind() 时把当前宽度/高度写成 #app 的行内样式覆盖
-       --left/right-panel-width 与 --footer-height,这几个初值只服务首帧. */
-    --side-default-width: 300px;
-    --footer-default-height: 240px;
-    --collapsed-side-width: 44px;
-    --collapsed-footer-height: 40px;
-
-    /* 参数区占右面板高度的比例(分隔条拖动的结果).
-       由 RightSplitController 写到 #app 上覆盖这里;这里只是脚本执行前
-       以及未绑定分隔条时的初始值,与 splitDefaultRatio(0.4)一致. */
-    --right-split-basis: 40%;
+    /* 窗口外壳的两个样式常量(真相源是 UI_CONFIG.window).
+       窗口几何(left/top/width/height)不进 CSS:窗口由 JS 建,几何由
+       WindowManager 写成行内样式,不存在"CSS 首帧"这回事;这里只有这两个
+       "CSS 必须自己读"的数:
+       - 标题栏高度:.window-header 消费它,与夹取用的 headerMinVisible 同源;
+       - Dock 预留高度:.window.is-maximized 的 bottom 消费它(最大化不盖住 Dock). */
+    --window-header-height: 36px;
+    --dock-reserve: 100px;
 }
 
 /* 页面根容器:铺满视口,并统一基础视觉风格 */
@@ -195,17 +189,10 @@ body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* 应用根节点:承载左侧源码/右侧参数/底部输出三个面板 */
+/* 应用根节点:3D 视口 + 窗口层 + Dock 的桌面 */
 #app {
     position: relative;
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-
-    /* 三个尺寸变量的初值:PanelController.bind() 会把当前宽度/高度写成 #app
-       的行内样式覆盖它们(拖拽与折叠共用那条写入路径).这里只做派生,真正的
-       数字在 :root 的 --side-default-width / --footer-default-height 里. */
-    --left-panel-width: var(--side-default-width);
-    --right-panel-width: var(--side-default-width);
-    --footer-height: var(--footer-default-height);
 }

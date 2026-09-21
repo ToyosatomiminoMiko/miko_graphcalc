@@ -22,7 +22,7 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 当前支持范围
 
-- 内置示例菜单:左侧「源码」面板标题栏的"示例"按钮打开分组清单
+- 内置示例菜单:`source code` 窗口标题栏的"示例"按钮打开分组清单
   (求导 / 偏导 与 其他主题),选中即整段替换编辑器源码并立即运行.
   示例文本在构建期由 `import.meta.glob(..., { query: '?raw' })` 从
   `example/*.miko` 内联进 bundle(运行时不 fetch,离线可用),`example/`
@@ -101,25 +101,60 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 相机状态不进入 DSL:透视/正交与旋转锁定由右侧 UI 开关控制,
 `camera:view` 按钮只负责预设视角.
 
+## 桌面窗口化
+
+界面形态是"**3D 视口铺满 + 五个浮动窗口 + 底部 Dock**":`#viewport`(Three.js
+画布)仍然铺满 `#app`,五个窗口悬在它上面,桌面空白处照常可以转视角.
+
+```text
+source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
+过程(递等式)        对象(实体 / 求值两栏)      Dock(任务栏)
+```
+
+- 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)**由 TS 声明式装配**
+  (`src/ui/desktop/WindowFrame.ts`),`index.html` 里没有任何 `.window` 结构,
+  只有五个正文宿主与三个空容器(`#window-layer` / `#snap-preview` / `#dock`);
+  加窗口只改 `UI_CONFIG.window.windows` 一处.
+- 能力:拖动标题栏移动,八向缩放,最小化,关闭,**Dock**(按钮由窗口清单生成,
+  带状态点与"全部还原"),最大化(填满桌面并给 Dock 留出高度),单窗口全屏
+  (`Esc` 或标题栏按钮退出),边缘吸附(左/右半屏,上边缘最大化)与窗口间磁吸.
+- 状态与写入点:`WindowManager` 持有 `geometry` / `state` / `restore` /
+  `focused` / `zIndex`;**几何的唯一写入点**是 `_applyGeometry`(逐条
+  `setProperty`,不碰 `z-index`),**状态的唯一写入点**是 `_applyState`
+  (所有 `.window` 类名,`inert`/`aria-hidden`,按钮文案,Dock 态),
+  `z-index` 只有 `focus()` 写.
+- 隐藏态(最小化/关闭)用 `opacity: 0` + `inert` + `aria-hidden`,**不用**
+  `display: none`:编辑器行号与高亮层在隐藏期间必须仍能量到尺寸,否则恢复后
+  对齐会整体错乱.
+- `#window-layer` 整层 `pointer-events: none`(只有 `.window` 自己 `auto`),
+  这是"空桌面处仍能转 3D"的前提;Dock 的实心盒子只占内容宽度,两侧留出可点的
+  桌面,窗口南边的缩放手柄才不会被压住.
+- **布局不落 localStorage**:刷新后回到默认几何,与"界面偏好不落本地存储"的
+  既有约定一致;设计取舍与逐条理由见
+  [面板窗口化设计计划](docs/windowing-plan.md).
+
 ## 界面样式配置
 
-代码区字体,KaTeX 字号与面板几何**不做运行时设置界面**,也不落 localStorage:
+代码区字体,KaTeX 字号与窗口外壳常量**不做运行时设置界面**,也不落 localStorage:
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/theme/applyUiConfig.ts`
 写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
-`css/panels.css`(面板与对象列表),`css/controls.css` 与 `css/base.css`
-的 `var()` 消费.
+`css/panels.css`(面板与对象列表),`css/controls.css`,`css/window.css`
+(窗口外壳/Dock/吸附高亮)与 `css/base.css` 的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
   `gutterMinWidth` 是行号槽宽下限;
 - `UI_CONFIG.formula.katexFontSize`:底部对象列表里 KaTeX 公式的字号,
   单位 em,基准是 `.object-expr` 的 16px;
-- `UI_CONFIG.panel`:三个面板的尺寸与右侧"参数区 / 视图区"的分割比例.
-  拖拽的夹取上下限(`sideMin/MaxWidth`,`footerMin/MaxHeight`,
-  `splitMin/MaxRatio`)CSS 用不到,只活在这里;默认尺寸,折叠尺寸,
-  两个最小高度与默认分割比例 CSS 首帧要消费,因此在 `css/base.css` 的
-  `:root` 有一份同名兜底,而 `#app` 的 `--left/right-panel-width` 与
-  `--footer-height` 只是 `var()` 派生,不再重复数字.
+- `UI_CONFIG.panel`:只剩参数区与视图控件的**内容下限**
+  (`paramsMinHeight` / `viewControlsMinHeight`),由 CSS 消费;
+- `UI_CONFIG.window`:桌面窗口化的全部几何与常量--五个窗口的标题/宿主/
+  默认几何锚点/最小尺寸,标题栏按钮清单,`edgeKeep`/`edgeGap`/
+  `headerMinVisible`/`dockReserve`/`headerHeight`,三层容器的 `z-index`
+  与吸附阈值.**窗口几何不进 CSS**(窗口是 JS 建的,不存在"CSS 首帧"),
+  默认几何由 `WindowGeometry.resolveDefaultGeometry()` 按当前桌面尺寸算出
+  px,由 `WindowManager` 写成行内样式;`css/base.css` 里只有两个窗口外壳
+  常量的兜底(`--window-header-height` 与 `--dock-reserve`).
 
 改完刷新页面即可.`css/base.css` 的 `:root` 兜底只负责脚本执行前的首帧,
 必须与 `UI_CONFIG` 保持一致--这条约定由 `applyUiConfig.test.ts` 逐字断言,
@@ -344,12 +379,12 @@ src/ui/
   editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
   formula/          KaTeX 排版与点击复制
   examples/         示例目录与载入
-  view/             右侧"视图"面板装配;view/controls/ 视图控件控制器(状态 + 校验 + 广播)
+  view/             视图窗口的控件装配;view/controls/ 视图控件控制器(状态 + 校验 + 广播)
   objects/          对象列表装配(左实体栏 + 右求值栏)
   entity/           实体列表(左栏)
   evaluation/       求值列表(右栏:分析/积分/求交/不定积分/ODE)
-  process/          过程页与步骤数据
-  panels/           面板外壳:几何拖拽/分栏/标签页
+  process/          过程窗口与步骤数据
+  desktop/          桌面窗口化:几何纯函数/窗口外壳/八向缩放/状态机/Dock/吸附
   params/           参数面板(滑块取值口径与写回时机)
   diagnostics/      诊断提示列表
 src/app/            控制与编排
@@ -426,7 +461,7 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 `contract/events.ts` 只保留有真实 emit 点的视图事件键,不再允许
 "先声明后接线"的 dead event keys.
 
-右侧"视图"面板(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
+视图窗口(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
 
 ```text
 RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初值(唯一读配置的视图代码)
@@ -451,7 +486,7 @@ RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初�
 `--segmented-columns`,行内撑满走修饰类 `.segmented--inline`.
 
 控件的可调范围与选项(`min`/`step`/ViewCube 名单)收在 `UI_CONFIG.view`:
-它是**只有 TS 消费**的界面参数(与 `panel` 的拖拽夹取范围同类),不进
+它是**只有 TS 消费**的界面参数(与 `UI_CONFIG.window` 的窗口几何同类),不进
 `applyUiConfig` 的 CSS 变量表,`css/base.css` 里因此没有第二份副本;渲染默认值
 仍只在 `RENDER_CONFIG`.控制器判"越界"时读的是同一份 `UI_CONFIG.view`.
 

@@ -13,6 +13,84 @@
  * `css/base.css` 的 `:root` 里有同名变量的兜底值,必须与本文件保持一致:
  * 兜底只负责脚本执行前的首帧,正常路径一定会被 applyUiConfig 覆盖.
  */
+/**
+ * 窗口几何:一个轴上的定位方式(见 docs/windowing-plan.md §4.1).
+ *
+ * `from: 'bottom'` 的语义**只有一条**:该窗口的这条边落在距桌面该侧 `inset`
+ * 处,于是 `x: { from: 'right', inset } -> x = dW - inset - w`,`h: { from:
+ * 'bottom', inset } -> h = dH - inset - y`.五个窗口共用同一个底边 `inset`,
+ * 底边自然齐平,不需要第二套规则.
+ */
+export type AxisSpec =
+    | { readonly at: number }
+    | { readonly from: 'right' | 'bottom'; readonly inset: number }
+    | 'center'
+    | { readonly fraction: number; readonly of: 'usableHeight' }
+    | {
+        readonly clamp: readonly [min: number, max: number];
+        readonly inset: number;
+    };
+
+/**
+ * 默认几何:写"锚点",不写算出来的数字.
+ *
+ * 列高与中列宽度都依赖桌面尺寸,写死 px 只在某一个视口下正确,因此配置里
+ * 只描述锚点,由 `WindowGeometry.resolveDefaultGeometry()` 按当前桌面算出 px.
+ */
+export interface WindowGeometrySpec {
+    readonly x: AxisSpec;
+    readonly y: AxisSpec;
+    readonly w: AxisSpec;
+    readonly h: AxisSpec;
+    /** 依赖另一个窗口:`y` 接在 `after` 的下方 `gap` 像素处(`y` 被忽略). */
+    readonly after?: { readonly id: string; readonly gap: number };
+}
+
+/** 窗口 id;数组顺序即 Dock 顺序与默认几何的依赖顺序. */
+export type WindowId = 'source' | 'view' | 'params' | 'process' | 'objects';
+
+/** 标题栏上的窗口按钮 id. */
+export type WindowActionId = 'minimize' | 'maximize' | 'fullscreen' | 'close';
+
+export interface WindowConfigEntry {
+    readonly id: WindowId;
+    /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
+    readonly title: string;
+    /** 正文宿主 id:`WindowManager` 用 `document.getElementById` 取. */
+    readonly hostId: string;
+    readonly dock: { readonly icon: string; readonly label: string };
+    readonly defaultGeometry: WindowGeometrySpec;
+    readonly minSize: { readonly w: number; readonly h: number };
+}
+
+export interface WindowConfig {
+    /** 五个窗口,顺序即 z 初始序与 Dock 顺序. */
+    readonly windows: readonly WindowConfigEntry[];
+    /** 标题栏上的窗口按钮:顺序即显示顺序,glyph 进配置不散在 TS 里. */
+    readonly actions: readonly {
+        readonly id: WindowActionId;
+        readonly label: string;
+        readonly glyph: string;
+    }[];
+    /** 移动/缩放时窗口至少留在桌内的宽度(px). */
+    readonly edgeKeep: number;
+    /** 窗口与桌面边缘的间隙(px). */
+    readonly edgeGap: number;
+    /** 标题栏至少可见高度(px):夹取 `y` 的上界要用它. */
+    readonly headerMinVisible: number;
+    /** 底部为 Dock 留出的高度(px). */
+    readonly dockReserve: number;
+    /** `.window-header` 高度(px):经 applyUiConfig 写成 CSS 变量,唯一副本. */
+    readonly headerHeight: number;
+    readonly z: {
+        readonly windowLayer: number;
+        readonly first: number;
+        readonly snapPreview: number;
+        readonly dock: number;
+    };
+    readonly snap: { readonly edge: number; readonly magnet: number };
+}
+
 export const UI_CONFIG = {
     /**
      * 源码编辑区(左面板).
@@ -50,52 +128,137 @@ export const UI_CONFIG = {
         katexFontSize: 1.5,
     },
     /**
-     * 面板布局几何(左源码 / 右参数 / 底部输出三个面板).
+     * 面板**内容**的最小可视高度(px).
      *
-     * 生效链路与 editor/formula 相同:`applyUiConfig()` 把需要写进 CSS 的那部分
-     * 写成 `:root` 变量,`css/base.css` 的同名兜底只负责脚本执行前的首帧.
-     * 区别在于**这里有一部分值 CSS 根本用不到**:
-     *
-     * - 拖拽的夹取上下限(sideMin/MaxWidth,footerMin/MaxHeight,splitMin/MaxRatio)
-     *   只有 `PanelController` / `RightSplitController` 当数字用,CSS 里没有同名变量,
-     *   所以不存在第二处副本,改这里就够了;
-     * - 默认尺寸,折叠尺寸,两个最小高度,默认分割比例 CSS 首帧要消费,因此在
-     *   `css/base.css` 的 `:root` 里有一份兜底,由 `applyUiConfig.test.ts` 锁住一致性:
-     *   改这里却漏改兜底,测试会直接失败,不会静默闪一帧旧样式.
+     * 面板自己的几何(宽度/位置/折叠)已经归窗口系统:见下面的 `window` 段.
+     * 这里剩下的两个数是"内容被压到多矮就不再舒服"的下限,由 CSS 消费
+     * (`--params-panel-min-height` / `--view-controls-min-height`);窗口比下限
+     * 还矮时,由那两块内容自己出内部滚动条,而不是把窗口撑破.
      */
     panel: {
-        /** 左右侧面板宽度(px):拖拽夹取范围与初始宽度. */
-        sideMinWidth: 220,
-        sideMaxWidth: 875,
-        sideDefaultWidth: 300,
-        /** 底部面板高度(px):拖拽夹取范围与初始高度. */
-        footerMinHeight: 160,
-        footerMaxHeight: 640,
-        footerDefaultHeight: 240,
-        /** 折叠后只留一条窄边(px),`layout.css` 的 `.collapsed` 消费. */
-        collapsedSideWidth: 44,
-        collapsedFooterHeight: 40,
-        /** 右面板上下两块内容各自的最小可视高度(px). */
+        /** 参数窗口里参数列表的最小可视高度(px). */
         paramsMinHeight: 120,
+        /** 视图窗口里视图控件的最小可视高度(px). */
         viewControlsMinHeight: 120,
-        /** 参数区占右面板高度的默认比例与拖拽范围. */
-        splitMinRatio: 0.15,
-        splitMaxRatio: 0.8,
-        splitDefaultRatio: 0.4,
     },
     /**
-     * 过程视图(右栏"过程"标签页)的展示参数.
+     * 桌面窗口化(见 docs/windowing-plan.md).
      *
-     * 与 `panel` 里那部分同理,**CSS 用不到**这几个数:
-     * - `disclosureThreshold` 与 `maxSteps` 只被纯函数当数字用;
-     * - 过程页**不单独设宽度**:参数页与过程页共用 `panel.sideDefaultWidth`
-     *   (右栏一共只有一份宽度,切页不换宽度),宽了就由用户拖,夹取范围沿用
-     *   `panel.sideMinWidth/sideMaxWidth`.
-     * 所以它们不进 `applyUiConfig` 的变量表,`css/base.css` 里也没有第二份副本.
+     * 与 `editor` / `formula` 的区别:**窗口几何不进 CSS** -- 窗口是 JS 建的,
+     * 在脚本跑之前窗口层是空的,不存在"CSS 首帧"这回事;几何的唯一真相源是
+     * 这里 + `WindowGeometry` 纯函数,由 `WindowManager` 写成行内样式.所以
+     * `applyUiConfig` 的映射表里没有任何 `--window-*`,唯一的例外是
+     * `headerHeight`(`.window-header` 的高度)与两个夹取常量.
+     *
+     * 数组顺序即默认几何的依赖顺序(`view` 依赖 `source`,`process` 依赖
+     * `params`),也是 Dock 的按钮顺序,不能随意调.
+     */
+    window: {
+        windows: [
+            {
+                id: 'source',
+                title: 'source code',
+                hostId: 'left-panel',
+                dock: { icon: '✎', label: '源码' },
+                defaultGeometry: {
+                    x: { at: 16 },
+                    y: { at: 16 },
+                    w: { at: 420 },
+                    // round((dH - dockReserve - edgeGap) * 0.68):让出左列下部给视图窗口
+                    h: { fraction: 0.68, of: 'usableHeight' },
+                },
+                minSize: { w: 300, h: 220 },
+            },
+            {
+                id: 'view',
+                title: '视图',
+                hostId: 'view-controls',
+                dock: { icon: '◫', label: '视图' },
+                defaultGeometry: {
+                    x: { at: 16 },
+                    y: { at: 0 }, // 占位:存在 after 时以 after 为准
+                    w: { at: 420 },
+                    // h = dH - inset - y,与 process 共用同一条底边
+                    h: { from: 'bottom', inset: 116 },
+                    after: { id: 'source', gap: 12 },
+                },
+                minSize: { w: 280, h: 180 },
+            },
+            {
+                id: 'params',
+                title: '参数',
+                hostId: 'right-page-params',
+                dock: { icon: '▤', label: '参数' },
+                defaultGeometry: {
+                    x: { from: 'right', inset: 16 },
+                    y: { at: 16 },
+                    w: { at: 420 },
+                    // round((dH - dockReserve - edgeGap) * 0.55)
+                    h: { fraction: 0.55, of: 'usableHeight' },
+                },
+                minSize: { w: 280, h: 200 },
+            },
+            {
+                id: 'process',
+                title: '过程',
+                hostId: 'right-page-process',
+                dock: { icon: '≡', label: '过程' },
+                defaultGeometry: {
+                    x: { from: 'right', inset: 16 },
+                    y: { at: 0 }, // 占位:存在 after 时以 after 为准
+                    w: { at: 420 },
+                    h: { from: 'bottom', inset: 116 },
+                    after: { id: 'params', gap: 12 },
+                },
+                minSize: { w: 280, h: 180 },
+            },
+            {
+                id: 'objects',
+                title: '对象',
+                hostId: 'bottom-panel',
+                dock: { icon: '☰', label: '对象' },
+                defaultGeometry: {
+                    // 中列宽度是算出来的:dW - 2 * (420 + 16),夹到 [360, 720]
+                    x: 'center',
+                    y: { from: 'bottom', inset: 116 },
+                    w: { clamp: [360, 720], inset: 2 * 436 + 32 },
+                    h: { at: 260 },
+                },
+                minSize: { w: 360, h: 160 },
+            },
+        ],
+        actions: [
+            { id: 'minimize', label: '最小化', glyph: '─' },
+            { id: 'maximize', label: '最大化', glyph: '▣' },
+            { id: 'fullscreen', label: '全屏', glyph: '⤢' },
+            { id: 'close', label: '关闭', glyph: '✕' },
+        ],
+        edgeKeep: 80,
+        edgeGap: 16,
+        headerMinVisible: 36,
+        dockReserve: 100,
+        headerHeight: 36,
+        /**
+         * 三层容器的 z-index(由 WindowManager 写成行内样式,是**唯一**来源:
+         * CSS 里没有这几个数).`snapPreview` 必须在窗口层**之下**--它标记的是
+         * "窗口会落到哪里",画在窗口之上会盖住正在拖的那个窗口.
+         */
+        z: { windowLayer: 100, first: 110, snapPreview: 50, dock: 200 },
+        snap: { edge: 16, magnet: 8 },
+    } as const satisfies WindowConfig,
+    /**
+     * 过程视图的展示参数.
+     *
+     * 与 `panel` 里那部分同理,**CSS 用不到**这两个数(`disclosureThreshold` 与
+     * `maxSteps` 只被纯函数当数字用),所以它们不进 `applyUiConfig` 的变量表,
+     * `css/base.css` 里也没有第二份副本.
+     *
+     * 过程的**几何**归窗口系统:过程是独立窗口,默认几何与最小尺寸见上面的
+     * `window.windows` 里 `process` 那一项,拖宽拖窄由用户自己决定.
      */
     process: {
         /**
-         * 三级披露阈值:细节行数**超过**它就进 L2 过程页,否则留在 L1 行内
+         * 三级披露阈值:细节行数**超过**它就进 L2 过程窗口,否则留在 L1 行内
          * `<details>`.与底栏"一屏约 14 行"的上限配合,留在 L1 的最多占掉
          * 不到半个底栏(见 docs/equation-solving-process.md 第 5 节).
          *

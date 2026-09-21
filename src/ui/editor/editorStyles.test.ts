@@ -14,9 +14,22 @@ function read(relative: string): string {
     return readFileSync(new URL(relative, import.meta.url), 'utf8');
 }
 
+/** 取出某个选择器的声明体(选择器写法固定,不做通用 CSS 解析). */
+function ruleOf(css: string, selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+}
+
+/** 声明体里某个属性的值(取不到返回 null,便于断言"两边都有"). */
+function valueOf(body: string, property: string): string | null {
+    const match = new RegExp(`(?:^|;)\\s*${property}\\s*:([^;]+)`).exec(body);
+    return match ? match[1].trim() : null;
+}
+
 describe('编辑区样式归属', () => {
     const editorCss = read('../../../css/editor.css');
     const panelsCss = read('../../../css/panels.css');
+    const windowCss = read('../../../css/window.css');
     const html = read('../../../index.html');
 
     it('编辑器的结构选择器都在 editor.css', () => {
@@ -52,6 +65,53 @@ describe('编辑区样式归属', () => {
 
         expect(base).toBeGreaterThanOrEqual(0);
         expect(editor).toBeGreaterThan(base);
+    });
+
+    it('高亮层与 textarea 的对齐样式逐项相同(窗口化不许碰的五条轴之一)', () => {
+        const textarea = ruleOf(editorCss, '#dsl-editor');
+        const highlightCode = ruleOf(editorCss, '#dsl-editor-highlight-code');
+
+        // 这两条当年是靠手工比对调出来的:字体/字号/行高/制表位/内边距任意一项
+        // 不一致,着色文字就会与光标错开,越往右下越明显.
+        for (const property of ['font-family', 'font-size', 'line-height', 'tab-size', 'padding']) {
+            const editor = valueOf(textarea, property);
+            const highlight = valueOf(highlightCode, property);
+            expect(editor, `#dsl-editor 缺少 ${property}`).not.toBeNull();
+            expect(highlight, `#dsl-editor-highlight-code 缺少 ${property}`).not.toBeNull();
+            expect(highlight, `${property} 两侧不一致`).toBe(editor);
+        }
+    });
+
+    it('高亮层的显隐挂在"紧邻的下一兄弟"这条选择器上', () => {
+        // 高亮层必须紧跟 textarea:谁在中间插一个节点,整层就不显示(而不是错位).
+        expect(editorCss).toContain('#dsl-editor.is-highlighted + #dsl-editor-highlight');
+    });
+
+    it('高亮层是 inset:0 的裁剪框而不是滚动容器', () => {
+        const rule = ruleOf(editorCss, '#dsl-editor-highlight');
+
+        expect(rule).toContain('inset: 0');
+        expect(rule).toContain('overflow: hidden');
+        expect(rule).not.toMatch(/overflow:\s*(auto|scroll)/);
+    });
+
+    it('index.html 里高亮层紧跟 textarea(相邻兄弟选择器依赖这个顺序)', () => {
+        // 谁在两者之间插一个节点,高亮就整层不显示(而不是错位,所以更容易被
+        // 误判成"功能没了").窗口化只改外层的挂载点,这条顺序不许动.
+        const afterTextarea = html.slice(html.indexOf('</textarea>') + '</textarea>'.length);
+        const withoutComments = afterTextarea.replace(/<!--[\s\S]*?-->/g, '').trimStart();
+
+        expect(withoutComments.startsWith('<div id="dsl-editor-highlight"')).toBe(true);
+    });
+
+    it('窗口的隐藏态不含 display: none(隐藏期间必须量得到尺寸)', () => {
+        // 编辑器行号与高亮层在隐藏期间若量到 0 宽/高,恢复后对齐会整体错乱,
+        // 而且错误发生在"另一次交互之后",极难联想到是隐藏方式导致的.
+        const hiddenRule = ruleOf(windowCss, '.window.is-hidden');
+
+        expect(hiddenRule).not.toBe('');
+        expect(hiddenRule).toContain('opacity: 0');
+        expect(hiddenRule).not.toMatch(/display:\s*none/);
     });
 
     it('高亮层是裁剪框而不是滚动容器', () => {

@@ -7,8 +7,8 @@
  * `%PWA_CHROME_COLOR%` 占位符换成同一个常量.
  *
  * 因此 HTML 里只能有占位符,不能出现字面量:一旦有人把颜色抄回 HTML,这里就会
- * 失败,避免"改一处漏一处"的第三份副本悄悄回来(与 RightPanelTabs.test 锁
- * index.html 不留默认页副本同一条理由).
+ * 失败,避免"改一处漏一处"的第三份副本悄悄回来(与 desktopHosts.test 锁
+ * index.html 不留窗口结构与配置副本同一条理由).
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';

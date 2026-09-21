@@ -48,19 +48,75 @@ export class StubClassList {
     }
 }
 
-/** 元素的行内样式:只实现控制器用到的显示/光标/变换与 CSS 变量写入. */
+/**
+ * 元素的行内样式.
+ *
+ * 与真 DOM 的 `CSSStyleDeclaration` 一样,**驼峰属性与 `setProperty` 的连字符
+ * 属性是同一份数据**:窗口化里 `focus()` 写 `style.zIndex`,几何写入走
+ * `style.setProperty('left', ...)`,两者必须能互相看见,否则"拖动会不会清掉
+ * z-index"这条回归在桩里断言不到(见 WindowManager.test.ts).
+ *
+ * 赋空字符串等于移除该条声明(真 DOM 里 `style.display = ''` 就是清掉行内值,
+ * 回落到样式表).
+ */
 export class StubStyle {
-    display = '';
-    cursor = '';
-    transform = '';
     private readonly properties = new Map<string, string>();
 
+    private read(name: string): string {
+        return this.properties.get(name) ?? '';
+    }
+
+    private write(name: string, value: string): void {
+        if (value === '') this.properties.delete(name);
+        else this.properties.set(name, value);
+    }
+
+    get display(): string {
+        return this.read('display');
+    }
+
+    set display(value: string) {
+        this.write('display', value);
+    }
+
+    get cursor(): string {
+        return this.read('cursor');
+    }
+
+    set cursor(value: string) {
+        this.write('cursor', value);
+    }
+
+    get transform(): string {
+        return this.read('transform');
+    }
+
+    set transform(value: string) {
+        this.write('transform', value);
+    }
+
+    /** 窗口的 z-index 由 `focus()` 独占写入(不是几何的一部分). */
+    get zIndex(): string {
+        return this.read('z-index');
+    }
+
+    set zIndex(value: string) {
+        this.write('z-index', value);
+    }
+
     setProperty(name: string, value: string): void {
-        this.properties.set(name, value);
+        this.write(name, value);
     }
 
     getPropertyValue(name: string): string {
-        return this.properties.get(name) ?? '';
+        return this.read(name);
+    }
+
+    /** 真 DOM 语义:返回被移除的值(没有则空串). */
+    removeProperty(name: string): string {
+        const previous = this.read(name);
+        this.properties.delete(name);
+        return previous;
     }
 }
 
@@ -80,8 +136,10 @@ export function detachNode(node: StubElement | StubText): void {
     node.parent = null;
 }
 
-/** `querySelector` 支持的选择器:`tag` / `.class` / `#id` / `[attr]` / `[attr=value]`. */
-function matchesSelector(element: StubElement, selector: string): boolean {
+/**
+ * 单个"简单选择器"的匹配:`tag` / `.class` / `#id` / `[attr]` / `[attr=value]`.
+ */
+function matchesSimple(element: StubElement, selector: string): boolean {
     const trimmed = selector.trim();
     if (trimmed === '') return false;
     if (trimmed.startsWith('#')) return element.id === trimmed.slice(1);
@@ -101,6 +159,60 @@ function matchesSelector(element: StubElement, selector: string): boolean {
     return element.tagName === trimmed;
 }
 
+/**
+ * 把复合选择器拆成简单选择器.
+ *
+ * 只在**方括号/引号之外**的 `.` / `#` / `[` 处切:`[data-example="a.miko"]` 里
+ * 那个点属于属性值,切开会得到两个都匹配不上的碎片(这个坑在
+ * `ExampleLoaderController.test.ts` 上真的踩到过).
+ */
+function splitCompound(selector: string): string[] {
+    const parts: string[] = [];
+    let current = '';
+    let depth = 0;
+    let quote = '';
+
+    for (const char of selector) {
+        if (quote !== '') {
+            current += char;
+            if (char === quote) quote = '';
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            current += char;
+            continue;
+        }
+        if (char === ']') {
+            depth = Math.max(0, depth - 1);
+            current += char;
+            continue;
+        }
+        if (depth === 0 && (char === '.' || char === '#' || char === '[')) {
+            if (current !== '') parts.push(current);
+            current = char;
+            if (char === '[') depth = 1;
+            continue;
+        }
+        current += char;
+    }
+    if (current !== '') parts.push(current);
+    return parts;
+}
+
+/**
+ * `querySelector` 支持的选择器:`tag` / `.class` / `#id` / `[attr]` / `[attr=value]`,
+ * 以及它们的**复合**形式(`.dock-btn[data-window="source"]`).
+ *
+ * 复合选择器逐段命中即可;后代/子代组合器与伪类仍然不支持(桩只服务控制器
+ * 自己写下的选择器).
+ */
+function matchesSelector(element: StubElement, selector: string): boolean {
+    const trimmed = selector.trim();
+    if (trimmed === '') return false;
+    return splitCompound(trimmed).every((part) => matchesSimple(element, part));
+}
+
 /** `dataset` 的 camelCase 属性名 <-> `data-*` 属性名. */
 function dataAttributeName(property: string): string {
     return `data-${property.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`;
@@ -110,7 +222,6 @@ export class StubElement {
     className = '';
     id = '';
     htmlFor = '';
-    title = '';
     tabIndex = -1;
     value = '';
     type = '';
@@ -337,6 +448,7 @@ export class StubElement {
             type,
             target: this,
             key: '',
+            timeStamp: 0,
             ctrlKey: false,
             metaKey: false,
             clientX: 0,
@@ -358,6 +470,52 @@ export class StubElement {
 
     removeAttribute(name: string): void {
         this.attributes.delete(name);
+    }
+
+    /**
+     * 布尔属性语义:存在即为真;`force` 给了就按其值设置.
+     *
+     * 窗口的 `inert` 用 `toggleAttribute` 写(`applyState` 的唯一写入点),
+     * 桩不实现这一条,`WindowManager.test.ts` 连第一次 `applyState` 都过不去.
+     */
+    toggleAttribute(name: string, force?: boolean): boolean {
+        const on = force ?? !this.attributes.has(name);
+        if (on) this.attributes.set(name, '');
+        else this.attributes.delete(name);
+        return on;
+    }
+
+    /**
+     * `title` 与 `title="..."` 是同一份数据(真 DOM 的反射属性).
+     *
+     * 桩里两者必须反射到同一处:`el()` 的 `attrs` 走 `setAttribute`,
+     * `createButton` 走 `element.title = ...`,真实 DOM 里两条路径等价,桩里
+     * 分成两个字段就会让"按钮的 title 到底写进去没有"变成假阴性.
+     */
+    get title(): string {
+        return this.attributes.get('title') ?? '';
+    }
+
+    set title(value: string) {
+        this.attributes.set('title', value);
+    }
+
+    /** `hidden` 与 `[hidden]` 是同一份数据(真 DOM 的布尔反射属性). */
+    get hidden(): boolean {
+        return this.attributes.has('hidden');
+    }
+
+    set hidden(value: boolean) {
+        this.toggleAttribute('hidden', value);
+    }
+
+    /** `inert` 同上:窗口隐藏态靠它挡 Tab 序与点击. */
+    get inert(): boolean {
+        return this.attributes.has('inert');
+    }
+
+    set inert(value: boolean) {
+        this.toggleAttribute('inert', value);
     }
 
     /** 与 offsetHeight 同源:桩里不做边框/内边距区分. */
@@ -462,6 +620,8 @@ export interface StubEvent {
     type: string;
     target: unknown;
     key: string;
+    /** 事件时间戳(ms):窗口的"双击标题栏"判定要用两次按下的间隔. */
+    timeStamp: number;
     ctrlKey: boolean;
     metaKey: boolean;
     clientX: number;
@@ -540,6 +700,13 @@ export interface StubDocument {
     createDocumentFragment(): StubElement;
     querySelector<T>(selector: string): T | null;
     querySelectorAll<T>(selector: string): T[];
+    /**
+     * 按 id 取节点.
+     *
+     * 窗口化按 `UI_CONFIG.window.windows[].hostId` 取正文宿主,用的就是它;
+     * 桩里走与 `querySelector('#id')` 同一条遍历,语义一致.
+     */
+    getElementById<T>(id: string): T | null;
     /** document 级键盘监听(KeyboardController 的全局快捷键绑在这里). */
     addEventListener(type: string, handler: (event: StubEvent) => void): void;
     removeEventListener(type: string, handler: (event: StubEvent) => void): void;
@@ -581,6 +748,7 @@ export function installDomStub(): DomStub {
         createDocumentFragment: () => new StubElement('#fragment'),
         querySelector: <T>(selector: string) => (selectAll<T>(selector)[0] ?? null),
         querySelectorAll: <T>(selector: string) => selectAll<T>(selector),
+        getElementById: <T>(id: string) => (selectAll<T>(`#${id}`)[0] ?? null),
         addEventListener: (type, handler) => {
             const list = documentListeners.get(type) ?? [];
             list.push(handler);
@@ -596,6 +764,7 @@ export function installDomStub(): DomStub {
                 type,
                 target: body,
                 key: '',
+                timeStamp: 0,
                 ctrlKey: false,
                 metaKey: false,
                 clientX: 0,
@@ -642,6 +811,7 @@ export function installDomStub(): DomStub {
                 type,
                 target: window,
                 key: '',
+                timeStamp: 0,
                 ctrlKey: false,
                 metaKey: false,
                 clientX: 0,

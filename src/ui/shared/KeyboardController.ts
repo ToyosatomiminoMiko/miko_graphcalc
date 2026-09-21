@@ -12,6 +12,8 @@
  *
  * 组件绑定(经 register 注入,见 DslApp):
  * - 公式的 Enter/Space 复制(FormulaCopyController.keyboardBinding())
+ * - 示例浮层的 Esc / 上下键(ExampleLoaderController.keyboardBindings())
+ * - 单窗口全屏的 Esc 退出(注册在示例浮层之后:菜单开着时先关菜单)
  *
  * 绑定/解绑严格成对:bind() 之后必须 dispose(),DslApp.dispose() 负责清理.
  */
