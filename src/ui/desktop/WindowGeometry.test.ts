@@ -1,7 +1,7 @@
 /**
  * 窗口几何纯函数的边界穷举(阶段 0 的验收).
  *
- * 这里不碰 DOM:夹取,移动,最大化,吸附判定,以及五个窗口在两组目标视口下的
+ * 这里不碰 DOM:夹取,移动,吸附判定,以及五个窗口在两组目标视口下的
  * 默认几何都能在单测里钉死.真机上"CSS 有没有让窗口填满"是另一回事(见
  * docs/windowing-plan.md §8.1).
  */
@@ -10,11 +10,8 @@ import { UI_CONFIG } from '@/config/uiConfig';
 import {
     clampGeometry,
     fitGeometry,
-    fullscreenGeometry,
     geometryStyle,
-    geometryToCss,
     magnetize,
-    maximizedGeometry,
     moveGeometry,
     resolveDefaultGeometry,
     resolveEdgeSnap,
@@ -133,6 +130,8 @@ describe('resolveDefaultGeometry:五个窗口的默认几何', () => {
         });
 
         it(`${label}:默认几何都不小于各自的最小尺寸`, () => {
+            // 这一条只保证两个设计视口;更小的桌面上 raw 结果可以低于 minSize,
+            // 兜底在 `WindowManager.bind()` 的 `fitGeometry`(那里有对应回归).
             const resolved = resolveAll(desktop);
             for (const spec of WINDOW.windows) {
                 const geometry = resolved.get(spec.id)!;
@@ -249,40 +248,19 @@ describe('fitGeometry:resize 时把窗口整体收进桌内', () => {
     });
 });
 
-describe('最大化与全屏', () => {
-    const desktop = desktopOf(1000, 700);
-
-    it('最大化填满桌面并给 Dock 让出底部', () => {
-        expect(maximizedGeometry(desktop, WINDOW.dockReserve))
-            .toEqual({ x: 0, y: 0, w: 1000, h: 600 });
-    });
-
-    it('全屏填满整个桌面', () => {
-        expect(fullscreenGeometry(desktop)).toEqual({ x: 0, y: 0, w: 1000, h: 700 });
-    });
-
-    it('两者都不经过夹取:小桌面上也不缩回最小尺寸', () => {
-        const tiny = desktopOf(200, 100);
-        expect(maximizedGeometry(tiny, WINDOW.dockReserve))
-            .toEqual({ x: 0, y: 0, w: 200, h: 0 });
-        expect(fullscreenGeometry(tiny)).toEqual({ x: 0, y: 0, w: 200, h: 100 });
-    });
-});
-
 describe('resolveEdgeSnap', () => {
     const desktop = desktopOf(1280, 800);
     const snap = WINDOW.snap;
-    const geometry: Geometry = { x: 400, y: 300, w: 420, h: 260 };
 
     it('上边缘 -> 最大化(优先于左右)', () => {
-        const result = resolveEdgeSnap(geometry, { x: 4, y: 4 }, desktop, snap);
+        const result = resolveEdgeSnap({ x: 4, y: 4 }, desktop, snap);
         expect(result?.kind).toBe('maximize');
         expect(result?.target).toEqual({ x: 0, y: 0, w: 1280, h: 700 });
     });
 
     it('左/右边缘 -> 半屏,高度与最大化一致', () => {
-        const left = resolveEdgeSnap(geometry, { x: snap.edge, y: 300 }, desktop, snap);
-        const right = resolveEdgeSnap(geometry, { x: 1280 - snap.edge, y: 300 }, desktop, snap);
+        const left = resolveEdgeSnap({ x: snap.edge, y: 300 }, desktop, snap);
+        const right = resolveEdgeSnap({ x: 1280 - snap.edge, y: 300 }, desktop, snap);
 
         // 与最大化同高:铺到 Dock 上方(§4.2:"三者观感统一").
         expect(left).toEqual({ target: { x: 0, y: 0, w: 640, h: 700 }, kind: 'left' });
@@ -290,10 +268,10 @@ describe('resolveEdgeSnap', () => {
     });
 
     it('阈值开闭:刚好等于阈值吸附,超出一个像素不吸附', () => {
-        expect(resolveEdgeSnap(geometry, { x: snap.edge, y: 500 }, desktop, snap)?.kind).toBe('left');
-        expect(resolveEdgeSnap(geometry, { x: snap.edge + 1, y: 500 }, desktop, snap)).toBeNull();
-        expect(resolveEdgeSnap(geometry, { x: 500, y: snap.edge }, desktop, snap)?.kind).toBe('maximize');
-        expect(resolveEdgeSnap(geometry, { x: 500, y: snap.edge + 1 }, desktop, snap)).toBeNull();
+        expect(resolveEdgeSnap({ x: snap.edge, y: 500 }, desktop, snap)?.kind).toBe('left');
+        expect(resolveEdgeSnap({ x: snap.edge + 1, y: 500 }, desktop, snap)).toBeNull();
+        expect(resolveEdgeSnap({ x: 500, y: snap.edge }, desktop, snap)?.kind).toBe('maximize');
+        expect(resolveEdgeSnap({ x: 500, y: snap.edge + 1 }, desktop, snap)).toBeNull();
     });
 });
 
@@ -325,7 +303,7 @@ describe('magnetize', () => {
     });
 });
 
-describe('geometryStyle / geometryToCss', () => {
+describe('geometryStyle', () => {
     const geometry: Geometry = { x: 16, y: 32, w: 420, h: 260 };
 
     it('四条属性是 px 字符串', () => {
@@ -335,10 +313,6 @@ describe('geometryStyle / geometryToCss', () => {
             width: '420px',
             height: '260px',
         });
-    });
-
-    it('geometryToCss 只是拼接(给断言与日志用)', () => {
-        expect(geometryToCss(geometry)).toBe('left: 16px; top: 32px; width: 420px; height: 260px');
     });
 });
 

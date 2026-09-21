@@ -44,7 +44,6 @@ export interface WindowFrameSpec {
 
 export interface WindowFrameHandle {
     readonly element: HTMLElement;
-    readonly header: HTMLElement;
     /** 拖动起手元素(`.window-title`) */
     readonly title: HTMLElement;
     readonly body: HTMLElement;
@@ -53,14 +52,13 @@ export interface WindowFrameHandle {
         readonly element: HTMLElement;
     }[];
     readonly controls: ReadonlyMap<string, ButtonHandle>;
-    setTitle(text: string): void;
     dispose(): void;
 }
 
 /**
  * 逐条写四条几何属性:窗口几何**唯一允许的写入形状**.
  *
- * 不要用 `element.style.cssText = geometryToCss(...)`:`cssText` 赋值会清空整个
+ * 不要用 `element.style.cssText = ...`:`cssText` 赋值会清空整个
  * 行内声明块,把 `focus()` 写的 `z-index` 一起清掉,被拖的窗口会当场掉到其它
  * 窗口后面(见 docs/windowing-plan.md §11.2 E8).
  */
@@ -133,16 +131,10 @@ export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle {
 
     return {
         element,
-        header,
         title,
         body,
         handles,
         controls: controlHandles,
-        setTitle: (text: string) => {
-            // 只换标题文字那个 span:titleContent(如 #formula-copy-hint)是
-            // 现成节点,不能被 textContent 一起清掉.
-            label.textContent = text;
-        },
         dispose() {
             for (const button of controlHandles.values()) button.dispose();
             controlHandles.clear();

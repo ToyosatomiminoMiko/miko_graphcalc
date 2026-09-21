@@ -297,7 +297,7 @@ zIndex     number                  // 该窗口当前的 z-index(焦点独占写
   它不写类名,也不碰 `z-index`(行内属性压过类规则,清不干净就是"最大化没反应").
 - **状态的唯一写入点**是 `WindowManager._applyState(id)`:`.window` 上的
   **每一个类**(`.is-maximized` / `.is-fullscreen` / `.is-hidden` /
-  `.is-closed` / `.is-focused` 除外--后者归 `focus()`)都在这里切,并刷新
+  `.is-focused` 除外--后者归 `focus()`)都在这里切,并刷新
   `inert` / `aria-hidden` / 窗口按钮文案 / Dock 按钮的激活态.拖动,按钮,
   Dock,键盘(阶段 5)全部只改状态,由这两个函数落地.
 - `z-index` 有**第三**个写入点,就是 `focus()`:几何写入会清行内样式,两者
@@ -323,10 +323,11 @@ zIndex     number                  // 该窗口当前的 z-index(焦点独占写
 | closed | Dock 按钮 | normal | 同上 |
 | 任意 | 桌面 `resize` | 同态 | normal 按夹取规则收进桌内;maximized/fullscreen 只需重算类(几何被 CSS 接管) |
 
-`minimized` 与 `closed` 的行为目前**完全等价**(都进 `is-hidden` + `inert`),
-只差 `.is-closed` 这个类.这是刻意的:留着它给后续"关闭=释放内容"留口,但
-一期不许任何逻辑去区分两者(若实现时发现确实没有区别,合并成一个 `hidden`
-态也是可接受的收敛,§10 的"明确不做"不受影响).
+`minimized` 与 `closed` 的行为**完全等价**(都进 `is-hidden` + `inert`),
+两者的区别只体现在 Dock 按钮的 `data-state` 上.落地时删掉了原方案里那个
+只写不读的 `.is-closed` 类:它没有 CSS 消费者,留着只会让人以为"改它就能改
+关闭态样式"(见 §11.2 E31).后续若真要"关闭=释放内容",再按新语义加回来,
+而不是先留一个空类名.
 
 ### 3.2 焦点与 z-order
 
@@ -450,8 +451,10 @@ y ∈ [0, desktopH - HEADER_MIN]                   // 标题栏绝不能被拖�
 | 指针距桌面上边缘 ≤ `SNAP_EDGE` | 全桌面高亮 | 最大化(§3.3) |
 | 窗口某条边与另一可见窗口的对应边距离 ≤ `SNAP_MAGNET`(8px) | 对齐参考线 | 该边贴合(只吸附正在被拖的那条边,不改变尺寸) |
 
-- 高亮层是 `#snap-preview`(一个绝对定位 div,由类切换半屏/全屏两种形状),
-  不做动画,拖动结束即隐藏.
+- 高亮层是 `#snap-preview`(一个绝对定位 div,形状由**行内几何**给出:半屏就是
+  `desktopW/2` 宽的矩形,最大化就是整块桌面),不做动画,拖动结束即隐藏.
+  落地时删掉了原方案的 `is-left` / `is-right` / `is-maximize` 类:形状已经由
+  几何表达,那三个类没有 CSS 消费者(§11.2 E31).
 - 磁吸只对**同一轴**的边生效,且吸附是"这一次移动的修正",下一次移动会先
   清掉修正再判--否则窗口会被永久吸住.
 - 阈值进 `UI_CONFIG.window.snap`,不进 CSS(CSS 不消费,与现有
@@ -695,15 +698,17 @@ export function clampGeometry(g: Geometry, limits: Limits): Geometry;
 /** 移动:k -> k+1 的唯一入口.delta 是原始像素增量. */
 export function moveGeometry(g: Geometry, dx: number, dy: number, limits: Limits): Geometry;
 
-/** 最大化/全屏:填满桌面减去底部余量. */
-export function maximizedGeometry(desktop: Desktop, dockReserve: number): Geometry;
-export function fullscreenGeometry(desktop: Desktop): Geometry;
+/** resize 时把窗口整体收进桌内(初始几何与桌面 resize 都走它). */
+export function fitGeometry(g: Geometry, limits: Limits): Geometry;
+
+/** 吸附落点的三种形状(与 resolveEdgeSnap 的返回同域). */
+export type SnapKind = 'left' | 'right' | 'maximize';
 
 /** 吸附判定:返回落点几何或 null(不吸附). */
 export function resolveEdgeSnap(
-    g: Geometry, pointer: { x: number; y: number },
+    pointer: { x: number; y: number },
     desktop: Desktop, snap: { edge: number },
-): { readonly target: Geometry; readonly kind: 'left' | 'right' | 'maximize' } | null;
+): { readonly target: Geometry; readonly kind: SnapKind } | null;
 
 /** 磁吸:把被拖的边贴到其它窗口的对应边.只改一个轴. */
 export function magnetize(
@@ -717,9 +722,6 @@ export function magnetize(
 export function geometryStyle(
     g: Geometry,
 ): Readonly<Record<'left' | 'top' | 'width' | 'height', string>>;
-
-/** 上面四条的拼接,只用于单测断言与日志(不要拿它去写 `style.cssText`). */
-export function geometryToCss(g: Geometry): string;
 ```
 
 **夹取公式(唯一一份)**:
@@ -735,9 +737,12 @@ y    = clamp(g.y, 0, max(0, desktop.h - headerMinVisible))
 超出桌面,也不要算出 `min > max` 的区间(`clamp` 会返回 `min`,窗口比桌面大,
 标题栏仍在桌内,能抓回来).
 
-`maximizedGeometry` = `{ x: 0, y: 0, w: desktop.w, h: desktop.h - dockReserve }`;
-`fullscreenGeometry` = `{ x: 0, y: 0, w: desktop.w, h: desktop.h }`.两者都
-**不经过 `clampGeometry`**(否则会被 `min` 下限干扰,且最大化本身就允许超出).
+`maximized` / `fullscreen` 的落地几何**不在 `WindowGeometry.ts`**:进入这两种态
+时 `WindowFrame.clearGeometry` 清掉行内四条属性,几何交给 `css/window.css` 的
+`.window.is-maximized`(`inset: 0 0 var(--dock-reserve) 0`)与
+`.window.is-fullscreen`(`inset: 0`).原方案里的 `maximizedGeometry` /
+`fullscreenGeometry` 两个函数在落地时删除了:它们是同一组数字的第二份实现,
+而且只被自己的单测调用(§11.2 E31).
 
 `resolveEdgeSnap` 的判据(三者互斥,按这个顺序判):
 
@@ -833,13 +838,11 @@ export interface WindowActionButton {
 }
 export interface WindowFrameHandle {
     readonly element: HTMLElement;
-    readonly header: HTMLElement;
     readonly title: HTMLElement;   // 拖动起手元素
     readonly body: HTMLElement;
     readonly handles: readonly { readonly direction: ResizeDirection;
                                   readonly element: HTMLElement }[];
     readonly controls: ReadonlyMap<string, ButtonHandle>;
-    setTitle(text: string): void;             // 最大化/还原时改按钮文案用不到,留口
     dispose(): void;
 }
 export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle;
@@ -870,7 +873,7 @@ element.append(header, body, ...RESIZE_HANDLES.map(direction => {
 三个必须做的细节:
 
 - **`el()` 不支持 `style`**:几何**只能**经 `writeGeometry()` 逐条
-  `style.setProperty` 落地.不要用 `element.style.cssText = geometryToCss(...)`--
+  `style.setProperty` 落地.不要用 `element.style.cssText = ...`--
   `cssText` 赋值会**清空整个行内声明块**,把 `focus()` 写的 `z-index` 一起清掉,
   被拖的窗口会当场掉到其它窗口后面(旧稿就是 `cssText` 写法,见 §11.2 E8).
 - **`spec.overlays` 是标题栏里的浮层**(`#example-menu`),它是 `.window-header`
@@ -882,7 +885,7 @@ element.append(header, body, ...RESIZE_HANDLES.map(direction => {
 
 几何的两个 DOM 侧助手(`writeGeometry` / `clearGeometry`)放在 `WindowFrame.ts`
 并导出,由 `createWindowFrame` 与 `WindowManager.applyGeometry` 共用;
-`geometryStyle` / `geometryToCss`(纯字符串)留在 `WindowGeometry.ts`:
+`geometryStyle`(纯字符串)留在 `WindowGeometry.ts`:
 
 ```ts
 /** 逐条写四条几何属性.唯一允许的几何落地方式(不碰 z-index). */
@@ -1001,7 +1004,8 @@ private applyGeometry(id: string): void {
 `applyGeometry` **不碰任何类名**:`.window` 上的类(含 `is-maximized` /
 `is-fullscreen`)全部由 `applyState` 独占.`clearGeometry` / `writeGeometry`
 也只碰 `left/top/width/height` 四条属性--`z-index` 归 `focus()` 独占.
-这条是硬约束:旧稿用 `element.style.cssText = geometryToCss(...)` 写几何,
+这条是硬约束:旧稿用 `element.style.cssText = geometryToCss(...)` 写几何
+(`geometryToCss` 这个助手在落地时一并删除了,见 §11.2 E31),
 `cssText` 赋值会清空整个行内声明块,于是拖动第一帧就把 `z-index` 清成 `auto`,
 被拖的窗口当场掉到其它窗口后面(§11.2 E8).
 
@@ -1013,11 +1017,11 @@ private applyState(id: string): void {
     const entry = this.entries.get(id)!;
     const element = entry.frame.element;
     const hidden = entry.state === 'minimized' || entry.state === 'closed';
-    // 五个状态类一起在这里刷新:normal 态全部移除.
+    // 三个状态类一起在这里刷新:normal 态全部移除(关闭态不另写类名,
+    // 它与最小化在视觉上同一件事,状态只体现在 Dock 的 data-state).
     element.classList.toggle('is-maximized', entry.state === 'maximized');
     element.classList.toggle('is-fullscreen', entry.state === 'fullscreen');
     element.classList.toggle('is-hidden', hidden);
-    element.classList.toggle('is-closed', entry.state === 'closed');
     element.toggleAttribute('inert', hidden);     // 挡 Tab 序与点击
     element.setAttribute('aria-hidden', String(hidden));
     // 最大化 / 全屏两个按钮的文案在对应态要变成"退出",两个入口(按钮/双击)
@@ -1999,13 +2003,15 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E22 | 三层容器的 `z-index` 必须由 `WindowManager.bind()` 从 `UI_CONFIG.window.z` 写成**行内样式** | 只靠 DOM 顺序不行:`#dock` 是 `z-index: auto`,而 `.window` 有正 `z-index`,CSS 的绘制顺序会让窗口整块盖住 Dock(而且点不到).另外 `snapPreview` 取 **50**:吸附预览是"窗口会落到哪里"的底图,画在窗口层(100)之上会盖住正在拖的窗口 |
 | E23 | §5.5 第 2 条的"唯一例外是标题栏高度"扩成**三条** | 除 `--window-header-height` 外,还必须有 `--dock-reserve`(`.window.is-maximized` 的 `bottom` 消费,否则最大化盖住 Dock)与 `--window-body-height`(示例浮层的 `max-height` 要按所属窗口正文算,而浮层在标题栏里,百分比解析不到窗口高度,见 E5).三者都由 JS 写入,CSS 只读,数值只有一份(前两条经 `applyUiConfig`,第三条由 `_applyGeometry` 写) |
 | E24 | `bindDragGesture` 的 `onStart` / `onDelta` 增加"原始 `PointerEvent`"参数 | §3.5 的吸附判据是"**指针**距桌面边缘 ≤ `SNAP_EDGE`",而拖动件的回调原本只有增量.给回调补上事件是向后兼容的(`onStart: () => {}` 这类实现照旧可编译),因此不需要第二份手势实现 |
-| E25 | 四个既有节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)在 `index.html` 里放进一个 `hidden` 的 `#window-staging` 暂存区 | 方案只说"交给窗口标题栏",没说它们在启动前待在哪儿.它们必须在 `new DslApp()` **之前**就在文档里(控制器按 id 取节点),所以先集中在暂存区,`WindowFrame` 建好外壳后原样搬走;搬完暂存区自然为空 |
+| E25 | 四个既有节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)在 `index.html` 里放进一个 `hidden` 的 `#window-staging` 暂存区 | 方案只说"交给窗口标题栏",没说它们在启动前待在哪儿.它们必须在 `new DslApp()` **之前**就在文档里(控制器按 id 取节点),所以先集中在暂存区,`WindowFrame` 建好外壳后原样搬走;搬完由 `DslApp` 摘掉这个空壳,不留一个"看起来还是结构"的空 div(§11.2 E31) |
 | E27 | 标题栏双击最大化不用 `dblclick`,改判"两次 `pointerdown` 的间隔" | 拖动件在 `pointerdown` 里 `preventDefault()`(为了不选中标题文字),浏览器正是在这一步决定要不要继续派发兼容鼠标事件,`dblclick` 能不能到就成了实现细节;按间隔判定不依赖兼容事件,触屏也成立(§10 原本担心的正是这个).另外"从最大化状态拖出来"改成**第一次真的移动时**才还原:单纯点一下标题栏不该把最大化窗口还原掉 |
 | E28 | 删除 `src/ui/widgets/Tabs.ts` 与其测试(`createTabs` 的唯一消费者是 `RightPanelTabs`) | 拆页之后它没有任何消费者,对应的 `.panel-header .tabs` 规则也已随标签栏删除.按本仓库"不留死代码"的惯例一并删除;要恢复标签页控件时从提交历史里取回即可 |
 | E26 | `.panel` 只保留"填满窗口正文"的骨架,连 `background` 与 `border-radius` 也不留 | B8 的 A 案要求"不要两层边框/阴影";底色由 `.window` 给,面板再写一遍是看不见的第二份来源 |
 
 | E29 | §4.5 的 `onDesktopResize()` 只写"所有 normal 窗口重新夹取",§3.4 的夹取又刻意允许窗口挂出桌面边缘(`x ≤ dW - edgeKeep`) | 两者合起来的行为是:视口变小之后,右列窗口**大半截留在屏幕外**(1280->1000 时 `params` 仍有 264px 在外面),而 §9 第 11 项要求"视口 resize:窗口不越界" | 新增纯函数 `fitGeometry(g, limits)`:在 `clampGeometry` 之后再尽量把窗口**整体**收进桌内(`x ∈ [0, max(0, dW - w)]`),`onDesktopResize` 与 `restoreAll` 用它.分工写清楚:**拖动**仍按 §3.4 的夹取(允许挂出去,否则"推到边上"做不到),**外部变化**(resize/复位)用 fit |
-| E30 | §4.2 写"半屏的高度与最大化一致(减去 `dockReserve`)",但 `resolveEdgeSnap` 的签名里没有 `dockReserve`,`Desktop` 又只有 `bottomReserve = dockReserve + edgeGap` | 照字面实现会算成 `dH - 116`(684),与最大化的 `dH - 100`(700)差 16px,半屏与最大化观感不一致 | `Desktop` 改成直接携带 `dockReserve` 与 `edgeGap`(`usableHeight = h - dockReserve - edgeGap`,数值仍是 `dH - 116`),半屏与最大化都用 `h - dockReserve`;`maximizedGeometry` 的签名不动 |
+| E30 | §4.2 写"半屏的高度与最大化一致(减去 `dockReserve`)",但 `resolveEdgeSnap` 的签名里没有 `dockReserve`,`Desktop` 又只有 `bottomReserve = dockReserve + edgeGap` | 照字面实现会算成 `dH - 116`(684),与最大化的 `dH - 100`(700)差 16px,半屏与最大化观感不一致 | `Desktop` 改成直接携带 `dockReserve` 与 `edgeGap`(`usableHeight = h - dockReserve - edgeGap`,数值仍是 `dH - 116`),半屏与最大化都用 `h - dockReserve`;`maximizedGeometry` 后来随"最大化交给 CSS"一起删除了(§11.2 E31) |
+| E31 | 落地后复查发现一批**编译得过,单测也全绿**的死代码:`maximizedGeometry` / `fullscreenGeometry`(最大化/全屏其实由 CSS 类接管,这两个函数只被自己的单测调用),`geometryToCss`,`SnapPreview` 的 `is-left` / `is-right` / `is-maximize` 类,`WindowManager` 写的 `.is-closed`,`Dock` 的 `is-normal`,`WindowFrameHandle.setTitle` / `header`,`DockButtonHandle.icon` / `label` / `stateDot`,`DockHandle.element`,以及 `resolveEdgeSnap` 那个"为将来保留"的未用参数 | tsc 只查**文件内**未使用的局部符号:导出成员,只写不读的类名,断头 JSDoc 都照不到.更糟的是它们的单测给出了"这个行为被覆盖"的假象(例如 `maximizedGeometry` 的用例,而真正生效的 `inset` + `--dock-reserve` 反而没被它们守住) | 全部删除;`SnapPreview.show(target)` 只保留 `is-open`;两个句柄只暴露生产代码真正读的成员;`Dock` 的初始状态改走与运行期同一个 `setState` 入口;`geometryToCss` 的"不要写 `cssText`"那条约定改由注释与 `writeGeometry` 的实现守住 |
+| E32 | 状态机复查发现三处"真机上多操作几次才出现,且不报错"的问题:①`restore` 还原后不清空,连续两轮"最大化/还原"会把中途挪过的位置丢掉;②`onDesktopResize` 只收 `normal` 窗口,最小化/关闭期间桌面变小,恢复后窗口停在桌外再也抓不回来;③`bind()` 直接写 `resolveDefaultGeometry` 的结果,小视口下 `view` 低于 `minSize`(1280x700 时 159 < 180),`objects` 的 `y` 甚至为负(标题栏被顶出桌顶) | 三者都属**状态序列**与"初始态是唯一例外"的盲区:现有单测只覆盖单次最大化循环与大视口,`clampGeometry` 的文档口径(`y ∈ [0, dH - headerMinVisible]`)在初始布局上根本没被走一遍 | ①进入 maximized/fullscreen 时**无条件**记录 `entry.geometry`,退出时用完即置 `null`;②隐藏态在 `onDesktopResize` 里也走 `fitGeometry`;③`bind()` 的默认几何过 `fitGeometry`.三条各补一条回归用例(`WindowManager.test.ts`),另加"`bind()` 只能调用一次"的守卫 |
 
 ### 11.3 查过但**不是**阻碍的(留个记录,省得再查一遍)
 
@@ -2031,7 +2037,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | R4 | 窗口 `hidden` 恢复后编辑器度量到 0 宽 | 行号槽宽错乱 | §8 待验点 1;`onGeometryChange` 是为此预留的挂钩 |
 | R5 | 最大化的"全屏高亮"与窗口状态不同步 | 预览与落地不一致,用户困惑 | 吸附判定是 `WindowGeometry` 的纯函数,预览与落地**调同一个函数** |
 | R6 | 标题栏拖动与动作按钮争事件 | 按钮点不动,或拖动起不来 | 拖动起手就是 `.window-title`,与 `.window-actions` / `.window-controls` 是兄弟而非父子;不靠运行期 `closest` 判断(§5.4) |
-| R7 | 窗口默认几何在小视口下越界 | 首次打开就抓不到某个窗口 | §3.4 的夹取规则 + `resize` 时重算;回归清单第 1 项 |
+| R7 | 窗口默认几何在小视口下越界 | 首次打开就抓不到某个窗口 | §3.4 的夹取规则 + `bind()` 的 `fitGeometry`(§11.2 E32)+ `resize` 时重算;回归清单第 1 项 |
 | R10 | 窗外壳由 JS 建之后,有人"顺手"往 `index.html` 里手写一份 `.window` | 标记有两份真相源,改一处漏一处不报错 | §5.3 的硬约束 + §7 的 `WindowFrame.test.ts` DOM 契约守卫 |
 | R11 | 拆页只改了"谁在哪个窗口",漏改"点过程"那条链路 | 点"过程"没反应(窗口被最小化),或悄悄改掉了参数窗口的几何 | §3.7 的三步口径 + `reveal()` 是唯一入口;回归清单第 5 项专测 |
 | R12 | 有人把"两页共用一份宽度/一次只看一页"或"参数区与视图区共用一个高度"的旧口径当成仍需维护的约束 | 拆页被当成回退,或又加回标签页 / 分隔条 | §2.2 写明那两条口径的前提都是"右栏只有一份空间",窗口化后前提消失;R24 是它的落地检查 |
@@ -2068,7 +2074,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | 最小化/恢复 | 隐藏态 `opacity: 0` + `inert` + **`display: flex`**(R15);隐藏期间 `#dsl-editor` 的 `clientWidth/Height` 与行号槽宽仍然有效;Dock 恢复到原几何 | 通过 |
 | 高亮层对齐(§5.6) | textarea 与高亮层的矩形,`font-*`/`line-height`/`tab-size`/`padding` 逐项相同;滚到最右/最下后 `transform == translate(-scrollLeft, -scrollTop)`;高亮层 `overflow: hidden` 且两侧 `scrollHeight` 相等(当年那 15.1px 的坑) | 通过 |
 | 最大化/全屏 | 最大化 = `{0,0,dW,dH-100}` 且四条行内几何被清空(E9),`z-index` 仍在;还原逐像素一致;全屏 = `{0,0,dW,dH}`,Dock 自动隐藏,`Esc` 退出并还原 | 通过 |
-| 边缘吸附 | 拖到左边缘预览 `is-open is-left`,松手落到左半屏 `{0,0,640,700}`(与最大化同高,见 E30);松手后预览层复位 | 通过 |
+| 边缘吸附 | 拖到左边缘预览亮起(`is-open`),松手落到左半屏 `{0,0,640,700}`(与最大化同高,见 E30);松手后预览层复位 | 通过 |
 | 示例菜单(B2) | 打开后条目齐全,菜单完整可见(底线在窗口底边之上),内部可滚动,滚到底后最后一项可点中;`Esc` 关闭 | 通过 |
 | 过程窗口(§3.7) | 被最小化的过程窗口在点条目"过程"后恢复可见,聚焦并载入内容(不最大化,不改几何) | 通过 |
 | 视口 resize | 窗口整体收回桌内(E29),3D 画布尺寸跟着 `#app` 变 | 通过 |

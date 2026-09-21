@@ -8,29 +8,31 @@
  *
  * 它必须 `pointer-events: none`(写在 CSS 里):否则这层会挡住正在拖的指针,
  * 吸附一开始就再也收不到 `pointermove`.
+ *
+ * 形状差异全部来自行内几何(半屏就是 `desktop.w / 2` 宽的矩形,最大化就是整块
+ * 桌面),所以这里不再按 `kind` 写 `is-left` / `is-right` / `is-maximize` 之类
+ * 没有 CSS 消费者的类名;开合只有 `.is-open` 一个状态(与 CSS 里的唯一规则对应).
  */
 import { writeGeometry } from './WindowFrame';
 import type { Geometry } from './WindowGeometry';
 
-export type SnapKind = 'left' | 'right' | 'maximize';
-
 export interface SnapPreviewHandle {
-    show(target: Geometry, kind: SnapKind): void;
+    show(target: Geometry): void;
     hide(): void;
     dispose(): void;
 }
 
 export function createSnapPreview(element: HTMLElement): SnapPreviewHandle {
     return {
-        show(target: Geometry, kind: SnapKind) {
+        show(target: Geometry) {
             writeGeometry(element, target);
-            element.className = `snap-preview is-open is-${kind}`;
+            element.classList.add('is-open');
         },
         hide() {
-            element.className = 'snap-preview';
+            element.classList.remove('is-open');
         },
         dispose() {
-            element.className = 'snap-preview';
+            element.classList.remove('is-open');
         },
     };
 }

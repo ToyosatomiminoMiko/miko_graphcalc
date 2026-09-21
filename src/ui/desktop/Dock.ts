@@ -25,16 +25,11 @@ export interface DockHandlers {
 }
 
 export interface DockButtonHandle {
-    readonly element: HTMLButtonElement;
-    readonly icon: HTMLElement;
-    readonly label: HTMLElement;
-    readonly stateDot: HTMLElement;
     setActive(active: boolean): void;
     setState(state: WindowState): void;
 }
 
 export interface DockHandle {
-    readonly element: HTMLElement;
     readonly buttons: ReadonlyMap<WindowId, DockButtonHandle>;
     /** 只让当前焦点窗口的按钮亮起;`null` = 一个都不亮. */
     setActive(id: WindowId | null): void;
@@ -43,14 +38,18 @@ export interface DockHandle {
     dispose(): void;
 }
 
-/** 窗口状态 -> Dock 状态点要显示的类名. */
-function stateClass(state: WindowState): string {
+/**
+ * 窗口状态 -> Dock 状态点要显示的类名.
+ *
+ * `normal` 返回 null:它没有任何规则,不写类名就不会多出一个"以为有样式"的死类.
+ */
+function stateClass(state: WindowState): string | null {
     switch (state) {
         case 'maximized': return 'is-maximized';
         case 'fullscreen': return 'is-fullscreen';
         case 'minimized': return 'is-minimized';
         case 'closed': return 'is-closed';
-        default: return 'is-normal';
+        default: return null;
     }
 }
 
@@ -74,7 +73,6 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
             attrs: {
                 type: 'button',
                 'data-window': spec.id,
-                'data-state': 'normal',
                 'aria-pressed': 'false',
                 title: spec.title,
             },
@@ -84,17 +82,16 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
         button.addEventListener('click', () => handlers.onSelect(spec.id));
 
         buttons.set(spec.id, {
-            element: button,
-            icon,
-            label,
-            stateDot,
             setActive: (active: boolean) => {
                 button.classList.toggle('is-active', active);
                 button.setAttribute('aria-pressed', String(active));
             },
             setState: (state: WindowState) => {
                 button.setAttribute('data-state', state);
-                stateDot.className = `dock-btn-state ${stateClass(state)}`;
+                const stateName = stateClass(state);
+                stateDot.className = stateName === null
+                    ? 'dock-btn-state'
+                    : `dock-btn-state ${stateName}`;
             },
         });
         group.append(button);
@@ -118,12 +115,13 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
     const inner = el('div', { class: 'dock-inner' }, group, actions);
     container.replaceChildren(inner);
 
+    // 初始状态走与运行期同一条路径(`setState`),不在这里另写一份 `data-state`
+    // 与状态点类名:两处初始化就是"改一处漏一处"的起点.
     for (const spec of UI_CONFIG.window.windows) {
         buttons.get(spec.id)!.setState('normal');
     }
 
     return {
-        element: inner,
         buttons,
         setActive(id: WindowId | null) {
             for (const [buttonId, button] of buttons) button.setActive(buttonId === id);

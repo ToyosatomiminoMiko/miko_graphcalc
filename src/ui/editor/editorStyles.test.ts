@@ -88,6 +88,9 @@ describe('编辑区样式归属', () => {
     });
 
     it('高亮层是 inset:0 的裁剪框而不是滚动容器', () => {
+        // 滚动偏移写在高亮内容的 transform 上(见 EditorHighlight.sync);
+        // 一旦这里变成 auto/scroll,高亮层就会与 textarea 各有一个最大滚动偏移
+        // (两者 client 尺寸差一个滚动条厚度),靠近底部时高亮会被夹住而错位.
         const rule = ruleOf(editorCss, '#dsl-editor-highlight');
 
         expect(rule).toContain('inset: 0');
@@ -112,15 +115,5 @@ describe('编辑区样式归属', () => {
         expect(hiddenRule).not.toBe('');
         expect(hiddenRule).toContain('opacity: 0');
         expect(hiddenRule).not.toMatch(/display:\s*none/);
-    });
-
-    it('高亮层是裁剪框而不是滚动容器', () => {
-        // 滚动偏移写在高亮内容的 transform 上(见 EditorHighlight.sync);
-        // 一旦这里变成 auto/scroll,高亮层就会与 textarea 各有一个最大滚动偏移
-        // (两者 client 尺寸差一个滚动条厚度),靠近底部时高亮会被夹住而错位.
-        const rule = /#dsl-editor-highlight\s*\{[^}]*\}/.exec(editorCss)?.[0] ?? '';
-
-        expect(rule).toContain('overflow: hidden');
-        expect(rule).not.toMatch(/overflow:\s*(auto|scroll)/);
     });
 });

@@ -27,10 +27,11 @@ import {
     type Desktop,
     type Geometry,
     type Limits,
+    type SnapKind,
 } from './WindowGeometry';
 import { clearGeometry, createWindowFrame, writeGeometry, type WindowActionButton, type WindowFrameHandle } from './WindowFrame';
 import { bindWindowResize } from './WindowResize';
-import { createSnapPreview, type SnapKind, type SnapPreviewHandle } from './SnapPreview';
+import { createSnapPreview, type SnapPreviewHandle } from './SnapPreview';
 
 export type WindowState = 'normal' | 'maximized' | 'fullscreen' | 'minimized' | 'closed';
 
@@ -98,6 +99,8 @@ export class WindowManager {
     private pendingSnap: PendingSnap | null = null;
     /** 每个窗口上一次"标题栏按下"的时间戳,只服务双击判定. */
     private readonly lastTitleDown = new Map<WindowId, number>();
+    /** `bind()` 只允许生效一次(见该方法). */
+    private bound = false;
 
     /**
      * @param layer       `#window-layer`:窗口的定位参照与 z-order 层
@@ -120,6 +123,14 @@ export class WindowManager {
      * ③Dock;④初始焦点(没有焦点就没有 z 序参照).
      */
     bind(): void {
+        if (this.bound) {
+            throw new Error(
+                'WindowManager: bind() 只能调用一次;dispose() 之后不支持重建'
+                + '(监听用的 AbortController 已经 abort,再 bind 会静默产出不可交互的窗口)',
+            );
+        }
+        this.bound = true;
+
         const root = this.layer.parentElement;
         if (!root) throw new Error('WindowManager: #window-layer 必须挂在桌面容器里');
         this.root = root;
@@ -171,6 +182,12 @@ export class WindowManager {
                 zIndex: this.z,
             };
             this.entries.set(spec.id, entry);
+            // 默认几何也要过一遍夹取:`resolveDefaultGeometry` 只做锚点换算,
+            // 小视口下它的结果可以低于 `minSize`(`view` 在 1280x700 上是 159 <
+            // 180),`objects` 的 `y` 甚至可能为负(标题栏被顶出桌顶,再也抓不回来).
+            // 与 `setGeometry` / `restoreAll` / `onDesktopResize` 共用 `fitGeometry`,
+            // 初始态不再是唯一例外.
+            entry.geometry = fitGeometry(entry.geometry, this._limits(entry));
             // 初始 z 也要落到 DOM 上:层叠顺序不能靠 DOM 顺序(窗口层是个
             // 独立的层,z-index: auto 的窗口会被显式取号的窗口压住).
             frame.element.style.zIndex = String(entry.zIndex);
@@ -301,11 +318,16 @@ export class WindowManager {
         const entry = this._require(id);
         if (maximized) {
             if (entry.state === 'maximized') return;
-            entry.restore ??= entry.geometry;
+            // 无条件记下当前几何:用 `??=` 会把上一次最大化前的旧值留到下一次
+            // (用户中途挪过的位置在还原时被丢掉,见 WindowManager.test.ts 的
+            // "最大化/还原走两轮"用例).
+            entry.restore = entry.geometry;
             entry.state = 'maximized';
         } else {
             if (entry.state !== 'maximized') return;
             entry.geometry = entry.restore ?? entry.geometry;
+            // 还原后立刻清掉:留着它下一次最大化就不会再记录新位置.
+            entry.restore = null;
             entry.state = 'normal';
         }
         // 先落地状态类,再按新状态决定"写四条行内属性"还是"清掉它们".
@@ -329,11 +351,13 @@ export class WindowManager {
                     this.setFullscreen(other.spec.id, false);
                 }
             }
-            if (entry.state !== 'maximized') entry.restore ??= entry.geometry;
+            if (entry.state !== 'maximized') entry.restore = entry.geometry;
             entry.state = 'fullscreen';
         } else {
             if (entry.state !== 'fullscreen') return;
             entry.geometry = entry.restore ?? entry.geometry;
+            // 与 setMaximized 同一条:还原即作废,否则下一次全屏会回到旧位置.
+            entry.restore = null;
             entry.state = 'normal';
         }
         this._applyState(id);
@@ -381,7 +405,9 @@ export class WindowManager {
         if (!this.root) return;
         this.desktop = this._measureDesktop();
         for (const entry of this.entries.values()) {
-            if (entry.state === 'normal') {
+            // 隐藏态(最小化/关闭)也要收:它们保留的是普通态几何,而恢复路径
+            // 不做夹取--桌面变小期间停在桌外的窗口恢复后就再也抓不回来了.
+            if (entry.state !== 'maximized' && entry.state !== 'fullscreen') {
                 // resize 是外部变化:把窗口整体收回桌内(拖动仍按 §3.4 的夹取).
                 entry.geometry = fitGeometry(entry.geometry, this._limits(entry));
             }
@@ -414,6 +440,7 @@ export class WindowManager {
         this.geometryListeners.clear();
         this.pendingSnap = null;
         this.focusedId = null;
+        this.lastTitleDown.clear();
         this.root = null;
     }
 
@@ -542,13 +569,12 @@ export class WindowManager {
                 next = magnetize(next, this._otherGeometries(id), UI_CONFIG.window.snap.magnet);
 
                 const snap = resolveEdgeSnap(
-                    next,
                     { x: event.clientX, y: event.clientY },
                     this.desktop,
                     UI_CONFIG.window.snap,
                 );
                 this.pendingSnap = snap ? { id, kind: snap.kind, target: snap.target } : null;
-                if (snap) this.snapPreview?.show(snap.target, snap.kind);
+                if (snap) this.snapPreview?.show(snap.target);
                 else this.snapPreview?.hide();
 
                 this.setGeometry(id, next);
@@ -653,7 +679,8 @@ export class WindowManager {
         element.classList.toggle('is-maximized', entry.state === 'maximized');
         element.classList.toggle('is-fullscreen', entry.state === 'fullscreen');
         element.classList.toggle('is-hidden', hidden);
-        element.classList.toggle('is-closed', entry.state === 'closed');
+        // 关闭与最小化在视觉上是同一件事(都靠 `.is-hidden`);Dock 上的状态点
+        // 走 `data-state`,所以这里不再多写一个没有 CSS 消费者的 `is-closed`.
         // 隐藏态用 opacity + inert,不用 display:none:编辑器行号与高亮层
         // 会量到 0 尺寸(见 §5.6).
         element.toggleAttribute('inert', hidden);

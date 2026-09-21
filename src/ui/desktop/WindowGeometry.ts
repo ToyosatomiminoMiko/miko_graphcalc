@@ -1,8 +1,8 @@
 /**
- * 窗口几何:锚点换算 / 夹取 / 最大化 / 吸附判定的**纯函数**.
+ * 窗口几何:锚点换算 / 夹取 / 吸附判定的**纯函数**.
  *
  * 本文件不引用任何 DOM(不 import `document`,`getComputedStyle`,也不认识
- * 元素):夹取边界,最大化换算,锚点默认值,吸附候选全部能在单测里穷举.
+ * 元素):夹取边界,锚点默认值,吸附候选全部能在单测里穷举.
  * 真正把结果写进页面的是 `WindowManager` + `WindowFrame.writeGeometry`.
  *
  * 三条数值口径(唯一一份,别在别处再发明):
@@ -11,8 +11,10 @@
  *   的 `inset` 必须与这个和一致(单测守着).
  * - 夹取:`w/h ∈ [min, max(min, desktop)]`,`x ∈ [-(w - edgeKeep), dW - edgeKeep]`,
  *   `y ∈ [0, dH - headerMinVisible]`.标题栏是唯一的手动入口,绝不能被拖出桌顶.
- * - 最大化/全屏**不经过** `clampGeometry`:它们本来就允许铺满,过一遍夹取只会
- *   被 `min` 下限干扰.
+ *   `bind()` 的初始几何同样要过一遍 `fitGeometry`,否则"默认值"会成为唯一的例外.
+ * - 最大化/全屏**没有几何函数**:进入这两种态时行内四条属性被清掉,几何交给
+ *   `css/window.css` 的 `.is-maximized` / `.is-fullscreen`(`inset`),所以这里
+ *   也不存在"最大化矩形"的第二份实现.
  */
 import type { AxisSpec, WindowGeometrySpec } from '@/config/uiConfig';
 
@@ -35,7 +37,7 @@ export interface Geometry {
 }
 
 /** 某个窗口的最小尺寸. */
-export interface SizeConstraints {
+interface SizeConstraints {
     readonly w: number;
     readonly h: number;
 }
@@ -176,17 +178,6 @@ export function moveGeometry(g: Geometry, dx: number, dy: number, limits: Limits
     return clampGeometry({ x: g.x + dx, y: g.y + dy, w: g.w, h: g.h }, limits);
 }
 
-/** 最大化:填满桌面,底部留出 Dock 的高度. */
-export function maximizedGeometry(desktop: Desktop, dockReserve: number): Geometry {
-    return { x: 0, y: 0, w: desktop.w, h: desktop.h - dockReserve };
-}
-
-/** 单窗口全屏:填满整个桌面. */
-export function fullscreenGeometry(desktop: Desktop): Geometry {
-    return { x: 0, y: 0, w: desktop.w, h: desktop.h };
-}
-
-/** 边缘吸附的判据(三者互斥,按此顺序判);`null` = 不吸附. */
 /**
  * resize 时把窗口**整体**收进桌内.
  *
@@ -204,19 +195,20 @@ export function fitGeometry(g: Geometry, limits: Limits): Geometry {
     };
 }
 
+/** 边缘吸附的三种落点(与 `resolveEdgeSnap` 的返回同域). */
+export type SnapKind = 'left' | 'right' | 'maximize';
+
+/**
+ * 边缘吸附的判据(三者互斥,按此顺序判);`null` = 不吸附.
+ *
+ * 判据只用到指针与桌面:被拖窗口自身的几何与"吸不吸附"无关(窗口间磁吸另有
+ * `magnetize`),所以这里不接收它--不为"将来可能用得上"多留一个参数.
+ */
 export function resolveEdgeSnap(
-    /**
-     * 被拖窗口的当前几何.
-     *
-     * 一期的判据只用到指针与桌面(磁吸另有 `magnetize`),这里保留参数是为了
-     * 与 `magnetize` 同一副签名,将来若要"窗口已贴边就不再预览"等规则不必改
-     * 调用方;参数名前置下划线表达"当前实现不读它".
-     */
-    _geometry: Geometry,
     pointer: { readonly x: number; readonly y: number },
     desktop: Desktop,
     snap: { readonly edge: number },
-): { readonly target: Geometry; readonly kind: 'left' | 'right' | 'maximize' } | null {
+): { readonly target: Geometry; readonly kind: SnapKind } | null {
     // 半屏与最大化两者高度一致(都铺到 Dock 上方),这样"怎么放都是同一个观感"
     // (见 §4.2:三者观感统一).
     const height = desktop.h - desktop.dockReserve;
@@ -280,11 +272,4 @@ export function geometryStyle(g: Geometry): Readonly<Record<'left' | 'top' | 'wi
         width: `${g.w}px`,
         height: `${g.h}px`,
     };
-}
-
-/** 四条属性的拼接,只用于单测断言与日志(不要拿它去写 `style.cssText`). */
-export function geometryToCss(g: Geometry): string {
-    return Object.entries(geometryStyle(g))
-        .map(([name, value]) => `${name}: ${value}`)
-        .join('; ');
 }

@@ -10,25 +10,19 @@
  * 左侧源码编辑区已独立到 css/editor.css;本文件不再包含编辑器的几何与配色.
  * ========================================================================== */
 
-/* 面板本体:只保留"填满窗口正文"的骨架.
+/* 面板本体 / 右栏页容器:同一条"填满窗口正文"的骨架.
    底色/边框/阴影归窗口外壳那一层(.window),不再叠两层;`position: absolute` /
    `z-index` / `overflow` 全部删掉:几何归 WindowManager,裁切归 .window-body,
    而 `overflow: hidden` 会把有意超出面板的浮层切掉(见 §11.1 B2).
-   面板里的标题栏(.panel-header)也整体删除:标题上移成窗口标题(W6/B8). */
-.panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-/* 右栏页容器:与窗口正文同一条"纵向 flex"骨架,并吃掉正文剩余高度.
-   标签栏与页级 hidden 都已删除(两页各自独立成窗口);这里的 flex 约束在
-   `.window-body` 这个新父节点下同样成立(B5). */
+   面板里的标题栏(.panel-header)也整体删除:标题上移成窗口标题(W6/B8);
+   右栏的标签栏与页级 hidden 同样删除(两页各自独立成窗口).
+   `flex: 1 1 auto` 不在这里写:`.window-body > *` 已经给了(见 css/window.css),
+   两处都写就会在下一次改窗口正文骨架时漏掉一处. */
+.panel,
 .right-page {
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 /* ==========================================================================

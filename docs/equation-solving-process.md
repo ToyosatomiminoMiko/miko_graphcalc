@@ -25,14 +25,19 @@
 
 ### 1.1 空间实测
 
-数字来自 `src/config/uiConfig.ts` 的 `UI_CONFIG.panel` 与 `css/layout.css`:
+> **历史快照**:本节与 §3.2 记的是**窗口化之前**的固定面板布局(`css/layout.css`
+> 与三个贴边面板).`css/layout.css` 与 `#right-panel` 已随窗口化删除,下面的
+> 宽度/高度数字与 `#right-splitter` 相关结论都只作"当时为什么需要独立过程视图"
+> 的论据保留;当前的窗口几何见 [面板窗口化设计计划](windowing-plan.md) §4.
+
+数字来自 `src/config/uiConfig.ts` 的 `UI_CONFIG.panel` 与(当时的)`css/layout.css`:
 
 | 区域 | 现状 | 来源 |
 | --- | --- | --- |
-| 三维视口 | `position:absolute; inset:0`,铺满全窗口,所有面板浮在它上面 | `css/layout.css` `#viewport` |
-| 左栏(源码) | 宽 220–875px(默认 300),通高 | `#left-panel` |
-| 右栏(参数/视图) | 宽 220–875px(默认 300),**通高** | `#right-panel` |
-| 底栏(对象清单) | 高 **160–640px**(默认 240),折叠后 40,夹在左右栏之间 | `#bottom-panel` |
+| 三维视口 | `position:absolute; inset:0`,铺满全窗口,所有面板浮在它上面 | 现为 `css/window.css` `#viewport` |
+| 左栏(源码) | 宽 220–875px(默认 300),通高 | 现为 `source code` 窗口 |
+| 右栏(参数/视图) | 宽 220–875px(默认 300),**通高** | 现拆成 `参数` / `视图` 两个窗口 |
+| 底栏(对象清单) | 高 **160–640px**(默认 240),折叠后 40,夹在左右栏之间 | 现为 `对象` 窗口 |
 | 底栏内部 | `1fr 1fr` 两栏(实体 \| 求值),各自纵向滚动 | `#object-panel` |
 | 过程现状 | 求值条目里一个 `<details>`,展开后一行一条 KaTeX | `evaluationDom.ts` / `.eval-detail-body` |
 
@@ -88,7 +93,13 @@
 
 ## 3 版面:右栏标签页
 
-### 3.1 目标结构
+> **历史方案(已被窗口化取代)**:本章描述的标签页 / 分隔条 / `PanelController`
+> 折叠链路**没有按此落地**--W6 直接把它们拆成了五个独立窗口.保留原文是为了
+> 记下"当时评估过的耦合点与取舍";`RightPanelTabs` / `RightSplitController` /
+> `Tabs.ts` / `#right-splitter` / `#right-tabs` 与 `css/layout.css` 均已删除.
+> 过程当前的形态见 [面板窗口化设计计划](windowing-plan.md) §3.7.
+
+### 3.1 目标结构(历史)
 
 ```text
 <aside id="right-panel" class="panel">
@@ -131,10 +142,12 @@ tabindex".语义不同强行复用会把读屏与键盘行为做成四不像.新
 `src/ui/widgets/Tabs.ts`,样式仍归 CSS,句柄契约(`element` / `get` /
 `onChange` / `dispose`)与其他控件保持一致.
 
-### 3.2 必须处理的四个耦合点
+### 3.2 必须处理的四个耦合点(历史:随控制器一起作废)
 
 这一节是本次改动**唯一有真实风险**的地方,四处都在现有控制器里,漏一处就是
 上一轮 UI 审查里那类"模型一套,DOM 一套"的缺陷(UI-P3.3).
+**窗口化之后这些控制器都不存在了**(`PanelController` / `RightSplitController`
+/ `RightPanelTabs` 已删除),下面四条只作为"拆页时踩过哪些坑"的记录.
 
 1. **折叠语义**.`PanelController._applyLayout()` 会遍历面板的直接子元素,把
    非 header 的全部设成 `display:none`.标签页栏必须**放进那个 header 内部**,
@@ -352,12 +365,16 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 | --- | --- | --- |
 | `ui/shared/keyedRowList.ts` | 过程页的步骤行按"步骤指纹"做增删复用,重载不重建同内容行 | 不要另写一套行缓存 |
 | `ui/formula/FormulaView.ts` | KaTeX 排版与模板缓存直接复用 | 不要扩大 512 的模板缓存上限(步骤 LaTeX 是有限集合) |
-| `ui/shared/dragGesture.ts` | 右栏宽度拖动沿用现有手柄 | 不要新写拖动实现 |
-| `config/uiConfig.ts` | 过程页默认宽度,披露阈值,步骤上限都放这里(纯数据) | 不要硬编码进渲染逻辑;若某个值 CSS 首帧也要消费,必须同步 `css/base.css` 的 `:root` 兜底并由 `applyUiConfig.test.ts` 锁住一致性 |
+| `ui/shared/dragGesture.ts` | 拖动沿用现有手势件(原文指右栏宽度手柄;窗口化后是窗口移动与八向缩放,仍是同一份实现) | 不要另写拖动实现 |
+| `config/uiConfig.ts` | 过程窗口的默认几何(`UI_CONFIG.window`),披露阈值,步骤上限都放这里(纯数据) | 不要硬编码进渲染逻辑;若某个值 CSS 首帧也要消费,必须同步 `css/base.css` 的 `:root` 兜底并由 `applyUiConfig.test.ts` 锁住一致性 |
 
 ---
 
 ## 8 验收与测试
+
+> 历史验收单(标签页方案).其中前两条的载体(`PanelController.test.ts` /
+> `RightSplitController.test.ts`)已随窗口化删除;剩余条目(披露判据,纯函数
+> 单测,`npm test` / `typecheck` 全绿)仍然适用.
 
 一期验收(逐条可验证):
 
@@ -375,7 +392,10 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 
 ---
 
-## 9 风险与降级
+## 9 风险与降级(历史)
+
+> R1–R3,R5 的缓解措施都建立在"标签页 + 折叠 + 分隔条"这套已删除的机制上,
+> 按历史记录读.
 
 | # | 风险 | 缓解 | 降级 |
 | --- | --- | --- | --- |
@@ -397,8 +417,8 @@ export function needsProcessPage(lines: readonly EvaluationDetailLine[]): boolea
 - **不改 `DslApp` 的编排职责**(它仍是组合根,新控制器在 `start()` 里装配一次);
 - **不在过程页里内联 Markdown 讲义**:讲解文案属于 `docs/`,不重复第二份
   (路线图 §7.2 第 1 条);
-- **不落 localStorage**:界面偏好与当前步都不持久化,刷新回默认(与
-  `RightSplitController` 的既有约定一致);
+- **不落 localStorage**:界面偏好与当前步都不持久化,刷新回默认(与窗口
+  "刷新后回到默认几何"的既有约定一致);
 - **一期不做播放动画,不做练习判定,不做进度**;
 - **不做二值的"过程对不对"判定**:需要时按路线图 C1 的第三态口径走.
 

@@ -8,7 +8,7 @@ applyUiConfig();
 /**
  * 模块级唯一实例.
  *
- * 必须留一个可触达的引用,否则 `DslApp.dispose()` 整棵树(面板拖动监听,
+ * 必须留一个可触达的引用,否则 `DslApp.dispose()` 整棵树(窗口拖动/缩放监听,
  * ResizeObserver,requestAnimationFrame,EventBus 订阅,共享 Worker)都没有
  * 调用时机 -- 写好的清理路径会变成只对测试生效的死代码.
  *

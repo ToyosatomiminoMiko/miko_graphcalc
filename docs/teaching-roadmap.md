@@ -173,7 +173,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 问题 | **D1,当前最硬的缺口**:`example/` 根本没进构建产物,学生只能手抄 |
-| 改动 | ① `vite.config.ts` 增 `import.meta.glob('../example/*.miko', { query: '?raw' })` 或专用插件,把示例作为**字符串资源**打进产物;② 左面板 `index.html` 的 `panel-header` 增一个 `<select>`(或复用现有按钮样式);③ 新增 `src/ui/ExamplePicker.ts` 纯逻辑组件,选中后写入 `#dsl-editor` 并触发 `run-btn` 的等价路径. |
+| 改动 | ① `vite.config.ts` 增 `import.meta.glob('../example/*.miko', { query: '?raw' })` 或专用插件,把示例作为**字符串资源**打进产物;② `source code` 窗口标题栏增一个入口(落地成现在的"示例"按钮 + `#example-menu` 浮层;原文写的是已随窗口化删除的 `.panel-header`);③ 新增 `src/ui/ExamplePicker.ts` 纯逻辑组件,选中后写入 `#dsl-editor` 并触发 `run-btn` 的等价路径. |
 | 依赖 | T2(需要示例带上标题元信息才能生成下拉项) |
 | 工作量 | `2–3d` |
 | 验收 | 下拉列出全部示例;选择后编辑器内容与文件一致;点击运行后场景正确;刷新页面后默认仍是原默认场景(不隐式改变启动行为) |
@@ -288,14 +288,14 @@
 | --- | --- |
 | 问题 | **G1 的展示侧 + G3 合并成的同一个教学需求**:学生要看到"每一步为什么".现状把过程挤在底栏求值条目的一个 `<details>` 里--底栏高上限 640px,扣掉标题与内边距后可用约 548px,简单递等式一行约 37px(带分式 55–70px),**一屏最多约 14 行**,且与实体清单对半分宽(默认 1920 屏每栏约 646px,长式子必然横滚) |
 | 设计 | 见 [方程求解过程的展示设计](equation-solving-process.md):**不改浮层格局**,把右栏改成标签页(页1 参数/视图,页2 过程);过程页通高(1080p 下约 27 行),一行一步递等式,条目走三级披露(L0 摘要 / L1 行内短过程 / L2 过程页) |
-| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器" |
+| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器".**落地形态已变**:W6 把标签页/分隔条整条链路拆成五个独立窗口(`PanelController` / `RightPanelTabs` / `RightSplitController` 已删除),过程是独立窗口,详见 [窗口化计划](windowing-plan.md) |
 | 二期 | 步骤索引驱动几何(割线->切线,黎曼矩形加细,交点高亮):把"第 k 步"当虚拟参数走 `CompileController.refresh` -> `RenderController.applyScene(scene, changedParams)`,复用既有缓存与 latest-only 调度;IR **只新增**字段(如 `stepHighlights`) |
 | 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源:过程页骨架(标签页/递等式/披露)零改动;UI 增量只有"求解"子列表条目与过程页**题目区**--这正是展示层先行的价值 |
 | 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.miko`,默认场景也带两条 `solve` |
 | 依赖 | 一期无(可与 T8/B1 并行);二期原计划接一期预留的 `onStepChange` 出口--该出口已随翻步一起删除(见设计文档 4.4),二期需和真正的步骤交互一起重新设计接口;三期依赖 B1 的产物类型口径 |
 | 工作量 | 一期 `3–5d`(跨 HTML/CSS/新控制器/共享行件契约),二期 `3–5d`,三期 `1w+`(需先豁免 §7.1 的禁令) |
-| 验收 | 一期:①标签页切换后折叠/展开与 `dispose()` 复位与现有一致;②过程页激活时 `#params-panel` / `#right-splitter` 不参与布局,切回后分隔比例不变;③长过程条目进过程页后底栏高度不变;④判据/步骤分区有纯函数测试;⑤`npm test` 与 `npm run typecheck` 全绿;⑥主 chunk 增量实测 < 30KB |
-| 风险 | ①`PanelController._applyLayout()` 的折叠语义是"隐藏除承载按钮的 header 外的全部直接子元素",标签栏必须放进该 header 内部,页内容各包一层;②`RightSplitController.computeSplitRatio()` 以 `#right-panel` 矩形为基准,加标签栏后该前提失效,基准要换成页容器;③`--right-panel-width` 只有 `PanelController._applyLayout` 一个写入点(UI-P3.3 的教训),标签页控制器不能自己写变量;④右栏默认 300px 对递等式偏窄(实作后确认"按页记宽"会让切页时栏宽跳变,已改为参数页与过程页**共用一份宽度**,需要时手动拖);⑤参数被藏到另一页后用户可能忘了调参,过程页顶部保留只读参数回显 |
+| 验收 | 一期:①标签页切换后折叠/展开与 `dispose()` 复位与现有一致(**已作废**:标签页与 `PanelController` 已删除);②过程页激活时 `#params-panel` / `#right-splitter` 不参与布局,切回后分隔比例不变(**已作废**:过程是独立窗口);③长过程条目进过程页后底栏高度不变;④判据/步骤分区有纯函数测试;⑤`npm test` 与 `npm run typecheck` 全绿;⑥主 chunk 增量实测 < 30KB |
+| 风险 | ①`PanelController._applyLayout()` 的折叠语义是"隐藏除承载按钮的 header 外的全部直接子元素",标签栏必须放进该 header 内部,页内容各包一层(**已作废**);②`RightSplitController.computeSplitRatio()` 以 `#right-panel` 矩形为基准,加标签栏后该前提失效,基准要换成页容器(**已作废**);③`--right-panel-width` 只有 `PanelController._applyLayout` 一个写入点(UI-P3.3 的教训),标签页控制器不能自己写变量(**已作废**,窗口宽度归 `WindowManager`);④右栏默认 300px 对递等式偏窄(实作后确认"按页记宽"会让切页时栏宽跳变,已改为参数页与过程页**共用一份宽度**,需要时手动拖);⑤参数被藏到另一页后用户可能忘了调参,过程页顶部保留只读参数回显 |
 | 降级 | 只做一期且不做标签页:过程页做成右栏内一个可折叠区块,数据只接**积分与梯度**两类(细节行最多,递等结构最明显) |
 
 ## 阶段 C:长期/探索
@@ -553,9 +553,11 @@
    组件,仍需跑 `npm test` 与手工验证页面.
 6. **右栏一旦多用途,布局状态就有第二处来源**.B5 把右栏改成标签页后,面板
    折叠,分隔条比例,栏宽三件事同时被"哪一页在前"影响.缓解只有一条:
-   每个状态保留**唯一写入点**(折叠与栏宽归 `PanelController`,比例归
-   `RightSplitController`,页归属归标签页控制器),任何"顺手写一下 CSS 变量"
-   的捷径都会重现 UI-P3.3 那类自相矛盾的面板.详见
+   每个状态保留**唯一写入点**.这条教训在窗口化时以另一种形式保留了:
+   窗口几何/状态/z-order 各自只有一个写入点(`_applyGeometry` / `_applyState` /
+   `focus()`),任何"顺手写一下 CSS 变量或类名"的捷径都会重现 UI-P3.3 那类
+   自相矛盾的面板.历史(折叠/栏宽归 `PanelController`,比例归
+   `RightSplitController`,页归属归标签页控制器)见
    [方程求解过程的展示设计](equation-solving-process.md) 第 3.2 节.
 
 ## 7.3 每项任务的通用验收清单

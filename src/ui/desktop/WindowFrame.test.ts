@@ -9,10 +9,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UI_CONFIG } from '@/config/uiConfig';
 import { installDomStub, type StubElement } from '@/testing/domStub';
-import { createWindowFrame, type WindowActionButton } from './WindowFrame';
+import { createWindowFrame, type WindowActionButton, type WindowFrameHandle } from './WindowFrame';
 import { RESIZE_DIRECTIONS } from './WindowResize';
 
 const GEOMETRY = { x: 16, y: 32, w: 420, h: 260 };
+
+/** 标题栏按类名取:句柄不暴露 `header`(生产代码只读 title/body/handles/controls). */
+function headerOf(frame: WindowFrameHandle): StubElement {
+    return frame.element.querySelector('.window-header') as unknown as StubElement;
+}
 
 function controls(onClick: () => void = () => {}): WindowActionButton[] {
     return UI_CONFIG.window.actions.map((action) => ({
@@ -70,16 +75,16 @@ describe('createWindowFrame 的结构契约', () => {
         expect(frame.element.tabIndex).toBe(-1);
         expect(frame.element.getAttribute('aria-labelledby')).toBe('window-title-source');
 
-        expect(frame.header.className).toBe('window-header');
+        expect(headerOf(frame).className).toBe('window-header');
         expect(frame.title.className).toBe('window-title');
         expect(frame.body.className).toBe('window-body');
-        expect(frame.header.contains(frame.title as unknown as Node)).toBe(true);
+        expect(headerOf(frame).contains(frame.title as unknown as StubElement)).toBe(true);
         // 正文与标题栏是兄弟:正文必须在 header 之外(浮层在 header 里,反过来会被裁).
-        expect(frame.header.contains(frame.body as unknown as Node)).toBe(false);
+        expect(headerOf(frame).contains(frame.body as unknown as StubElement)).toBe(false);
         expect(frame.element.contains(frame.body as unknown as Node)).toBe(true);
 
-        const actions = frame.header.querySelector('.window-actions');
-        const controlBox = frame.header.querySelector('.window-controls');
+        const actions = headerOf(frame).querySelector('.window-actions');
+        const controlBox = headerOf(frame).querySelector('.window-controls');
         expect(actions).not.toBeNull();
         expect(controlBox).not.toBeNull();
 
@@ -199,7 +204,7 @@ describe('既有节点是搬进来的,不是重建的(§4.4)', () => {
             geometry: GEOMETRY,
         });
 
-        const actions = frame.header.querySelector('.window-actions') as unknown as StubElement;
+        const actions = headerOf(frame).querySelector('.window-actions') as unknown as StubElement;
         expect(actions.children).toContain(fixture.runButton);
         // 同一个对象,不是复制品.
         expect(actions.querySelector('#run-btn')).toBe(fixture.runButton);
@@ -218,28 +223,10 @@ describe('既有节点是搬进来的,不是重建的(§4.4)', () => {
             geometry: GEOMETRY,
         });
 
-        expect(frame.header.querySelector('#example-menu')).toBe(fixture.exampleMenu);
+        expect(headerOf(frame).querySelector('#example-menu')).toBe(fixture.exampleMenu);
         expect(frame.body.querySelector('#example-menu')).toBeNull();
         // 浮层是 header 的直接子节点,不在 .window-actions 那一层.
-        const actions = frame.header.querySelector('.window-actions') as unknown as StubElement;
+        const actions = headerOf(frame).querySelector('.window-actions') as unknown as StubElement;
         expect(actions.children).not.toContain(fixture.exampleMenu);
-    });
-
-    it('setTitle 只换标题文字,不影响 titleContent', () => {
-        const fixture = installExistingNodes();
-        const frame = createWindowFrame({
-            id: 'objects',
-            title: '对象',
-            titleContent: [fixture.copyHint as unknown as HTMLElement],
-            actions: [],
-            overlays: [],
-            controls: controls(),
-            geometry: GEOMETRY,
-        });
-
-        frame.setTitle('对象列表');
-
-        expect(frame.title.textContent).toContain('对象列表');
-        expect(frame.title.querySelector('#formula-copy-hint')).toBe(fixture.copyHint);
     });
 });

@@ -65,6 +65,8 @@ export class DslApp {
     private readonly exampleButton: HTMLButtonElement;
     private readonly exampleMenu: HTMLElement;
     private readonly formulaCopyHint: HTMLElement;
+    /** 几何变化的退订函数(`dispose()` 里调用,与 `_wireEditorResize` 配对). */
+    private unsubscribeGeometry: (() => void) | null = null;
     /** 过程页视图:条目"过程"入口把文档交给它载入. */
     private processPanel: ProcessPanel | null = null;
 
@@ -196,10 +198,11 @@ export class DslApp {
     /**
      * 装配并启动:绑定全局监听,起 rAF 循环,编译一次当前源码.
      *
-     * 幂等:重复调用直接返回.这里的每一步都会**覆盖**字段引用(panelController /
-     * rightSplitController / keyboardController / animationFrameId),再跑一次会
-     * 让第一套对象失去引用却又继续监听 window/document,并多出一个永不取消的
-     * 动画帧循环 -- 静默的双份键鼠通道.有 dispose() 就该有配对的一次性启动.
+     * 幂等:重复调用直接返回.这里的每一步都会**覆盖**字段引用
+     * (`windowManager` / `keyboardController` / `animationFrameId`),
+     * 再跑一次会让第一套对象失去引用却又继续监听 window/document,
+     * 并多出一个永不取消的动画帧循环 -- 静默的双份键鼠通道.
+     * 有 dispose() 就该有配对的一次性启动.
      */
     start(): void {
         if (this.started) return;
@@ -213,6 +216,9 @@ export class DslApp {
         // 建 Dock,起初始焦点.必须发生在取宿主之前的那一步之后,其余控制器
         // 都能拿到节点之后(宿主的搬运不改节点身份,控制器按 id 拿到的还是同一个).
         this.windowManager.bind();
+        // 暂存区的四个节点已经被搬进各窗口标题栏,空壳留在文档里没有用途
+        // (见 index.html 的 `#window-staging`).
+        document.getElementById('window-staging')?.remove();
         this._wireEditorResize();
 
         // 过程页视图只装配一次;参数只读回显(R6)按需拉当前值,不在这里存副本.
@@ -270,6 +276,8 @@ export class DslApp {
         window.removeEventListener('resize', this.onResize);
 
         // 窗口:摘监听,把宿主还回 #app,删掉窗口外壳(与 bind() 配对).
+        this.unsubscribeGeometry?.();
+        this.unsubscribeGeometry = null;
         this.windowManager.dispose();
         this.processPanel?.dispose();
         this.processPanel = null;
@@ -496,10 +504,13 @@ export class DslApp {
      * 行号与高亮层各自都有 `ResizeObserver`,那是**主路径**;这条钩子是兜底:
      * 最小化/关闭再恢复时,元素在隐藏期间量到的未必是最终尺寸(隐藏态刻意不用
      * `display: none`,就是为了让测量始终有效).只改 x/y 的拖动不重复刷新.
+     *
+     * 退订函数存起来,与 `dispose()` 配对(不能只依赖 `WindowManager.dispose()`
+     * 顺手清监听:那样两边的生命周期就只有一处能改).
      */
     private _wireEditorResize(): void {
         const lastKey = new Map<string, string>();
-        this.windowManager.onGeometryChange((id) => {
+        this.unsubscribeGeometry = this.windowManager.onGeometryChange((id) => {
             const geometry = this.windowManager.getGeometry(id);
             const key = `${geometry.w}x${geometry.h}:${this.windowManager.getState(id)}`;
             if (lastKey.get(id) === key) return;

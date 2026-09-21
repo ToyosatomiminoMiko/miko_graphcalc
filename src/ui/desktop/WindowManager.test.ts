@@ -28,12 +28,12 @@ interface Fixture {
     readonly hosts: Map<WindowId, StubElement>;
 }
 
-function setup(): Fixture {
+function setup(desktopW = 1280, desktopH = 800): Fixture {
     const stub = installDomStub();
     const root = stub.document.createElement('div');
     root.id = 'app';
-    root.offsetWidth = 1280;
-    root.offsetHeight = 800;
+    root.offsetWidth = desktopW;
+    root.offsetHeight = desktopH;
     stub.document.body.append(root);
 
     // 五个正文宿主先照 index.html 的样子放好,bind() 时被搬进各自窗口正文.
@@ -170,6 +170,32 @@ describe('bind:装配', () => {
 
         expect(() => manager.bind()).toThrow(/left-panel/);
     });
+
+    it('bind 只能调用一次(dispose 后重建会静默产出不可交互的窗口,所以直接抛)', () => {
+        const { manager } = setup();
+
+        expect(() => manager.bind()).toThrow(/只能调用一次/);
+    });
+
+    it('小桌面(1280x700)上默认几何也过夹取:不小于 minSize,底边不留进标题栏外', () => {
+        const { manager } = setup(1280, 700);
+        const view = WINDOW.windows.find((spec) => spec.id === 'view')!;
+
+        // raw resolveDefaultGeometry 在这里只给 159(见 WindowGeometry.test.ts
+        // 的说明),夹取后必须顶到 minSize.h.
+        expect(manager.getGeometry('view').h).toBeGreaterThanOrEqual(view.minSize.h);
+    });
+
+    it('极矮桌面(1280x350)上 objects 的标题栏仍留在桌内(y >= 0)', () => {
+        const { manager } = setup(1280, 350);
+
+        for (const spec of WINDOW.windows) {
+            const geometry = manager.getGeometry(spec.id);
+            expect(geometry.y, `${spec.id}.y`).toBeGreaterThanOrEqual(0);
+            expect(geometry.y, `${spec.id}.y`).toBeLessThanOrEqual(350 - WINDOW.headerMinVisible);
+            expect(geometry.h, `${spec.id}.h`).toBeGreaterThan(0);
+        }
+    });
 });
 
 describe('焦点与 z-order', () => {
@@ -278,16 +304,19 @@ describe('状态机', () => {
         expect(element.classList.contains('is-focused')).toBe(true);
     });
 
-    it('关闭:带 .is-closed,且能从 Dock 恢复', () => {
+    it('关闭:走 .is-hidden,Dock 状态点记成 closed,且能从 Dock 恢复', () => {
         const { layer, dock, manager } = setup();
         const button = dock.querySelector('[data-window="objects"]') as unknown as StubElement;
 
         manager.setClosed('objects', true);
-        expect(windowOf(layer, 'objects').classList.contains('is-closed')).toBe(true);
+        expect(windowOf(layer, 'objects').classList.contains('is-hidden')).toBe(true);
+        // 关闭与最小化的区别只体现在 Dock 的 data-state 上(没有 `.is-closed` 规则).
+        expect(button.getAttribute('data-state')).toBe('closed');
 
         button.dispatch('click');
         expect(manager.getState('objects')).toBe('normal');
-        expect(windowOf(layer, 'objects').classList.contains('is-closed')).toBe(false);
+        expect(windowOf(layer, 'objects').classList.contains('is-hidden')).toBe(false);
+        expect(button.getAttribute('data-state')).toBe('normal');
     });
 
     it('最大化:进入清掉四条行内几何,退出按 restore 逐像素写回', () => {
@@ -312,6 +341,56 @@ describe('状态机', () => {
         expect(element.style.getPropertyValue('left')).toBe('16px');
         expect(element.style.getPropertyValue('height')).toBe('465px');
         expect(manager.getGeometry('source')).toEqual(before);
+    });
+
+    it('最大化/还原走两轮:第二轮必须回到中途挪过的位置(restore 不留旧值)', () => {
+        const { manager } = setup();
+        const moved = { x: 300, y: 200, w: 420, h: 300 };
+
+        manager.setMaximized('source', true);
+        manager.setMaximized('source', false);
+        manager.setGeometry('source', moved);
+
+        manager.setMaximized('source', true);
+        manager.setMaximized('source', false);
+
+        expect(manager.getGeometry('source')).toEqual(moved);
+    });
+
+    it('全屏/退出走两轮:第二轮同样回到中途挪过的位置', () => {
+        const { manager } = setup();
+        const moved = { x: 300, y: 200, w: 420, h: 300 };
+
+        manager.setFullscreen('source', true);
+        manager.setFullscreen('source', false);
+        manager.setGeometry('source', moved);
+
+        manager.setFullscreen('source', true);
+        manager.setFullscreen('source', false);
+
+        expect(manager.getGeometry('source')).toEqual(moved);
+    });
+
+    it('隐藏期间桌面变小:最小化/关闭的窗口也会被收回桌内,恢复后抓得到', () => {
+        const { root, manager } = setup();
+        manager.setGeometry('params', { x: 900, y: 100, w: 420, h: 300 });
+        manager.setGeometry('process', { x: 900, y: 100, w: 420, h: 300 });
+        manager.setMinimized('params', true);
+        manager.setClosed('process', true);
+
+        root.offsetWidth = 600;
+        root.offsetHeight = 500;
+        manager.onDesktopResize();
+
+        manager.setMinimized('params', false);
+        manager.setClosed('process', false);
+
+        for (const id of ['params', 'process'] as const) {
+            const geometry = manager.getGeometry(id);
+            expect(geometry.x, `${id}.x`).toBeGreaterThanOrEqual(0);
+            expect(geometry.x + geometry.w, `${id} 右边界`).toBeLessThanOrEqual(600);
+            expect(geometry.y, `${id}.y`).toBeLessThanOrEqual(500 - WINDOW.headerMinVisible);
+        }
     });
 
     it('最大化 -> 全屏 -> 退出:restore 不被全屏覆盖', () => {
@@ -449,14 +528,13 @@ describe('拖动 / 吸附', () => {
         title.dispatch('pointerdown', { clientX: 600, clientY: 400, pointerId: 1 });
         title.dispatch('pointermove', { clientX: 4, clientY: 400, pointerId: 1 });
 
-        expect(snap.className).toContain('is-open');
-        expect(snap.className).toContain('is-left');
+        expect(snap.classList.contains('is-open')).toBe(true);
         expect(snap.style.getPropertyValue('width')).toBe('640px');
 
         title.dispatch('pointerup', { clientX: 4, clientY: 400, pointerId: 1 });
 
         expect(manager.getGeometry('source')).toEqual({ x: 0, y: 0, w: 640, h: 700 });
-        expect(snap.className).toBe('snap-preview');
+        expect(snap.classList.contains('is-open')).toBe(false);
     });
 
     it('拖到上边缘:预览最大化,松手进入 maximized', () => {
@@ -467,7 +545,7 @@ describe('拖动 / 吸附', () => {
         title.dispatch('pointerdown', { clientX: 600, clientY: 300, pointerId: 1 });
         title.dispatch('pointermove', { clientX: 600, clientY: 4, pointerId: 1 });
 
-        expect(snap.className).toContain('is-maximize');
+        expect(snap.classList.contains('is-open')).toBe(true);
         expect(manager.getState('source')).toBe('normal');
 
         title.dispatch('pointerup', { clientX: 600, clientY: 4, pointerId: 1 });

@@ -266,7 +266,8 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
              把这些**现成节点**原样 append 进 .window-actions / .window-header /
              .window-title(见 src/ui/desktop/WindowFrame.ts).
              放在这个 hidden 的暂存区里,是为了让它们在脚本执行前不参与布局;
-             被搬走之后这个容器就空了. -->
+             WindowManager.bind() 之后由 DslApp 摘掉这个空壳,不留一个"看起来
+             还是结构"的空 div. -->
         <div id="window-staging" hidden>
             <button id="example-btn" type="button" aria-haspopup="true" aria-expanded="false"
                 aria-controls="example-menu">示例</button>
