@@ -15,9 +15,11 @@
 import { describe, expect, it } from 'vitest';
 import { readdir } from 'node:fs/promises';
 import {
+    DEFAULT_EXAMPLE_FILE,
     EXAMPLE_CATALOG,
     EXAMPLE_GROUP_TITLES,
     allExamples,
+    defaultExample,
     exampleSource,
     groupedExamples,
     type ExampleGroup,
@@ -74,5 +76,14 @@ describe('示例目录', () => {
 
     it('清单之外的文件名取不到源码,返回 null 而不是空串', () => {
         expect(exampleSource('no_such_example.miko')).toBeNull();
+    });
+
+    it('首屏默认示例在清单里,且能取到源码', () => {
+        // App 启动时编辑器为空就写入它(DslApp._seedDefaultExample):改了文件名
+        // 却忘了登记,或删了文件,首屏会空着,这里把它挡在测试里.
+        const entry = defaultExample();
+        expect(entry, `${DEFAULT_EXAMPLE_FILE} 不在清单里`).not.toBeNull();
+        expect(entry!.file).toBe(DEFAULT_EXAMPLE_FILE);
+        expect(exampleSource(entry!.file)).not.toBeNull();
     });
 });

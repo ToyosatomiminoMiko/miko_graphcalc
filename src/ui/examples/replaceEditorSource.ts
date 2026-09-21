@@ -35,6 +35,18 @@ export function replaceTextareaSource(
     return false;
 }
 
+/**
+ * 首屏种子源码:把默认示例写进**原本为空**的编辑器.
+ *
+ * 与 {@link replaceTextareaSource} 分开:那条路要保住用户已有代码的撤销栈,
+ * 所以必须 `focus()` + `select()` + `execCommand`;而启动时编辑器本来是空的,
+ * 没有历史要保,抢焦点反而会盖掉窗口系统刚设好的初始焦点.这里直接赋值,
+ * 调用方自己刷新行号栏与高亮层--直接赋值不派发 `input` 事件.
+ */
+export function seedTextareaSource(editor: HTMLTextAreaElement, source: string): void {
+    editor.value = source;
+}
+
 function insertTextPreservingUndo(
     editor: HTMLTextAreaElement,
     source: string,

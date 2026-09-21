@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
-import { replaceTextareaSource } from './replaceEditorSource';
+import { replaceTextareaSource, seedTextareaSource } from './replaceEditorSource';
 
 interface Harness {
     readonly stub: DomStub;
@@ -83,5 +83,21 @@ describe('replaceTextareaSource', () => {
 
         expect(replace(h, 'EXAMPLE SOURCE')).toBe(false);
         expect(h.editor.value).toBe('EXAMPLE SOURCE');
+    });
+});
+
+describe('seedTextareaSource(首屏种子)', () => {
+    it('直接赋值,不抢焦点,也不走编辑命令', () => {
+        const h = setup();
+        h.stub.execCommand.result = true;
+
+        seedTextareaSource(h.editor as unknown as HTMLTextAreaElement, 'DEFAULT SOURCE');
+
+        expect(h.editor.value).toBe('DEFAULT SOURCE');
+        // 启动时抢焦点会盖掉窗口系统刚设好的初始焦点;种子写入也没有历史要保,
+        // 不需要走编辑管线(见 seedTextareaSource 的说明).
+        expect(h.focusSpy).not.toHaveBeenCalled();
+        expect(h.selectSpy).not.toHaveBeenCalled();
+        expect(h.stub.execCommand.args).toEqual([]);
     });
 });

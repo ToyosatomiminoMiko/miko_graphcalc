@@ -31,8 +31,8 @@ import { createWindowChrome, windowSlotsProvider } from '@/ui/desktop/windowChro
 import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
 import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
 import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
-import { exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
-import { replaceTextareaSource } from '@/ui/examples/replaceEditorSource';
+import { defaultExample, exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
+import { replaceTextareaSource, seedTextareaSource } from '@/ui/examples/replaceEditorSource';
 import { createViewPanel, type ViewPanel } from '@/ui/view/ViewPanel';
 
 export class DslApp {
@@ -222,6 +222,10 @@ export class DslApp {
         window.addEventListener('resize', this.onResize);
         this.animationFrameId = requestAnimationFrame(this.animate);
 
+        // 首屏默认源码:index.html 的编辑器现在是空的,这里先种入默认示例,
+        // 下面那一次 run() 编译的就是它;编辑器里已有内容(比如有人往 HTML 的
+        // textarea 里预置了源码)时不覆盖.
+        this._seedDefaultExample();
         void this.run();
     }
 
@@ -320,17 +324,42 @@ export class DslApp {
         }
 
         replaceTextareaSource(this.editor, source);
+        this._syncExampleChrome(entry);
+        void this.run();
+    }
+
+    /**
+     * 首屏默认示例:编辑器为空时写入 {@link defaultExample}(即 `example/test.miko`).
+     *
+     * 只种源码,不在这里编译--`start()` 末尾那一次 `run()` 会编译它,启动时
+     * 不会编译两遍.源码缺失时保持空编辑器:`exampleCatalog.test.ts` 与
+     * `exampleScenes.test.ts` 已经保证它在清单里且能内联/编译,这里是防御.
+     */
+    private _seedDefaultExample(): void {
+        if (this.editor.value.trim() !== '') return;
+        const entry = defaultExample();
+        const source = entry === null ? null : exampleSource(entry.file);
+        if (entry === null || source === null) return;
+
+        seedTextareaSource(this.editor, source);
+        this._syncExampleChrome(entry);
+    }
+
+    /**
+     * 源码写进编辑器之后的公共收尾:光标归位,刷新两套编辑器装饰,把菜单里
+     * 当前示例标亮.
+     *
+     * 载入与首屏种子共用:`execCommand` 成功后浏览器自己会派发 `input`(行号栏
+     * 跟着更新),回退路径与首屏的直接赋值都不会--统一在这里补一次,两条路径的
+     * 行为就一致了(EditorLineNumbers.refresh 本就是为"程序化改写编辑器"准备的).
+     */
+    private _syncExampleChrome(entry: ExampleEntry): void {
         // 全选覆盖后光标停在文末,编辑器会跟着滚到底部;载入后应当看到开头.
         this.editor.setSelectionRange(0, 0);
         this.editor.scrollTop = 0;
-        // execCommand 成功后浏览器自己会派发 input(行号栏跟着更新),兜底路径
-        // 不会;统一再刷一次,两条路径的行为就一致了(EditorLineNumbers.refresh
-        // 本就是为"程序化改写编辑器"准备的).
         this.lineNumbers.refresh();
         this.editorHighlight.refresh();
-
         this.exampleLoader.setActive(entry.file);
-        void this.run();
     }
 
     private animate = (timestamp: number): void => {

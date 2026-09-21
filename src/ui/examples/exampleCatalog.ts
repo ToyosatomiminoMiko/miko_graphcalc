@@ -110,6 +110,19 @@ export const EXAMPLE_GROUP_TITLES: Record<ExampleGroup, string> = {
 };
 
 /**
+ * 首屏默认载入的示例(文件名).
+ *
+ * `index.html` 里 `<textarea id="dsl-editor">` 的默认源码已经移入 `example/`,
+ * 编辑器初值是空的;App 启动时若编辑器为空,就把这一门课写进去,首屏不是一片
+ * 空视口.
+ *
+ * 为什么放在清单模块而不是写死在 `DslApp`:装配层只该知道"载入默认示例",
+ * "默认是哪一门课"属于课程清单.这个文件名必须在 {@link EXAMPLE_CATALOG} 里
+ * (由 `exampleCatalog.test.ts` 守住).
+ */
+export const DEFAULT_EXAMPLE_FILE = 'test.miko';
+
+/**
  * 取示例源码.清单里没有这个文件,或 glob 没命中(理论上不该发生,由
  * `exampleCatalog.test.ts` 守住)时返回 null,调用方报错而不是塞空文本.
  */
@@ -125,6 +138,16 @@ export function exampleSource(file: string): string | null {
  */
 export function allExamples(): readonly ExampleEntry[] {
     return Object.values(EXAMPLE_CATALOG).flat();
+}
+
+/**
+ * 首屏默认示例条目;清单里没有 {@link DEFAULT_EXAMPLE_FILE} 时返回 null.
+ *
+ * 返回整条目而不是文件名:`DslApp` 载入后要用 `entry.file` 把菜单项标成当前项
+ * (`setActive`),直接给条目省得调用方再按文件名查一次.
+ */
+export function defaultExample(): ExampleEntry | null {
+    return allExamples().find((entry) => entry.file === DEFAULT_EXAMPLE_FILE) ?? null;
 }
 
 /**
