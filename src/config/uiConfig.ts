@@ -83,7 +83,7 @@ export interface WindowConfigEntry {
     readonly title: string;
     /** 正文宿主 id:由 `readAppHosts()` 取成节点后交给 `WindowManager`(见 app/appHosts.ts). */
     readonly hostId: string;
-    readonly dock: { readonly icon: string; readonly label: string };
+    readonly dock: { readonly label: string };
     readonly defaultGeometry: WindowGeometrySpec;
     readonly minSize: { readonly w: number; readonly h: number };
 }
@@ -200,7 +200,7 @@ export const UI_CONFIG = {
                 id: 'source',
                 title: 'source code',
                 hostId: 'left-panel',
-                dock: { icon: '✎', label: '源码' },
+                dock: { label: '源码' },
                 defaultGeometry: {
                     x: { at: 16 },
                     y: { at: 16 },
@@ -214,7 +214,7 @@ export const UI_CONFIG = {
                 id: 'view',
                 title: '视图',
                 hostId: 'view-controls',
-                dock: { icon: '◫', label: '视图' },
+                dock: { label: '视图' },
                 defaultGeometry: {
                     x: { at: 16 },
                     y: { at: 0 }, // 占位:存在 after 时以 after 为准
@@ -229,7 +229,7 @@ export const UI_CONFIG = {
                 id: 'params',
                 title: '参数',
                 hostId: 'right-page-params',
-                dock: { icon: '▤', label: '参数' },
+                dock: { label: '参数' },
                 defaultGeometry: {
                     x: { from: 'right', inset: 16 },
                     y: { at: 16 },
@@ -243,7 +243,7 @@ export const UI_CONFIG = {
                 id: 'process',
                 title: '过程',
                 hostId: 'right-page-process',
-                dock: { icon: '≡', label: '过程' },
+                dock: { label: '过程' },
                 defaultGeometry: {
                     x: { from: 'right', inset: 16 },
                     y: { at: 0 }, // 占位:存在 after 时以 after 为准
@@ -257,7 +257,7 @@ export const UI_CONFIG = {
                 id: 'objects',
                 title: '对象',
                 hostId: 'bottom-panel',
-                dock: { icon: '☰', label: '对象' },
+                dock: { label: '对象' },
                 defaultGeometry: {
                     // 中列宽度是算出来的:dW - 2 * (420 + 16),夹到 [360, 720]
                     x: 'center',

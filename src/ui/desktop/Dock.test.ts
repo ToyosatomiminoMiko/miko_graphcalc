@@ -48,8 +48,6 @@ describe('createDock', () => {
         for (const spec of UI_CONFIG.window.windows) {
             const button = buttonOf(container, spec.id);
             expect(button.title).toBe(spec.title);
-            expect(button.querySelector<StubElement>('.dock-btn-icon')?.textContent)
-                .toBe(spec.dock.icon);
             expect(button.querySelector<StubElement>('.dock-btn-label')?.textContent)
                 .toBe(spec.dock.label);
             expect(button.getAttribute('aria-pressed')).toBe('false');

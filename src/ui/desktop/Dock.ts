@@ -3,7 +3,7 @@
  *
  * 按钮**由窗口清单生成**(`UI_CONFIG.window.windows`),不在 HTML 里手写;点击
  * 语义(提升/最小化/还原/复位)由 `WindowManager` 按状态分派,本模块只负责:
- * - 装配按钮(图标 + 标题 + 状态点),顺序与清单一致;
+ * - 装配按钮(标题 + 状态点),顺序与清单一致;
  * - 上报点击(`handlers.onSelect`);
  * - 写入激活态(`.is-active` 与 `aria-pressed`)与状态点(`data-state`).
  *
@@ -65,7 +65,6 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
 
     const group = el('div', { class: 'dock-group' });
     for (const spec of UI_CONFIG.window.windows) {
-        const icon = el('span', { class: 'dock-btn-icon', text: spec.dock.icon });
         const label = el('span', { class: 'dock-btn-label', text: spec.dock.label });
         const stateDot = el('span', { class: 'dock-btn-state' });
         const button = el('button', {
@@ -77,7 +76,7 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
                 title: spec.title,
             },
         });
-        button.append(icon, label, stateDot);
+        button.append(label, stateDot);
 
         button.addEventListener('click', () => handlers.onSelect(spec.id));
 

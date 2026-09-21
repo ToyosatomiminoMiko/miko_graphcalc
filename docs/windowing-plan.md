@@ -580,7 +580,7 @@ interface WindowConfigEntry {
     readonly title: string;
     /** 正文宿主 id:由 readAppHosts() 取成节点后交给 WindowManager(见 E35). */
     readonly hostId: string;
-    readonly dock: { readonly icon: string; readonly label: string };
+    readonly dock: { readonly label: string };
     readonly defaultGeometry: WindowGeometrySpec;
     readonly minSize: { readonly w: number; readonly h: number };
 }
@@ -615,33 +615,33 @@ window: {
 
 ```ts
 { id: 'source',  title: 'source code', hostId: 'left-panel',
-  dock: { icon: '✎', label: '源码' },
+  dock: { label: '源码' },
   defaultGeometry: { x: { at: 16 }, y: { at: 16 }, w: { at: 420 },
                      h: { fraction: 0.68, of: 'usableHeight' } },  // = round((dH-116)*0.68)
   minSize: { w: 300, h: 220 } }
 
 { id: 'view',    title: '视图',       hostId: 'view-controls',
-  dock: { icon: '◫', label: '视图' },
+  dock: { label: '视图' },
   defaultGeometry: { x: { at: 16 }, y: { at: 0 },
                      w: { at: 420 }, h: { from: 'bottom', inset: 116 },
                      after: { id: 'source', gap: 12 } },           // y = source.y + source.h + 12
   minSize: { w: 280, h: 180 } }                                    // h = dH - 116 - y(与 process 同一条底边)
 
 { id: 'params',  title: '参数',       hostId: 'right-page-params',
-  dock: { icon: '▤', label: '参数' },
+  dock: { label: '参数' },
   defaultGeometry: { x: { from: 'right', inset: 16 }, y: { at: 16 }, w: { at: 420 },
                      h: { fraction: 0.55, of: 'usableHeight' } }, // = round((dH-116)*0.55)
   minSize: { w: 280, h: 200 } }
 
 { id: 'process', title: '过程',       hostId: 'right-page-process',
-  dock: { icon: '≡', label: '过程' },
+  dock: { label: '过程' },
   defaultGeometry: { x: { from: 'right', inset: 16 }, y: { at: 0 },
                      w: { at: 420 }, h: { from: 'bottom', inset: 116 },
                      after: { id: 'params', gap: 12 } },          // y = params.y + params.h + 12
   minSize: { w: 280, h: 180 } }                                   // h = dH - 116 - y(与 view 同一条底边)
 
 { id: 'objects', title: '对象',       hostId: 'bottom-panel',
-  dock: { icon: '☰', label: '对象' },
+  dock: { label: '对象' },
   defaultGeometry: { x: 'center', y: { from: 'bottom', inset: 116 },  // = dH - 116 - h = dH - 376
                      w: { clamp: [360, 720], inset: 2 * 436 + 32 },  // = dW - 904
                      h: { at: 260 } },
@@ -1301,7 +1301,7 @@ window: {
             id: 'source',
             title: 'source code',           // 窗户标题沿用原面板标题(W6)
             hostId: 'left-panel',          // 已存在的元素,原样搬进窗口正文
-            dock: { icon: '✎', label: '源码' },
+            dock: { label: '源码' },
             // 默认几何是**锚点 + 夹取**,不是写死的数字:列高与中列宽度
             // 都依赖桌面尺寸,由 WindowGeometry.resolveDefaultGeometry() 算出 px
             // (见 §11.2 E4).锚点的语义只有一条,写在 §4.1 的 AxisSpec 注释里.
