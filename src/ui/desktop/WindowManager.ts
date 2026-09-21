@@ -8,7 +8,7 @@
  *    (几何交给 CSS 类的 `inset: 0`).它不写类名,也**不碰 `z-index`**.
  * 2. **状态的唯一写入点**是 `_applyState`:`.window` 上的每一个类(除
  *    `.is-focused`)都在这里切,并刷新 `inert` / `aria-hidden` / 窗口按钮文案 /
- *    Dock 的激活态与状态点.
+ *    Dock 的激活态与隐藏态.
  *
  * `z-index` 有第三个写入点:`focus()`.几何写入会清行内属性,两者必须分开,
  * 否则会出现"拖动第一帧窗口就掉到后面"(见 docs/windowing-plan.md §11.2 E8).
@@ -674,7 +674,7 @@ export class WindowManager {
         element.classList.toggle('is-maximized', entry.state === 'maximized');
         element.classList.toggle('is-fullscreen', entry.state === 'fullscreen');
         element.classList.toggle('is-hidden', hidden);
-        // 关闭与最小化在视觉上是同一件事(都靠 `.is-hidden`);Dock 上的状态点
+        // 关闭与最小化在视觉上是同一件事(都靠 `.is-hidden`);Dock 按钮的淡化
         // 走 `data-state`,所以这里不再多写一个没有 CSS 消费者的 `is-closed`.
         // 隐藏态用 opacity + inert,不用 display:none:编辑器行号与高亮层
         // 会量到 0 尺寸(见 §5.6).

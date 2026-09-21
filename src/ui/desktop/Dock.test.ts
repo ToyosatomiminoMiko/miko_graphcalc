@@ -1,6 +1,6 @@
 /**
  * Dock 的装配契约:按钮由窗口清单生成(不是手写),点击只上报 id,
- * 激活态与状态点由 `setActive` / `setState` 写入.
+ * 激活态与隐藏态由 `setActive` / `setState` 写入.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { UI_CONFIG, type WindowId } from '@/config/uiConfig';
@@ -63,7 +63,7 @@ describe('createDock', () => {
         expect(selected).toEqual(['process', 'source']);
     });
 
-    it('激活态与状态点都由 dock 自己写', () => {
+    it('激活态与隐藏态都由 dock 自己写', () => {
         const { container, dock } = setup();
 
         dock.setActive('params');
@@ -76,8 +76,8 @@ describe('createDock', () => {
 
         dock.buttons.get('objects')!.setState('minimized');
         expect(buttonOf(container, 'objects').getAttribute('data-state')).toBe('minimized');
-        expect(buttonOf(container, 'objects').querySelector<StubElement>('.dock-btn-state')?.className)
-            .toContain('is-minimized');
+        // 状态只有 `data-state` 一份(CSS 按它淡化按钮):按钮里不再有第二个装饰元素.
+        expect(buttonOf(container, 'objects').querySelector<StubElement>('.dock-btn-state')).toBeNull();
     });
 
     it('两个桌面动作按钮上报各自的意图', () => {

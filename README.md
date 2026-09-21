@@ -116,7 +116,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   只有五个正文宿主与三个空容器(`#window-layer` / `#snap-preview` / `#dock`);
   加窗口只改 `UI_CONFIG.window.windows` 一处.
 - 能力:拖动标题栏移动,八向缩放,最小化,关闭,**Dock**(按钮由窗口清单生成,
-  带状态点与"全部还原"),最大化(填满桌面并给 Dock 留出高度),单窗口全屏
+  含"全部还原"),最大化(填满桌面并给 Dock 留出高度),单窗口全屏
   (`Esc` 或标题栏按钮退出),边缘吸附(左/右半屏,上边缘最大化)与窗口间磁吸.
 - 状态与写入点:`WindowManager` 持有 `geometry` / `state` / `restore` /
   `focused` / `zIndex`;**几何的唯一写入点**是 `_applyGeometry`(逐条

@@ -314,7 +314,7 @@ describe('状态机', () => {
         expect(element.classList.contains('is-focused')).toBe(true);
     });
 
-    it('关闭:走 .is-hidden,Dock 状态点记成 closed,且能从 Dock 恢复', () => {
+    it('关闭:走 .is-hidden,Dock 按钮记成 closed,且能从 Dock 恢复', () => {
         const { layer, dock, manager } = setup();
         const button = dock.querySelector('[data-window="objects"]') as unknown as StubElement;
 

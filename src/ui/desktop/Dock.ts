@@ -3,9 +3,9 @@
  *
  * 按钮**由窗口清单生成**(`UI_CONFIG.window.windows`),不在 HTML 里手写;点击
  * 语义(提升/最小化/还原/复位)由 `WindowManager` 按状态分派,本模块只负责:
- * - 装配按钮(标题 + 状态点),顺序与清单一致;
+ * - 装配按钮(标题),顺序与清单一致;
  * - 上报点击(`handlers.onSelect`);
- * - 写入激活态(`.is-active` 与 `aria-pressed`)与状态点(`data-state`).
+ * - 写入激活态(`.is-active` 与 `aria-pressed`)与隐藏态(`data-state`,CSS 按它淡化).
  *
  * 为什么按钮不放在 `index.html`:加一个窗口要改两处(标记与清单)就会漂移,
  * 而"清单是唯一真相源"是本方案的硬约束(见 docs/windowing-plan.md §5.3).
@@ -26,6 +26,11 @@ export interface DockHandlers {
 
 export interface DockButtonHandle {
     setActive(active: boolean): void;
+    /**
+     * 写 `data-state`:CSS 只按它淡化"最小化/关闭"的按钮(`opacity`).
+     * 状态只由按钮自身表达:
+     * 隐藏态看本方法的 `data-state`, 聚焦态看 `setActive`.
+     */
     setState(state: WindowState): void;
 }
 
@@ -36,21 +41,6 @@ export interface DockHandle {
     /** 全屏时 Dock 自动隐藏(退出全屏的那个按钮也随之消失,`Esc` 仍可用). */
     setFullscreen(visible: boolean): void;
     dispose(): void;
-}
-
-/**
- * 窗口状态 -> Dock 状态点要显示的类名.
- *
- * `normal` 返回 null:它没有任何规则,不写类名就不会多出一个"以为有样式"的死类.
- */
-function stateClass(state: WindowState): string | null {
-    switch (state) {
-        case 'maximized': return 'is-maximized';
-        case 'fullscreen': return 'is-fullscreen';
-        case 'minimized': return 'is-minimized';
-        case 'closed': return 'is-closed';
-        default: return null;
-    }
 }
 
 /**
@@ -66,7 +56,6 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
     const group = el('div', { class: 'dock-group' });
     for (const spec of UI_CONFIG.window.windows) {
         const label = el('span', { class: 'dock-btn-label', text: spec.dock.label });
-        const stateDot = el('span', { class: 'dock-btn-state' });
         const button = el('button', {
             class: 'dock-btn',
             attrs: {
@@ -76,7 +65,7 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
                 title: spec.title,
             },
         });
-        button.append(label, stateDot);
+        button.append(label);
 
         button.addEventListener('click', () => handlers.onSelect(spec.id));
 
@@ -87,10 +76,6 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
             },
             setState: (state: WindowState) => {
                 button.setAttribute('data-state', state);
-                const stateName = stateClass(state);
-                stateDot.className = stateName === null
-                    ? 'dock-btn-state'
-                    : `dock-btn-state ${stateName}`;
             },
         });
         group.append(button);
@@ -114,8 +99,8 @@ export function createDock(container: HTMLElement, handlers: DockHandlers): Dock
     const inner = el('div', { class: 'dock-inner' }, group, actions);
     container.replaceChildren(inner);
 
-    // 初始状态走与运行期同一条路径(`setState`),不在这里另写一份 `data-state`
-    // 与状态点类名:两处初始化就是"改一处漏一处"的起点.
+    // 初始状态走与运行期同一条路径(`setState`),不在这里另写一份 `data-state`:
+    // 两处初始化就是"改一处漏一处"的起点.
     for (const spec of UI_CONFIG.window.windows) {
         buttons.get(spec.id)!.setState('normal');
     }

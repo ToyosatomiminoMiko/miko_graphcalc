@@ -382,26 +382,12 @@
     background: var(--color-accent-active-bg);
 }
 
+/* 隐藏态(最小化/关闭)只由按钮自身的淡化表达:曾经还有一个 6px 状态点,
+ * 但它对这两个状态与这条 opacity 重复,对 maximized 与"窗口铺满桌面"重复,
+ * 对 fullscreen 更是永远画不出来(全屏时 #dock 整条 display:none). */
 .dock-btn[data-state="minimized"],
 .dock-btn[data-state="closed"] {
     opacity: 0.6;
-}
-
-.dock-btn-state {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-neutral);
-}
-
-.dock-btn-state.is-minimized,
-.dock-btn-state.is-closed {
-    background: var(--color-text-faint);
-}
-
-.dock-btn-state.is-maximized,
-.dock-btn-state.is-fullscreen {
-    background: var(--color-accent);
 }
 
 .dock-actions {

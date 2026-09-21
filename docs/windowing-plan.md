@@ -466,10 +466,11 @@ y ∈ [0, desktopH - HEADER_MIN]                   // 标题栏绝不能被拖�
 一条固定在底边居中的横向容器,内容**由窗口清单生成**(不在 HTML 里手写
 按钮,与"示例菜单由控制器渲染"同一约定):
 
-- 每个窗口一个按钮:标题 + 状态点.点击语义按状态分派:normal -> 提升并聚焦
-  (已是焦点则最小化);minimized/closed -> 恢复到 `geometry`;maximized ->
-  还原到 `normal`.
-- 当前焦点窗口的按钮带 `.is-active`.
+- 每个窗口一个按钮:**只放标题**,不摆状态标记.点击语义按状态分派:normal ->
+  提升并聚焦(已是焦点则最小化);minimized/closed -> 恢复到 `geometry`;
+  maximized -> 还原到 `normal`.
+- 按钮自身就是状态指示:当前焦点窗口的按钮带 `.is-active`(背景 + 边框 + 文字色),
+  最小化/关闭的按钮按 `data-state` 淡化(`opacity: 0.6`).
 - Dock 右侧另放一个**桌面动作区**:单窗口全屏退出(`Esc` 同样可退),以及
   一个"全部还原"入口(把五个窗口一键复位到默认几何,对应参考项目的
   "恢复默认").
@@ -2048,6 +2049,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E33 | 标题栏四个节点仍留在 `index.html`:一个 `#window-staging` 暂存区 + `DslApp` 里按 window id 写 if 链的 `_windowContent()` + 一条"这四个 id 还在 HTML 里"的守卫测试 | 四个消费者的**签名本来就是收节点**(`ExampleLoaderController` 收 `{button, menu}`,`FormulaCopyController` 收 hint,`runButton` 是 `DslApp` 自己的),查 id 的只有装配层:同一个 `#example-btn` 在 5 行内被查了两次.也就是说"id 与监听归控制器"这条理由撑不住--**创建点**才是错的,所有权一直很清楚 | 三个节点并入 `ui/desktop/windowChrome.ts` 的 `createWindowChrome()`(用 `el()` 建,文案进 `UI_CONFIG.window.chrome`),以构造参数注入控制器;`index.html` 删掉暂存区,`DslApp` 删掉 if 链与 `window-staging` 摘除;`desktopHosts.test.ts` 的旧守卫反向改成"这四个 id 不许再出现在 HTML 里".`aria-haspopup` / `aria-labelledby` 等静态属性随节点一起搬,`Popover` 独占的状态属性不变 |
 | E34 | "谁搬去哪"散在三个文件里:`UI_CONFIG` 只写窗口清单,`WindowFrameSpec` 用 `titleContent` / `actions` / `overlays` 三个平行字段,`DslApp._windowContent()` 用 if 链把它们接起来;槽位词汇在每个文件里各叫一个名字 | 同一件事三处各说一半,加一个标题栏节点要同时改配置示例,spec 字段与 if 链;而且 `titleContent` 按"是什么"命名,`actions` / `overlays` 按"是什么东西"命名,读代码必须来回跳 | 引入唯一的槽位词表 `WindowSlot = 'title' | 'actions' | 'overlays'`(定义在 `uiConfig.ts`,`WindowFrameSpec.slots` 用同一套键),采用关系收成 `UI_CONFIG.window.adopted` 一张表,由 `windowSlotsProvider(chrome)` 一次解析成 provider;`DslApp` 不再参与"谁搬去哪".节点名的强类型由 `WindowChrome = Record<ChromeNodeId, HTMLElement>` 在编译期守住 |
 | E35 | `index.html` 里散着 26 处 `document.getElementById`(视口 / 参数面板 / 诊断 / 七个对象列表 / 编辑器四个槽 / 过程面板 / `#app` / 窗口三容器),旁边还有 `WindowManager` 自己按 `hostId` 查宿主 | `!` 非空断言把"HTML 改名或删节点"推迟到运行期的 `Cannot read properties of null`;而 `ui/widgets/dom.ts` 与 `ui/view/ViewPanel.ts` 早就把"id 当全局注册表"写成淘汰做法,窗口化等于在最后一公里把它请了回来 | 新增 `app/appHosts.ts`:`readAppHosts()` 是全应用唯一按 id 取节点的地方,取不到就抛带 id 的错误,五个正文宿主也在这里按 `hostId` 取好交给 `WindowManager`(此后 `DslApp` 与 `WindowManager` 都不碰 `document`);配两向守卫:`desktopHosts.test.ts`(配置 ↔ HTML)与 `appHosts.test.ts`(HTML ↔ 取节点,用 HTML 的 id 集合构造桩树).`index.html` 的准入清单同时写进 §5.3 |
+| E36 | §3.6 的 Dock 按钮写"标题 + 状态点",窗口清单里另有一枚 per-window 字形图标(`dock.icon`) | 两个装饰件都不承担信息:①图标(✎ / ◫ / ▤ / ≡ / ☰)与按钮文字同义;②状态点的 5 个分支里,`minimized`/`closed` 与按钮自身的 `data-state` 淡化重复(二者本就行为等价),"`normal`"是恒亮的默认灰点,`maximized` 与"窗口铺满桌面"重复,`fullscreen` 更是**永远画不出来**--全屏时 `#dock` 整条 `display: none`,那条 `background: var(--color-accent)` 没有观测者 | 删掉 `dock.icon` 字段(`WindowConfigEntry.dock` 只剩 `label`)与 `dock-btn-icon` 元素 + CSS;删掉状态点元素,`stateClass()` 函数与 `.dock-btn-state` 四条规则,只保留 `data-state`(CSS 按它写 `opacity: 0.6`).状态表达收敛为按钮自身两态:聚焦 = `.is-active`,最小化/关闭 = `data-state` |
 
 ### 11.3 查过但**不是**阻碍的(留个记录,省得再查一遍)
 
