@@ -57,6 +57,7 @@ function setup(desktopW = 1280, desktopH = 800): Fixture {
         layer as unknown as HTMLElement,
         dock as unknown as HTMLElement,
         snap as unknown as HTMLElement,
+        hosts as unknown as ReadonlyMap<WindowId, HTMLElement>,
         () => ({}),
     );
     manager.bind();
@@ -149,7 +150,7 @@ describe('bind:装配', () => {
         expect(zs.slice(1)).toEqual([...zs.slice(1)].sort((a, b) => a - b));
     });
 
-    it('宿主 id 漂移时抛一条带 hostId 的错(不是 append(null) 的 TypeError)', () => {
+    it('宿主缺失时抛一条带 hostId 的错(不是 append(null) 的 TypeError)', () => {
         const stub = installDomStub();
         const root = stub.document.createElement('div');
         root.id = 'app';
@@ -161,10 +162,19 @@ describe('bind:装配', () => {
         const snap = stub.document.createElement('div');
         root.append(layer, dock, snap);
 
+        // 正常路径上宿主由 `readAppHosts()` 按 hostId 取齐(缺了在那里就报错);
+        // 这条守的是最后一道:直接构造 WindowManager 的调用方漏传了宿主.
+        const bodies = new Map<WindowId, HTMLElement>();
+        for (const spec of WINDOW.windows) {
+            if (spec.id === 'source') continue;
+            bodies.set(spec.id, stub.document.createElement('div') as unknown as HTMLElement);
+        }
+
         const manager = new WindowManager(
             layer as unknown as HTMLElement,
             dock as unknown as HTMLElement,
             snap as unknown as HTMLElement,
+            bodies,
             () => ({}),
         );
 

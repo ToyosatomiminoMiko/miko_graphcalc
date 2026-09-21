@@ -6,11 +6,11 @@
  * 任何状态:拖动,缩放,按钮语义都由 `WindowManager` 在建完之后接线,与
  * "`PanelController.bind()` 才挂手柄"是同一时序.
  *
- * 与 `spec.actions` / `spec.overlays` / `spec.titleContent` 里的节点是**搬过来
- * 的,不是重建的**:`#example-btn` / `#run-btn` 的监听,`#example-menu` 的浮层
- * 状态,`#formula-copy-hint` 的回显都不能丢,所以只 `append` 现成节点,不按
- * innerHTML 重做一份(见 §4.4).
+ * 与 `spec.slots` 里的节点是**搬过来的,不是重建的**:`#example-btn` /
+ * `#run-btn` 的监听,`#example-menu` 的浮层状态,`#formula-copy-hint` 的回显都
+ * 不能丢,所以只 `append` 现成节点,不按 innerHTML 重做一份(见 §4.4).
  */
+import { type WindowSlot } from '@/config/uiConfig';
 import { createButton, type ButtonHandle } from '@/ui/widgets/Button';
 import { el, type Child } from '@/ui/widgets/dom';
 import {
@@ -30,12 +30,14 @@ export interface WindowActionButton {
 export interface WindowFrameSpec {
     readonly id: string;
     readonly title: string;
-    /** 标题里的额外内容(对象窗口放 `#formula-copy-hint`). */
-    readonly titleContent: readonly Child[];
-    /** 标题栏动作的现成节点:示例按钮 / RUN. */
-    readonly actions: readonly Child[];
-    /** 标题栏浮层的现成节点:`#example-menu`. */
-    readonly overlays: readonly Child[];
+    /**
+     * 要搬进各槽位的**现成节点**;同一槽位内顺序即显示顺序.
+     *
+     * 键取自 `UI_CONFIG` 的 `WindowSlot`:`title` 进 `.window-title`,`actions`
+     * 进 `.window-actions`,`overlays` 是 `.window-header` 的直接子节点.这套词
+     * 与 `UI_CONFIG.window.adopted` 说同一句话.缺省槽位 = 不搬节点,不写空数组.
+     */
+    readonly slots: Partial<Record<WindowSlot, readonly Child[]>>;
     /** 由 `UI_CONFIG.window.actions` 生成的窗口按钮. */
     readonly controls: readonly WindowActionButton[];
     /** 建好即刻写入行内样式,避免首帧闪在左上角. */
@@ -94,10 +96,10 @@ export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle {
     // 读屏名指向标题文本;id 由窗口 id 派生,一个窗口只有一个标题.
     title.id = `window-title-${spec.id}`;
     const label = el('span', { text: spec.title });
-    title.append(label, ...concrete(spec.titleContent));
+    title.append(label, ...concrete(spec.slots.title ?? []));
     element.setAttribute('aria-labelledby', title.id);
 
-    const actions = el('div', { class: 'window-actions' }, ...concrete(spec.actions));
+    const actions = el('div', { class: 'window-actions' }, ...concrete(spec.slots.actions ?? []));
 
     const controls = el('div', { class: 'window-controls' });
     const controlHandles = new Map<string, ButtonHandle>();
@@ -115,7 +117,7 @@ export function createWindowFrame(spec: WindowFrameSpec): WindowFrameHandle {
 
     // 浮层是 header 的直接子节点(不是 .window-actions 的子节点,那一层是按钮行),
     // 也必须在 .window-body 之外,否则会被正文的裁切切掉(§11.1 B2).
-    const header = el('header', { class: 'window-header' }, title, actions, controls, ...concrete(spec.overlays));
+    const header = el('header', { class: 'window-header' }, title, actions, controls, ...concrete(spec.slots.overlays ?? []));
     const body = el('div', { class: 'window-body' });
 
     const handles = RESIZE_DIRECTIONS.map((direction) => ({

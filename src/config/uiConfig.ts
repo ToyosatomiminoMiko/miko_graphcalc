@@ -52,11 +52,36 @@ export type WindowId = 'source' | 'view' | 'params' | 'process' | 'objects';
 /** 标题栏上的窗口按钮 id. */
 export type WindowActionId = 'minimize' | 'maximize' | 'fullscreen' | 'close';
 
+/**
+ * 标题栏上的挂载槽位.
+ *
+ * 这是窗口标题栏的**唯一一套位置词汇**:配置用 `slot` 声明节点进哪里,
+ * `createWindowFrame` 按同一个键装配,DOM 契约(`.window-title` /
+ * `.window-actions` / `.window-header`)与测试断言说同一个词.
+ */
+export type WindowSlot = 'title' | 'actions' | 'overlays';
+
+/**
+ * 标题栏采用节点的名字.
+ *
+ * 与 `WindowChrome` 的字段名一一对应(见 `ui/desktop/windowChrome.ts`):
+ * 那边把它当 `Record<ChromeNodeId, HTMLElement>` 的键,所以这里少写一个名字
+ * 或多写一个都会编译不过,不存在"配置里有,代码里没有"的漂移.
+ */
+export type ChromeNodeId = 'exampleButton' | 'runButton' | 'exampleMenu' | 'formulaCopyHint';
+
+/** 采用关系:节点由 `createWindowChrome` 建,落在哪个窗口的哪个槽由这条给. */
+export interface AdoptedNodeSpec {
+    readonly node: ChromeNodeId;
+    readonly window: WindowId;
+    readonly slot: WindowSlot;
+}
+
 export interface WindowConfigEntry {
     readonly id: WindowId;
     /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
     readonly title: string;
-    /** 正文宿主 id:`WindowManager` 用 `document.getElementById` 取. */
+    /** 正文宿主 id:由 `readAppHosts()` 取成节点后交给 `WindowManager`(见 app/appHosts.ts). */
     readonly hostId: string;
     readonly dock: { readonly icon: string; readonly label: string };
     readonly defaultGeometry: WindowGeometrySpec;
@@ -72,6 +97,22 @@ export interface WindowConfig {
         readonly label: string;
         readonly glyph: string;
     }[];
+    /**
+     * 标题栏采用关系:装配期按这张表把现成节点放进各窗口的槽位.
+     *
+     * "哪个节点进哪个窗口的哪个槽"只有这一份声明,装配层不再写 if 链
+     * (见 docs/windowing-plan.md §5.3).
+     */
+    readonly adopted: readonly AdoptedNodeSpec[];
+    /** 标题栏节点的文案:字面量只在配置里,HTML 与 TS 都不留副本. */
+    readonly chrome: {
+        /** 示例按钮的可见文案. */
+        readonly exampleLabel: string;
+        /** 运行按钮的可见文案. */
+        readonly runLabel: string;
+        /** 公式复制提示的初始文案. */
+        readonly copyHint: string;
+    };
     /** 移动/缩放时窗口至少留在桌内的宽度(px). */
     readonly edgeKeep: number;
     /** 窗口与桌面边缘的间隙(px). */
@@ -233,6 +274,19 @@ export const UI_CONFIG = {
             { id: 'fullscreen', label: '全屏', glyph: '⤢' },
             { id: 'close', label: '关闭', glyph: '✕' },
         ],
+        // 四个应用节点由 createWindowChrome() 用 el() 建,这里只声明它们落在哪
+        // (旧写法是 index.html 里一个 hidden 暂存区 + DslApp 里一条 if 链).
+        adopted: [
+            { node: 'exampleButton', window: 'source', slot: 'actions' },
+            { node: 'runButton', window: 'source', slot: 'actions' },
+            { node: 'exampleMenu', window: 'source', slot: 'overlays' },
+            { node: 'formulaCopyHint', window: 'objects', slot: 'title' },
+        ],
+        chrome: {
+            exampleLabel: '示例',
+            runLabel: 'RUN',
+            copyHint: '点击公式复制 TeX',
+        },
         edgeKeep: 80,
         edgeGap: 16,
         headerMinVisible: 36,

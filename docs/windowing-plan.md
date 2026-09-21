@@ -99,7 +99,7 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 | C2 | 折叠 = 收成窄边 + 隐藏正文直接子元素 | `PanelController._applyLayout` | **删除**.最小化/关闭由窗口态表达,不再是"面板折叠";`_collectBindings` / `_bindToggleButtons` 随 `[data-panel-toggle]` 一起消失 |
 | C3 | 拖动宽度/高度 | `PanelController._bindResizeHandles` | 换成窗口拖动与八向缩放(仍走 `bindDragGesture`) |
 | C4 | `.panel.collapsed ...` 一整组 CSS | `css/panels.css` 57–66,830 | 换成 `.window.is-minimized` 等窗口态选择器 |
-| C5 | 面板标题栏 `.panel-header`(含"示例/RUN/收起"按钮) | `index.html` + `css/panels.css` 14–67 | 变成**窗口标题栏**:拖动区 + 窗口按钮;"示例/RUN"移入窗口标题栏(`.window-actions`),`#formula-copy-hint` 移入对象窗口的 `titleContent`.面板自带的那层 `.panel-header` **整个删除**(W6 的 A 案,§11.1 B8) |
+| C5 | 面板标题栏 `.panel-header`(含"示例/RUN/收起"按钮) | `index.html` + `css/panels.css` 14–67 | 变成**窗口标题栏**:拖动区 + 窗口按钮;"示例/RUN"移入窗口标题栏(`.window-actions`),`#formula-copy-hint` 移入对象窗口标题的 `slots.title`(旧名 `titleContent`).面板自带的那层 `.panel-header` **整个删除**(W6 的 A 案,§11.1 B8) |
 | C6 | 右栏标签栏留在面板 header 内部(为折叠逻辑) | `index.html` 244 注释,`RightPanelTabs` | **整个删除**.参数页与过程页各自独立成窗口,`RightPanelTabs` 与 `#right-tabs` 一并消失;`.right-page[hidden]` 那条 `display:none` 也没了存在理由 |
 | C7 | 面板通高 / 通宽靠绝对定位的 `top/bottom/left` | `css/layout.css` 32–55 | 窗口正文给确定高度,`.panel` 改成"填满窗口正文"(`flex:1;min-height:0`) |
 | C8 | 示例浮层按视口高度留余量,折叠时隐藏 | `css/panels.css` 806–833 | 锚点改窗口标题栏;`max-height` 按窗口正文高度算 |
@@ -113,8 +113,9 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 **不动的**:`EditorLineNumbers`,
 `EditorHighlight`,`ObjectListController`,`ParamPanelController`,
 `DiagnosticsController`,`ProcessPanel`,`FormulaCopyController`,
-`ExampleLoaderController`,`ViewPanel`.它们全部通过 `document.getElementById`
-或构造参数拿节点,窗口化只改**节点在树里的位置与祖先尺寸**,不改节点自身.
+`ExampleLoaderController`,`ViewPanel`.它们全部通过构造参数拿节点(装配层
+在 `app/appHosts.ts` 与 `ui/desktop/windowChrome.ts` 取好/建好传进去,E34/E35),
+窗口化只改**节点在树里的位置与祖先尺寸**,不改节点自身.
 
 **删掉的**:`PanelController`(C1–C4),`RightPanelTabs`(C6)与
 `RightSplitController`(C14).三者都是"布局/页面归属/分栏比例"的控制器,而这三
@@ -364,7 +365,7 @@ zIndex     number                  // 该窗口当前的 z-index(焦点独占写
 
 ### 3.4 拖动,八向缩放与指针穿透
 
-**拖动**:起手元素是 `.window-title`(标题文字 + 可选 `titleContent`),标题栏
+**拖动**:起手元素是 `.window-title`(标题文字 + 可选 `slots.title`),标题栏
 动作(`.window-actions`:示例 / RUN)与窗口按钮(`.window-controls`)是它的
 **兄弟**,天然不在拖动区内.不做"整个 header 可拖,靠 `closest('button')`
 过滤":`bindDragGesture` 在 `pointerdown` 里 `preventDefault()`,而
@@ -577,7 +578,7 @@ interface WindowConfigEntry {
     readonly id: 'source' | 'view' | 'params' | 'process' | 'objects';
     /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
     readonly title: string;
-    /** 正文宿主 id:WindowManager 用 document.getElementById 取(见 E1). */
+    /** 正文宿主 id:由 readAppHosts() 取成节点后交给 WindowManager(见 E35). */
     readonly hostId: string;
     readonly dock: { readonly icon: string; readonly label: string };
     readonly defaultGeometry: WindowGeometrySpec;
@@ -824,9 +825,9 @@ bindDragGesture(handle, signal, {
 export interface WindowFrameSpec {
     readonly id: string;
     readonly title: string;
-    readonly titleContent: readonly Child[];   // 标题里的额外内容(对象窗口放 #formula-copy-hint)
-    readonly actions: readonly Child[];        // 现成节点:示例按钮 / RUN
-    readonly overlays: readonly Child[];       // 现成节点:标题栏浮层(#example-menu)
+    // 现成节点按槽位分组;词表 `WindowSlot` 与 UI_CONFIG.window.adopted 是同一套.
+    // 缺省槽位 = 不搬节点(E33).
+    readonly slots: Partial<Record<WindowSlot, readonly Child[]>>;
     readonly controls: readonly WindowActionButton[];  // 由 UI_CONFIG.window.actions 生成
     readonly geometry: Geometry;               // 建好即刻写入行内样式
 }
@@ -856,13 +857,15 @@ element.tabIndex = -1;
 element.hidden = false;               // 由状态类控制显隐,不用 hidden
 writeGeometry(element, spec.geometry);   // 立即写,避免一帧闪在左上角;见下面的"唯一写入形状"
 
-const title = el('span', { class: 'window-title' }, el('span', { text: spec.title }), ...spec.titleContent);
-const actions = el('div', { class: 'window-actions' }, ...spec.actions);
+const title = el('span', { class: 'window-title' },
+    el('span', { text: spec.title }), ...(spec.slots.title ?? []));
+const actions = el('div', { class: 'window-actions' }, ...(spec.slots.actions ?? []));
 const controls = el('div', { class: 'window-controls' },
     ...spec.controls.map(c => createButton({ class: 'window-control-btn', text: c.glyph,
                                              ariaLabel: c.label, title: c.label })
         .also(b => b.onClick(c.onClick)).element));
-const header = el('header', { class: 'window-header' }, title, actions, controls, ...spec.overlays);
+const header = el('header', { class: 'window-header' }, title, actions, controls,
+    ...(spec.slots.overlays ?? []));
 const body = el('div', { class: 'window-body' });
 element.append(header, body, ...RESIZE_HANDLES.map(direction => {
     const handle = el('div', { class: 'resize-handle', attrs: { 'data-window-resize': direction } });
@@ -876,12 +879,13 @@ element.append(header, body, ...RESIZE_HANDLES.map(direction => {
   `style.setProperty` 落地.不要用 `element.style.cssText = ...`--
   `cssText` 赋值会**清空整个行内声明块**,把 `focus()` 写的 `z-index` 一起清掉,
   被拖的窗口会当场掉到其它窗口后面(旧稿就是 `cssText` 写法,见 §11.2 E8).
-- **`spec.overlays` 是标题栏里的浮层**(`#example-menu`),它是 `.window-header`
+- **`slots.overlays` 是标题栏里的浮层**(`#example-menu`),它是 `.window-header`
   的直接子节点,不是 `.window-actions` 的(那一层是按钮行).浮层的定位锚点是
   `.window-header`(`position: relative`),且必须在 `.window-body` **之外**,
   否则会被正文的裁切切掉(§11.1 B2).
-- **`spec.actions` / `spec.overlays` 里的节点是搬过来的,不是重建的**
-  (`#run-btn` 的监听不能丢).用 `append` / `replaceChildren` 都要保留节点身份.
+- **`slots` 里三个槽位的节点是搬过来的,不是重建的**(`#run-btn` 的监听不能丢).
+  用 `append` / `replaceChildren` 都要保留节点身份.节点由 `windowChrome.ts` 建,
+  经 `UI_CONFIG.window.adopted` 定位,不再来自 `index.html`(E33).
 
 几何的两个 DOM 侧助手(`writeGeometry` / `clearGeometry`)放在 `WindowFrame.ts`
 并导出,由 `createWindowFrame` 与 `WindowManager.applyGeometry` 共用;
@@ -949,14 +953,13 @@ export class WindowManager {
 }
 ```
 
-`layer` / `dock` / `snapPreview` 三个节点由调用方传入(与 `EditorHighlight`
+`layer` / `dock` / `snapPreview` 三个容器节点由调用方传入(与 `EditorHighlight`
 "节点由装配层取好传入"同一约定),本类不自己去 `getElementById` 找它们;
-宿主节点则相反,**必须**由本类按 `spec.hostId` 走 `document.getElementById`:
-`bind()` 是**先取宿主,再把宿主 append 进 frame**,那一刻宿主还在 `#app` 里,
-用 `layer.querySelector` 查不到它(旧稿把理由写成"搬进 `.window` 后不再是
-`#app` 的后代",那是错的:`#window-layer` 就在 `#app` 里;见 §11.2 E1).
-取不到宿主时必须**抛一条带 id 的错误**,不要 `!` 硬断言后让
-`frame.body.append(null)` 报一个读不懂的 TypeError.
+正文宿主同样由调用方传入(`windowBodies: ReadonlyMap<WindowId, HTMLElement>`,
+按 `spec.hostId` 取好的一整张表,见 `app/appHosts.ts`)--**本类完全不碰
+`document`**(E34).取不到宿主时仍然抛一条带 id 的错误,不要 `!` 硬断言后让
+`frame.body.append(null)` 报一个读不懂的 TypeError;正常路径上这个错误由
+`readAppHosts()` 在装配期更早发出.
 
 `bind()` 的顺序(不能换):
 
@@ -967,8 +970,8 @@ export class WindowManager {
    for spec of UI_CONFIG.window.windows:          // 数组顺序即依赖顺序
        g = resolveDefaultGeometry(spec, desktop, resolved)
        resolved.set(spec.id, g)
-3. for spec: createWindowFrame({ ..., geometry: g })   // actions/overlays 里的现成节点在这里被 append
-       host = document.getElementById(spec.hostId)     // 取不到就抛带 id 的错
+3. for spec: createWindowFrame({ ..., slots: content(spec.id), geometry: g })  // slots 里的现成节点在这里被 append
+       host = windowBodies.get(spec.id)                 // 取不到就抛带 id 的错
        frame.body.append(host)                          // 宿主是搬过来的,不是重建
        layer.append(frame.element)
        bindWindowMove(id)                               // .window-title 上的拖动
@@ -1178,7 +1181,7 @@ measureText 里那 15px 的 chrome(canvas 以外的边距).同一个词再加"�
 
 | 文件 | 改动 |
 | --- | --- |
-| `index.html` | 新增 `#window-layer` / `#dock` / `#snap-preview` 三个空宿主(§5.3);面板本体留原处,删三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]` 分隔条,右栏标签栏 `#right-tabs`(§2.2),**"参数区/视图区"分隔条 `#right-splitter`**(§1.2 C14),外层空壳 `#right-panel`(§11.1 B6);**删掉三处面板自带的 `.panel-header`**(W6/B8:两个标题上移为窗口标题,`#example-menu` 与 `#formula-copy-hint` 分别改挂窗口标题栏的 `overlays` / `titleContent`);**把 `#view-controls` 从 `#right-page-params` 里挪出来当独立宿主**(§11.1 B10);`.window` 外壳**不写进 HTML**,由 `createWindowFrame` 建 |
+| `index.html` | 新增 `#window-layer` / `#dock` / `#snap-preview` 三个空宿主(§5.3);面板本体留原处,删三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]` 分隔条,右栏标签栏 `#right-tabs`(§2.2),**"参数区/视图区"分隔条 `#right-splitter`**(§1.2 C14),外层空壳 `#right-panel`(§11.1 B6);**删掉三处面板自带的 `.panel-header`**(W6/B8:两个标题上移为窗口标题,`#example-menu` 与 `#formula-copy-hint` 由 `windowChrome.ts` 建,按 `slots.overlays` / `slots.title` 落位,E33);**把 `#view-controls` 从 `#right-page-params` 里挪出来当独立宿主**(§11.1 B10);`.window` 外壳**不写进 HTML**,由 `createWindowFrame` 建 |
 | `css/layout.css` | **删除**.三件事各有去向:`#left-panel` / `#right-panel` / `#bottom-panel` 的绝对定位 -> 窗口几何(§3.1);`.resize-handle` 基类与四向光标规则 -> **`.resize-handle` 类名保留**,连同八向光标一起搬进 `css/window.css`;`.panel` 的底色/边框/阴影 -> `css/panels.css`(或 `window.css` 的 `.window-body > *`).**`.panel` 那条规则搬走时不要带上 `overflow: hidden`**(裁切归 `.window-body`) |
 | `css/window.css` | 新增(见上),含保留的 `.resize-handle` 与八向 `cursor`;`.window { overflow: visible }`,`.window-body { overflow: hidden }` 负责裁切(**B2**);`.window-header { height: var(--window-header-height) }` |
 | `css/panels.css` | 删 `.panel.collapsed` 组(57–66,830)与 `#right-tabs` 全部规则,`.right-page[hidden]`,**`.right-splitter` 全部规则(156–185)**,**`#params-panel { flex: 0 0 var(--right-split-basis) }` 改成 `flex: 1; min-height: 0`**;示例浮层锚点改 `.window-header`,`max-height` 改按窗口正文算(E5);新增 `.window-body` 的 flex 列与 `.window-body > * { flex: 1; min-height: 0 }`(B5) |
@@ -1234,15 +1237,14 @@ this.windowManager.onGeometryChange(() => {
 });
 ```
 
-`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint` **不需要在这里
-搬**:它们是"窗口清单里 source 那一项的 `actions` / `overlays`"与"objects 那一项
-的 `titleContent`",由 `WindowFrame` 按 `UI_CONFIG` 组装时 append 进
-`.window-actions` / `.window-header` / `.window-title`(§4.4).
-`ExampleLoaderController` / `FormulaCopyController` 与 `_wireEditor()` 拿这几个
-节点的时机(构造函数里 `getElementById`)不受影响,监听也照旧--但**节点必须在
-`new DslApp()` 之前都还在文档里**(它们现在分别在 `#left-panel` 与
-`#bottom-panel` 的 `.panel-header` 内,搬动发生在 `start()` 的
-`windowManager.bind()`).
+`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint` **不在这里
+搬,也不在 `index.html` 里**:四者由 `ui/desktop/windowChrome.ts` 的
+`createWindowChrome()` 用 `el()` 建出来,落点由 `UI_CONFIG.window.adopted`
+声明,再由 `windowSlotsProvider()` 解析成 `WindowFrameSpec.slots`(E33).
+`ExampleLoaderController` / `FormulaCopyController` 与 `runButton` 拿到的是
+**构造参数**(与 `createViewPanel(host)` 同一约定),所以既没有"启动前必须在
+文档里"的约束,也没有 `getElementById`.旧稿的"必须在 `new DslApp()` 之前都还
+在文档里 + `hidden` 暂存区"随 E25 一并作废.
 
 `DslApp` 的 `window.addEventListener('resize', this.onResize)` **保持不动**:
 窗口的重新夹取由 `WindowManager` 自己在 `bind()` 里挂的 `resize` 监听负责
@@ -1265,6 +1267,23 @@ this.windowManager.onGeometryChange(() => {
 窗口外壳**不写进 `index.html`**.本项目已经把"结构进 HTML,逻辑进控制器"的
 旧做法改成"HTML 只留宿主与默认数据,结构由 `el()` 声明式建出来",窗口化必须
 沿用,不能因为它是新代码就退回手写标记.
+
+**准入清单(E33 起生效,"全程声明式"的可判定形式)**.`index.html` 只允许三类
+内容,别的节点一律不许出现:
+
+1. **应用外壳与层**:`#app` / `#viewport` / `#window-layer` / `#dock` /
+   `#snap-preview`;
+2. **五个正文宿主**:`UI_CONFIG.window.windows[].hostId` 指向的元素;
+3. **面板本体**:仅当它的默认内容本身是 HTML 文本(`#dsl-editor` 的默认源码,
+   以及靠它守住"源码不参与缩进"的那批测试);面板内的结构容器(如
+   `#dsl-editor-input`,`#object-panel`)属于本类.
+
+除这三类以外的节点--**包括标题栏动作,浮层,提示**--都在 TS 里 `el()` 建,
+以构造参数注入(见 `ui/desktop/windowChrome.ts`),**不用 id 查找**.取节点的
+唯一入口是 `app/appHosts.ts` 的 `readAppHosts()`;`DslApp` 与 `WindowManager`
+都不再碰 `document`.这条规则有测试守卫:`ui/desktop/desktopHosts.test.ts`
+(配置 ↔ HTML),`app/appHosts.test.ts`(HTML ↔ 取节点),
+`ui/desktop/windowChrome.test.ts`(节点结构).
 
 现状的两条既有做法(照抄即可):
 
@@ -1301,6 +1320,14 @@ window: {
         { id: 'fullscreen', label: '全屏',   glyph: '⤢' },
         { id: 'close',      label: '关闭',   glyph: '✕' },
     ],
+    // 标题栏采用关系:谁,进哪个窗口,哪个槽.节点本身在 windowChrome.ts 里建.
+    adopted: [
+        { node: 'exampleButton',   window: 'source',  slot: 'actions'  },
+        { node: 'runButton',       window: 'source',  slot: 'actions'  },
+        { node: 'exampleMenu',     window: 'source',  slot: 'overlays' },
+        { node: 'formulaCopyHint', window: 'objects', slot: 'title'    },
+    ],
+    chrome: { exampleLabel: '示例', runLabel: 'RUN', copyHint: '点击公式复制 TeX' },
 }
 ```
 
@@ -1312,15 +1339,14 @@ window: {
 各自漂移(旧稿在这节又抄了一份不完全一样的 `WindowFrameSpec`,见 §11.2 E10):
 
 - `createWindowFrame` 建出 `.window` / `.window-header` / `.window-body` /
-  八根手柄,并把 `spec.actions`(标题栏动作,如"示例"/"RUN"),
-  `spec.overlays`(标题栏浮层,如 `#example-menu`)与 `spec.titleContent`
-  (标题里的额外内容,如对象窗口的 `#formula-copy-hint`)里的**已存在节点**
-  原样 append 进去--不是按 innerHTML 重建一份.这样 `#run-btn` /
-  `#example-menu` / `#formula-copy-hint` / `#params-panel` 这些既有节点与其
-  监听全部原样保留,`DslApp` 拿它们的方式不变.
-- 宿主节点(`#left-panel` / `#view-controls` / `#right-page-params` /
-  `#right-page-process` / `#bottom-panel`)由 `WindowManager` 从 `document`
-  取到后 `body.append(host)`;宿主与其全部内容一行不改(§1.2).
+  八根手柄,并把 `spec.slots` 三个槽位(`title` / `actions` / `overlays`)里的
+  **现成节点**原样 append 进去--不是按 innerHTML 重建一份.节点由
+  `windowChrome.ts` 建(示例 / RUN / 示例浮层 / 复制提示),落点由
+  `UI_CONFIG.window.adopted` 声明,`WindowManager` 只负责转交.
+- 正文宿主(`#left-panel` / `#view-controls` / `#right-page-params` /
+  `#right-page-process` / `#bottom-panel`)由 `readAppHosts()` 按配置的
+  `hostId` 取成一张表,`WindowManager` 收到后 `body.append(host)`;宿主与其全部
+  内容一行不改(§1.2).`WindowManager` 不再自己查 `document`(E34).
   `#view-controls` 这一条是 W6 新增的:它原先在 `#right-page-params` 内部,
   现在是**视图窗口**的宿主,必须从参数页里挪出来(§11.1 B10).
 - `data-*` 属性统一走 `el()` 的 `attrs`(`el('section', { attrs: { 'data-window': id } })`),
@@ -1345,7 +1371,7 @@ window: {
          .window-body.面板本体内容一行不改,只:
          ① 删三个 [data-panel-toggle] 与三根 [data-resize-panel];
          ② 删三处面板自带的 .panel-header(W6/B8:标题上移为窗口标题);
-         ③ 把 #example-menu / #formula-copy-hint 摘出来交给窗口标题栏;
+         ③ 删 #example-menu / #formula-copy-hint(改由 windowChrome.ts 建,E33);
          ④ 把 #view-controls 从 #right-page-params 里提出来(视图窗口宿主) -->
     <aside id="left-panel" class="panel"> ...编辑器... </aside>
     <!-- 右栏原来那层 #right-panel 删除(见 §11.1 B6) -->
@@ -1368,10 +1394,10 @@ window: {
   所以"删 `RightPanelTabs`"这一步本身就消除了全部写入者,不需要去摘一个不存在
   的属性;旧稿把 B1 写成"必须显式摘掉 `hidden`"是不准确的(§11.1 B1 已订正).
   唯一残留风险是 vite 开发态 HMR 不整页刷新时的旧 DOM,刷新即消失.
-- **`#example-menu` 必须在阶段 1 显式搬家**:它现在在
-  `#left-panel > .panel-header` 内,而窗口化把它画在窗口标题栏下(§5.4).
-  按"面板本体一行不改"照做会把它留在窗口正文里,再改 CSS 锚点就直接废掉浮层
-  (§11.1 B2).
+- **`#example-menu` 与 `#formula-copy-hint` 早已不在 HTML 里**:它们由
+  `windowChrome.ts` 建,`adopted` 表把它们分别放进 source 窗口的 `overlays` 与
+  objects 窗口的 `title`(E33).旧稿在这一步写的是"从 `.panel-header` 里摘出来",
+  那条路径随 `.panel-header` 一起消失.
 - **三个面板自带的 `.panel-header` 已按 W6/B8 拍板:全删**.窗口标题栏给出
   `source code` / `参数` / `视图` / `过程` / `对象`,面板里不再留第二层标题
   (`视图` 那条 header 更是直接变成了一个窗口标题).`.panel` 的 border/阴影也
@@ -1386,13 +1412,14 @@ window: {
   是 HTML textarea 的文本内容,`editorStyles` / 示例相关那批测试按"源码不参与
   缩进,不搬动"的约定守着它(§7 保留清单).面板本体留在原处,只由 JS 改挂载
   点,是最小改动且不触碰那条约定;窗口外壳这一层**没有**这类约束,所以它必须
-  声明式地建.
-- **宿主节点由谁 append**:`WindowManager` 按 `hostId` 取到宿主(可能是
-  `.panel`,也可能是 `#view-controls`),再 `frame.body.append(host)`.宿主与其
-  内部一切一行不改,§1.2 那批控制器照旧通过 `getElementById` 拿节点.
+  声明式地建.这条豁免就是 §5.3 准入清单第 3 条.
+- **宿主节点由谁 append**:`readAppHosts()` 按 `hostId` 取齐五个宿主交给
+  `WindowManager`,`bind()` 里 `frame.body.append(host)`.宿主与其内部一切一行
+  不改;面板内部的控制器继续用构造参数收节点(`ObjectListController` /
+  `ParamPanelController` / `createViewPanel`),`DslApp` 自己不再查 id(E34).
 - **删除清单**:三个 `[data-panel-toggle]` 按钮,三根 `[data-resize-panel]`
   分隔条,三处 `.panel-header`,`#right-splitter`,加上 `#example-menu` /
-  `#formula-copy-hint` 的**搬迁**与 `#view-controls` 的**上提**.
+  `#formula-copy-hint` 的**移除**与 `#view-controls` 的**上提**.
 
 窗外壳由 JS 生成带来的一个**新收益**要写清楚:`.window` 之间的层叠关系与
 `data-window` 连接全部由注册表给出,`index.html` 里不再有"三个面板的复制粘贴
@@ -1411,10 +1438,10 @@ window: {
 section.window[data-window="<id>"][tabindex="-1"][role="region"]
 ├── header.window-header
 │   ├── span.window-title            ← 拖动起手元素(bindDragGesture)
-│   │   └── (titleContent:对象窗口放 #formula-copy-hint,其余为空)
-│   ├── div.window-actions           ← 面板自带的动作(示例 / RUN),由调用方传入
+│   │   └── (slots.title:对象窗口放 #formula-copy-hint,其余为空)
+│   ├── div.window-actions           ← slots.actions(示例 / RUN,由 windowChrome 建)
 │   ├── div.window-controls          ← 最小化 / 最大化 / 全屏 / 关闭
-│   └── (overlays:标题栏浮层,如 #example-menu)
+│   └── (slots.overlays:标题栏浮层,如 #example-menu)
 ├── div.window-body
 │   └── <host>                        ← #left-panel / #right-page-params /
 │                                       #right-page-process / #bottom-panel
@@ -1671,7 +1698,9 @@ section.window[data-window="<id>"][tabindex="-1"][role="region"]
 | `src/ui/desktop/WindowResize.test.ts` | 八个方向的"增量 -> 几何改变"解释(纯函数),以及**西/北方向同时动 `x/w`**,单轴方向只动一条,角 = 两轴之并这三条;`canStart` 在 `state !== 'normal'` 时返回 false(用桩的 `getState`);最小尺寸与 `EDGE_KEEP` 夹取 |
 | `src/ui/desktop/Dock.test.ts` | Dock **五个**按钮由清单生成(不是手写),顺序与 `UI_CONFIG.window.windows` 一致;按状态分派的点击语义;激活态跟随焦点 |
 | `src/ui/editor/editorStyles.test.ts`(扩写,不是新建) | §5.6 的四条新守卫:高亮层与 textarea 的 `font-*`/`line-height`/`tab-size`/`padding` 逐项相等;`#dsl-editor.is-highlighted + #dsl-editor-highlight` 相邻兄弟选择器存在;`#dsl-editor-highlight` 是 `inset: 0` + `overflow: hidden`;`css/window.css` 的隐藏态不含 `display: none` |
-| `src/ui/desktop/desktopHosts.test.ts`(新建,可选但推荐) | 纯文本解析 `index.html`:每个 `UI_CONFIG.window.windows[].hostId` 都能在 HTML 里找到对应 id,且 `index.html` 里**没有任何 `.window` 结构**.这是一条不需要浏览器的守卫,堵住"配置与 HTML 漂移"(§11.1 B9) |
+| `src/ui/desktop/desktopHosts.test.ts`(新建,可选但推荐) | 纯文本解析 `index.html`:每个 `UI_CONFIG.window.windows[].hostId` 都能在 HTML 里找到对应 id 且只出现一次,`index.html` 里**没有任何 `.window` 结构**,标题栏四个应用节点与 `#window-staging` 都不在 HTML 里(E33).这是一条不需要浏览器的守卫,堵住"配置与 HTML 漂移"(§11.1 B9) |
+| `src/app/appHosts.test.ts`(新建,E35) | 把 `index.html` 的 id 集合造成桩树,断言 `readAppHosts()` 不抛(HTML 够不够),五个正文宿主 key 与配置一致,缺一个宿主就抛带该 id 的错误 |
+| `src/ui/desktop/windowChrome.test.ts`(新建,E33/E34) | 四个节点按 `ChromeNodeId` 建齐,文案来自 `UI_CONFIG.window.chrome`,`Popover` 需要的 aria 配对成立,`windowSlotsProvider()` 的输出与 `adopted` 表一致 |
 
 **改写**:
 
@@ -1933,10 +1962,10 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 `.panel-header` 整个删除;`.panel` 只保留"填满窗口正文"的骨架,底色/边框/阴影
 归窗口外壳那一层.于是:
 
-- `#left-panel` 的 `.panel-header` 整块删(示例/RUN 已在 `.window-actions`,
-  `#example-menu` 已在 `.window-header`);
-- `#bottom-panel` 的 `.panel-header` 整块删(`#formula-copy-hint` 移入对象窗口的
-  `titleContent`);
+- `#left-panel` 的 `.panel-header` 整块删(示例/RUN 由 `windowChrome.ts` 建,
+  落在 `.window-actions`,`#example-menu` 落在 `.window-header`);
+- `#bottom-panel` 的 `.panel-header` 整块删(`#formula-copy-hint` 由
+  `windowChrome.ts` 建,落在对象窗口的 `slots.title`);
 - `#right-page-params` 里的 `<header class="panel-header">视图</header>` 整块删
   (它变成**视图窗口**的标题,而 `#view-controls` 从参数页搬出去,见 B10).
 
@@ -1945,13 +1974,17 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 
 **B9 配置里的 `hostId` 与 `index.html` 会静默漂移.**
 
-`UI_CONFIG.window.windows[].hostId` 是一个字符串,`WindowManager` 用
-`document.getElementById` 取它.`index.html` 里删/改名一个宿主,配置不会跟着
-报错;非空断言(`!`)只会让 `frame.body.append(null)` 抛一个读不懂的 TypeError.
+`UI_CONFIG.window.windows[].hostId` 是一个字符串,装配期要用它换到真实节点.
+`index.html` 里删/改名一个宿主,配置不会跟着报错;最坏的情况是某个 `!` 把错误
+推迟到运行期,变成 `frame.body.append(null)` 抛一个读不懂的 TypeError.
 
-处理:①`bind()` 里取不到就抛一条带 `hostId` 的错误;②加一条不需要浏览器的
-守卫测试(§8 的 `desktopHosts.test.ts`),用纯文本解析 `index.html`,断言每个
-`hostId` 都存在.这也顺手把"配置是唯一真相源"从注释变成断言.
+处理(E34 定稿):取节点只有一处--`app/appHosts.ts` 的 `readAppHosts()` 按
+`hostId` 取齐五个正文宿主,取不到就抛一条**带 id** 的错误;`WindowManager` 收
+一张已经取好的表,自己完全不碰 `document`.守卫测试三条:纯文本解析
+`index.html` 断言每个 `hostId` 都存在(`desktopHosts.test.ts`),用 HTML 的 id
+集合构造桩树断言 `readAppHosts()` 不抛且缺一个就报出那个 id
+(`appHosts.test.ts`),节点结构归 `windowChrome.test.ts`.这也顺手把"配置是
+唯一真相源"从注释变成断言.
 
 **B10 `#view-controls` 要从参数页里搬出来当视图窗口的宿主.**
 
@@ -1994,7 +2027,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E18 | `UI_CONFIG.window.headerHeight` 注释写"与 css/window.css 一致" | 这是本仓库唯一没有守卫的 TS↔CSS 同值(别的同值都有测试锁),改一处会出现"标题栏被夹到只剩半行" | 改为经 `applyUiConfig` 写 `--window-header-height`,`css/window.css` 用 `var()` 消费,并加一致性断言(§4.1/§5.5) |
 | E19 | 全文按"四个窗口"写(§1/§2/§4.1/§5.2/§7/§8/§9/§11/§12),`source` 是通高窗口,`RightSplitController` 被列在"不动的"清单里 | W6 拍板**五个窗口**(`参数` 与 `视图` 也拆开)之后,这些全部失效:通高的 `source` 没有位置给 `view`;参数与视图不再共用一栏高度,分栏控制器与 `--right-split-basis` 没有存在理由;`#view-controls` 必须从参数页里提出来当宿主 | 全文按五个窗口重写:默认几何改成"左列 source/view,右列 params/process,底部 objects"(§2.1),`RightSplitController` / `#right-splitter` / `--right-split-basis` / `UI_CONFIG.panel.split*` 进删除清单(C14),`#view-controls` 列为新宿主(B10),窗口标题取原面板文案(W6/B8 A 案) |
 | E21 | §2.1 写"五个窗口共用同一条底边线 `dH-116`",并在 §7 阶段 0 的验收里要求"五个窗口的底边一起断言" | 与 §2.1/§4.1 自己给出的期望值表冲突:`source` 与 `params` 用 `fraction` 取高(0.68 / 0.55),它们的底边在 `dH-116` **之上**(1920×1080 下分别是 672 与 546,不是 964).真正常在底线上的只有 `view` / `process` / `objects` 三个 | 订正为:**三块的下沿共用底线 `dH-116`**,其余窗口的底边必须 `≤ dH-116`(不能进 Dock 的 `dockReserve`).阶段 0 的用例按这条写:`view` / `process` / `objects` 的 `y+h === dH-116`,`source` / `params` 只断言 `≤` |
-| E20 | `#formula-copy-hint`(在底部面板 header 里)与 `#example-menu` 只被当成"面板内部元素" | B8 A 案要删掉三处 `.panel-header`,这两条链路的载体正好都在里面:`FormulaCopyController` 要一个节点回显复制提示,`ExampleLoaderController` 要一个浮层容器;删 header 而不安置它们等于静默删功能 | `#example-menu` 走 `overlays` 挂窗口标题栏(B2),`#formula-copy-hint` 走 `titleContent` 挂对象窗口标题(§4.4/§5.4);两者的控制器与监听不变 |
+| E20 | `#formula-copy-hint`(在底部面板 header 里)与 `#example-menu` 只被当成"面板内部元素" | B8 A 案要删掉三处 `.panel-header`,这两条链路的载体正好都在里面:`FormulaCopyController` 要一个节点回显复制提示,`ExampleLoaderController` 要一个浮层容器;删 header 而不安置它们等于静默删功能 | `#example-menu` 走 `slots.overlays` 挂窗口标题栏(B2),`#formula-copy-hint` 走 `slots.title` 挂对象窗口标题(§4.4/§5.4;当时叫 `overlays` / `titleContent`,E34 统一为槽位词汇);两者的控制器与监听不变 |
 
 **实现记录(落地时新增,补在 E 系列之后)**:
 
@@ -2003,7 +2036,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E22 | 三层容器的 `z-index` 必须由 `WindowManager.bind()` 从 `UI_CONFIG.window.z` 写成**行内样式** | 只靠 DOM 顺序不行:`#dock` 是 `z-index: auto`,而 `.window` 有正 `z-index`,CSS 的绘制顺序会让窗口整块盖住 Dock(而且点不到).另外 `snapPreview` 取 **50**:吸附预览是"窗口会落到哪里"的底图,画在窗口层(100)之上会盖住正在拖的窗口 |
 | E23 | §5.5 第 2 条的"唯一例外是标题栏高度"扩成**三条** | 除 `--window-header-height` 外,还必须有 `--dock-reserve`(`.window.is-maximized` 的 `bottom` 消费,否则最大化盖住 Dock)与 `--window-body-height`(示例浮层的 `max-height` 要按所属窗口正文算,而浮层在标题栏里,百分比解析不到窗口高度,见 E5).三者都由 JS 写入,CSS 只读,数值只有一份(前两条经 `applyUiConfig`,第三条由 `_applyGeometry` 写) |
 | E24 | `bindDragGesture` 的 `onStart` / `onDelta` 增加"原始 `PointerEvent`"参数 | §3.5 的吸附判据是"**指针**距桌面边缘 ≤ `SNAP_EDGE`",而拖动件的回调原本只有增量.给回调补上事件是向后兼容的(`onStart: () => {}` 这类实现照旧可编译),因此不需要第二份手势实现 |
-| E25 | 四个既有节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)在 `index.html` 里放进一个 `hidden` 的 `#window-staging` 暂存区 | 方案只说"交给窗口标题栏",没说它们在启动前待在哪儿.它们必须在 `new DslApp()` **之前**就在文档里(控制器按 id 取节点),所以先集中在暂存区,`WindowFrame` 建好外壳后原样搬走;搬完由 `DslApp` 摘掉这个空壳,不留一个"看起来还是结构"的空 div(§11.2 E31) |
+| E25 | 四个既有节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)在 `index.html` 里放进一个 `hidden` 的 `#window-staging` 暂存区 | 方案只说"交给窗口标题栏",没说它们在启动前待在哪儿.它们必须在 `new DslApp()` **之前**就在文档里(控制器按 id 取节点),所以先集中在暂存区,`WindowFrame` 建好外壳后原样搬走;搬完由 `DslApp` 摘掉这个空壳,不留一个"看起来还是结构"的空 div(§11.2 E31).**已作废,见 E33**:暂存区整块删除,连"启动前必须在文档里"这个前提一起作废 |
 | E27 | 标题栏双击最大化不用 `dblclick`,改判"两次 `pointerdown` 的间隔" | 拖动件在 `pointerdown` 里 `preventDefault()`(为了不选中标题文字),浏览器正是在这一步决定要不要继续派发兼容鼠标事件,`dblclick` 能不能到就成了实现细节;按间隔判定不依赖兼容事件,触屏也成立(§10 原本担心的正是这个).另外"从最大化状态拖出来"改成**第一次真的移动时**才还原:单纯点一下标题栏不该把最大化窗口还原掉 |
 | E28 | 删除 `src/ui/widgets/Tabs.ts` 与其测试(`createTabs` 的唯一消费者是 `RightPanelTabs`) | 拆页之后它没有任何消费者,对应的 `.panel-header .tabs` 规则也已随标签栏删除.按本仓库"不留死代码"的惯例一并删除;要恢复标签页控件时从提交历史里取回即可 |
 | E26 | `.panel` 只保留"填满窗口正文"的骨架,连 `background` 与 `border-radius` 也不留 | B8 的 A 案要求"不要两层边框/阴影";底色由 `.window` 给,面板再写一遍是看不见的第二份来源 |
@@ -2012,6 +2045,9 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E30 | §4.2 写"半屏的高度与最大化一致(减去 `dockReserve`)",但 `resolveEdgeSnap` 的签名里没有 `dockReserve`,`Desktop` 又只有 `bottomReserve = dockReserve + edgeGap` | 照字面实现会算成 `dH - 116`(684),与最大化的 `dH - 100`(700)差 16px,半屏与最大化观感不一致 | `Desktop` 改成直接携带 `dockReserve` 与 `edgeGap`(`usableHeight = h - dockReserve - edgeGap`,数值仍是 `dH - 116`),半屏与最大化都用 `h - dockReserve`;`maximizedGeometry` 后来随"最大化交给 CSS"一起删除了(§11.2 E31) |
 | E31 | 落地后复查发现一批**编译得过,单测也全绿**的死代码:`maximizedGeometry` / `fullscreenGeometry`(最大化/全屏其实由 CSS 类接管,这两个函数只被自己的单测调用),`geometryToCss`,`SnapPreview` 的 `is-left` / `is-right` / `is-maximize` 类,`WindowManager` 写的 `.is-closed`,`Dock` 的 `is-normal`,`WindowFrameHandle.setTitle` / `header`,`DockButtonHandle.icon` / `label` / `stateDot`,`DockHandle.element`,以及 `resolveEdgeSnap` 那个"为将来保留"的未用参数 | tsc 只查**文件内**未使用的局部符号:导出成员,只写不读的类名,断头 JSDoc 都照不到.更糟的是它们的单测给出了"这个行为被覆盖"的假象(例如 `maximizedGeometry` 的用例,而真正生效的 `inset` + `--dock-reserve` 反而没被它们守住) | 全部删除;`SnapPreview.show(target)` 只保留 `is-open`;两个句柄只暴露生产代码真正读的成员;`Dock` 的初始状态改走与运行期同一个 `setState` 入口;`geometryToCss` 的"不要写 `cssText`"那条约定改由注释与 `writeGeometry` 的实现守住 |
 | E32 | 状态机复查发现三处"真机上多操作几次才出现,且不报错"的问题:①`restore` 还原后不清空,连续两轮"最大化/还原"会把中途挪过的位置丢掉;②`onDesktopResize` 只收 `normal` 窗口,最小化/关闭期间桌面变小,恢复后窗口停在桌外再也抓不回来;③`bind()` 直接写 `resolveDefaultGeometry` 的结果,小视口下 `view` 低于 `minSize`(1280x700 时 159 < 180),`objects` 的 `y` 甚至为负(标题栏被顶出桌顶) | 三者都属**状态序列**与"初始态是唯一例外"的盲区:现有单测只覆盖单次最大化循环与大视口,`clampGeometry` 的文档口径(`y ∈ [0, dH - headerMinVisible]`)在初始布局上根本没被走一遍 | ①进入 maximized/fullscreen 时**无条件**记录 `entry.geometry`,退出时用完即置 `null`;②隐藏态在 `onDesktopResize` 里也走 `fitGeometry`;③`bind()` 的默认几何过 `fitGeometry`.三条各补一条回归用例(`WindowManager.test.ts`),另加"`bind()` 只能调用一次"的守卫 |
+| E33 | 标题栏四个节点仍留在 `index.html`:一个 `#window-staging` 暂存区 + `DslApp` 里按 window id 写 if 链的 `_windowContent()` + 一条"这四个 id 还在 HTML 里"的守卫测试 | 四个消费者的**签名本来就是收节点**(`ExampleLoaderController` 收 `{button, menu}`,`FormulaCopyController` 收 hint,`runButton` 是 `DslApp` 自己的),查 id 的只有装配层:同一个 `#example-btn` 在 5 行内被查了两次.也就是说"id 与监听归控制器"这条理由撑不住--**创建点**才是错的,所有权一直很清楚 | 三个节点并入 `ui/desktop/windowChrome.ts` 的 `createWindowChrome()`(用 `el()` 建,文案进 `UI_CONFIG.window.chrome`),以构造参数注入控制器;`index.html` 删掉暂存区,`DslApp` 删掉 if 链与 `window-staging` 摘除;`desktopHosts.test.ts` 的旧守卫反向改成"这四个 id 不许再出现在 HTML 里".`aria-haspopup` / `aria-labelledby` 等静态属性随节点一起搬,`Popover` 独占的状态属性不变 |
+| E34 | "谁搬去哪"散在三个文件里:`UI_CONFIG` 只写窗口清单,`WindowFrameSpec` 用 `titleContent` / `actions` / `overlays` 三个平行字段,`DslApp._windowContent()` 用 if 链把它们接起来;槽位词汇在每个文件里各叫一个名字 | 同一件事三处各说一半,加一个标题栏节点要同时改配置示例,spec 字段与 if 链;而且 `titleContent` 按"是什么"命名,`actions` / `overlays` 按"是什么东西"命名,读代码必须来回跳 | 引入唯一的槽位词表 `WindowSlot = 'title' | 'actions' | 'overlays'`(定义在 `uiConfig.ts`,`WindowFrameSpec.slots` 用同一套键),采用关系收成 `UI_CONFIG.window.adopted` 一张表,由 `windowSlotsProvider(chrome)` 一次解析成 provider;`DslApp` 不再参与"谁搬去哪".节点名的强类型由 `WindowChrome = Record<ChromeNodeId, HTMLElement>` 在编译期守住 |
+| E35 | `index.html` 里散着 26 处 `document.getElementById`(视口 / 参数面板 / 诊断 / 七个对象列表 / 编辑器四个槽 / 过程面板 / `#app` / 窗口三容器),旁边还有 `WindowManager` 自己按 `hostId` 查宿主 | `!` 非空断言把"HTML 改名或删节点"推迟到运行期的 `Cannot read properties of null`;而 `ui/widgets/dom.ts` 与 `ui/view/ViewPanel.ts` 早就把"id 当全局注册表"写成淘汰做法,窗口化等于在最后一公里把它请了回来 | 新增 `app/appHosts.ts`:`readAppHosts()` 是全应用唯一按 id 取节点的地方,取不到就抛带 id 的错误,五个正文宿主也在这里按 `hostId` 取好交给 `WindowManager`(此后 `DslApp` 与 `WindowManager` 都不碰 `document`);配两向守卫:`desktopHosts.test.ts`(配置 ↔ HTML)与 `appHosts.test.ts`(HTML ↔ 取节点,用 HTML 的 id 集合构造桩树).`index.html` 的准入清单同时写进 §5.3 |
 
 ### 11.3 查过但**不是**阻碍的(留个记录,省得再查一遍)
 
@@ -2051,7 +2087,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | R20 | 默认几何把某个窗口的底边压到 Dock 之下(B4 的第 2 条) | 该窗口的南边手柄抓不到,且不报错 | §11.2 E13 订正了数值;阶段 0 的纯函数用例断言五个窗口底边同为 `dH-116`;回归清单第 1,7 项 |
 | R21 | `.panel` 的 `overflow: hidden` 被原样搬进 `panels.css` | 示例菜单仍被裁掉(即使 `.window` 已放行),排查时会一直盯着 `.window` | §11.1 B2 第 3 条;搬运 `.panel` 规则时明确不带 `overflow` |
 | R22 | 面板自带 header 与窗口标题栏重复(B8) | 两层标题,两层边框,加窗口越多越乱 | 已按 W6 拍板 A 案(全删,文案上移);回归清单第 15 项;`#example-menu` / `#formula-copy-hint` 的安置见 B2/E20 |
-| R23 | `hostId` 与 `index.html` 漂移(B9) | 启动时抛一个读不懂的 TypeError,或宿主静默为空 | `bind()` 抛带 `hostId` 的错误 + `desktopHosts.test.ts` 纯文本守卫 |
+| R23 | `hostId` 与 `index.html` 漂移(B9) | 启动时抛一个读不懂的 TypeError,或宿主静默为空 | `readAppHosts()` 抛带 `hostId` 的错误(`WindowManager` 仍保留最后一道)+ `desktopHosts.test.ts` / `appHosts.test.ts` 纯文本与桩树守卫 |
 | R24 | 分栏链路只删了一半(`RightSplitController` 删了,`--right-split-basis` 或 `.right-splitter` 规则还在) | 要么一条死 CSS 让下一个人以为还有分栏,要么 `#params-panel` 拿不到高度而塌成 0 | §1.2 C14 列全四处写入点;回归清单第 14 项;`desktopHosts.test.ts` 断言 `#right-splitter` / `data-split-page` 不存在 |
 | R25 | `#view-controls` 没从参数页里搬出来(B10) | 视图窗口空白,或参数窗口与视图窗口抢同一个节点(后者更糟:节点只有一个父节点,先搬的赢) | §11.1 B10 + §5.2 的 `index.html` 行;阶段 1 验收要求"参数 / 视图 / 过程三个窗口都有内容" |
 

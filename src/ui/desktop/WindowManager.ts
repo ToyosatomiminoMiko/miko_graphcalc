@@ -13,7 +13,7 @@
  * `z-index` 有第三个写入点:`focus()`.几何写入会清行内属性,两者必须分开,
  * 否则会出现"拖动第一帧窗口就掉到后面"(见 docs/windowing-plan.md §11.2 E8).
  */
-import { UI_CONFIG, type WindowConfigEntry, type WindowId } from '@/config/uiConfig';
+import { UI_CONFIG, type WindowConfigEntry, type WindowId, type WindowSlot } from '@/config/uiConfig';
 import { bindDragGesture } from '@/ui/shared/dragGesture';
 import type { Child } from '@/ui/widgets/dom';
 import { createDock, type DockHandle } from './Dock';
@@ -45,22 +45,15 @@ export type WindowState = 'normal' | 'maximized' | 'fullscreen' | 'minimized' | 
  */
 const DOUBLE_CLICK_MS = 300;
 
-/** 从 `index.html` 搬进窗口的既有节点(不是重建的). */
-export interface WindowContent {
-    /** 标题栏动作:示例 / RUN. */
-    readonly actions?: readonly Child[];
-    /** 标题栏浮层:`#example-menu`. */
-    readonly overlays?: readonly Child[];
-    /** 标题里的额外内容:`#formula-copy-hint`. */
-    readonly titleContent?: readonly Child[];
-}
+/** 一个窗口标题栏要搬进去的现成节点,按槽位分组(词表见 `uiConfig.WindowSlot`). */
+export type WindowContent = Partial<Record<WindowSlot, readonly Child[]>>;
 
 /**
- * 按窗口 id 取既有节点.
+ * 按窗口 id 取该窗口标题栏的现成节点.
  *
- * 这些节点(`#example-btn` / `#run-btn` / `#example-menu` / `#formula-copy-hint`)
- * 的 id,监听与控制器都属于装配层,所以由 `DslApp` 提供,`WindowManager` 不按
- * id 去猜它们的位置(见 §5.2 的接线清单).
+ * 节点的所有者是装配层(--> `ui/desktop/windowChrome.ts`),`WindowManager`
+ * 既不按 id 猜它们的位置,也不管它们从哪来;它只把拿到的节点 `append` 进对应
+ * 槽位(见 §5.2 的接线清单).
  */
 export type WindowContentProvider = (id: WindowId) => WindowContent;
 
@@ -103,24 +96,28 @@ export class WindowManager {
     private bound = false;
 
     /**
-     * @param layer       `#window-layer`:窗口的定位参照与 z-order 层
-     * @param dockElement `#dock`:底部任务栏容器
-     * @param snapElement `#snap-preview`:吸附高亮层
-     * @param content     既有节点的提供者(见 {@link WindowContentProvider})
+     * @param layer        `#window-layer`:窗口的定位参照与 z-order 层
+     * @param dockElement  `#dock`:底部任务栏容器
+     * @param snapElement  `#snap-preview`:吸附高亮层
+     * @param windowBodies 五个正文宿主,按窗口 id 取;由 `readAppHosts()` 按
+     *                     `UI_CONFIG.window.windows[].hostId` 取好传入 -- 本类
+     *                     不碰 `document`,缺宿主在取节点那一步就报错
+     * @param content      标题栏节点的提供者(见 {@link WindowContentProvider})
      */
     constructor(
         private readonly layer: HTMLElement,
         private readonly dockElement: HTMLElement,
         private readonly snapElement: HTMLElement,
+        private readonly windowBodies: ReadonlyMap<WindowId, HTMLElement>,
         private readonly content: WindowContentProvider,
     ) {}
 
     /**
      * 建 frame + 搬宿主 + 建 Dock + 起初始焦点 + 挂 resize.
      *
-     * 顺序不能换:①先算全部默认几何(数组顺序即依赖顺序);②建 frame 并**先取
-     * 宿主再 append**(那一刻宿主还在 `#app` 里,`layer.querySelector` 查不到它);
-     * ③Dock;④初始焦点(没有焦点就没有 z 序参照).
+     * 顺序不能换:①先算全部默认几何(数组顺序即依赖顺序);②建 frame 并把
+     * `content` 给的标题栏节点搬进对应槽位(宿主在取节点那一步已经取好,不依赖
+     * 它此刻的父节点是谁);③Dock;④初始焦点(没有焦点就没有 z 序参照).
      */
     bind(): void {
         if (this.bound) {
@@ -155,14 +152,12 @@ export class WindowManager {
             const frame = createWindowFrame({
                 id: spec.id,
                 title: spec.title,
-                titleContent: content.titleContent ?? [],
-                actions: content.actions ?? [],
-                overlays: content.overlays ?? [],
+                slots: content,
                 controls: this._actionButtons(spec.id),
                 geometry: resolved.get(spec.id)!,
             });
 
-            const host = document.getElementById(spec.hostId);
+            const host = this.windowBodies.get(spec.id);
             if (!host) {
                 throw new Error(`WindowManager: 找不到窗口 ${spec.id} 的正文宿主 #${spec.hostId}`);
             }

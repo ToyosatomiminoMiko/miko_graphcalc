@@ -55,9 +55,31 @@ describe('窗口宿主与 index.html', () => {
         expect(markup).toContain('window.css');
     });
 
-    it('待搬迁节点还在 HTML 里(它们的 id 与监听归控制器)', () => {
+    it('标题栏应用节点不在 HTML 里(由 createWindowChrome 建,位置声明在 adopted)', () => {
+        // 这四个节点曾经住在一个 hidden 的 `#window-staging` 暂存区里,由
+        // WindowManager.bind() 搬进标题栏.现在它们从出生起就在 TS 里(见
+        // ui/desktop/windowChrome.ts),HTML 不许再出现副本,也不许那个暂存区回来.
         for (const id of ['example-btn', 'run-btn', 'example-menu', 'formula-copy-hint']) {
-            expect(markup, `index.html 里没有 #${id}`).toContain(`id="${id}"`);
+            expect(markup, `index.html 里不该再有 #${id}`).not.toContain(`id="${id}"`);
+        }
+        expect(markup).not.toContain('window-staging');
+    });
+
+    it('每个 adopted 声明的窗口与槽位都合法,且节点名不会重名', () => {
+        const windowIds = UI_CONFIG.window.windows.map((spec) => spec.id);
+        const nodes = UI_CONFIG.window.adopted.map((adopted) => adopted.node);
+        for (const adopted of UI_CONFIG.window.adopted) {
+            expect(windowIds).toContain(adopted.window);
+            expect(['title', 'actions', 'overlays']).toContain(adopted.slot);
+        }
+        // 一个节点只能有一个位置:重复声明会让同一个节点被 append 两次(等于搬走).
+        expect(new Set(nodes).size).toBe(nodes.length);
+    });
+
+    it('每个正文宿主 id 在 HTML 里只出现一次', () => {
+        for (const spec of UI_CONFIG.window.windows) {
+            const hits = markup.split(`id="${spec.hostId}"`).length - 1;
+            expect(hits, `#${spec.hostId} 出现了 ${hits} 次`).toBe(1);
         }
     });
 });

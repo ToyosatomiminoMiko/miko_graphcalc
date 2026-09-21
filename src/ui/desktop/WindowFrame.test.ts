@@ -35,7 +35,7 @@ interface Fixture {
     readonly clicked: string[];
 }
 
-/** 照 `index.html` 的样子先放好"面板自带"的现成节点. */
+/** 照 `windowChrome.ts` 的样子先放好现成节点(id 只服务 aria 配对,见该文件). */
 function installExistingNodes(): Fixture {
     const runButton = document.createElement('button') as unknown as StubElement;
     runButton.id = 'run-btn';
@@ -61,9 +61,7 @@ describe('createWindowFrame 的结构契约', () => {
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [],
-            overlays: [],
+            slots: {},
             controls: controls(),
             geometry: GEOMETRY,
         });
@@ -103,9 +101,7 @@ describe('createWindowFrame 的结构契约', () => {
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [],
-            overlays: [],
+            slots: {},
             controls: controls(),
             geometry: GEOMETRY,
         });
@@ -128,9 +124,7 @@ describe('createWindowFrame 的结构契约', () => {
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [],
-            overlays: [],
+            slots: {},
             controls: UI_CONFIG.window.actions.map((action) => ({
                 id: action.id,
                 label: action.label,
@@ -150,9 +144,7 @@ describe('createWindowFrame 的结构契约', () => {
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [],
-            overlays: [],
+            slots: {},
             controls: controls(),
             geometry: GEOMETRY,
         });
@@ -169,9 +161,7 @@ describe('createWindowFrame 的结构契约', () => {
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [],
-            overlays: [],
+            slots: {},
             controls: UI_CONFIG.window.actions.map((action) => ({
                 id: action.id,
                 label: action.label,
@@ -192,14 +182,16 @@ describe('createWindowFrame 的结构契约', () => {
 });
 
 describe('既有节点是搬进来的,不是重建的(§4.4)', () => {
-    it('actions / overlays / titleContent 的节点身份保持不变', () => {
+    it('slots 里的节点身份保持不变', () => {
         const fixture = installExistingNodes();
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [fixture.copyHint as unknown as HTMLElement],
-            actions: [fixture.runButton as unknown as HTMLElement],
-            overlays: [fixture.exampleMenu as unknown as HTMLElement],
+            slots: {
+                title: [fixture.copyHint as unknown as HTMLElement],
+                actions: [fixture.runButton as unknown as HTMLElement],
+                overlays: [fixture.exampleMenu as unknown as HTMLElement],
+            },
             controls: controls(),
             geometry: GEOMETRY,
         });
@@ -211,14 +203,15 @@ describe('既有节点是搬进来的,不是重建的(§4.4)', () => {
         expect(frame.title.querySelector('#formula-copy-hint')).toBe(fixture.copyHint);
     });
 
-    it('#example-menu 落在 .window-header 而不是 .window-body(否则会被正文裁掉)', () => {
+    it('overlays 落在 .window-header 而不是 .window-body(否则会被正文裁掉)', () => {
         const fixture = installExistingNodes();
         const frame = createWindowFrame({
             id: 'source',
             title: 'source code',
-            titleContent: [],
-            actions: [fixture.runButton as unknown as HTMLElement],
-            overlays: [fixture.exampleMenu as unknown as HTMLElement],
+            slots: {
+                actions: [fixture.runButton as unknown as HTMLElement],
+                overlays: [fixture.exampleMenu as unknown as HTMLElement],
+            },
             controls: controls(),
             geometry: GEOMETRY,
         });

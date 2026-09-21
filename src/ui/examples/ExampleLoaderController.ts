@@ -47,7 +47,7 @@ export class ExampleLoaderController {
         private readonly onSelect: (entry: ExampleEntry) => void,
     ) {
         if (!elements.button || !elements.menu) {
-            throw new Error('ExampleLoaderController 缺少 #example-btn / #example-menu 结构');
+            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 ui/desktop/windowChrome.ts)');
         }
 
         this.popover = createPopover({ trigger: elements.button, panel: elements.menu });

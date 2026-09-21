@@ -1,4 +1,5 @@
 import { DslApp } from './app/DslApp';
+import { readAppHosts } from './app/appHosts';
 import { applyUiConfig } from './ui/theme/applyUiConfig';
 
 // 先把 UI_CONFIG 落成 :root 上的 CSS 变量,再构造 DslApp:
@@ -21,7 +22,9 @@ declare global {
     }
 }
 
-const app = new DslApp();
+// `readAppHosts()` 是全应用唯一按 id 取节点的地方(见 app/appHosts.ts);
+// 缺宿主会在这里抛出带 id 的错误,而不是留到运行期变成 null.
+const app = new DslApp(readAppHosts());
 window.__dslApp = app;
 app.start();
 

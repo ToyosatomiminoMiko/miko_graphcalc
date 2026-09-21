@@ -2,7 +2,7 @@
  * DslApp -- OpenSCAD 式 DSL Shell 的装配层.
  *
  * 职责被刻意收敛为:
- * - 找到并保存 DOM 入口
+ * - 接收 `readAppHosts()` 取好的 DOM 入口(本文件不按 id 查节点)
  * - 组装 SceneStore / CompileController / RenderController
  * - 装配参数面板/对象列表/诊断区等 UI 控制器
  * - 处理"运行源码"和"拖参数刷新"两条入口
@@ -13,10 +13,10 @@
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
 import type { SceneIR } from '@/contract/ir';
-import type { WindowId } from '@/config/uiConfig';
 import { EventBus } from '@/core/EventBus';
 import { KeyboardController } from '@/ui/shared/KeyboardController';
 import type { GraphCalcEvents } from '@/contract/events';
+import type { AppHosts } from './appHosts';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
 import { RenderController } from './RenderController';
@@ -26,7 +26,8 @@ import { EditorLineNumbers } from '@/ui/editor/EditorLineNumbers';
 import { EditorHighlight } from '@/ui/editor/EditorHighlight';
 import { FormulaCopyController } from '@/ui/formula/FormulaCopyController';
 import { ObjectListController } from '@/ui/objects/ObjectListController';
-import { WindowManager, type WindowContent } from '@/ui/desktop/WindowManager';
+import { WindowManager } from '@/ui/desktop/WindowManager';
+import { createWindowChrome, windowSlotsProvider } from '@/ui/desktop/windowChrome';
 import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
 import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
 import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
@@ -52,7 +53,8 @@ export class DslApp {
     private readonly viewPanel: ViewPanel;
 
     private readonly editor: HTMLTextAreaElement;
-    private readonly runButton: HTMLButtonElement;
+    /** 运行按钮:由 `createWindowChrome()` 建,监听在本类(它拥有"运行"这条动作). */
+    private readonly runButton: HTMLElement;
     private readonly lineNumbers: EditorLineNumbers;
     private readonly editorHighlight: EditorHighlight;
     /**
@@ -61,10 +63,10 @@ export class DslApp {
      * RightSplitController 三个"布局/页归属/分栏比例"控制器.
      */
     private readonly windowManager: WindowManager;
-    /** 搬进窗口标题栏的既有节点(见 `_windowContent`). */
-    private readonly exampleButton: HTMLButtonElement;
-    private readonly exampleMenu: HTMLElement;
-    private readonly formulaCopyHint: HTMLElement;
+    /** 过程窗口正文宿主(`start()` 才装配过程视图). */
+    private readonly processHost: HTMLElement;
+    /** `#app`:浮层"点外部关闭"与公式复制的键盘代理都挂在这个根上. */
+    private readonly appRoot: HTMLElement;
     /** 几何变化的退订函数(`dispose()` 里调用,与 `_wireEditorResize` 配对). */
     private unsubscribeGeometry: (() => void) | null = null;
     /** 过程页视图:条目"过程"入口把文档交给它载入. */
@@ -90,46 +92,35 @@ export class DslApp {
 
     private keyboardController: KeyboardController | null = null;
 
-    constructor() {
-        const viewport = document.getElementById('viewport')!;
-        const paramsPanel = document.getElementById('params-panel')!;
-        const diagnostics = document.getElementById('diagnostics')!;
-        const entityList = document.getElementById('entity-object-list')!;
-        const analysisList = document.getElementById('analysis-object-list')!;
-        const integralList = document.getElementById('integral-object-list')!;
-        const intersectionList = document.getElementById('intersection-object-list')!;
-        const solveList = document.getElementById('solve-object-list')!;
-        const antiderivativeList = document.getElementById('antiderivative-object-list')!;
-        const odeList = document.getElementById('ode-object-list')!;
-        const formulaCopyHint = document.getElementById('formula-copy-hint')!;
-
-        this.editor = document.getElementById('dsl-editor') as HTMLTextAreaElement;
-        this.runButton = document.getElementById('run-btn') as HTMLButtonElement;
+    /**
+     * @param hosts `readAppHosts()` 取好的 `index.html` 宿主;本类不按 id 查节点.
+     *              标题栏上的四个应用节点由 `createWindowChrome()` 就地建,
+     *              位置声明在 `UI_CONFIG.window.adopted`(见 windowChrome.ts).
+     */
+    constructor(hosts: AppHosts) {
+        this.editor = hosts.editor;
+        // 标题栏的四个节点在这里建一次:监听归各自的控制器,位置归 adopted 表.
+        const chrome = createWindowChrome();
+        this.runButton = chrome.runButton;
+        this.processHost = hosts.processPanel;
+        this.appRoot = hosts.app;
         // 行号栏的两个兄弟节点在这里取好传进去:EditorLineNumbers 不再自己
         // 往父节点里按 id 查(依赖可见,缺结构时构造期报错,见 UI-P3.10).
         this.lineNumbers = new EditorLineNumbers(this.editor, {
-            gutter: document.getElementById('dsl-editor-gutter'),
-            numbers: document.getElementById('dsl-editor-lines'),
+            gutter: hosts.editorGutter,
+            numbers: hosts.editorLines,
         });
         // 高亮层同样由装配层取节点传入;它和行号栏一样监听 input/scroll,
         // 但一个只画行号(translate),一个当滚动容器用(见各自类的说明).
         this.editorHighlight = new EditorHighlight(this.editor, {
-            scroller: document.getElementById('dsl-editor-highlight'),
-            code: document.getElementById('dsl-editor-highlight-code'),
+            scroller: hosts.editorHighlight,
+            code: hosts.editorHighlightCode,
         });
 
         this.compileController = new CompileController(this.store);
-        this.diagnosticsController = new DiagnosticsController(diagnostics);
+        this.diagnosticsController = new DiagnosticsController(hosts.diagnostics);
         this.objectListController = new ObjectListController(
-            {
-                entity: entityList,
-                analysis: analysisList,
-                integral: integralList,
-                intersection: intersectionList,
-                solve: solveList,
-                antiderivative: antiderivativeList,
-                ode: odeList,
-            },
+            hosts.objectLists,
             {
                 // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要
                 // 重新编译,数值计算才会被真正跳过.
@@ -145,54 +136,30 @@ export class DslApp {
             },
         );
         this.paramPanelController = new ParamPanelController(
-            paramsPanel,
+            hosts.paramsPanel,
             (name) => this._scheduleRefresh(name),
         );
-        this.formulaCopyController = new FormulaCopyController(formulaCopyHint);
-        this.formulaCopyHint = formulaCopyHint;
-        this.exampleButton = document.getElementById('example-btn') as HTMLButtonElement;
-        this.exampleMenu = document.getElementById('example-menu')!;
-        this.viewPanel = createViewPanel(document.getElementById('view-controls')!);
+        this.formulaCopyController = new FormulaCopyController(chrome.formulaCopyHint);
+        this.viewPanel = createViewPanel(hosts.viewControls);
         this.exampleLoader = new ExampleLoaderController(
-            {
-                button: document.getElementById('example-btn')!,
-                menu: document.getElementById('example-menu')!,
-            },
+            { button: chrome.exampleButton, menu: chrome.exampleMenu },
             (entry) => this._loadExample(entry),
         );
         this.renderController = new RenderController(
-            viewport,
+            hosts.viewport,
             this.store,
             this.diagnosticsController,
             this.objectListController,
         );
-        // 三个容器节点由装配层取好传入(与 EditorHighlight 同一约定):
-        // 窗口层,Dock 与吸附高亮都留在 index.html 的空宿主里.
+        // 容器与正文宿主都由装配层取好传入(与 EditorHighlight 同一约定),
+        // 本类与 WindowManager 都不再碰 document.
         this.windowManager = new WindowManager(
-            document.getElementById('window-layer')!,
-            document.getElementById('dock')!,
-            document.getElementById('snap-preview')!,
-            (id) => this._windowContent(id),
+            hosts.windowLayer,
+            hosts.dock,
+            hosts.snapPreview,
+            hosts.windowBodies,
+            windowSlotsProvider(chrome),
         );
-    }
-
-    /**
-     * 哪些既有节点搬进哪个窗口的标题栏.
-     *
-     * 这些节点(示例 / RUN / 示例浮层 / 复制提示)的 id 与监听归各自的控制器,
-     * 位置却归窗口外壳,所以由装配层在这里点名,而不是让 WindowManager 去猜.
-     */
-    private _windowContent(id: WindowId): WindowContent {
-        if (id === 'source') {
-            return {
-                actions: [this.exampleButton, this.runButton],
-                overlays: [this.exampleMenu],
-            };
-        }
-        if (id === 'objects') {
-            return { titleContent: [this.formulaCopyHint] };
-        }
-        return {};
     }
 
     /**
@@ -213,26 +180,23 @@ export class DslApp {
         this._wireEditor();
 
         // 窗口装配:建五个窗口外壳,把五个正文宿主搬进各自的 .window-body,
-        // 建 Dock,起初始焦点.必须发生在取宿主之前的那一步之后,其余控制器
-        // 都能拿到节点之后(宿主的搬运不改节点身份,控制器按 id 拿到的还是同一个).
+        // 把标题栏节点放进 adopted 表声明的槽位,建 Dock,起初始焦点.宿主在
+        // 构造期就已取好,搬运不改节点身份,其余控制器拿到的还是同一个.
         this.windowManager.bind();
-        // 暂存区的四个节点已经被搬进各窗口标题栏,空壳留在文档里没有用途
-        // (见 index.html 的 `#window-staging`).
-        document.getElementById('window-staging')?.remove();
         this._wireEditorResize();
 
         // 过程页视图只装配一次;参数只读回显(R6)按需拉当前值,不在这里存副本.
         this.processPanel = new ProcessPanel(
-            document.getElementById('process-panel')!,
+            this.processHost,
             {
                 getParamEcho: () =>
                     formatProcessParamEcho(this.paramPanelController.getValues()),
             },
         );
-        this.formulaCopyController.bind(document.getElementById('app')!);
+        this.formulaCopyController.bind(this.appRoot);
         // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听
         // (键盘那条路仍然只走 KeyboardController).
-        this.exampleLoader.bind(document.getElementById('app')!);
+        this.exampleLoader.bind(this.appRoot);
 
         this.keyboardController = new KeyboardController(this.editor, {
             onHome: () => this.renderController.resetHome(),

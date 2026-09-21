@@ -245,6 +245,6 @@ describe('高亮与销毁', () => {
         expect(() => new ExampleLoaderController(
             { button: button as unknown as HTMLElement, menu: null as unknown as HTMLElement },
             () => {},
-        )).toThrow(/example-menu/);
+        )).toThrow(/浮层节点/);
     });
 });

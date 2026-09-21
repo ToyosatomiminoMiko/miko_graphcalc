@@ -46,7 +46,7 @@
                          只是颜色透明,由高亮层透出着色后的源码(见 EditorHighlight).
                          注意:textarea 的内容不参与缩进,改缩进会改变默认源码. -->
                     <div id="dsl-editor-input">
-                    <textarea id="dsl-editor" spellcheck="false">
+                        <textarea id="dsl-editor" spellcheck="false">
 point P = [0, 0, 0];
 
 // 临时示例,后续统一加入文档
@@ -261,24 +261,6 @@ solve S2 = a*x^2 - 2 = 0;       // 参数系数 -> 求根公式(拖 a 会重解)
                 </div>
             </section>
         </footer>
-        <!-- 待搬迁节点:标题栏动作(示例 / RUN),示例浮层,复制提示.
-             它们的 id 与监听归各自的控制器,窗口外壳由 createWindowFrame 建好之后
-             把这些**现成节点**原样 append 进 .window-actions / .window-header /
-             .window-title(见 src/ui/desktop/WindowFrame.ts).
-             放在这个 hidden 的暂存区里,是为了让它们在脚本执行前不参与布局;
-             WindowManager.bind() 之后由 DslApp 摘掉这个空壳,不留一个"看起来
-             还是结构"的空 div. -->
-        <div id="window-staging" hidden>
-            <button id="example-btn" type="button" aria-haspopup="true" aria-expanded="false"
-                aria-controls="example-menu">示例</button>
-            <button id="run-btn">RUN</button>
-            <!-- 示例浮层:分组与菜单项由 ExampleLoaderController 按
-                 src/ui/examples/exampleCatalog.ts 渲染,HTML 里不留清单副本 -->
-            <div id="example-menu" class="example-menu" role="menu"
-                aria-labelledby="example-btn"></div>
-            <!-- 复制提示只有这一处:公式可点,文案在这里回显 -->
-            <span id="formula-copy-hint" class="object-list-hint">点击公式复制 TeX</span>
-        </div>
     </div>
 
     <script type="module" src="./src/main.ts"></script>
