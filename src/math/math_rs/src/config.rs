@@ -25,6 +25,14 @@ pub const MAX_CURVE_SAMPLES: usize = 200_000;
 /// 三维向量场采样总点数上限 nx·ny·nz(每点输出 3 个 f32).
 pub const MAX_VECTOR_FIELD_POINTS: usize = 8_000_000;
 
+/// 定义域认证(区间算术)的最大四分细分深度,见 `interval_core`.
+///
+/// 细分只用于化解**区间算术自身的保守**(dependency problem),不用于
+/// "逼近"真实边界:真实边界/极点所在的格子细到任何深度仍然是 `Partial`,
+/// 直接判无效.深度每加 1,最坏情况代价 ×4(实际因短路远低于此);
+/// 取 4 足以让 `sqrt(x - x + 1)` 这类自相消表达式在规定次数内被证明.
+pub const CERTIFY_SUBDIVISION_DEPTH: u32 = 4;
+
 /// 求交 / 等值线网格 segments 上限:marching squares 的单元数是
 /// O(segments²) × 面片数,curve×curve 空间路径另有 O(segments²) 候选对.
 pub const MAX_INTERSECTION_SEGMENTS: usize = 1024;

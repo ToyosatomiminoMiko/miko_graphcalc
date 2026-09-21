@@ -42,7 +42,9 @@ pub(crate) use eval::compile_runtime_expr;
 /// 查表版求值器只在测试里作为预绑定路径的参照物(见 `eval.rs`).
 #[cfg(test)]
 pub(crate) use eval::evaluate_runtime_expr;
-pub(crate) use eval::{bind_expression, evaluate_bound, BoundExpr, EvalContext};
+pub(crate) use eval::{
+    bind_expression, evaluate_bound, odd_denominator_rational, BoundExpr, EvalContext, SymBinding,
+};
 /// 不定积分内核入口(产物类型见 `integral.rs`,不含 `Expr`).
 pub use integral::{
     antiderivative as antiderivative_outcome, antiderivative_with_parameters,

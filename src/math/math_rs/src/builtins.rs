@@ -7,7 +7,7 @@ use crate::symbolic::{BinOp, Expr, UnaryOp};
 /// 每个函数只在这里登记一次:求值,符号求导和 LaTeX 显示都从这一张表取.
 /// 多参数/别名函数(pow,sec,log 等)在表达式归一化阶段改写为基础函数.
 /// 一元求值函数指针;`eval::bind_expression` 会在编译期把函数名解析成它
-/// (见 [`unary_eval`]),热点循环里不再按名字线性扫表.
+/// (见 [`unary_spec`]),热点循环里不再按名字线性扫表.
 pub(crate) type UnaryMathFunction = fn(f64) -> f64;
 type DerivativeFunction = fn(&Expr) -> Expr;
 
@@ -27,6 +27,33 @@ pub(crate) enum LatexStyle {
     LogBase(u8),
 }
 
+/// 一元内置函数的**区间扩张算子**标签(定义域认证用).
+///
+/// 与 [`LatexStyle`] 同性质:只是一个"这行是什么函数"的标签,具体区间
+/// 语义在 `crate::interval_core::apply_unary` 一处实现,避免区间算术散落到
+/// 符号表里.`bind_expression` 在编译期把它连同一个函数指针一起写进
+/// `BoundExpr::Call`,因此求值路径完全不受影响(零成本).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum IntervalOp {
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Sinh,
+    Cosh,
+    Tanh,
+    Exp,
+    Ln,
+    Log10,
+    Log2,
+    Sqrt,
+    Cbrt,
+    Abs,
+    Sign,
+}
+
 struct MathBuiltin {
     name: &'static str,
     /// 参数个数(元数).基础函数当前全为 1,但显式登记而不是默认 1:
@@ -34,6 +61,9 @@ struct MathBuiltin {
     /// 归一化/求导/LaTeX/求值四处不再各写一套检查.
     arity: u8,
     eval: UnaryMathFunction,
+    /// 区间扩张算子标签(见 [`IntervalOp`]).必须与 `eval` 表达同一个函数:
+    /// 两处不一致会让"定义域认证"与"逐点求值"对同一格给出矛盾结论.
+    interval: IntervalOp,
     derivative: DerivativeFunction,
     latex: LatexStyle,
 }
@@ -170,6 +200,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "sin",
         arity: 1,
+        interval: IntervalOp::Sin,
         eval: f64::sin,
         derivative: derivative_sin,
         latex: LatexStyle::Named("\\sin"),
@@ -177,6 +208,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "cos",
         arity: 1,
+        interval: IntervalOp::Cos,
         eval: f64::cos,
         derivative: derivative_cos,
         latex: LatexStyle::Named("\\cos"),
@@ -184,6 +216,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "tan",
         arity: 1,
+        interval: IntervalOp::Tan,
         eval: f64::tan,
         derivative: derivative_tan,
         latex: LatexStyle::Named("\\tan"),
@@ -191,6 +224,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "asin",
         arity: 1,
+        interval: IntervalOp::Asin,
         eval: f64::asin,
         derivative: derivative_asin,
         latex: LatexStyle::Named("\\arcsin"),
@@ -198,6 +232,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "acos",
         arity: 1,
+        interval: IntervalOp::Acos,
         eval: f64::acos,
         derivative: derivative_acos,
         latex: LatexStyle::Named("\\arccos"),
@@ -205,6 +240,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "atan",
         arity: 1,
+        interval: IntervalOp::Atan,
         eval: f64::atan,
         derivative: derivative_atan,
         latex: LatexStyle::Named("\\arctan"),
@@ -212,6 +248,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "sinh",
         arity: 1,
+        interval: IntervalOp::Sinh,
         eval: f64::sinh,
         derivative: derivative_sinh,
         latex: LatexStyle::Named("\\sinh"),
@@ -219,6 +256,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "cosh",
         arity: 1,
+        interval: IntervalOp::Cosh,
         eval: f64::cosh,
         derivative: derivative_cosh,
         latex: LatexStyle::Named("\\cosh"),
@@ -226,6 +264,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "tanh",
         arity: 1,
+        interval: IntervalOp::Tanh,
         eval: f64::tanh,
         derivative: derivative_tanh,
         latex: LatexStyle::Named("\\tanh"),
@@ -233,6 +272,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "exp",
         arity: 1,
+        interval: IntervalOp::Exp,
         eval: f64::exp,
         derivative: derivative_exp,
         latex: LatexStyle::Exp,
@@ -240,6 +280,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "ln",
         arity: 1,
+        interval: IntervalOp::Ln,
         eval: f64::ln,
         derivative: derivative_ln,
         latex: LatexStyle::Named("\\ln"),
@@ -247,6 +288,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "log10",
         arity: 1,
+        interval: IntervalOp::Log10,
         eval: f64::log10,
         derivative: derivative_log10,
         latex: LatexStyle::LogBase(10),
@@ -254,6 +296,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "log2",
         arity: 1,
+        interval: IntervalOp::Log2,
         eval: f64::log2,
         derivative: derivative_log2,
         latex: LatexStyle::LogBase(2),
@@ -261,6 +304,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "sqrt",
         arity: 1,
+        interval: IntervalOp::Sqrt,
         eval: f64::sqrt,
         derivative: derivative_sqrt,
         latex: LatexStyle::Sqrt,
@@ -268,6 +312,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "cbrt",
         arity: 1,
+        interval: IntervalOp::Cbrt,
         eval: f64::cbrt,
         derivative: derivative_cbrt,
         latex: LatexStyle::NthRoot(3),
@@ -275,6 +320,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
     MathBuiltin {
         name: "abs",
         arity: 1,
+        interval: IntervalOp::Abs,
         eval: f64::abs,
         derivative: derivative_abs,
         latex: LatexStyle::Abs,
@@ -284,6 +330,7 @@ const MATH_FUNCTIONS: &[MathBuiltin] = &[
         // 符号求导(d|x|/dx 等)输出 sign 语义而不是 |u|/u 的 0/0 写法.
         name: "sign",
         arity: 1,
+        interval: IntervalOp::Sign,
         eval: |value: f64| {
             if value > 0.0 {
                 1.0
@@ -334,15 +381,16 @@ pub(crate) fn apply_unary(name: &str, value: f64) -> Result<f64, String> {
         .ok_or_else(|| format!("表达式暂不支持函数 {name}"))
 }
 
-/// 返回一元内置函数的求值函数指针;名字未登记时返回 `None`.
+/// 返回一元内置函数的**求值函数指针 + 区间算子标签**;名字未登记时 `None`.
 ///
-/// 供预绑定求值路径(`eval::bind_expression`)在**编译期**把 17 项线性扫
-/// (`apply_unary`)解析成函数指针,热点循环里不再按名字查找.
-pub(crate) fn unary_eval(name: &str) -> Option<UnaryMathFunction> {
+/// 一次扫表同时解析两者(而不是扫两遍),保证 `eval` 与 `interval` 永远
+/// 取自同一行:`bind_expression` 把这对写进 `BoundExpr::Call`,求值走前者,
+/// 定义域认证走后者,两者不可能指到不同的函数.
+pub(crate) fn unary_spec(name: &str) -> Option<(UnaryMathFunction, IntervalOp)> {
     MATH_FUNCTIONS
         .iter()
         .find(|builtin| builtin.name == name)
-        .map(|builtin| builtin.eval)
+        .map(|builtin| (builtin.eval, builtin.interval))
 }
 
 /// 返回函数对应的 LaTeX 样式;不属于基础函数时返回 `None`.

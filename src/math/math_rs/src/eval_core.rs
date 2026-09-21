@@ -145,6 +145,20 @@ impl CompiledEvaluator {
             None => Err("表达式结果为非有限数值".to_string()),
         }
     }
+
+    /// 预绑定树的只读访问.
+    ///
+    /// 供定义域认证(`crate::interval_core`)复用同一套"编译 + 绑定"逻辑:
+    /// 认证走的是同一棵 `BoundExpr`,差别只在"按点解释"还是"按盒解释",
+    /// 因此系数配对,同名系数取最后一个,维度槽位这些约定不可能两处走偏.
+    pub(crate) fn bound_node(&self) -> &BoundExpr {
+        &self.node
+    }
+
+    /// 系数槽的只读访问(与 [`Self::bound_node`] 配套使用).
+    pub(crate) fn coefficient_values(&self) -> &[f64] {
+        &self.context.coefficients
+    }
 }
 
 #[cfg(test)]

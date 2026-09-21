@@ -143,8 +143,15 @@ pub(crate) enum BoundExpr {
     Sym(SymBinding),
     Neg(Box<BoundExpr>),
     Binary(BinOp, Box<BoundExpr>, Box<BoundExpr>),
-    /// 一元函数:函数指针在构造期解析(见 `builtins::unary_eval`).
-    Call(builtins::UnaryMathFunction, Box<BoundExpr>),
+    /// 一元函数:函数指针与区间算子标签在构造期解析(见 `builtins::unary_spec`).
+    ///
+    /// 第二个字段只被定义域认证(`crate::interval_core`)消费,逐点求值忽略它;
+    /// 两者来自同一张表的同一行,不可能指到不同函数.
+    Call(
+        builtins::UnaryMathFunction,
+        builtins::IntervalOp,
+        Box<BoundExpr>,
+    ),
     /// 函数未登记(或元数不是 1);求值时按旧文案报错.
     UnsupportedCall(String),
     /// 数组表达式不可直接求值.
@@ -191,10 +198,12 @@ pub(crate) fn bind_expression(expr: &Expr, coefficient_names: &[String]) -> Boun
             Box::new(bind_expression(right, coefficient_names)),
         ),
         Expr::Call(name, args) => match args.as_slice() {
-            [arg] => match builtins::unary_eval(name) {
-                Some(function) => {
-                    BoundExpr::Call(function, Box::new(bind_expression(arg, coefficient_names)))
-                }
+            [arg] => match builtins::unary_spec(name) {
+                Some((function, interval)) => BoundExpr::Call(
+                    function,
+                    interval,
+                    Box::new(bind_expression(arg, coefficient_names)),
+                ),
                 None => BoundExpr::UnsupportedCall(name.clone()),
             },
             _ => BoundExpr::UnsupportedCall(name.clone()),
@@ -272,7 +281,7 @@ pub(crate) fn evaluate_bound(expr: &BoundExpr, ctx: &EvalContext) -> Result<Opti
                 _ => Ok(None),
             }
         }
-        BoundExpr::Call(function, arg) => {
+        BoundExpr::Call(function, _interval, arg) => {
             let Some(value) = evaluate_bound(arg, ctx)? else {
                 return Ok(None);
             };
@@ -343,7 +352,7 @@ const SIMPLE_ODD_DEN: u64 = 33;
 ///   `x*n` 舍入到 0(m==0 分支必被跳过),直接判无实值.这既省掉整段扫描,
 ///   也顺手挡掉了「x 很小而 n 很大时 `x*n` 仍有限,但 `round()` 已丢光精度」
 ///   的极端输入.
-fn odd_denominator_rational(x: f64) -> Option<(i64, u64)> {
+pub(crate) fn odd_denominator_rational(x: f64) -> Option<(i64, u64)> {
     if !x.is_finite() {
         return None;
     }

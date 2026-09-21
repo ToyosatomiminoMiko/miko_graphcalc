@@ -27,26 +27,36 @@
 //                 表达式(CompiledEvaluator)只编译一次,在
 //                 (cols+1)×(rows+1) 行优先网格(外 y 内 x)上逐点求值
 //                 z = f(x,y),非有限值写为 NaN;再据此组装 positions
-//                 (x,y,z 扁平 f32)并统计 z_min/z_max -- 只统计有限 z,
+//                 (x,y,z 扁平 f32,经 saturate_to_f32 钳进 f32 有限区间)
+//                 并统计 z_min/z_max -- 只统计有限 z,
 //                 若全部非法则回退 DEGENERATE_Z_MIN/Z_MAX(见 config.rs)
-//              ② compute_valid_cells()       无效单元过滤
-//                 一个单元在以下情况不参与绘制:
-//                   · 任一顶点 z 为 NaN(防止 NaN 面法线经顶点平均污染
-//                     相邻正常三角形);
-//                   · 单元跨过竖直渐近线/间断(某条边两端 z 符号相反且
-//                     中点值跳出两端,再叠加"跳变远超该方向的中位跳变"
-//                     或"中点值远超两端幅值"任一条)--像 tan(x) 在渐近线
-//                     两侧都是"有限但巨大"的 z 值,不会产生 NaN,若不按此
-//                     剔除会被画成一堵贯穿渐近线的"墙";
-//                     符号相反但中点介于两端的光滑过零必须放行,否则会在
-//                     曲面上误切出一条方形空洞.
-//              ③ generate_valid_indices()    网格索引
+//              ② math_rs::interval_core::certify_surface_cells()
+//                                              整格定义域认证
+//                 与①共用同一棵绑定树,把每个单元的坐标区间代入表达式做
+//                 区间算术,证明"整格处处有定义".判据是三值的:整格有定义
+//                 (可绘制)/ 整格在定义域外 / 一部分有定义(边界或极点穿过,
+//                 按四分自适应细分,仍证不出就不绘制).
+//                 这取代了旧版的"跳变中位数 + 经验倍数 + 边中点重采样"
+//                 启发式:那套判据只看有限个点,原理上抓不到落在格子内部的
+//                 极点,且阈值(16 倍,2 倍)与采样密度耦合;区间认证给的是
+//                 证明.代价是定义域边界上留一条一个网格步宽的缺失带.
+//              ③ compute_valid_cells()       无效单元过滤
+//                 一个单元在以下情况不参与绘制(与关系):
+//                   · 任一顶点 z 为非有限--主要挡 f64 溢出(认证会说
+//                     "处处有定义",但采样值已不可用),同时防止 NaN 面法线
+//                     经顶点平均污染相邻正常三角形;
+//                   · 未被②认证为整格有定义--`tan(x*a)`,`1/(x-a)` 这类
+//                     竖直渐近线两侧都是"有限但巨大"的 z 值,不产生 NaN,
+//                     只有整格证明才能把它们挡在几何之外.
+//              ④ generate_valid_indices()    网格索引
 //                 只对有效单元出两个三角形,每格拆 (a,b,d)+(a,d,c);
 //                 无效单元不产出任何索引,这才是真正参与绘制的几何.
-//              ④ compute_vertex_normals()   平滑法线
+//              ⑤ compute_vertex_normals()   平滑法线
 //                 对共享顶点累加三角形面法线再归一化,与 Three.js
 //                 BufferGeometry.computeVertexNormals() 语义一致;
-//                 放在 WASM 做,避免主线程 O(顶点数) 遍历
+//                 放在 WASM 做,避免主线程 O(顶点数) 遍历.
+//                 中间量走 f64:只要顶点有限(由 saturate_to_f32 保证),
+//                 f64 路径上不可能溢出,因此不会出现 `Inf − Inf = NaN`.
 //             ↓ 产出
 //         SurfaceSampleResult { positions, valid_indices, normals,
 //                               z_min, z_max }
@@ -65,6 +75,10 @@
 //                      (diffuse 乘顶点色;specular 不受影响,
 //                       与旧 vertexColors + CPU color 语义一致)
 //
+// 非有限(NaN)三角形的四条成因,各自修在哪,以及两条**有意保留**的边界
+// (定义域边界的一格缺失带,一维曲线仍是跳变启发式),连同 A/B 实测数字,
+// 见 docs/surface-nan-audit.md.改动本文件的顶点/法线写出路径前请先读它.
+//
 // 同步约束:config.rs 中的配色常量(SURFACE_HUE_START / SURFACE_SATURATION /
 // SURFACE_LIGHTNESS_BASE / SURFACE_LIGHTNESS_RANGE / FLAT_COLOR_T)必须与
 // surfaceColorMap.ts 内嵌的 GLSL 常量保持一致 -- 改任一侧都要同步另一侧.
@@ -74,181 +88,80 @@ use crate::config::{
     DEGENERATE_Z_MIN,
 };
 
-/// 垂直渐近线式"跳变必须超出的相对倍数"(相对该方向的中位跳变).
+/// f32 的最大有限值 `(2−2⁻²³)·2¹²⁷ ≈ 3.4028235e38`.
 ///
-/// 与采样层曲线的 `ASYMPTOTE_JUMP_FACTOR` 同量级.用于捕捉"渐近线恰好靠近
-/// 网格点"的情形:此时近侧采样值已经很大,跨线边跳变远超中位跳变.
-const POLE_JUMP_FACTOR: f64 = 16.0;
+/// 写成"从 f32 取"而不是字面量,保证与目标平台的 f32::MAX 逐位一致.
+const F32_FINITE_MAX: f64 = f32::MAX as f64;
 
-/// 中点发散倍数:判定一条符号翻转边是否是"冲到 ±∞"的间断.
+/// 把 f64 投影到 f32 的**可表示有限区间** `±F32_FINITE_MAX`.
 ///
-/// 只在边中点重新求值一次 f:若中点值远超两端 z 的幅值,说明函数在两点之间
-/// 发散(间断);若只是平滑过零(如 `z=1000·sin(x)`),中点值应介于两端之间.
-const POLE_MIDPOINT_FACTOR: f64 = 2.0;
-
-/// 中位数;空切片返回 0,避免除零/NaN 污染.
-fn median(values: &[f64]) -> f64 {
-    if values.is_empty() {
-        return 0.0;
-    }
-    let mut sorted = values.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let mid = sorted.len() / 2;
-    if sorted.len().is_multiple_of(2) {
-        (sorted[mid - 1] + sorted[mid]) / 2.0
-    } else {
-        sorted[mid]
-    }
-}
-
-/// 网格中某一方向(水平 x / 竖直 y)相邻边跳变 |Δz| 的中位数,作为该方向
-/// "正常跳变"的稳健尺度.非有限端点不计入.
-fn edge_median(z_values: &[f64], cols: usize, rows: usize, horizontal: bool) -> f64 {
-    let width = cols + 1;
-    let mut jumps: Vec<f64> = Vec::new();
-    if horizontal {
-        for j in 0..=rows {
-            for i in 0..cols {
-                let a = z_values[j * width + i];
-                let b = z_values[j * width + i + 1];
-                if a.is_finite() && b.is_finite() {
-                    jumps.push((b - a).abs());
-                }
-            }
-        }
-    } else {
-        for i in 0..=cols {
-            for j in 0..rows {
-                let a = z_values[j * width + i];
-                let b = z_values[(j + 1) * width + i];
-                if a.is_finite() && b.is_finite() {
-                    jumps.push((b - a).abs());
-                }
-            }
-        }
-    }
-    median(&jumps)
-}
-
-/// 判断一条"符号翻转"边是否跨越了竖直渐近线.
+/// # 为什么必须在写出的那个类型上设闸门
 ///
-/// 变号边的绝大多数是"函数正常穿过零",而不是发散:例如
-/// `z = x * e^{-(x²+y²)}` 在 x=0 一整列,`∂/∂x[e^{-(x²+y²)}]` 的过零线,
-/// 都是光滑变号.因此这里先取边中点值 `f_mid`,再按下面的次序判定:
+/// `f64 as f32` **不保有限**:任何绝对值大于 [`F32_FINITE_MAX`] 的有限 f64
+/// 都会变成 `f32::INFINITY`.旧版只在 f64 上判 `z.is_finite()`,于是
+/// `exp(x^2+y^2)` 在 (10,10) 处的 e²⁰⁰ ≈ 7.2e86(f64 有限)顺利过闸,
+/// 写进 positions 就成了 Inf -- 这正是"采样层非有限值"之外的第二条
+/// 非有限顶点通路,闸门漏掉了它.
 ///
-/// 1. **中点无定义** -> 间断(渐近线穿过单元,采样拿不到值);
-/// 2. **中点介于两端之间**(`min(z0, z1) <= f_mid <= max(z0, z1)`) ->
-///    函数在这条边上单调穿零,直接放行.这一票否决是必需的:它挡住的是
-///    `POLE_JUMP_FACTOR` 那一路的误判 -- 曲面大片平坦时全局中位跳变很小,
-///    而变号列的跳变可能超过它的 16 倍,只看跳变倍数会在光滑曲面上切出
-///    一条方形空洞(回归用例 `smooth_zero_crossing_keeps_all_cells`);
-/// 3. **中点跳出两端** -> 两路互相补充的信号任一成立即判为间断:
-///    - **跳变远超**该方向的中位跳变:捕捉渐近线靠近网格点,近侧采样值
-///      已经很大的情形;
-///    - **中点发散**(`f_mid` 远超两端 z 幅值):捕捉渐近线落在单元中部,
-///      两侧采样值都不大的情形.该项尺度无关,对 `tan(x*a)` 任意 `a` 都
-///      稳定,不会因渐近线变密而被全局中位数污染.
+/// # 为什么是饱和而不是丢格
 ///
-/// 仅当两端 z 符号相反时才检查,以排除"平滑但陡峭"的正常边.
-#[allow(clippy::too_many_arguments)]
-fn edge_crosses_discontinuity(
-    z0: f64,
-    z1: f64,
-    mid_x: f64,
-    mid_y: f64,
-    median_jump: f64,
-    expr: &str,
-    names: &[String],
-    values: &[f64],
-) -> bool {
-    if (z0 < 0.0) == (z1 < 0.0) {
-        return false;
-    }
-    let f_mid = math_rs::field_core::evaluate_scalar(expr, names, values, mid_x, mid_y, 0.0)
-        .unwrap_or(f64::NAN);
-    if !f_mid.is_finite() {
-        return true;
-    }
-    if f_mid >= z0.min(z1) && f_mid <= z0.max(z1) {
-        return false;
-    }
-    let scale = z0.abs().max(z1.abs()).max(f64::MIN_POSITIVE);
-    if f_mid.abs() > POLE_MIDPOINT_FACTOR * scale {
-        return true;
-    }
-    median_jump > 0.0 && (z1 - z0).abs() > POLE_JUMP_FACTOR * median_jump
+/// `clamp` 是**单调保序投影**:有限进,有限出,±∞ 映到 ±`f32::MAX`,
+/// NaN 保持 NaN(NaN 顶点所在单元由 [`compute_valid_cells`] 剔除,语义不变).
+/// 饱和不改变单元有效性,所以不会在极点/溢出区额外制造空洞;"丢格"则会
+/// 把本可连续逼近的极限面变成破洞.饱和后的几何仍是单调的,视觉上是一根
+/// 封顶尖刺,与 [`robust_color_range`] 对颜色尖刺"钳到两端"的处理同源.
+///
+/// 注意:这只保证**有限**,不保证**尺度可看**.若 z 全量被撑到 1e30,
+/// 场景尺度仍会被包围盒拉爆 -- 那是"几何 z 区间"的问题,与 NaN 无关.
+fn saturate_to_f32(value: f64) -> f32 {
+    value.clamp(-F32_FINITE_MAX, F32_FINITE_MAX) as f32
 }
 
 /// 逐单元判断是否可参与绘制.
 ///
-/// 无效条件(满足任一即丢弃该单元的两个三角形):
+/// 两个条件是**与**关系,各自挡住一类"不能出三角形"的理由:
 ///
-/// **① 任一顶点 z 为 NaN(必须剔除,勿删).**
+/// **① 任一顶点 z 为非有限(保留,勿删).**
 ///
-/// 任何包含 NaN 顶点的三角形,其面法线是 NaN;而
-/// `compute_vertex_normals` 会把三角形面法线按共享顶点累加再归一化,
-/// 一旦某个含 NaN 的三角形参与了累加,NaN 就会通过顶点平均**扩散到所有
-/// 相邻的正常三角形**,导致整片曲面出现高光/阴影异常.所以这里的 NaN
-/// 判断不能省:它是"把采样层登记的非有限值(NaN 占位)挡在网格之外"的
-/// 最后一道闸.某些统计口径(如 `z_min`/`z_max`)会遍历含 NaN 的顶点,
-/// 但**绘制几何只认 `valid_indices`**,不含 NaN 单元.
+/// `z_values` 里的 NaN 有两个来源:求值层的定义域外掩码,以及 `f64` 溢出
+/// (`exp(x²+y²)` 在 |x|,|y| 较大时直接越过 `f64` 上限).定义域那一类已由
+/// ② 覆盖,这里主要挡**溢出** -- 它与定义域无关,区间认证会如实判"处处有
+/// 定义",但采样值已经不再是一个可用的高度.
 ///
-/// **② 单元跨越了竖直渐近线(见 `edge_crosses_discontinuity`).**
+/// 另外,含 NaN 顶点的三角形其面法线是 NaN,而 [`compute_vertex_normals`] 把
+/// 面法线按共享顶点累加,NaN 会顺着顶点平均扩散到整片相邻的正常三角形.
+/// 所以这条闸门同时是"不让非有限值进入几何"的最后一道.
 ///
-/// `tan(x*a)` 这类曲面在渐近线两侧都是"有限但巨大"的 z 值,不会产生 NaN,
-/// 若不按此剔除,跨线单元会被画成一堵贯穿渐近线的"墙".
+/// **② 该单元未被区间认证为"整格有定义"**
+/// (见 [`math_rs::interval_core::certify_surface_cells`]).
 ///
-/// 注意:符号相反**不等于**间断.光滑过零(中点值介于两端之间)一律放行,
-/// 否则 `z = x*e^{-(x²+y²)}` 这类曲面会在变号线上被切出一条空洞.
-#[allow(clippy::too_many_arguments)]
+/// `tan(x*a)`,`1/(x-a)` 这类竖直渐近线两侧都是"有限但巨大"的 z 值,不产生
+/// NaN;只看顶点有限性的话,跨线单元会被画成一堵贯穿渐近线的"墙".判据从
+/// "跳变比中位数大多少倍"这类经验阈值换成了**对整格的证明**:把坐标区间代入
+/// 表达式做区间算术,只要除法分母区间不含 0,`sqrt`/`ln` 的实参区间合法,
+/// 就证明了整格处处有定义.证明不了的格子(定义域边界,极点,区间算术过于
+/// 保守)一律不出三角形.
+///
+/// 两条判据的分工是"点"与"整格":① 只看 4 个角,便宜且能挡住溢出;
+/// ② 看整个单元,能挡住落在格子内部的极点 -- 那是任何有限点采样都抓不到的.
 fn compute_valid_cells(
     z_values: &[f64],
     cols: usize,
     rows: usize,
-    x_min: f64,
-    x_max: f64,
-    y_min: f64,
-    y_max: f64,
-    expr: &str,
-    names: &[String],
-    values: &[f64],
+    certified: &[bool],
 ) -> Vec<bool> {
+    debug_assert_eq!(certified.len(), cols * rows);
     let width = cols + 1;
-    // 网格坐标映射:列/行 -> 世界坐标(与采样层 uniform_nodes 同式).
-    let cell_x = |i: usize| x_min + (x_max - x_min) * (i as f64 / cols as f64);
-    let cell_y = |j: usize| y_min + (y_max - y_min) * (j as f64 / rows as f64);
-
-    let med_h = edge_median(z_values, cols, rows, true);
-    let med_v = edge_median(z_values, cols, rows, false);
-
     let mut valid = Vec::with_capacity(cols * rows);
     for j in 0..rows {
-        let y0 = cell_y(j);
-        let y1 = cell_y(j + 1);
         for i in 0..cols {
-            let x0 = cell_x(i);
-            let x1 = cell_x(i + 1);
-
-            let z00 = z_values[j * width + i];
-            let z10 = z_values[j * width + i + 1];
-            let z01 = z_values[(j + 1) * width + i];
-            let z11 = z_values[(j + 1) * width + i + 1];
-
-            let ok = [z00, z10, z01, z11].iter().all(|z| z.is_finite())
-                // 四条边各查一次:下/上(水平,中点变 x),左/右(竖直,变 y).
-                && !edge_crosses_discontinuity(
-                    z00, z10, (x0 + x1) / 2.0, y0, med_h, expr, names, values,
-                )
-                && !edge_crosses_discontinuity(
-                    z01, z11, (x0 + x1) / 2.0, y1, med_h, expr, names, values,
-                )
-                && !edge_crosses_discontinuity(
-                    z00, z01, x0, (y0 + y1) / 2.0, med_v, expr, names, values,
-                )
-                && !edge_crosses_discontinuity(
-                    z10, z11, x1, (y0 + y1) / 2.0, med_v, expr, names, values,
-                );
-            valid.push(ok);
+            let corners = [
+                z_values[j * width + i],
+                z_values[j * width + i + 1],
+                z_values[(j + 1) * width + i],
+                z_values[(j + 1) * width + i + 1],
+            ];
+            valid.push(corners.iter().all(|z| z.is_finite()) && certified[j * cols + i]);
         }
     }
     valid
@@ -370,9 +283,11 @@ fn sample_surface_values(
             let x = x_min + (x_max - x_min) * (i as f64 / cols as f64);
             let z = z_vals[(j * (cols + 1) + i) as usize];
 
-            positions.push(x as f32);
-            positions.push(y as f32);
-            positions.push(z as f32);
+            // 三个分量都过 f32 饱和闸门:x/y 来自用户区间,同样可能超出 f32
+            // 范围(如 range = ±1e40),不能只防 z.
+            positions.push(saturate_to_f32(x));
+            positions.push(saturate_to_f32(y));
+            positions.push(saturate_to_f32(z));
 
             if z.is_finite() {
                 finite_z.push(z);
@@ -413,19 +328,20 @@ pub fn sample_and_process_surface(
         rows,
     )?;
 
-    // 先用"单元有效性"过滤(NaN + 渐近线间断),再据此生成索引.
-    let cell_valid = compute_valid_cells(
-        &z_vals,
-        cols as usize,
-        rows as usize,
+    // 先做"整格有定义"的区间认证(math_rs 侧,与采样共用同一棵绑定树),
+    // 再叠加顶点有限性闸门(挡溢出),据此生成索引.
+    let certified = math_rs::interval_core::certify_surface_cells(
+        expr,
+        coeff_names,
+        coeff_values,
         x_min,
         x_max,
         y_min,
         y_max,
-        expr,
-        coeff_names,
-        coeff_values,
-    );
+        cols as usize,
+        rows as usize,
+    )?;
+    let cell_valid = compute_valid_cells(&z_vals, cols as usize, rows as usize, &certified);
     let valid_indices = generate_valid_indices(cols as usize, rows as usize, &cell_valid);
     let normals = compute_vertex_normals(&positions, &valid_indices);
 
@@ -447,34 +363,51 @@ pub fn sample_and_process_surface(
 /// 与 Three.js `BufferGeometry.computeVertexNormals()` 的思路一致:
 /// 对共享同一顶点的所有三角形面法线做累加,最后归一化
 /// 放在 Rust/WASM 中计算,可以避免主线程做 O(顶点数) 的 CPU 遍历
+///
+/// # 中间量用 f64 是"法线不可能非有限"的证明前提
+///
+/// 顶点有限性已由 [`saturate_to_f32`] 保证(positions 中每个分量都是有限
+/// f32).在此前提下:
+/// - 两个有限 f32 之差绝对值 `< 2^129`;
+/// - 叉积分量是两数之积,`< 2^258`;
+/// - 规则网格里每个顶点至多被 6 个有效三角形共享,累加 `< 2^261`.
+///
+/// 而 f64 的有限上界约 `2^1024`,余量约 700 个二进制数量级.所以**只要顶点
+/// 有限,f64 路径上不可能产生 Inf,也就不可能出现 `Inf − Inf = NaN`**.
+/// 归一化后结果落在 `[-1,1]`,转回 f32 无损.
+///
+/// 旧版直接在 f32 里做叉积与累加:两个 1e30 量级的边分量相乘即 `inf`,
+/// 再相减就是 NaN,而 NaN 会经顶点平均扩散到整片相邻三角形 --
+/// 文件头注释担心的正是这条扩散路径,但采样层的 NaN 闸门管不到它.
 pub fn compute_vertex_normals(positions: &[f32], valid_indices: &[u32]) -> Vec<f32> {
-    let mut normals = vec![0.0f32; positions.len()];
+    let vertex_count = positions.len() / 3;
+    let mut accum = vec![0.0f64; positions.len()];
 
-    // 第一遍:累加每个三角形对三个顶点的贡献
+    // 第一遍:累加每个三角形对三个顶点的贡献(f64 精度)
     for triangle in valid_indices.as_chunks::<3>().0 {
         let ia = triangle[0] as usize;
         let ib = triangle[1] as usize;
         let ic = triangle[2] as usize;
 
         // 索引理论上都在合法范围内,这里做防御性检查
-        if ia >= positions.len() / 3 || ib >= positions.len() / 3 || ic >= positions.len() / 3 {
+        if ia >= vertex_count || ib >= vertex_count || ic >= vertex_count {
             continue;
         }
 
         let a = (
-            positions[ia * 3],
-            positions[ia * 3 + 1],
-            positions[ia * 3 + 2],
+            positions[ia * 3] as f64,
+            positions[ia * 3 + 1] as f64,
+            positions[ia * 3 + 2] as f64,
         );
         let b = (
-            positions[ib * 3],
-            positions[ib * 3 + 1],
-            positions[ib * 3 + 2],
+            positions[ib * 3] as f64,
+            positions[ib * 3 + 1] as f64,
+            positions[ib * 3 + 2] as f64,
         );
         let c = (
-            positions[ic * 3],
-            positions[ic * 3 + 1],
-            positions[ic * 3 + 2],
+            positions[ic * 3] as f64,
+            positions[ic * 3 + 1] as f64,
+            positions[ic * 3 + 2] as f64,
         );
 
         let abx = b.0 - a.0;
@@ -488,28 +421,38 @@ pub fn compute_vertex_normals(positions: &[f32], valid_indices: &[u32]) -> Vec<f
         let ny = abz * acx - abx * acz;
         let nz = abx * acy - aby * acx;
 
-        normals[ia * 3] += nx;
-        normals[ia * 3 + 1] += ny;
-        normals[ia * 3 + 2] += nz;
-        normals[ib * 3] += nx;
-        normals[ib * 3 + 1] += ny;
-        normals[ib * 3 + 2] += nz;
-        normals[ic * 3] += nx;
-        normals[ic * 3 + 1] += ny;
-        normals[ic * 3 + 2] += nz;
+        accum[ia * 3] += nx;
+        accum[ia * 3 + 1] += ny;
+        accum[ia * 3 + 2] += nz;
+        accum[ib * 3] += nx;
+        accum[ib * 3 + 1] += ny;
+        accum[ib * 3 + 2] += nz;
+        accum[ic * 3] += nx;
+        accum[ic * 3 + 1] += ny;
+        accum[ic * 3 + 2] += nz;
     }
 
-    // 第二遍:归一化,零向量保留为零
-    for normal in normals.as_chunks_mut::<3>().0 {
+    // 第二遍:归一化并写回 f32.
+    //
+    // 零长度**不能留成零向量**:GLSL 的 `normalize(vec3(0.0))` 是 0/0 = NaN,
+    // 会把"Rust 侧全是有限值"的努力在着色器里重新变回 NaN 法线.这里给一个
+    // 稳定兜底方向 (0,0,1).真正参与绘制的顶点必然属于某个 xy 面内非退化
+    // 的网格三角形,其累加向量非零,拿不到兜底;拿到它的只有未被任何有效
+    // 三角形引用的顶点(NaN 顶点,被剔除单元独占的顶点),不参与绘制.
+    let mut normals = vec![0.0f32; positions.len()];
+    for (index, normal) in accum.as_chunks::<3>().0.iter().enumerate() {
         let x = normal[0];
         let y = normal[1];
         let z = normal[2];
         let length = (x * x + y * y + z * z).sqrt();
-        if length > 1e-8 {
-            normal[0] = x / length;
-            normal[1] = y / length;
-            normal[2] = z / length;
-        }
+        let (ux, uy, uz) = if length > 1e-8 {
+            (x / length, y / length, z / length)
+        } else {
+            (0.0, 0.0, 1.0)
+        };
+        normals[index * 3] = ux as f32;
+        normals[index * 3 + 1] = uy as f32;
+        normals[index * 3 + 2] = uz as f32;
     }
 
     normals
@@ -526,32 +469,34 @@ mod tests {
     }
 
     #[test]
-    fn tan_surface_drops_pole_crossing_cells() {
-        // tan(x) 在 x=±π/2, ±3π/2 附近有竖直渐近线:两侧都是有限但巨大的 z
-        // 值,跨线单元应被剔除(不再画出贯穿渐近线的"墙"),因此有效三角形
-        // 明显少于全量 cols*rows*6.
+    fn tan_surface_drops_exactly_the_pole_cells() {
+        // tan(x) 在 x=±π/2, ±3π/2 有竖直渐近线:两侧都是有限但巨大的 z 值,
+        // 跨线单元必须剔除(否则被画成一堵贯穿渐近线的"墙").
+        //
+        // 判据换成区间认证后,这里可以断言**精确**的剔除量:`tan = sin/cos`,
+        // cos 区间含 0 的格子才无效,而 [-6,6] 上 4 条渐近线各自严格落在
+        // 某一列之内(不在格线上),所以恰好剔除 4 列 = 4*64*6 个索引,
+        // 与阈值/采样密度无关.旧版靠"跳变 > 16×中位跳变",只能断言一个
+        // 宽松区间.
         let result = run("tan(x * a)", &[("a".to_string(), 1.0)]);
         let cols = 64usize;
         let rows = 64usize;
         let full = cols * rows * 6;
-        assert!(result.valid_indices.len() < full, "渐近线单元应被剔除");
         assert_eq!(result.valid_indices.len() % 3, 0);
-        // tan(x) 在 [-6,6] 上有 4 条渐近线(±π/2, ±3π/2),每条只剔除跨线的
-        // 1 列(64 行 * 6 索引),共 4*64*6 = 1536.这里只校验剔除量"接近但小于
-        // 全量",避免把因子/采样噪声锁死为精确值.
-        assert!(
-            result.valid_indices.len() > full - 8 * rows * 6,
-            "剔除量应只集中在渐近线附近,实际有效 {} / 全量 {}",
+        assert_eq!(
             result.valid_indices.len(),
-            full
+            full - 4 * rows * 6,
+            "应恰好剔除 4 条渐近线所在的 4 列"
         );
     }
 
     #[test]
     fn smooth_zero_crossing_keeps_all_cells() {
         // `x * e^{-(x²+y²)}` 在 x=0 一整列光滑穿过零.变号边的跳变远超全局
-        // 中位跳变(中位数被大片平坦区拉低),若只看"跳变 > 16×中位跳变"就会
-        // 把这一列误判成渐近线,在曲面上切出一条方形空洞.
+        // 中位跳变(中位数被大片平坦区拉低),旧的"跳变倍数"判据会把这一列
+        // 误判成渐近线,在曲面上切出一条方形空洞.
+        // 现在的判据不看跳变:整个表达式处处有定义(exp 全实轴有定义,无除法,
+        // 无根号),区间认证一次通过所有格子,与"变号"彻底无关.
         // 回归来源:example/gauss_surface.miko 里 `derivative dx =
         // derivative(s1, x)` 生成的曲面 dx = ∂/∂x[j·e^{-a(x²+y²)}] 同样是
         // 关于 x 的奇函数,默认 a=0.1 时在 x=0 附近丢过一条方形空洞.
@@ -569,7 +514,9 @@ mod tests {
         // 原始报告用例(example/gauss_surface.miko):偏导曲面
         // dx = ∂/∂x[3·e^{-0.1(x²+y²)}],range=[-8,8]² / segments=96.
         // 旧判据只按"跳变 > 16×中位跳变"就会在 x∈[0, 1/6],y∈[-2.5, 2.33]
-        // 丢掉 30 个单元,渲染成一条方形空洞.表达式取编译器展开后的原样.
+        // 丢掉 30 个单元,渲染成一条方形空洞.表达式取编译器展开后的原样:
+        // 底数是正常量 2.718...(正底),指数是区间,认证走 positive_pow,
+        // 与 x 是否变号无关,因此全部单元保留.
         let result = sample_and_process_surface(
             "-(3 * (2.718281828459045 ^ (-(0.1 * (x ^ 2 + y ^ 2))) * (0.2 * x)))",
             &[],
@@ -657,11 +604,163 @@ mod tests {
         }
     }
 
+    /// 区间认证独有的能力:极点落在**格子内部**时,任何有限点采样都抓不到,
+    /// 区间算术能证明该格含奇异点.
+    ///
+    /// `1/((x−0.5)² + (y−0.5)² − 1e−4)` 在 (0.5, 0.5) 周围有一圈半径 0.01 的
+    /// 极点(分母为 0).64×64 网格下这个圆完全落在第 34 列/第 34 行的单元
+    /// 内部:该单元四个角的分母都显著为正(≈0.0312,0.0077),z 有限且同号,
+    /// 旧启发式(顶点 NaN + 边跳变 vs 中位跳变 + 边中点重采样)看不到任何
+    /// 异常,会把整格画成一道贯穿极点的"墙".区间认证只要看到分母区间含 0
+    /// 就判该格无效 -- 不需要采样点恰好落在圆上.
+    #[test]
+    fn interior_pole_circle_inside_one_cell_is_dropped() {
+        let segments = 64usize;
+        let cols = segments;
+        let result = sample_and_process_surface(
+            "1 / ((x - 0.5) ^ 2 + (y - 0.5) ^ 2 - 0.0001)",
+            &[],
+            &[],
+            -6.0,
+            6.0,
+            -6.0,
+            6.0,
+            segments as u32,
+            segments as u32,
+        )
+        .unwrap();
+
+        let full = segments * segments * 6;
+        let dropped = (full - result.valid_indices.len()) / 6;
+        assert_eq!(dropped, 1, "只应剔除含极点圆的那一个单元,实际 {dropped} 个");
+
+        // 逐三角形取首索引即可唯一标识所属单元(每格出 [a,b,d] 与 [a,d,c],
+        // 两段的首索引都是该单元的 a 角 = j*(cols+1)+i).不能直接对
+        // valid_indices 查"某个顶点在不在":顶点被相邻单元共享,查不出归属.
+        let drawn_cells: std::collections::HashSet<u32> = result
+            .valid_indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|triangle| triangle[0])
+            .collect();
+        // 0.5 落在第 34 个单元(单元宽 12/64 = 0.1875)里.
+        let pole_cell = (34 * (cols + 1) + 34) as u32;
+        let neighbour_cell = (33 * (cols + 1) + 33) as u32;
+        assert!(
+            !drawn_cells.contains(&pole_cell),
+            "含极点圆的单元 (34,34) 未被剔除"
+        );
+        assert!(
+            drawn_cells.contains(&neighbour_cell),
+            "相邻正常单元 (33,33) 不应被误剔"
+        );
+    }
+
+    /// 定义域是圆盘:圆外的格子由**整格证明**拒绝,不是靠"角上是否 NaN".
+    /// `sqrt(1 − x² − y²)` 的实参是连续的,圆内为正,圆外为负,认证对每一格
+    /// 给出三值结论,边界带(证明不出的那一圈)按设计不绘制.
+    #[test]
+    fn disk_domain_is_certified_cell_by_cell() {
+        let result = run("sqrt(1 - x * x - y * y)", &[]);
+        let cells = result.valid_indices.len() / 6;
+        // 半径 1 的圆盘面积 π ≈ 3.1416;单元面积 (12/64)² = 0.0352.
+        // 完全落在圆内的格子约 π/0.0352 ≈ 89,再减去边界一格的环形带
+        // (周长/步长 ≈ 2π/0.1875 ≈ 33),剩 ~56.给一个宽区间,只锁"确实
+        // 画出了圆盘内部,且远少于全部 4096 格".
+        assert!(
+            (20..200).contains(&cells),
+            "圆盘内部格子数不合理:{cells}(全量 4096)"
+        );
+    }
+
     #[test]
     fn nan_surface_still_masks_cells() {
         // sqrt(x) 在 x<0 时 z 为 NaN,这些单元应被剔除(原有 NaN 掩码行为不丢失).
         let result = run("sqrt(x)", &[]);
         let full = 64usize * 64usize * 6;
         assert!(result.valid_indices.len() < full, "NaN 区域单元应剔除");
+    }
+
+    /// 通路②回归:有限 f64 但超出 f32 范围的 z,不得以 Inf 形式进入 positions.
+    ///
+    /// `exp(x²+y²)` 在角落 (10,10) 处 = e²⁰⁰ ≈ 7.2e86:f64 完全有限,但远超
+    /// `f32::MAX ≈ 3.4e38`.旧闸门只在 f64 上判 `is_finite()`,于是这里会写进
+    /// `f32::INFINITY`,再经面法线的 `Inf − Inf` 变成 NaN 并扩散.
+    #[test]
+    fn finite_f64_beyond_f32_range_never_becomes_infinite_vertex() {
+        let segments = 32usize;
+        let result = sample_and_process_surface(
+            "exp(x ^ 2 + y ^ 2)",
+            &[],
+            &[],
+            -10.0,
+            10.0,
+            -10.0,
+            10.0,
+            segments as u32,
+            segments as u32,
+        )
+        .unwrap();
+
+        assert!(
+            result.positions.iter().all(|v| v.is_finite()),
+            "positions 里出现非有限顶点:f64->f32 溢出闸门失效"
+        );
+        assert!(
+            result.normals.iter().all(|v| v.is_finite()),
+            "normals 里出现非有限值"
+        );
+        // exp 处处有定义,不应因此丢掉任何单元(饱和不等于丢格).
+        assert_eq!(
+            result.valid_indices.len(),
+            segments * segments * 6,
+            "溢出只应饱和,不应改变单元有效性"
+        );
+    }
+
+    /// x/y 来自用户区间,同样可能超出 f32 范围,闸门必须一视同仁.
+    #[test]
+    fn out_of_f32_range_axes_saturate_instead_of_overflowing() {
+        let result =
+            sample_and_process_surface("x + y", &[], &[], -1e40, 1e40, -1e40, 1e40, 8, 8).unwrap();
+
+        assert!(
+            result.positions.iter().all(|v| v.is_finite()),
+            "x/y 轴超出 f32 范围时仍写入了非有限顶点"
+        );
+        assert!(result.normals.iter().all(|v| v.is_finite()));
+    }
+
+    /// 通路③回归:边长 1e30 的三角形在 f32 里叉积即溢出为 Inf,`Inf − Inf`
+    /// 得 NaN.几何上它的法线就是 (0,0,1),必须算得出来且有限.
+    #[test]
+    fn vertex_normals_survive_coordinates_whose_cross_overflows_f32() {
+        let positions = [0.0f32, 0.0, 0.0, 1e30, 0.0, 0.0, 0.0, 1e30, 0.0];
+        let normals = compute_vertex_normals(&positions, &[0, 1, 2]);
+
+        assert!(
+            normals.iter().all(|v| v.is_finite()),
+            "大坐标下的面法线溢出:f32 累加未被搬到 f64,normals = {normals:?}"
+        );
+        for normal in normals.as_chunks::<3>().0 {
+            assert!(
+                (normal[2].abs() - 1.0).abs() < 1e-6,
+                "xy 平面内三角形的法线应为 (0,0,±1),实际 {normal:?}"
+            );
+        }
+    }
+
+    /// 通路④:零累加向量不能留成零向量 -- GLSL 的 `normalize(vec3(0.0))`
+    /// 是 0/0 = NaN,会把 NaN 重新塞回着色器.
+    #[test]
+    fn unreferenced_vertices_get_a_fallback_normal_not_zero() {
+        let positions = [0.0f32; 9];
+        let normals = compute_vertex_normals(&positions, &[]);
+
+        assert!(normals.iter().all(|v| v.is_finite()));
+        for normal in normals.as_chunks::<3>().0 {
+            assert_eq!(*normal, [0.0, 0.0, 1.0]);
+        }
     }
 }

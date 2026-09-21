@@ -29,6 +29,7 @@ pub mod geometry_core;
 pub mod integral_core;
 pub mod integral_method;
 pub mod intersection_core;
+pub mod interval_core;
 /// crate 级共享数值原语(线性消元 / 一维求根 / 方程组 Newton):求解,求交与
 /// 联立共用,见模块文档.
 mod numeric_core;
