@@ -112,6 +112,54 @@
   反应",E13 默认几何三处底边线不一致,E14 `WindowState` 缺 `fullscreen`,
   E19 四个窗口改五个窗口的连锁,E31 落地后的死代码清理,E32 状态序列与初始
   夹取的三处修复等)+ 一份"查过但不是阻碍"的记录.
+- [UI 库分离设计计划](ui-library-extraction-plan.md) -- 规划文档:回答"把界面抽成
+  一个单独维护的 UI 库,文件怎么组织,抽之前必须先做什么,'只导入库 + 声明式编排
+  UI 元素'可不可行".**结论:可行,但不是把 `src/ui` 整个搬出去** -- 实测
+  `src/ui` 14,589 行里只有约四成是通用 UI(5.5k 行),一半是这个应用的界面
+  (7.3k 行,直接消费 `SceneIR` / `ParamDeclaration` / 编译器拼的 LaTeX).
+  三个值得单记的结论:
+  ①**"声明式"是三层**:L1 结构声明(已有,`widgets/dom.ts` 的 `el()`)/ L2 编排
+  声明(一半,`UI_CONFIG.window` 的 `windows[]`+`adopted[]`+`slots` 已经是,
+  `DslApp` 构造函数里 14 个控制器还是命令式)/ **L3 状态绑定(没有)** -- L3 才是
+  "编排"的门槛,所以"要不要一个极小 signal 运行时"这条绕不过去;**已拍板走 B
+  且 vendored `@preact/signals-core`**,不违反 `dom.ts` 文件头"不引框架/不用
+  JSX"的既有取舍,900 行手写 DOM 桩还能继续用;**§4.1 单独讲"signal 到底是
+  什么"** -- 语义核心 25 行 + 它在 `PointStyleController` 里替掉的那 6 条手工
+  同步路径(业务口径变成 `computed`),以及它"不是框架/不做调度/不接管 DOM"
+  的边界,和 vendored 要守住的三条约束(公开面是库自己的 / 不用 `batch()` /
+  不当状态管理库用)).
+  ②**横在中间的不是渲染层**:UI 只 import 一个外部包 `katex`,**没有任何
+  `@/render/*`**,与 three.js 之间早就切成"契约类型 + 回调"了;真正的阻塞是
+  `@/contract/ir`(21 处)与 `@/compiler/dsl/evaluationLatex`(10 处,编译器在给
+  界面拼 LaTeX -- 留着它,消费者必须先装编译器).
+  ③**"真的独立了"可以机械化判定**:库源码 grep 不到 `@/contract`/`@/compiler`/
+  `@/math`/`@/config/renderConfig`,grep 不到 `getElementById`,样式里 grep 不到
+  `#`.三条同时成立即独立库.
+  含:现状依赖全景(按目录的耦合矩阵 + 行数三分),**§5 去耦合清单 D1–D10**
+  (D1 宿主 DOM 方向反转,D4 配置从单例变注入,D7 全局 `document` 改 root 注入是
+  七条硬阻塞;D8 的 CSS 实测 17 个 id 选择器共 49 处,库的样式只能有类名),
+  §6 抽库后的目录树(库六个子包 + 应用侧 `views/` `adapters/`),§7 先 npm
+  workspaces 后拆 repo 与 CI 拆分,§8 分期 P0–P4,§10 六条风险(R1 过度分层,
+  R2 信号层不许引异步调度...)与"明确不做的事".
+  五份附录是首轮写作之后补的:**附录 A** 给出复现正文全部数字的命令(每个数都能
+  重跑),**附录 B** 记库里已经有的五条约定(一件一个 `AbortController`,键盘唯一
+  出口 `register({keys,resolve})`,浮层"点外部关闭"挂根节点,id 只服务标签关联,
+  指针拖拽只有 `shared/dragGesture.ts` 一份实现)
+  与落地时会立刻撞到的**七类缺件**(`TextField` / `Menu` / `Splitter` /
+  `ScrollArea` / 列表件 / `Dialog`·`Toast` / `Tooltip` -- 现有控件只有 6 件),
+  **附录 C** 记搬库时最容易丢的六件事(C1 `applyUiConfig()` 必须先于构造,否则
+  行号槽量到兜底字体;C2 有 9 个 CSS 变量在 `css/base.css:190-210` 与
+  `uiConfig.ts` 各有一份值,搬库时应收成一处;C3 §5.6 高亮层对齐契约只能真机验;
+  C5 库的 CI 不需要 wasm,这正是解耦的证据),**附录 D** 以文件数计的规模参考
+  (P0 移 37 个文件,P2 移 46 个),**附录 E** 是运行时依赖足迹(今天 2 个直接
+  依赖 `katex`/`three`,传递进产物的只有这 2 个;分离后库恰好 1 个
+  `@preact/signals-core`,MIT/零依赖/min 5.7KB·gzip 2.0KB;外加一条 CI 守卫:
+  库的 `dependencies` 只许这一项).
+  状态:**规划稿,未动代码**;两条决策都已拍板,**本文已无待定项**:
+  **U3 = 路线 B**(库提供一个极小响应式层,控件接受 `T | Signal<T>`,放弃 A
+  "声明式到不了 L3"与 C"推翻不引框架的取舍,测试面全动"),**U7 = vendored**
+  (`@preact/signals-core`,但库对外只导出自己的 `signal`/`effect`/`computed`,
+  且不用它的 `batch()`;三条约束在 §4.1 末).
 - [方程求解过程的展示设计](equation-solving-process.md) -- 设计文档(文首已标注:
   "右栏标签页 / 参数区与视图区共用高度"这两条前提被窗口化的 W6 推翻,过程现在
   是独立窗口;其余结论仍然有效):过程展示

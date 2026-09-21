@@ -4,5 +4,5 @@ src/generated/
 dist/
 .vscode
 __pycache__/
-*.pyc
 prompt
+packages/

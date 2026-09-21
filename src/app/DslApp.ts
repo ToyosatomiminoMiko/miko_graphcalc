@@ -2,7 +2,7 @@
  * DslApp -- OpenSCAD 式 DSL Shell 的装配层.
  *
  * 职责被刻意收敛为:
- * - 接收 `readAppHosts()` 取好的 DOM 入口(本文件不按 id 查节点)
+ * - 接收 `buildAppViews()` 建好的内容节点(本文件不按 id 查节点)
  * - 组装 SceneStore / CompileController / RenderController
  * - 装配参数面板/对象列表/诊断区等 UI 控制器
  * - 处理"运行源码"和"拖参数刷新"两条入口
@@ -13,44 +13,48 @@
  *   编辑 -> parseMiko -> compileScene -> 3D 视口 + param 面板 + 对象列表.
  */
 import type { SceneIR } from '@/contract/ir';
-import { EventBus } from '@/core/EventBus';
-import { KeyboardController } from '@/ui/shared/KeyboardController';
-import type { GraphCalcEvents } from '@/contract/events';
-import type { AppHosts } from './appHosts';
+import {
+    EditorHighlight,
+    EditorLineNumbers,
+    FormulaCopyController,
+    KeyboardController,
+    MessageList,
+    WindowManager,
+    mountDesktop,
+    type DesktopHandle,
+} from '@miko/ui';
+import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
+import { highlightDsl } from '@/editor/dslHighlight';
+import type { AppViews } from './appViews';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
 import { RenderController } from './RenderController';
-import { ParamPanelController } from '@/ui/params/ParamPanelController';
-import { DiagnosticsController } from '@/ui/diagnostics/DiagnosticsController';
-import { EditorLineNumbers } from '@/ui/editor/EditorLineNumbers';
-import { EditorHighlight } from '@/ui/editor/EditorHighlight';
-import { FormulaCopyController } from '@/ui/formula/FormulaCopyController';
-import { ObjectListController } from '@/ui/objects/ObjectListController';
-import { WindowManager } from '@/ui/desktop/WindowManager';
-import { createWindowChrome, windowSlotsProvider } from '@/ui/desktop/windowChrome';
-import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
-import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
-import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
-import { defaultExample, exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
-import { replaceTextareaSource, seedTextareaSource } from '@/ui/examples/replaceEditorSource';
-import { createViewPanel, type ViewPanel } from '@/ui/view/ViewPanel';
+import { ParamPanelController } from '@/views/params/ParamPanelController';
+import { ObjectListController, type ObjectListHandlers } from '@/views/objects/ObjectListController';
+import { ProcessPanel, formatProcessParamEcho } from '@/views/process/ProcessPanel';
+import type { ProcessRequest } from '@/views/evaluation/EvaluationItem';
+import { ExampleLoaderController } from '@/views/examples/ExampleLoaderController';
+import { defaultExample, exampleSource, type ExampleEntry } from '@/views/examples/exampleCatalog';
+import { replaceTextareaSource, seedTextareaSource } from '@/views/examples/replaceEditorSource';
+import { createViewPanel, type ViewPanelHandle } from '@/views/view/ViewPanel';
+import { createViewState, type ViewState } from '@/views/view/viewState';
 
 export class DslApp {
-    private readonly eventBus = new EventBus<GraphCalcEvents>();
     private readonly store = new SceneStore();
     private readonly compileController: CompileController;
     private readonly renderController: RenderController;
     private readonly paramPanelController: ParamPanelController;
-    private readonly diagnosticsController: DiagnosticsController;
+    private readonly diagnosticsController: MessageList;
     private readonly objectListController: ObjectListController;
     private readonly formulaCopyController: FormulaCopyController;
     private readonly exampleLoader: ExampleLoaderController;
     /**
-     * 右侧"视图"面板:布局与控件实例在这里建一次,句柄交给 RenderController
-     * 分发给各控制器(见 `wireViewControls`).它的生命周期不在这里管 --
-     * 每个控件恰好一个控制器所有者,由那些控制器各自 dispose.
+     * 视图状态源(P3):"视图"面板与渲染侧共用这一份 signal,中间不再有
+     * 控制器与 EventBus 那一层.
      */
-    private readonly viewPanel: ViewPanel;
+    private readonly viewState: ViewState;
+    /** 右侧"视图"面板:控件与订阅都归它自己,dispose 时统一解绑. */
+    private readonly viewPanel: ViewPanelHandle;
 
     private readonly editor: HTMLTextAreaElement;
     /** 运行按钮:由 `createWindowChrome()` 建,监听在本类(它拥有"运行"这条动作). */
@@ -63,6 +67,8 @@ export class DslApp {
      * RightSplitController 三个"布局/页归属/分栏比例"控制器.
      */
     private readonly windowManager: WindowManager;
+    /** `mountDesktop()` 的句柄:三层容器与窗口管理器的生命周期归它. */
+    private readonly desktop: DesktopHandle;
     /** 过程窗口正文宿主(`start()` 才装配过程视图). */
     private readonly processHost: HTMLElement;
     /** `#app`:浮层"点外部关闭"与公式复制的键盘代理都挂在这个根上. */
@@ -93,73 +99,54 @@ export class DslApp {
     private keyboardController: KeyboardController | null = null;
 
     /**
-     * @param hosts `readAppHosts()` 取好的 `index.html` 宿主;本类不按 id 查节点.
-     *              标题栏上的四个应用节点由 `createWindowChrome()` 就地建,
-     *              位置声明在 `UI_CONFIG.window.adopted`(见 windowChrome.ts).
+     * @param views `buildAppViews()` 建好的应用内容节点与逐窗口内容表;
+     *              桌面容器(`window-layer` / `dock` / `snap-preview` / 各窗口
+     *              正文)由 `mountDesktop()` 自己建,本类不按 id 查任何节点.
      */
-    constructor(hosts: AppHosts) {
-        this.editor = hosts.editor;
-        // 标题栏的四个节点在这里建一次:监听归各自的控制器,位置归 adopted 表.
-        const chrome = createWindowChrome();
-        this.runButton = chrome.runButton;
-        this.processHost = hosts.processPanel;
-        this.appRoot = hosts.app;
-        // 行号栏的两个兄弟节点在这里取好传进去:EditorLineNumbers 不再自己
-        // 往父节点里按 id 查(依赖可见,缺结构时构造期报错,见 UI-P3.10).
-        this.lineNumbers = new EditorLineNumbers(this.editor, {
-            gutter: hosts.editorGutter,
-            numbers: hosts.editorLines,
-        });
-        // 高亮层同样由装配层取节点传入;它和行号栏一样监听 input/scroll,
-        // 但一个只画行号(translate),一个当滚动容器用(见各自类的说明).
-        this.editorHighlight = new EditorHighlight(this.editor, {
-            scroller: hosts.editorHighlight,
-            code: hosts.editorHighlightCode,
-        });
+    constructor(views: AppViews) {
+        this.editor = views.editor;
+        this.runButton = views.chrome.runButton;
+        this.processHost = views.processPanel;
+        this.appRoot = views.root;
+        const decorations = this._createEditorDecorations(views);
+        this.lineNumbers = decorations.lineNumbers;
+        this.editorHighlight = decorations.highlight;
 
         this.compileController = new CompileController(this.store);
-        this.diagnosticsController = new DiagnosticsController(hosts.diagnostics);
+        this.diagnosticsController = new MessageList(views.diagnostics);
+        // 显隐/过程入口这一组回调单独建:它们各自绑一个业务动作,堆在构造
+        // 函数里只会把"装配顺序"淹掉(见 `_objectListHandlers`).
         this.objectListController = new ObjectListController(
-            hosts.objectLists,
-            {
-                // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要
-                // 重新编译,数值计算才会被真正跳过.
-                toggleEntity: (id) => this.renderController.toggleObject(id),
-                toggleAnalysis: (name) => this._toggleAnalysis(name),
-                toggleIntegral: (name) => this._toggleIntegral(name),
-                toggleIntersection: (name) => this._toggleIntersection(name),
-                toggleSolve: (name) => this._toggleSolve(name),
-                toggleAntiderivative: (name) => this._toggleAntiderivative(name),
-                toggleOde: (name) => this._toggleOde(name),
-                // 三级披露的 L2 入口:条目已把过程文档建好,这里只负责切页与载入.
-                openProcess: (request) => this._openProcess(request),
-            },
+            views.objectLists,
+            this._objectListHandlers(),
         );
         this.paramPanelController = new ParamPanelController(
-            hosts.paramsPanel,
+            views.paramsPanel,
             (name) => this._scheduleRefresh(name),
         );
-        this.formulaCopyController = new FormulaCopyController(chrome.formulaCopyHint);
-        this.viewPanel = createViewPanel(hosts.viewControls);
+        this.formulaCopyController = new FormulaCopyController(views.chrome.formulaCopyHint);
+        this.viewState = createViewState();
+        this.viewPanel = createViewPanel(views.viewControls, this.viewState);
         this.exampleLoader = new ExampleLoaderController(
-            { button: chrome.exampleButton, menu: chrome.exampleMenu },
+            { button: views.chrome.exampleButton, menu: views.chrome.exampleMenu },
             (entry) => this._loadExample(entry),
         );
         this.renderController = new RenderController(
-            hosts.viewport,
+            views.viewport,
             this.store,
             this.diagnosticsController,
             this.objectListController,
         );
-        // 容器与正文宿主都由装配层取好传入(与 EditorHighlight 同一约定),
-        // 本类与 WindowManager 都不再碰 document.
-        this.windowManager = new WindowManager(
-            hosts.windowLayer,
-            hosts.dock,
-            hosts.snapPreview,
-            hosts.windowBodies,
-            windowSlotsProvider(chrome),
-        );
+
+        // 桌面容器由库自己建(D1):本类只声明"每个窗口装什么内容",不提供任何
+        // 带 id 的宿主.窗口清单/动作/夹取常量来自应用配置,经 desktopConfig()
+        // 收成库的 DesktopConfig.
+        this.desktop = mountDesktop(views.root, {
+            ...desktopConfig(),
+            background: [views.viewport],
+            content: views.windowContent,
+        });
+        this.windowManager = this.desktop.windows;
     }
 
     /**
@@ -176,13 +163,13 @@ export class DslApp {
         this.started = true;
 
         this.renderController.setupControls();
-        this.renderController.wireViewControls(this.eventBus, this.viewPanel);
+        // 视图状态 -> 渲染器:读值再转发只剩 effect 这一层(见 bindViewState).
+        this.renderController.bindViewState(this.viewState);
         this._wireEditor();
 
-        // 窗口装配:建五个窗口外壳,把五个正文宿主搬进各自的 .window-body,
-        // 把标题栏节点放进 adopted 表声明的槽位,建 Dock,起初始焦点.宿主在
-        // 构造期就已取好,搬运不改节点身份,其余控制器拿到的还是同一个.
-        this.windowManager.bind();
+        // 窗口装配已经在 `mountDesktop()` 里做过(构造期):建五个窗口外壳,把
+        // 各窗口内容搬进 `.window-body`,把标题栏节点放进 adopted 表声明的槽位,
+        // 建 Dock,起初始焦点.这里只补装配层自己的那条几何回调.
         this._wireEditorResize();
 
         // 过程页视图只装配一次;参数只读回显(R6)按需拉当前值,不在这里存副本.
@@ -243,14 +230,16 @@ export class DslApp {
 
         window.removeEventListener('resize', this.onResize);
 
-        // 窗口:摘监听,把宿主还回 #app,删掉窗口外壳(与 bind() 配对).
+        // 桌面:摘监听,把正文节点还回 #app,删掉窗口外壳与三层容器(与 mountDesktop 配对).
         this.unsubscribeGeometry?.();
         this.unsubscribeGeometry = null;
-        this.windowManager.dispose();
+        this.desktop.dispose();
         this.processPanel?.dispose();
         this.processPanel = null;
         this.lineNumbers.dispose();
         this.editorHighlight.dispose();
+        // 视图面板自己拥有控件与订阅(P3),所以这里显式拆一次.
+        this.viewPanel.dispose();
         this.renderController.dispose();
         this.compileController.dispose();
         this.paramPanelController.dispose();
@@ -297,6 +286,56 @@ export class DslApp {
                 error instanceof Error ? error.message : String(error),
             );
         }
+    }
+
+    /**
+     * 编辑器两侧的装饰件:行号栏与高亮层.
+     *
+     * 两者都由装配层取好兄弟节点传进去(依赖可见,缺结构时构造期报错,
+     * 见 UI-P3.10),并且都按 D6 注入本应用的配置:
+     * - 行号栏要槽宽下限(`UI_CONFIG.editor.gutterMinWidth`);
+     * - 高亮层要分词与配色(`highlightDsl`:库不认识 DSL 语法,也不认识配色类名).
+     */
+    private _createEditorDecorations(views: AppViews): {
+        lineNumbers: EditorLineNumbers;
+        highlight: EditorHighlight;
+    } {
+        return {
+            lineNumbers: new EditorLineNumbers(this.editor, {
+                gutter: views.editorGutter,
+                numbers: views.editorLines,
+            }, {
+                gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
+            }),
+            // 高亮层与行号栏一样监听 input/scroll,但一个只画行号(translate),
+            // 一个当滚动容器用(见各自类的说明).
+            highlight: new EditorHighlight(this.editor, {
+                scroller: views.editorHighlight,
+                code: views.editorHighlightCode,
+            }, {
+                highlight: highlightDsl,
+            }),
+        };
+    }
+
+    /**
+     * 对象列表的业务回调:每个显隐动作后面都是一条领域流程(见各 `_toggle*`),
+     * 所以只在这里汇总一次,构造函数的职责保持"装配顺序"一件事.
+     */
+    private _objectListHandlers(): ObjectListHandlers {
+        return {
+            // 实体显隐不重新编译,直接改 Plotter 可见性;求值对象显隐要重新
+            // 编译,数值计算才会被真正跳过.
+            toggleEntity: (id) => this.renderController.toggleObject(id),
+            toggleAnalysis: (name) => this._toggleAnalysis(name),
+            toggleIntegral: (name) => this._toggleIntegral(name),
+            toggleIntersection: (name) => this._toggleIntersection(name),
+            toggleSolve: (name) => this._toggleSolve(name),
+            toggleAntiderivative: (name) => this._toggleAntiderivative(name),
+            toggleOde: (name) => this._toggleOde(name),
+            // 三级披露的 L2 入口:条目已把过程文档建好,这里只负责切窗口与载入.
+            openProcess: (request) => this._openProcess(request),
+        };
     }
 
     private _wireEditor(): void {

@@ -2,7 +2,7 @@
  * 界面样式默认值.
  *
  * 与 `numericConfig` / `renderConfig` 同一约定:这里只放纯数据,不含 DOM
- * 或渲染逻辑.真正落到页面的是 `src/ui/theme/applyUiConfig.ts`,它把这些值写成
+ * 或渲染逻辑.真正落到页面的是 `@miko/ui/src/theme/applyUiConfig.ts`,它把这些值写成
  * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
  * 例外:`panel` 里的拖拽夹取范围与整个 `view` 段落**只有 TS 消费**,CSS 没有
@@ -13,58 +13,25 @@
  * `css/base.css` 的 `:root` 里有同名变量的兜底值,必须与本文件保持一致:
  * 兜底只负责脚本执行前的首帧,正常路径一定会被 applyUiConfig 覆盖.
  */
-/**
- * 窗口几何:一个轴上的定位方式(见 docs/windowing-plan.md §4.1).
- *
- * `from: 'bottom'` 的语义**只有一条**:该窗口的这条边落在距桌面该侧 `inset`
- * 处,于是 `x: { from: 'right', inset } -> x = dW - inset - w`,`h: { from:
- * 'bottom', inset } -> h = dH - inset - y`.五个窗口共用同一个底边 `inset`,
- * 底边自然齐平,不需要第二套规则.
- */
-export type AxisSpec =
-    | { readonly at: number }
-    | { readonly from: 'right' | 'bottom'; readonly inset: number }
-    | 'center'
-    | { readonly fraction: number; readonly of: 'usableHeight' }
-    | {
-        readonly clamp: readonly [min: number, max: number];
-        readonly inset: number;
-    };
+import type {
+    AxisSpec,
+    DesktopConfig,
+    WindowActionId,
+    WindowGeometrySpec,
+    WindowSlot,
+} from '@miko/ui';
 
-/**
- * 默认几何:写"锚点",不写算出来的数字.
- *
- * 列高与中列宽度都依赖桌面尺寸,写死 px 只在某一个视口下正确,因此配置里
- * 只描述锚点,由 `WindowGeometry.resolveDefaultGeometry()` 按当前桌面算出 px.
- */
-export interface WindowGeometrySpec {
-    readonly x: AxisSpec;
-    readonly y: AxisSpec;
-    readonly w: AxisSpec;
-    readonly h: AxisSpec;
-    /** 依赖另一个窗口:`y` 接在 `after` 的下方 `gap` 像素处(`y` 被忽略). */
-    readonly after?: { readonly id: string; readonly gap: number };
-}
+// 窗口系统的**通用词汇**(锚点/槽位/动作)由库定义(D4):应用侧只再导出,
+// 不重复写第二份,否则"库说 slot 有 3 个,应用说有 4 个"这种事没有编译错误.
+export type { AxisSpec, WindowActionId, WindowGeometrySpec, WindowSlot };
 
-/** 窗口 id;数组顺序即 Dock 顺序与默认几何的依赖顺序. */
+/** 窗口 id;数组顺序即 Dock 顺序与默认几何的依赖顺序(应用自己的清单). */
 export type WindowId = 'source' | 'view' | 'params' | 'process' | 'objects';
-
-/** 标题栏上的窗口按钮 id. */
-export type WindowActionId = 'minimize' | 'maximize' | 'fullscreen' | 'close';
-
-/**
- * 标题栏上的挂载槽位.
- *
- * 这是窗口标题栏的**唯一一套位置词汇**:配置用 `slot` 声明节点进哪里,
- * `createWindowFrame` 按同一个键装配,DOM 契约(`.window-title` /
- * `.window-actions` / `.window-header`)与测试断言说同一个词.
- */
-export type WindowSlot = 'title' | 'actions' | 'overlays';
 
 /**
  * 标题栏采用节点的名字.
  *
- * 与 `WindowChrome` 的字段名一一对应(见 `ui/desktop/windowChrome.ts`):
+ * 与 `WindowChrome` 的字段名一一对应(见 @miko/ui/src/desktop/windowChrome.ts):
  * 那边把它当 `Record<ChromeNodeId, HTMLElement>` 的键,所以这里少写一个名字
  * 或多写一个都会编译不过,不存在"配置里有,代码里没有"的漂移.
  */
@@ -77,34 +44,39 @@ export interface AdoptedNodeSpec {
     readonly slot: WindowSlot;
 }
 
-export interface WindowConfigEntry {
+/**
+ * 一个窗口:库的 `WindowConfigEntry` 的字段 + 应用自己的正文宿主 id.
+ *
+ * 为什么不直接 `extends WindowConfigEntry`:`id` 要从库的不透明 `string` **收窄**
+ * 成应用的字面量联合,interface 继承做不到收窄.两者的可赋值性由下面
+ * `UI_CONFIG.window` 的 `satisfies AppWindowConfig & DesktopConfig` 兜底.
+ */
+export interface AppWindowEntry {
     readonly id: WindowId;
     /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
     readonly title: string;
-    /** 正文宿主 id:由 `readAppHosts()` 取成节点后交给 `WindowManager`(见 app/appHosts.ts). */
-    readonly hostId: string;
     readonly dock: { readonly label: string };
     readonly defaultGeometry: WindowGeometrySpec;
     readonly minSize: { readonly w: number; readonly h: number };
 }
 
-export interface WindowConfig {
+/**
+ * 应用侧的窗口段:库的 `DesktopConfig` 全部字段 + 两张应用表.
+ *
+ * - `adopted`:"哪个节点进哪个窗口的哪个槽"只有这一份声明,装配层不再写 if 链
+ *   (见 docs/windowing-plan.md §5.3);
+ * - `chrome`:标题栏节点的文案,字面量只在配置里,HTML 与 TS 都不留副本.
+ */
+export interface AppWindowConfig {
     /** 五个窗口,顺序即 z 初始序与 Dock 顺序. */
-    readonly windows: readonly WindowConfigEntry[];
+    readonly windows: readonly AppWindowEntry[];
     /** 标题栏上的窗口按钮:顺序即显示顺序,glyph 进配置不散在 TS 里. */
     readonly actions: readonly {
         readonly id: WindowActionId;
         readonly label: string;
         readonly glyph: string;
     }[];
-    /**
-     * 标题栏采用关系:装配期按这张表把现成节点放进各窗口的槽位.
-     *
-     * "哪个节点进哪个窗口的哪个槽"只有这一份声明,装配层不再写 if 链
-     * (见 docs/windowing-plan.md §5.3).
-     */
     readonly adopted: readonly AdoptedNodeSpec[];
-    /** 标题栏节点的文案:字面量只在配置里,HTML 与 TS 都不留副本. */
     readonly chrome: {
         /** 示例按钮的可见文案. */
         readonly exampleLabel: string;
@@ -199,7 +171,6 @@ export const UI_CONFIG = {
             {
                 id: 'source',
                 title: 'source code',
-                hostId: 'left-panel',
                 dock: { label: '源码' },
                 defaultGeometry: {
                     x: { at: 16 },
@@ -213,7 +184,6 @@ export const UI_CONFIG = {
             {
                 id: 'view',
                 title: '视图',
-                hostId: 'view-controls',
                 dock: { label: '视图' },
                 defaultGeometry: {
                     x: { at: 16 },
@@ -228,7 +198,6 @@ export const UI_CONFIG = {
             {
                 id: 'params',
                 title: '参数',
-                hostId: 'right-page-params',
                 dock: { label: '参数' },
                 defaultGeometry: {
                     x: { from: 'right', inset: 16 },
@@ -242,7 +211,6 @@ export const UI_CONFIG = {
             {
                 id: 'process',
                 title: '过程',
-                hostId: 'right-page-process',
                 dock: { label: '过程' },
                 defaultGeometry: {
                     x: { from: 'right', inset: 16 },
@@ -256,7 +224,6 @@ export const UI_CONFIG = {
             {
                 id: 'objects',
                 title: '对象',
-                hostId: 'bottom-panel',
                 dock: { label: '对象' },
                 defaultGeometry: {
                     // 中列宽度是算出来的:dW - 2 * (420 + 16),夹到 [360, 720]
@@ -299,7 +266,7 @@ export const UI_CONFIG = {
          */
         z: { windowLayer: 100, first: 110, snapPreview: 50, dock: 200 },
         snap: { edge: 16, magnet: 8 },
-    } as const satisfies WindowConfig,
+    } as const satisfies AppWindowConfig,
     /**
      * 过程视图的展示参数.
      *
@@ -378,3 +345,47 @@ export const UI_CONFIG = {
         ],
     },
 } as const;
+
+/**
+ * 类型契约:应用的窗口段必须能被库的 `WindowManager` **原样**消费(D4).
+ *
+ * 单独写一条赋值而不是并进上面的 `satisfies AppWindowConfig & DesktopConfig`:
+ * 后者是对对象字面量的检查,会走"多余属性"规则,把应用自己的 `adopted` /
+ * `chrome` 报成"库的 `DesktopConfig` 里没有这两个属性";这里两边都是非字面量
+ * 表达式,只做可赋值性判断 -- 库改了必填字段(比如新增一个夹取常量)会立刻在
+ * 这里失败.
+ */
+const desktopConfigContract: DesktopConfig = UI_CONFIG.window;
+void desktopConfigContract;
+
+/**
+ * 窗口段里的**库配置部分**(D1/D4):`mountDesktop()` 要的那几个字段.
+ *
+ * `adopted` / `chrome` 是应用装配用的表(哪个标题栏节点进哪个窗口),不属于
+ * 桌面配置;显式列一遍字段而不是解构剔除,是为了让"库配置多了/少了哪一项"
+ * 在编译期就能看出来.
+ */
+export function desktopConfig(): DesktopConfig {
+    const {
+        windows,
+        actions,
+        edgeKeep,
+        edgeGap,
+        headerMinVisible,
+        dockReserve,
+        headerHeight,
+        z,
+        snap,
+    } = UI_CONFIG.window;
+    return {
+        windows,
+        actions,
+        edgeKeep,
+        edgeGap,
+        headerMinVisible,
+        dockReserve,
+        headerHeight,
+        z,
+        snap,
+    };
+}

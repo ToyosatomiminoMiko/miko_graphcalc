@@ -1,4 +1,11 @@
 /**
+ * 手写 DOM 桩(应用侧那一份).
+ *
+ * 库分家期间有两份内容相同的桩:这一份服务 `src/` 的应用测试,库那一份在
+ * `@miko/ui/test/domStub.ts`(D10:库的测试不跨包引用应用源码).
+ * 两边同时改契约时请一起改;库独立成 repo 之后两份自然分开.
+ */
+/**
  * 测试用最小 DOM 桩(node 环境,不引入 jsdom).
  *
  * 为什么不用 jsdom:项目没有该依赖,且这里要锁的是**控制器自己的不变量**
@@ -224,7 +231,23 @@ export class StubElement {
     htmlFor = '';
     tabIndex = -1;
     value = '';
-    type = '';
+    /**
+     * `input.type` 是**反射**属性:`el.type = 'number'` 与
+     * `setAttribute('type', 'number')` 在真 DOM 里改的是同一处.
+     * 桩里也要这样,否则 `querySelector('input[type="number"]')` 与
+     * `getAttribute('type')` 会读不到控件用属性写法设进去的类型.
+     */
+    private typeValue = '';
+
+    get type(): string {
+        return this.typeValue;
+    }
+
+    set type(value: string) {
+        this.typeValue = value;
+        this.attributes.set('type', value);
+    }
+
     min = '';
     max = '';
     step = '';
@@ -256,6 +279,13 @@ export class StubElement {
     readonly capturedPointers = new Set<number>();
     /** 父元素;append/prepend/replaceChildren 时维护,replaceWith 需要它. */
     parent: StubElement | null = null;
+    /**
+     * 真 DOM 的 `ownerDocument`.
+     *
+     * 库的 root 注入(D7)从元素反查"我属于哪个 document":键盘监听挂在哪,
+     * 拖动收尾改谁的 `body.style.cursor`,公式模板建在谁身上,都走它.
+     */
+    ownerDocument!: StubDocument;
     readonly style = new StubStyle();
     readonly classList = new StubClassList(this);
     readonly children: Array<StubElement | StubText> = [];
@@ -462,6 +492,12 @@ export class StubElement {
 
     setAttribute(name: string, value: string): void {
         this.attributes.set(name, value);
+        // 真 DOM 的**反射属性**:按属性名写也会改到同名成员上.库的 `el()` 走
+        // `attrs` 建节点(`el('div', { attrs: { id: 'x' } })`),不反射的话
+        // `querySelector('#x')` 与 `getElementById('x')` 会找不到自己的节点.
+        if (name === 'id') this.id = value;
+        else if (name === 'class') this.className = value;
+        else if (name === 'type') this.type = value;
     }
 
     getAttribute(name: string): string | null {
@@ -470,6 +506,9 @@ export class StubElement {
 
     removeAttribute(name: string): void {
         this.attributes.delete(name);
+        if (name === 'id') this.id = '';
+        else if (name === 'class') this.className = '';
+        else if (name === 'type') this.type = '';
     }
 
     /**
@@ -695,6 +734,8 @@ export interface StubWindow {
 export interface StubDocument {
     readonly documentElement: StubElement;
     readonly body: StubElement;
+    /** 真 DOM 的 `document.defaultView`:库从它取 window(D7). */
+    readonly defaultView: StubWindow;
     createElement(tag: string): StubElement;
     createTextNode(text: string): StubText;
     createDocumentFragment(): StubElement;
@@ -703,7 +744,7 @@ export interface StubDocument {
     /**
      * 按 id 取节点.
      *
-     * 窗口化按 `UI_CONFIG.window.windows[].hostId` 取正文宿主,用的就是它;
+     * 曾经用于按 `hostId` 取窗口正文宿主(D1 之后宿主由库自己建);
      * 桩里走与 `querySelector('#id')` 同一条遍历,语义一致.
      */
     getElementById<T>(id: string): T | null;
@@ -743,9 +784,21 @@ export function installDomStub(): DomStub {
     const document: StubDocument = {
         documentElement,
         body,
-        createElement: (tag: string) => new StubElement(tag),
+        // window 在下面才建;getter 让"document 与 window 相互可达"不必分两步赋值.
+        get defaultView(): StubWindow {
+            return window;
+        },
+        createElement: (tag: string) => {
+            const element = new StubElement(tag);
+            element.ownerDocument = document;
+            return element;
+        },
         createTextNode: (text: string) => new StubText(text),
-        createDocumentFragment: () => new StubElement('#fragment'),
+        createDocumentFragment: () => {
+            const fragment = new StubElement('#fragment');
+            fragment.ownerDocument = document;
+            return fragment;
+        },
         querySelector: <T>(selector: string) => (selectAll<T>(selector)[0] ?? null),
         querySelectorAll: <T>(selector: string) => selectAll<T>(selector),
         getElementById: <T>(id: string) => (selectAll<T>(`#${id}`)[0] ?? null),
@@ -776,6 +829,10 @@ export function installDomStub(): DomStub {
             for (const handler of [...(documentListeners.get(type) ?? [])]) handler(full);
         },
     };
+
+    // 树根那两个节点是直接 new 的(没走 createElement),ownerDocument 在这里补上.
+    documentElement.ownerDocument = document;
+    body.ownerDocument = document;
 
     const resizeObservers: StubResizeObserver[] = [];
     const rootVariables = new Map<string, string>();

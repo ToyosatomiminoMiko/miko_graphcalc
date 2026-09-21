@@ -1,213 +1,23 @@
 /* ==========================================================================
- * GraphCalc 基础样式
+ * GraphCalc 基础样式(应用侧)
  * --------------------------------------------------------------------------
- * 本文件只负责最底层的全局规则:
+ * 本文件只负责最底层的**页面级**规则:
  *   1. 统一盒模型,避免 padding/border 撑大元素;
  *   2. 建立页面背景/文字颜色与字体;
- *   3. 保存面板布局会用到的 CSS 变量;
- *   4. 保存全站圆角尺度(`--radius-*`,默认 0px = 直角).
+ *   3. 应用根节点与 3D 视口的铺满方式.
  *
- * 加载顺序:本文件应最先加载.
+ * 设计 token(色板 / 圆角 / 代码字体 / 面板下限 / 窗口外壳常量)不在这里:
+ * 它们已经随 UI 库走(`@miko/ui/styles/tokens.css`),由 `src/main.ts` 在样式
+ * 入口处最先加载.颜色/圆角的"唯一真相源"因此在那份文件里,由库自己的
+ * `cssPalette.test.ts` 断言.
+ *
+ * 应用里那两个"脚本执行前"的兜底副本也随之消失:token 层就是默认值,
+ * `applyUiConfig()` 只在需要覆盖时把 UI_CONFIG 的值写到 :root 上(C2).
  * ========================================================================== */
 
 /* 统一盒模型:所有元素宽度都包含 padding 与 border */
 * {
     box-sizing: border-box;
-}
-
-/* --------------------------------------------------------------------------
- * 全站圆角由 `--radius-sm` / `md` / `pill` / `round` 四个 token 驱动,
- * 默认值全部是 0px(直角).
- *
- * 组件里一律写 `border-radius: var(--radius-*)`,不再出现具体像素:恢复圆角
- * 只改 :root 的"圆角"一节,不必逐个组件加回去.新增组件请挑一个已有的形状
- * 角色复用,不要为 2px 的差别再起一个 token.
- * -------------------------------------------------------------------------- */
-
-/* --------------------------------------------------------------------------
- * :root 里的变量分三批,真相源不同,别找错地方:
- *
- * 1. **界面配色**(`--color-*` / `--kind-*`,块首"主题色板"一节):
- *    真相源就在本文件,消费者全是 CSS,没有任何 TS 读取方.
- *    规则见那节注释,由 src/ui/theme/cssPalette.test.ts 断言.
- *
- * 2. **代码字体 / KaTeX 字号 / 面板内容下限 / 窗口外壳常量**:
- *    真相源是 src/config/uiConfig.ts,启动时由 src/ui/theme/applyUiConfig.ts
- *    写到 :root 上并覆盖这里的值.下面这些只是"脚本执行前"的兜底,
- *    必须与 UI_CONFIG 保持一致,否则首帧会闪一下旧样式--这条约定由
- *    src/ui/theme/applyUiConfig.test.ts 逐字断言,漏改会先失败在测试上.
- *
- *    --code-gutter-width 是例外:它由 EditorLineNumbers 按实际字体与行数
- *    动态写入,这里只给一个保守初值.
- *
- *    拖拽用的夹取上下限(最小/最大宽度高度,分割比例边界)不在这里:CSS 不消费
- *    它们,只活在 UI_CONFIG.panel 里,没有第二处副本.
- *
- * 3. **圆角尺度**(`--radius-*`,块末"圆角"一节):与配色同理--消费者全是 CSS,
- *    TS 从不读它,所以真相源也在本文件,不放进 UI_CONFIG(放进去反而要多一份
- *    "脚本执行前"的兜底副本,还得让 applyUiConfig 的条数断言跟着改).
- *    默认全为 0px,即全站直角.
- * -------------------------------------------------------------------------- */
-:root {
-    /* ----------------------------------------------------------------------
-     * 主题色板:**界面配色的唯一真相源**.
-     *
-     * 规则只有两条,由 src/ui/theme/cssPalette.test.ts 逐条断言:
-     * 1. 每个颜色字面量只在这里出现一次;其余 css 文件一律 `var(--...)`,
-     *    同一个值不允许有第二处定义(改色只开这一个文件);
-     * 2. 值与上面某个 token 相同,只是换了语境的,写成下面的"别名"
-     *    (`--x: var(--y)`),字面量仍然只有一处.
-     *
-     * 为什么颜色不像字体/面板几何那样放进 src/config/uiConfig.ts:
-     * 那批值 TS 自己也要当数字/字符串用(字体度量,夹取上下限),所以真相源在 TS,
-     * base.css 里那份只是首帧兜底. 颜色没有这个需求--TS 侧从不读界面配色
-     * (唯一由脚本写入的颜色是 DSL 给的 --object-color),所以真相源直接放在
-     * CSS 里,连兜底副本都不需要.
-     *
-     * 场景配色不在这里:3D 里的调色板/坐标轴色由 src/config/numericConfig.ts
-     * 与 src/config/renderConfig.ts 持有,它们是"用户对象的颜色",改界面主题
-     * 不该连带改掉用户场景.
-     * ---------------------------------------------------------------------- */
-
-    /* -- 表面:背景层次由外到内 ------------------------------------------- */
-    --color-bg-app: #0e101a;                        /* 页面底色(html/body) */
-    --color-bg-panel: #141828;                      /* 三个面板的底色 */
-    --color-bg-sunken: #0d1120;                     /* 凹陷底:编辑器/输入框/列表栏/诊断区,也用作浅底徽章上的深色字 */
-    --color-bg-gutter: #0a0e1c;                     /* 行号槽(比编辑器底再暗一档) */
-    --color-bg-header: rgba(20, 24, 40, 0.96);      /* 面板标题栏/列表栏标题 */
-    --color-bg-popover: rgba(16, 20, 34, 0.98);     /* 示例浮层 */
-    --color-fill-control: rgba(255, 255, 255, 0.04);        /* 轻量按钮底(视角/模式按钮) */
-    --color-fill-control-strong: var(--color-border-divider); /* 行末显隐按钮底,与最浅分隔线同值 */
-    --color-fill-row: rgba(255, 255, 255, 0.03);    /* 对象行底 */
-    --color-fill-inset: rgba(255, 255, 255, 0.02);  /* 折叠细节块底 */
-    --color-fill-track: var(--color-border-strong); /* 开关轨道,与控件描边同值 */
-
-    /* -- 描边:由强到弱 --------------------------------------------------- */
-    --color-border-strong: rgba(255, 255, 255, 0.12);   /* 按钮/浮层/开关描边 */
-    --color-border-input: rgba(255, 255, 255, 0.1);    /* 数字输入框,右面板分隔条 */
-    --color-border-panel: rgba(255, 255, 255, 0.08);    /* 面板外框/编辑器外框/诊断区/列表栏 */
-    --color-border-group: rgba(255, 255, 255, 0.07);    /* 浮层分组之间的横线 */
-    --color-border-divider: rgba(255, 255, 255, 0.06);  /* 标题栏下边/控件分区上边/行号槽右边 */
-    --color-border-faint: rgba(255, 255, 255, 0.05);    /* 对象行描边 */
-    --color-border-swatch: rgba(255, 255, 255, 0.28);   /* 实体颜色色块描边(要比其它描边清楚) */
-
-    /* -- 阴影 ------------------------------------------------------------- */
-    --color-shadow-panel: rgba(0, 0, 0, 0.35);      /* 三个主面板 */
-    --color-shadow-popover: rgba(0, 0, 0, 0.45);    /* 示例浮层(压住编辑器,要更实) */
-
-    /* -- 文字:按重要性由高到低 ------------------------------------------- */
-    --color-text-strong: #dbe4ff;                   /* 输入值/编辑器正文/悬停高亮 */
-    --color-text-menu-hover: #e8f2ff;               /* 浮层菜单项悬停 */
-    --color-text: #c8d6f0;                          /* 页面默认正文 */
-    --color-text-menu: #c3cdea;                     /* 浮层菜单项 */
-    --color-text-active: #aac8ff;                   /* 激活态文字(当前相机模式/控件分区标题/当前示例) */
-    --color-text-formula: #9fd4ff;                  /* KaTeX 公式与就绪结果 */
-    --color-text-muted: #8e9fc7;                    /* 次要文字:标签/公式回退/开关圆钮 */
-    --color-text-meta: #7f8db3;                     /* 折叠细节里的纯文本元信息 */
-    --color-neutral: #7b8bb8;                       /* 中性灰蓝:未分类徽章底/禁用结果 */
-    --color-text-group: #6f7ca6;                    /* 浮层分组标题 */
-    --color-text-hint: #5f6f96;                     /* "点击公式复制"提示 */
-    --color-text-faint: #55618c;                    /* 最弱:注释/行号/浮层文件名 */
-
-    /* -- 主色(青)与它的透明档 -------------------------------------------- */
-    --color-accent: #6dd5ff;                        /* 全局强调色:属性名/循环系数/当前项标记 */
-    --color-accent-weak: rgba(109, 213, 255, 0.18);         /* 面板拖拽手柄悬停 */
-    --color-accent-tint: rgba(109, 213, 255, 0.16);         /* 分析类徽章底 */
-    --color-accent-hover-bg: rgba(109, 213, 255, 0.14);     /* 浮层菜单项悬停底 */
-    --color-accent-active-bg: rgba(109, 213, 255, 0.1);    /* 浮层当前项底 */
-    --color-accent-line: rgba(109, 213, 255, 0.25);         /* 折叠细节块左侧竖线 */
-    --color-accent-selection: rgba(109, 213, 255, 0.28);    /* 编辑器选区底 */
-    --color-accent-border: rgba(109, 213, 255, 0.45);       /* 悬停时的控件描边/分隔条 */
-    --color-accent-focus: rgba(109, 213, 255, 0.6);        /* 键盘焦点环(2px outline) */
-    --color-accent-focus-soft: rgba(109, 213, 255, 0.65);   /* 公式焦点环(1px) */
-
-    /* -- 选中态(偏蓝一档,与主色区分开) ---------------------------------- */
-    --color-select-bg: rgba(70, 130, 255, 0.25);    /* 选中按钮底 */
-    --color-select-track: rgba(70, 130, 255, 0.35); /* 开关打开时的轨道 */
-    --color-select-border: rgba(70, 130, 255, 0.45);/* 选中按钮描边 */
-
-    /* -- 状态色 ----------------------------------------------------------- */
-    --color-warning: #ffd38f;                       /* 警告文字/等待中结果 */
-    --color-warning-bg: rgba(255, 211, 143, 0.12);  /* "已隐藏"状态芯片底 */
-    --color-diagnostic-warning-bg: rgba(255, 190, 70, 0.12); /* 诊断区警告底(比芯片更黄一档) */
-    --color-error: #ff9aa8;                         /* 错误文字/复制失败 */
-    --color-error-border: rgba(255, 90, 110, 0.35); /* 出错对象行的描边 */
-    --color-diagnostic-error-bg: rgba(255, 70, 90, 0.14);    /* 诊断区错误底 */
-    --color-success: #8ee6a5;                       /* 成功文字(复制成功) */
-
-    /* -- 对象类型徽章图例 -------------------------------------------------
-       一栏里要能按色相区分对象类型,所以这是一套独立的图例色,不跟随主色;
-       与上面同值的项写成别名,字面量仍只有一处. */
-    --color-badge-ink: var(--color-bg-sunken);      /* 浅底徽章上的深色字,与凹陷底同值 */
-    --kind-curve: var(--color-accent);
-    --kind-surface: #ff6b8a;
-    --kind-vector: #b49cff;
-    --kind-point: var(--color-warning);
-    --kind-sphere: #7ee0c8;
-    --kind-box: #ff9f6b;
-    --kind-conic: #d08cff;
-    --kind-region: #a9e07b;
-    --kind-implicit: #9fb3ff;
-    --kind-integral: var(--color-success);
-    --kind-intersection: #ffd93d;
-    --kind-solve: #7fd8ff;                            /* 求解徽章底(与求交/积分同一套浅底深字体系) */
-    --kind-antiderivative: #ffb3d9;                   /* 原函数徽章底(与求解同类,换色相区分) */
-    --kind-ode: #b8f0a0;                              /* 微分方程徽章底(第 6 类求值对象,再换色相) */
-    --kind-divergence-bg: rgba(142, 230, 165, 0.16); /* 散度徽章底(与梯度/旋度同深色底体系) */
-    --kind-curl-bg: rgba(255, 194, 109, 0.18);       /* 旋度徽章底 */
-    --kind-laplacian-bg: rgba(196, 168, 255, 0.20);  /* 拉普拉斯徽章底 */
-
-    /* -- 滚动条 ----------------------------------------------------------- */
-    --color-scrollbar: rgba(142, 159, 199, 0.45);
-    --color-scrollbar-hover: rgba(142, 159, 199, 0.7);
-
-    /* -- DSL 语法高亮(只作用于编辑器高亮层) ------------------------------ */
-    --color-syntax-comment: var(--color-text-faint);    /* 注释与行号同色:源码里密度最高,必须最不抢眼 */
-    --color-syntax-property: var(--color-accent);       /* 选项名沿用场景主色 */
-    --color-syntax-string: #9ad48a;
-    --color-syntax-number: #e0a56b;
-    --color-syntax-keyword: #c678dd;
-    --color-syntax-operator: #9aa7d4;
-    --color-syntax-bracket: #7f8bbd;
-
-    /* -- 圆角:默认全站直角(0px),想恢复圆角只改这一节 --------------------
-       四个 token 按**形状角色**分,不按原来的像素值分:
-
-       - sm    小控件:按钮 / 输入框 / 对象行 / 菜单项 / 色板 / 焦点框(原 3~6px)
-       - md    容器与窗口:窗口外壳 / 标题栏 / 正文 / Dock / 浮层 / 列表栏(原 8~10px)
-       - pill  胶囊:徽章 / 滚动条拇指 / 开关轨道(原 999px / 22px;调大即成胶囊)
-       - round 圆:开关拇指(原 50%;要正圆就填 50%,填 px 只会得到圆角方块)
-
-       想复原改动前的设计:sm 6px,md 8px,pill 999px,round 50%.
-       代价是有意收敛的两处:原来 3px 的色板/焦点框会跟着 sm 变 6px,原来
-       10px 的 Dock 内壳会跟着 md 变 8px--这两处只差 2~3px,不值得单开档位. */
-    --radius-sm: 0px;
-    --radius-md: 0px;
-    --radius-pill: 0px;
-    --radius-round: 0px;
-
-    /* -- 以下为第 2 批:真相源在 src/config/uiConfig.ts(见文件头注释) ----- */
-    --code-font-family: 'JetBrains Mono Slashed', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --code-font-size: 16px;
-    --code-line-height: 1.2;
-    --code-tab-size: 4;
-    --katex-font-size: 1.5em;
-    --code-gutter-width: 32px;
-
-    /* 参数窗口/视图窗口里内容的最小可视高度(消费者是 panels.css 的
-       #params-panel 与 controls.css 的 #view-controls).窗口被拖到比下限还矮
-       时,由这两块自己出内部滚动条,谁都不会被压没. */
-    --params-panel-min-height: 120px;
-    --view-controls-min-height: 120px;
-
-    /* 窗口外壳的两个样式常量(真相源是 UI_CONFIG.window).
-       窗口几何(left/top/width/height)不进 CSS:窗口由 JS 建,几何由
-       WindowManager 写成行内样式,不存在"CSS 首帧"这回事;这里只有这两个
-       "CSS 必须自己读"的数:
-       - 标题栏高度:.window-header 消费它,与夹取用的 headerMinVisible 同源;
-       - Dock 预留高度:.window.is-maximized 的 bottom 消费它(最大化不盖住 Dock). */
-    --window-header-height: 36px;
-    --dock-reserve: 100px;
 }
 
 /* 页面根容器:铺满视口,并统一基础视觉风格 */
@@ -226,4 +36,13 @@ body {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+}
+
+/* 3D 视口铺满整个应用,位于所有窗口下方.
+   视口是**应用内容**(由 src/app/appViews.ts 建),所以它的样式留在应用侧:
+   库不认识"3D 视口"是什么,只知道窗口层要压在某个背景之上. */
+#viewport {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
 }

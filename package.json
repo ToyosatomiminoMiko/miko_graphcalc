@@ -5,6 +5,7 @@
   "description": "GraphCalc DSL",
   "type": "module",
   "dependencies": {
+    "@miko/ui": "https://github.com/ToyosatomiminoMiko/miko_ui/archive/refs/tags/v0.1.0.tar.gz",
     "katex": "^0.18.5",
     "three": "^0.185.1"
   },

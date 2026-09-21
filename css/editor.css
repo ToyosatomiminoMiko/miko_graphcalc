@@ -1,17 +1,14 @@
 /* ==========================================================================
- * GraphCalc 源码编辑器样式
+ * GraphCalc 编辑器样式(应用侧:只留应用自己的那两件事)
  * --------------------------------------------------------------------------
- * 负责左侧面板里的 DSL 源码编辑区:
- *   - 外框,输入包裹层与行号槽的尺寸/配色
- *   - 透明的 textarea 与其背后高亮层的严格重叠
- *   - 高亮层里各词法类别的配色
+ * 1. **面板容器**:`#editor-panel` 是应用建的源码窗口正文包裹层(给编辑器留
+ *    padding 并让它吃掉剩余高度);
+ * 2. **DSL 词法配色**:`.dsl-*` 这些类名由**应用的分词器**产出
+ *    (`src/editor/dslHighlight.ts`),所以配色归应用 -- 库的
+ *    `@miko/ui/styles/editor.css` 只管编辑器外壳的结构与对齐,不认识 DSL.
  *
- * 与 src/ui/editor/EditorLineNumbers.ts(行号)/ src/ui/editor/EditorHighlight.ts(滚动同步)/
- * src/ui/editor/dslHighlight.ts(分词)配套:那三个模块负责内容与行为,这里只负责
- * 它们依赖的几何与颜色,改动任何一处都要三边对齐.
- *
- * 字体/字号/行高/制表位来自 base.css 的 --code-* 变量(唯一真相源是
- * src/config/uiConfig.ts),所以本文件应在 base.css 之后加载.
+ * 编辑器的结构选择器(`.code-editor*`)已经随库走;这里出现它们只是作为
+ * 配色规则的**作用域**(作用域是库的公开类名,不是消费者的 id).
  * ========================================================================== */
 
 /* 编辑器容器占满左侧面板剩余高度 */
@@ -22,151 +19,16 @@
 }
 
 /* --------------------------------------------------------------------------
- * 编辑区布局:gutter + (高亮层 + textarea) 叠放.
- *
- * 对齐的三条铁律(与 src/ui/editor/EditorLineNumbers.ts / EditorHighlight.ts 配套):
- * 1. textarea 关闭软换行(white-space: pre),"源码行 == 视觉行",
- *    行号只需按 \n 计数即可逐行对应;
- * 2. gutter 与 textarea 使用完全相同的字体/字号/行高,并且起始位置一致
- *    (外框 border 1px + textarea padding-top 10px = gutter padding-top 11px),
- *    这样纵向滚动时只需把 gutter 内容按 -scrollTop 平移;
- * 3. 高亮层与 textarea 严格同尺寸重叠,字体/行高/内边距逐项相同,滚动偏移
- *    由 JS 写成高亮内容的 transform(见 EditorHighlight),不在这里估算任何
- *    padding 差值,也不让高亮层自己去滚动(两者的最大滚动偏移差一个滚动条
- *    厚度,抄 scrollTop 会在底部被夹住).
- * -------------------------------------------------------------------------- */
-
-/* 外框:统一承担圆角/边框/底色,textarea 内部滚动不越界 */
-#dsl-editor-box {
-    display: flex;
-    box-sizing: border-box;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    background: var(--color-bg-sunken);
-    border: 1px solid var(--color-border-panel);
-    border-radius: var(--radius-md);
-}
-
-/* 输入区包裹层:唯一职责是给"高亮层 + textarea"提供一个共同的定位参照,
-   它本身不承担滚动(textarea 内部滚动),所以尺寸约束要原样透传下去 */
-#dsl-editor-input {
-    position: relative;
-    display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-}
-
-/* 高亮层:默认不显示,由 EditorHighlight 给 textarea 加上 .is-highlighted 后
-   才出现(脚本没跑/结构缺失时文字仍然可见,不会变成一片空白).
-   它只是裁剪框:尺寸与 textarea 的边框盒完全重合,溢出的内容被裁掉,自己不滚动,
-   也不出现滚动条;横纵偏移由 EditorHighlight 写在下面那个 <pre> 的 transform 上,
-   所以这里必须是 overflow: hidden(改成 auto/scroll 会让最大滚动偏移与 textarea
-   差一个滚动条厚度,底部高亮被夹住而错位). */
-#dsl-editor-highlight {
-    display: none;
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-}
-
-#dsl-editor.is-highlighted + #dsl-editor-highlight {
-    display: block;
-}
-
-/* 高亮内容:padding/字体/行高必须与 #dsl-editor 逐项相同,否则首字符起点或
-   换行位置会差一个像素,越往右下越明显.
-   滚动偏移写在它的 transform 上(EditorHighlight.sync),这里刻意不加
-   will-change: 不提升为合成层,文字走的是与 textarea 同一套绘制路径,
-   不会因为图层化改变抗锯齿. */
-#dsl-editor-highlight-code {
-    margin: 0;
-    padding: 10px 12px;
-    font-family: var(--code-font-family);
-    font-size: var(--code-font-size);
-    line-height: var(--code-line-height);
-    tab-size: var(--code-tab-size, 4);
-    white-space: pre;
-    color: var(--color-text-strong);
-}
-
-/* --------------------------------------------------------------------------
  * 高亮配色(只作用于高亮层,textarea 的文字是透明的).
  *
  * 取色沿用深蓝底:青色(--color-syntax-property,与主色同值)是场景里的主色,
  * 继续用来标"选项名";注释刻意用行号同色(--color-syntax-comment),
- * 它在源码里密度最高,必须最不抢眼.色值全部来自 base.css 的色板,这里不再写字面量.
+ * 它在源码里密度最高,必须最不抢眼.色值全部来自库的 tokens.css,这里不再写字面量.
  * -------------------------------------------------------------------------- */
-#dsl-editor-highlight-code .dsl-comment { color: var(--color-syntax-comment); }
-#dsl-editor-highlight-code .dsl-string { color: var(--color-syntax-string); }
-#dsl-editor-highlight-code .dsl-number { color: var(--color-syntax-number); }
-#dsl-editor-highlight-code .dsl-keyword { color: var(--color-syntax-keyword); }
-#dsl-editor-highlight-code .dsl-property { color: var(--color-syntax-property); }
-#dsl-editor-highlight-code .dsl-operator { color: var(--color-syntax-operator); }
-#dsl-editor-highlight-code .dsl-bracket { color: var(--color-syntax-bracket); }
-
-/* 行号槽:宽度随字体与行数变化,内容超出时裁剪,靠 translate 跟随滚动 */
-#dsl-editor-gutter {
-    flex: 0 0 auto;
-    box-sizing: border-box;
-    /* 由 EditorLineNumbers 按 "最大行号位数 x 实际字体数字宽 + 内边距/边框"
-       写入,写死宽度会在 3 位行号或更大的字号下裁掉行号 */
-    width: var(--code-gutter-width);
-    padding: 11px 0 11px 8px; /* 顶部 11px = 外框 border 1px + 编辑区 padding 10px */
-    overflow: hidden;
-    background: var(--color-bg-gutter);
-    border-right: 1px solid var(--color-border-divider);
-    color: var(--color-text-faint);
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-/* 行号本体:与 textarea 同一字族/字号/行高(全部来自 UI_CONFIG);transform 由 TS 同步 */
-#dsl-editor-lines {
-    margin: 0;
-    font-family: var(--code-font-family);
-    font-size: var(--code-font-size);
-    line-height: var(--code-line-height);
-    white-space: pre;
-    text-align: right;
-    padding-right: 6px;
-    will-change: transform;
-}
-
-/* DSL 源码输入框:使用等宽字体,禁止缩放,不软换行.
-   position/z-index 把它压在高亮层之上:文字透明后,光标,选区和原生输入
-   行为仍然由这个真 textarea 负责 */
-#dsl-editor {
-    position: relative;
-    z-index: 1;
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-    resize: none;
-    background: transparent;
-    border: 0;
-    outline: none;
-    padding: 10px 12px;
-    font-family: var(--code-font-family);
-    font-size: var(--code-font-size);
-    line-height: var(--code-line-height);
-    white-space: pre;
-    overflow-wrap: normal;
-    tab-size: var(--code-tab-size, 4);
-}
-
-/* 高亮层就位:文字让位(只留光标色),着色完全由背景层显示 */
-#dsl-editor.is-highlighted {
-    color: transparent;
-    caret-color: var(--color-text-strong);
-}
-
-/* 透明文字下的选区要自己给底色:默认选区色偏淡,不给的话选中一段时
-   会与高亮层的文字糊在一起 */
-#dsl-editor::selection {
-    background: var(--color-accent-selection);
-}
+.code-editor-highlight-code .dsl-comment { color: var(--color-syntax-comment); }
+.code-editor-highlight-code .dsl-string { color: var(--color-syntax-string); }
+.code-editor-highlight-code .dsl-number { color: var(--color-syntax-number); }
+.code-editor-highlight-code .dsl-keyword { color: var(--color-syntax-keyword); }
+.code-editor-highlight-code .dsl-property { color: var(--color-syntax-property); }
+.code-editor-highlight-code .dsl-operator { color: var(--color-syntax-operator); }
+.code-editor-highlight-code .dsl-bracket { color: var(--color-syntax-bracket); }

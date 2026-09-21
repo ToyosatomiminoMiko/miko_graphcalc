@@ -16,83 +16,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="GraphCalc">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link href="css/base.css" rel="stylesheet" type="text/css">
-    <link href="css/window.css" rel="stylesheet" type="text/css">
-    <link href="css/panels.css" rel="stylesheet" type="text/css">
-    <link href="css/editor.css" rel="stylesheet" type="text/css">
-    <link href="css/controls.css" rel="stylesheet" type="text/css">
-    <link href="css/diagnostics.css" rel="stylesheet" type="text/css">
-    <link href="css/process.css" rel="stylesheet" type="text/css">
+    <!-- 样式不在这里挂载:全部由 `src/main.ts` 按固定顺序 import(库的 token /
+         控件 / 桌面样式 + 应用的面板 / 编辑器 / 诊断 / 过程样式).Vite 会把它们
+         抽成产物里的一个 <link>,所以生产构建的首帧与以前一样,不吃 FOUC. -->
 </head>
 
 <body>
-    <div id="app">
-        <div id="viewport"></div>
-
-        <!-- 窗口化三层:窗口层与吸附高亮都不拦截指针,只有 .window 与 Dock 收指针
-             (见 css/window.css 的文件头);内容全部由 WindowManager 声明式装配 -->
-        <div id="window-layer"></div>
-        <div id="snap-preview" aria-hidden="true"></div>
-        <div id="dock" role="toolbar" aria-label="窗口"></div>
-
-        <aside id="left-panel" class="panel">
-            <section id="editor-panel">
-                <div id="dsl-editor-box">
-                    <div id="dsl-editor-gutter" aria-hidden="true">
-                        <pre id="dsl-editor-lines"></pre>
-                    </div>
-                    <!-- 输入区包裹层:textarea 与背后的高亮层严格同尺寸重叠.
-                         textarea 里的文字仍然是真的(光标/选区/撤销/IME 全靠它),
-                         只是颜色透明,由高亮层透出着色后的源码(见 EditorHighlight).
-                         注意:textarea 的内容不参与缩进,改缩进会改变默认源码. -->
-                    <div id="dsl-editor-input">
-                        <textarea id="dsl-editor" spellcheck="false"></textarea>
-                        <div id="dsl-editor-highlight" aria-hidden="true">
-                            <pre id="dsl-editor-highlight-code"></pre>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </aside>
-
-        <!-- 视图窗口的宿主:原先在参数页内部,现在是 #app 下的独立节点
-             (见 docs/windowing-plan.md §11.1 B10);内容由 createViewPanel 装配 -->
-        <section id="view-controls"></section>
-
-        <!-- 参数窗口宿主:参数列表 + 诊断区留在同一个窗口里(诊断不是视图控件).
-             页级 hidden / 标签页 / 分栏都已删除:两页各自独立成窗口 -->
-        <div id="right-page-params" class="right-page">
-            <section id="params-panel"></section>
-            <section id="diagnostics" aria-live="polite"></section>
-        </div>
-
-        <!-- 过程窗口宿主:通高的递等式视图,内容与交互由 ui/process/ProcessPanel 装配 -->
-        <div id="right-page-process" class="right-page">
-            <section id="process-panel" class="process-panel"></section>
-        </div>
-
-        <footer id="bottom-panel" class="panel">
-            <section id="object-panel">
-                <div class="object-list-column">
-                    <header class="object-list-title">
-                        <span>实体对象</span>
-                    </header>
-                    <div id="entity-object-list" class="object-list-body"></div>
-                </div>
-                <div class="object-list-column">
-                    <header class="object-list-title">求值对象</header>
-                    <div id="evaluation-object-list" class="object-list-body">
-                        <div id="analysis-object-list" class="object-sublist"></div>
-                        <div id="integral-object-list" class="object-sublist"></div>
-                        <div id="intersection-object-list" class="object-sublist"></div>
-                        <div id="solve-object-list" class="object-sublist"></div>
-                        <div id="antiderivative-object-list" class="object-sublist"></div>
-                        <div id="ode-object-list" class="object-sublist"></div>
-                    </div>
-                </div>
-            </section>
-        </footer>
-    </div>
+    <!-- 页面上唯一手写的宿主:桌面容器.
+         3D 视口,窗口层 / 吸附预览 / Dock,五个窗口的正文与标题栏节点全部由
+         `src/app/appViews.ts` + `@miko/ui` 的 `mountDesktop()` 建(D1);
+         这里不再出现任何窗口/面板宿主 id. -->
+    <div id="app"></div>
 
     <script type="module" src="./src/main.ts"></script>
 </body>

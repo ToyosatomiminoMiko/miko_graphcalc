@@ -7,6 +7,7 @@
  * - 被积对象缺失时积分摘要返回 null,让 UI 明确回退纯文本而不是给半个公式.
  */
 import { describe, expect, it, vi } from 'vitest';
+import type { EvaluationDetailLine } from '@/contract/evaluation';
 import type {
     AnalysisResult,
     IntegralTask,
@@ -34,7 +35,6 @@ import {
     odeLatexDetailEntries,
     odeLatexSummary,
     type EvaluationDetailEntry,
-    type EvaluationDetailLine,
 } from './evaluationLatex';
 
 function analysis(overrides: Partial<AnalysisResult> = {}): AnalysisResult {

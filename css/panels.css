@@ -29,6 +29,21 @@
  * 右侧参数面板
  * ========================================================================== */
 
+/* 视图面板容器:它现在是**视图窗口**的正文宿主(原先在参数页下半块).
+   高度由窗口正文给出,窗口被拖到太矮时先压到 min-height,再自己出滚动条
+   (折叠项都在这一块里),而不是把窗口撑破.
+   它由应用建(src/app/appViews.ts),所以这条布局规则留在应用侧;库的样式表
+   里没有 id 选择器(D8). */
+#view-controls {
+    flex: 1 1 auto;
+    min-height: var(--view-controls-min-height);
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 /* 参数列表容器:内容超出时纵向滚动.
    高度来自"参数窗口"正文(不再有分隔条,也没有 --right-split-basis);
    窗口被拖到太矮时先压到 min-height,再自己出滚动条. */

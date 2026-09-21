@@ -25,11 +25,10 @@ import type {
     SceneObject,
     SolveTask,
 } from '@/contract/ir';
+// 展示数据形状在契约层(D3):渲染层不必为了一个类型 import 编译模块.
+import type { EvaluationDetailLine, LatexLine } from '@/contract/evaluation';
 import { latexResultNumber } from '@/math/latexNumber';
 import { integralBodyLatex, latexNumberText } from './latex';
-
-/** 一行公式片段(LaTeX 字符串). */
-export type LatexLine = string;
 
 /**
  * 积分式本体(``∫_a^b f dx``),再导出给 UI:积分条目的摘要排版它,数值回填后
@@ -201,16 +200,6 @@ export function integralLatexSummary(
 ): LatexLine | null {
     return integralBodyLatex(task, objects);
 }
-
-/**
- * 求值细节的一行:要么是可 KaTeX 排版的公式,要么是**纯文本**元信息.
- *
- * 域/方法/分段/分层这类键值元信息不需要公式排版(KaTeX 里还要套 `\text{}`,
- * 又长又难读),由 UI 直接当文本渲染.
- */
-export type EvaluationDetailLine =
-    | { kind: 'latex'; latex: LatexLine }
-    | { kind: 'text'; text: string };
 
 /**
  * 积分结果细节(带角色):展开后逐行排版.

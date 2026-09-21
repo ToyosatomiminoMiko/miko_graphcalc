@@ -15,6 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # UI 库的检查(边界守卫 / typecheck / vitest)已经跟着库搬到它自己的仓库:
+  #   https://github.com/ToyosatomiminoMiko/miko_ui  (.github/workflows/ci.yml)
+  # 这个仓库现在只通过 package.json 里那条按 tag 固定的 GitHub 归档 URL 拿
+  # `@miko/ui` 的产物,不再有库的源码,所以不需要(也无法)在这里检查它.
   build-and-deploy:
     runs-on: ubuntu-latest
     environment:
