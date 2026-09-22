@@ -40,7 +40,7 @@
 import type { SceneObject } from '@/contract/ir';
 import { createFormulaElement } from '@miko/ui';
 import { createObjectRow, createRowActions, createVisibilityButton } from '@miko/ui';
-import { el } from '@miko/ui';
+import { create_element } from '@miko/ui';
 import { sceneObjectExpression, sceneObjectKindLabel } from '@/adapters/entityText';
 
 export class EntityItem {
@@ -52,48 +52,45 @@ export class EntityItem {
         formula: string | null,
         onToggle: () => void,
     ) {
-        const badge = el('span', {
+        const badge = create_element('span', {
             class: `kind-badge kind-${object.kind}`,
-            text: sceneObjectKindLabel(object),
-        });
+        }, sceneObjectKindLabel(object));
 
         // 颜色定义:紧跟在类型徽章后面,同一行给"色块 + 明文值".只画色块等于
         // 只靠颜色传达信息(色觉/低对比度用户读不到),所以定义值也写出来;
         // 色块用 CSS 变量承接(见 panels.css 的 .object-color-swatch),
         // 值原样来自 IR--渲染层对颜色的接受范围与 Three.js 的 CSS 颜色一致.
-        const color = el('span', { class: 'object-color' });
+        const color = create_element('span', { class: 'object-color' });
         color.setAttribute('title', `颜色 ${object.color}`);
         color.setAttribute('aria-label', `颜色 ${object.color}`);
-        const swatch = el('span', { class: 'object-color-swatch' });
+        const swatch = create_element('span', { class: 'object-color-swatch' });
         swatch.setAttribute('aria-hidden', 'true');
         swatch.style.setProperty('--object-color', object.color);
         color.append(
             swatch,
-            el('code', { class: 'object-color-code', text: object.color }),
+            create_element('code', { class: 'object-color-code' }, object.color),
         );
 
         // 名称行专属容器:第一行只放"谁是谁"(名字 + 状态芯片).公式不在这里,
         // 它是 `.row-main` 里的第二个 flex 行(见下方 append 与 panels.css 的
         // `.entity-row > .row-main > .object-expr`),这样长公式能占满整行宽度.
-        const name = el('strong', {
+        const name = create_element('strong', {
             class: 'object-name',
-            text: object.name ?? `#${object.id}`,
-        });
+        }, object.name ?? `#${object.id}`);
         const expression = formula
             ? createFormulaElement(formula, 'object-expr')
-            : el('code', {
+            : create_element('code', {
                 class: 'object-expr',
-                text: sceneObjectExpression(object),
-            });
+            }, sceneObjectExpression(object));
         // 名称行(`.object-head`):对象名与状态芯片同一行,状态紧跟名字,不落到
         // 公式下面单独占一行(见 panels.css 的 `.object-head`).它与徽章/颜色/
         // 公式同处 `.row-main`,是把显隐按钮让到行末的那层包装.
-        const head = el('div', { class: 'object-head' });
+        const head = create_element('div', { class: 'object-head' });
         head.append(name);
         // 隐藏原来只靠 is-hidden 的透明度:再补一条文字状态,色觉/低对比度
         // 用户也能看出这个对象被排除了.
         if (!object.enabled) {
-            head.append(el('span', { class: 'row-state', text: '已隐藏' }));
+            head.append(create_element('span', { class: 'row-state' }, '已隐藏'));
         }
 
         // 行末显隐按钮:点它切换该实体是否参与渲染与计算.按钮与主内容包装

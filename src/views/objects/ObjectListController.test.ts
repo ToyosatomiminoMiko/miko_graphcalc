@@ -12,8 +12,8 @@
  *    一堆 inline 公式挤成一行;结果行在 <details> 内,跟着一起开合.
  *
  * DOM 桩与其它 ui 控制器测试共用一份(`testing/domStub.ts`);KaTeX 用
- * render(tex, el) 写回 textContent 的假实现,断言只看结构与 LaTeX 文本,
- * 不看排版.
+ * render(tex, element) 写回 textContent 的假实现,断言只看结构与 LaTeX
+ * 文本,不看排版.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {

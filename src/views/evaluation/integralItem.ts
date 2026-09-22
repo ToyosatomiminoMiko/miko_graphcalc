@@ -28,7 +28,7 @@ import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import { createRowActions, createVisibilityButton } from '@miko/ui';
 import { buildIntegralProcess } from '@/adapters/evaluationToSteps';
 import { needsProcessPage } from '@/views/process/disclosure';
-import { el } from '@miko/ui';
+import { create_element } from '@miko/ui';
 import {
     createDetailSections,
     createEvaluationRow,
@@ -302,7 +302,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      */
     private ensureStatusRow(): HTMLElement {
         if (this.result !== null) return this.result;
-        const result = el('code', { class: 'eval-result is-error', text: '' });
+        const result = create_element('code', { class: 'eval-result is-error' }, '');
         const container = this.row.querySelector<HTMLElement>('.eval-detail-body')
             ?? this.main;
         container.append(result);

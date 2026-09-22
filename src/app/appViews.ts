@@ -7,7 +7,7 @@
  * **内容**:3D 视口,编辑器,参数面板,过程面板,对象列表,以及标题栏上的四个
  * 节点.`index.html` 因此缩到 `<div id="app">`.
  *
- * 节点一律用库的 `el()` 建,类名与 id 与旧 HTML **逐字一致**:CSS 还是那一份
+ * 节点一律用库的 `create_element()` 建,类名与 id 与旧 HTML **逐字一致**:CSS 还是那一份
  * (`css/*.css`),这一步不动样式(去 id 化是 P4/D8).
  *
  * 建好的节点不只是"塞进去":`DslApp` 还要拿它们的句柄(编辑器,参数面板...)去
@@ -15,7 +15,7 @@
  */
 import {
     createCodeEditor,
-    el,
+    create_element,
     windowSlotsProvider,
     type Child,
     type WindowContentSpec,
@@ -73,9 +73,9 @@ function buildSourceWindow(doc: Document): {
         gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
         root: doc,
     });
-    const panel = el('section', { attrs: { id: 'editor-panel' }, root: doc }, code.element);
+    const panel = create_element('section', { id: 'editor-panel', root: doc }, code.element);
     // 旧 `#left-panel` 只有 `.panel` 这一条样式(id 选择器里没有它,见计划附录 C6).
-    const body = el('aside', { class: 'panel', root: doc }, panel);
+    const body = create_element('aside', { class: 'panel', root: doc }, panel);
 
     return {
         body,
@@ -93,23 +93,24 @@ function buildParamsWindow(doc: Document): {
     paramsPanel: HTMLElement;
     diagnostics: HTMLElement;
 } {
-    const paramsPanel = el('section', { attrs: { id: 'params-panel' }, root: doc });
-    const diagnostics = el('section', {
-        attrs: { id: 'diagnostics', 'aria-live': 'polite' },
+    const paramsPanel = create_element('section', { id: 'params-panel', root: doc });
+    const diagnostics = create_element('section', {
+        id: 'diagnostics',
+        'aria-live': 'polite',
         root: doc,
     });
-    const body = el('div', { class: 'right-page', root: doc }, paramsPanel, diagnostics);
+    const body = create_element('div', { class: 'right-page', root: doc }, paramsPanel, diagnostics);
     return { body, paramsPanel, diagnostics };
 }
 
 /** 过程窗口正文:通高的递等式视图. */
 function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: HTMLElement } {
-    const processPanel = el('section', {
+    const processPanel = create_element('section', {
         class: 'process-panel',
-        attrs: { id: 'process-panel' },
+        id: 'process-panel',
         root: doc,
     });
-    const body = el('div', { class: 'right-page', root: doc }, processPanel);
+    const body = create_element('div', { class: 'right-page', root: doc }, processPanel);
     return { body, processPanel };
 }
 
@@ -119,7 +120,7 @@ function buildObjectsWindow(doc: Document): {
     objectLists: ObjectListContainers;
 } {
     const list = (id: string, className: string): HTMLElement =>
-        el('div', { class: className, attrs: { id }, root: doc });
+        create_element('div', { class: className, id, root: doc });
 
     const objectLists: ObjectListContainers = {
         entity: list('entity-object-list', 'object-list-body'),
@@ -130,9 +131,9 @@ function buildObjectsWindow(doc: Document): {
         antiderivative: list('antiderivative-object-list', 'object-sublist'),
         ode: list('ode-object-list', 'object-sublist'),
     };
-    const evaluation = el('div', {
+    const evaluation = create_element('div', {
         class: 'object-list-body',
-        attrs: { id: 'evaluation-object-list' },
+        id: 'evaluation-object-list',
         root: doc,
     },
     objectLists.analysis,
@@ -142,14 +143,14 @@ function buildObjectsWindow(doc: Document): {
     objectLists.antiderivative,
     objectLists.ode);
 
-    const body = el('footer', { class: 'panel', root: doc },
-        el('section', { attrs: { id: 'object-panel' }, root: doc },
-            el('div', { class: 'object-list-column', root: doc },
-                el('header', { class: 'object-list-title', root: doc },
-                    el('span', { text: '实体对象', root: doc })),
+    const body = create_element('footer', { class: 'panel', root: doc },
+        create_element('section', { id: 'object-panel', root: doc },
+            create_element('div', { class: 'object-list-column', root: doc },
+                create_element('header', { class: 'object-list-title', root: doc },
+                    create_element('span', { root: doc }, '实体对象')),
                 objectLists.entity),
-            el('div', { class: 'object-list-column', root: doc },
-                el('header', { class: 'object-list-title', text: '求值对象', root: doc }),
+            create_element('div', { class: 'object-list-column', root: doc },
+                create_element('header', { class: 'object-list-title', root: doc }, '求值对象'),
                 evaluation)));
     return { body, objectLists };
 }
@@ -160,9 +161,9 @@ export function buildAppViews(root: HTMLElement): AppViews {
     const chrome = createWindowChrome();
     const slots = windowSlotsProvider(UI_CONFIG.window.adopted, chrome);
 
-    const viewport = el('div', { attrs: { id: 'viewport' }, root: doc });
+    const viewport = create_element('div', { id: 'viewport', root: doc });
     const source = buildSourceWindow(doc);
-    const viewControls = el('section', { attrs: { id: 'view-controls' }, root: doc });
+    const viewControls = create_element('section', { id: 'view-controls', root: doc });
     const params = buildParamsWindow(doc);
     const process = buildProcessWindow(doc);
     const objects = buildObjectsWindow(doc);

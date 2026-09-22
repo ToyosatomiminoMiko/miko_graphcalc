@@ -23,8 +23,8 @@
  * 一个 `signal<number>`(见 `@miko/ui` 的 `reactive/`),滑块与数字框都以它为
  * `value` 绑定:
  *
- * - 滑块拖动 → 写信号 → 数字框自己更新;
- * - 数字框输入 → 归一化后写信号 → 滑块自己更新;
+ * - 滑块拖动 -> 写信号 -> 数字框自己更新;
+ * - 数字框输入 -> 归一化后写信号 -> 滑块自己更新;
  * - 场景广播与重置按钮可用态订阅同一个信号.
  *
  * `writeValue()` 那条"四处一起改"的手工同步因此消失.
@@ -46,7 +46,7 @@
  * - 归一化后的文本只在 `change`(失焦/回车)时写回输入框.
  *
  * 每条参数行末端还有一个重置按钮(↺):把该参数退回 DSL `in` 前的声明值
- * (`param a = 1 in [0, 5, 0.1]` 里的 `1`).它与拖动滑块走同一条链路(写信号 →
+ * (`param a = 1 in [0, 5, 0.1]` 里的 `1`).它与拖动滑块走同一条链路(写信号 ->
  * 订阅者通知场景),按钮在"已经是声明值"时置灰.置灰判据里同时比较数字框文本,
  * 这样用户把输入框清空或写成 `1.` 之后(值没变而文本变了)仍然能用它把文本
  * 恢复成声明值.
@@ -58,7 +58,7 @@ import {
     createFieldLabel,
     createNumberField,
     createSlider,
-    el,
+    create_element,
     onValueChange,
     signal,
     type ButtonHandle,
@@ -72,13 +72,13 @@ export type ParamChangeHandler = (name: string, value: number) => void;
 /** 一行参数持有的交互件与它的状态源:重建面板时按这个清单统一解绑. */
 interface ParamRow {
     readonly name: string;
-    /** 这一行的**唯一状态源**(P3):滑块、数字框、重置判据、场景广播都读它. */
+    /** 这一行的**唯一状态源**(P3):滑块,数字框,重置判据,场景广播都读它. */
     readonly value: Signal<number>;
     readonly element: HTMLElement;
     readonly slider: SliderHandle;
     readonly number: NumberFieldHandle;
     readonly reset: ButtonHandle;
-    /** 退订"值变化 → 通知场景/刷新按钮"。 */
+    /** 退订"值变化 -> 通知场景/刷新按钮". */
     readonly stopChange: () => void;
 }
 
@@ -185,7 +185,7 @@ export class ParamPanelController {
             param.cyclic ? `${param.name} ↻` : param.name,
             slider.input.id,
         );
-        const row = el(
+        const row = create_element(
             'div',
             { class: 'param-row' },
             label,
@@ -239,7 +239,7 @@ export class ParamPanelController {
          * 重置:回到声明值.
          *
          * 文本必须**显式**写回:值可能本来就在声明值上(用户只是把输入框清空了),
-         * 那种情况下写信号是空操作、镜像不会动,不写文本输入框就会一直空着.
+         * 那种情况下写信号是空操作,镜像不会动,不写文本输入框就会一直空着.
          */
         reset.onClick(() => {
             value.value = declaredValue;

@@ -45,7 +45,7 @@ import {
     createSegmented,
     createSwitch,
     createSwitchRow,
-    el,
+    create_element,
     watchValue,
     type NumberFieldHandle,
 } from '@miko/ui';
@@ -99,8 +99,8 @@ export function createViewPanel(host: HTMLElement, state: ViewState): ViewPanelH
     // ── 相机 ────────────────────────────────────────────────────────────
     // 透视/正交两段文字是"点一下也能切"的旁路入口;开关才是可访问的主入口,
     // 所以文字保持 <span>(不用 <label for>,否则会与开关的可访问名打架).
-    const perspective = el('span', { class: 'cam-label', text: '透视' });
-    const orthographic = el('span', { class: 'cam-label', text: '正交' });
+    const perspective = create_element('span', { class: 'cam-label' }, '透视');
+    const orthographic = create_element('span', { class: 'cam-label' }, '正交');
     const modeLabels = [
         { mode: CAM_MODE_WHEN_UNCHECKED, element: perspective },
         { mode: CAM_MODE_WHEN_CHECKED, element: orthographic },
@@ -235,18 +235,18 @@ export function createViewPanel(host: HTMLElement, state: ViewState): ViewPanelH
 
     const axis = createControlGroup(
         '坐标轴',
-        createRow(el('span', { text: '向上' }), upAxis.element),
+        createRow(create_element('span', {}, '向上'), upAxis.element),
         createNumberRow('线宽', axisLineWidth).row,
         createSwitchRow('刻度', axisTicks),
         createSwitchRow('π 单位', axisPiUnit),
         createRow(
-            el('span', { text: '标签' }),
+            create_element('span', {}, '标签'),
             createInlineToggle('X', axisLabels.x),
             createInlineToggle('Y', axisLabels.y),
             createInlineToggle('Z', axisLabels.z),
         ),
         createRow(
-            el('span', { text: '网格' }),
+            create_element('span', {}, '网格'),
             createInlineToggle('XZ', gridPlanes.xz),
             createInlineToggle('XY', gridPlanes.xy),
             createInlineToggle('YZ', gridPlanes.yz),

@@ -16,7 +16,7 @@
 import { UI_CONFIG } from '@/config/uiConfig';
 import { createFormulaElement } from '@miko/ui';
 import { KeyedRowList, type KeyedRowHandles } from '@miko/ui';
-import { el } from '@miko/ui';
+import { create_element } from '@miko/ui';
 import {
     PROCESS_STEP_KIND_LABELS,
     partitionStepsByKind,
@@ -70,27 +70,27 @@ export class ProcessPanel {
         private readonly root: HTMLElement,
         private readonly options: ProcessPanelOptions = {},
     ) {
-        this.title = el('span', { class: 'process-title', text: '过程' });
-        this.legend = el('span', { class: 'process-legend' });
+        this.title = create_element('span', { class: 'process-title' }, '过程');
+        this.legend = create_element('span', { class: 'process-legend' });
         // 题目区:过程页先给"在解什么",再给步骤(见 ProcessDocument.problem).
-        this.problem = el('div', { class: 'process-problem' });
+        this.problem = create_element('div', { class: 'process-problem' });
         setHidden(this.problem, true);
-        this.echo = el('div', { class: 'process-param-echo' });
+        this.echo = create_element('div', { class: 'process-param-echo' });
         setHidden(this.echo, true);
 
-        const header = el(
+        const header = create_element(
             'div',
             { class: 'process-header' },
-            el('div', { class: 'process-heading' }, this.title, this.legend),
+            create_element('div', { class: 'process-heading' }, this.title, this.legend),
             this.problem,
             this.echo,
         );
 
-        this.empty = el('p', { class: 'process-empty', text: EMPTY_TEXT });
-        this.truncated = el('p', { class: 'process-truncated' });
+        this.empty = create_element('p', { class: 'process-empty' }, EMPTY_TEXT);
+        this.truncated = create_element('p', { class: 'process-truncated' });
         setHidden(this.truncated, true);
 
-        this.stepsContainer = el('div', { class: 'process-steps' });
+        this.stepsContainer = create_element('div', { class: 'process-steps' });
         // KeyedRowList 构造时会给容器加 role="list"(与两个对象列表同一约定).
         this.list = new KeyedRowList<IndexedStep, ProcessStepRow>(this.stepsContainer);
 
@@ -149,18 +149,17 @@ export class ProcessPanel {
 
     private _buildStepRow(entry: IndexedStep): ProcessStepRow {
         const formula = createFormulaElement(entry.step.latex, 'process-step-formula', false);
-        const reason = el('span', {
+        const reason = create_element('span', {
             class: 'kind-badge process-step-reason',
-            text: entry.step.reason,
-        });
+        }, entry.step.reason);
         // kind 决定徽章配色(样式归 CSS),title 给出分区的中性名字.
         reason.dataset.kind = entry.step.kind;
         reason.title = PROCESS_STEP_KIND_LABELS[entry.step.kind];
 
-        const row = el('div', { class: 'process-step' });
+        const row = create_element('div', { class: 'process-step' });
         row.setAttribute('role', 'listitem');
         row.append(
-            el('span', { class: 'process-step-index', text: String(entry.index + 1) }),
+            create_element('span', { class: 'process-step-index' }, String(entry.index + 1)),
             formula,
             reason,
         );

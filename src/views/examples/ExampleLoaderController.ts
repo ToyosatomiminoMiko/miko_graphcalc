@@ -22,7 +22,7 @@
  * 监听分别由本控制器与 Popover 持有,各自的 `dispose()` 负责解绑.
  */
 import type { KeyboardBinding } from '@miko/ui';
-import { el } from '@miko/ui';
+import { create_element } from '@miko/ui';
 import { createPopover, type PopoverHandle } from '@miko/ui';
 import { allExamples, groupedExamples, type ExampleEntry } from './exampleCatalog';
 
@@ -128,14 +128,14 @@ export class ExampleLoaderController {
      */
     private _render(): void {
         const sections = groupedExamples().map((section) => {
-            const group = el('div', {
+            const group = create_element('div', {
                 class: 'example-menu-group',
-                attrs: { role: 'group', 'aria-label': section.title },
+                role: 'group',
+                'aria-label': section.title,
             });
-            group.append(el('div', {
+            group.append(create_element('div', {
                 class: 'example-menu-group-title',
-                text: section.title,
-            }));
+            }, section.title));
 
             for (const entry of section.entries) {
                 const item = this._renderItem(entry);
@@ -149,20 +149,19 @@ export class ExampleLoaderController {
     }
 
     private _renderItem(entry: ExampleEntry): HTMLElement {
-        const item = el('button', {
+        const item = create_element('button', {
             class: 'example-menu-item',
-            attrs: { role: 'menuitem' },
+            role: 'menuitem',
         });
         item.type = 'button';
         item.dataset.example = entry.file;
         // 中文标题在前(读的是它),文件名在后做"这是哪个文件"的对照.
         item.title = `example/${entry.file}`;
         item.append(
-            el('span', { class: 'example-menu-label', text: entry.title }),
-            el('span', {
+            create_element('span', { class: 'example-menu-label' }, entry.title),
+            create_element('span', {
                 class: 'example-menu-file',
-                text: entry.file.replace(/\.miko$/, ''),
-            }),
+            }, entry.file.replace(/\.miko$/, '')),
         );
         return item;
     }

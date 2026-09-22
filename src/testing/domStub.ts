@@ -232,7 +232,7 @@ export class StubElement {
     tabIndex = -1;
     value = '';
     /**
-     * `input.type` 是**反射**属性:`el.type = 'number'` 与
+     * `input.type` 是**反射**属性:`input.type = 'number'` 与
      * `setAttribute('type', 'number')` 在真 DOM 里改的是同一处.
      * 桩里也要这样,否则 `querySelector('input[type="number"]')` 与
      * `getAttribute('type')` 会读不到控件用属性写法设进去的类型.
@@ -492,8 +492,8 @@ export class StubElement {
 
     setAttribute(name: string, value: string): void {
         this.attributes.set(name, value);
-        // 真 DOM 的**反射属性**:按属性名写也会改到同名成员上.库的 `el()` 走
-        // `attrs` 建节点(`el('div', { attrs: { id: 'x' } })`),不反射的话
+        // 真 DOM 的**反射属性**:按属性名写也会改到同名成员上.库的 `create_element()` 走
+        // `attrs` 建节点(`create_element('div', { attrs: { id: 'x' } })`),不反射的话
         // `querySelector('#x')` 与 `getElementById('x')` 会找不到自己的节点.
         if (name === 'id') this.id = value;
         else if (name === 'class') this.className = value;
@@ -527,7 +527,7 @@ export class StubElement {
     /**
      * `title` 与 `title="..."` 是同一份数据(真 DOM 的反射属性).
      *
-     * 桩里两者必须反射到同一处:`el()` 的 `attrs` 走 `setAttribute`,
+     * 桩里两者必须反射到同一处:`create_element()` 的 `attrs` 走 `setAttribute`,
      * `createButton` 走 `element.title = ...`,真实 DOM 里两条路径等价,桩里
      * 分成两个字段就会让"按钮的 title 到底写进去没有"变成假阴性.
      */
