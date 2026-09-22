@@ -28,7 +28,7 @@ const NUMERIC: ParamDeclaration = {
 };
 
 const CYCLIC: ParamDeclaration = {
-    name: 'φ',
+    name: '方位角',
     value: 0,
     min: -Math.PI,
     max: Math.PI,
@@ -37,7 +37,7 @@ const CYCLIC: ParamDeclaration = {
 };
 
 /**
- * 声明值本身就在域外的循环参数:`collectParams` 会先把 `φ = 7` 回绕成主值
+ * 声明值本身就在域外的循环参数:`collectParams` 会先把域外的 `7` 回绕成主值
  * `7 - 2π`,面板拿到的就是回绕后的值(面板不再二次归一化,但重置目标必须
  * 与编译期同源).
  */
@@ -171,8 +171,10 @@ describe('参数行的可访问名(UI-P3.1)', () => {
     it('循环参数的可见与可访问文案都带循环提示', () => {
         const { label, numberInput } = setup(CYCLIC);
 
-        expect(label.textContent).toBe('φ ↻');
-        expect(numberInput.getAttribute('aria-label')).toBe('φ 数值(循环)');
+        expect(label.textContent).toBe('方位角 cyclic');
+        // 循环提示是一枚独立的徽章(与"类型"标签同一套外观),名字本身不变色.
+        expect(label.querySelector('.slider-field-tag')).not.toBeNull();
+        expect(numberInput.getAttribute('aria-label')).toBe('方位角 数值(循环)');
     });
 });
 
@@ -182,7 +184,7 @@ describe('重置按钮(回到 in 前的声明值)', () => {
 
         expect(resetButton.tagName).toBe('button');
         expect(resetButton.type).toBe('button');
-        expect(resetButton.textContent).toBe('↺');
+        expect(resetButton.textContent).toBe('reset');
         expect(resetButton.disabled).toBe(true);
     });
 
@@ -260,7 +262,7 @@ describe('重置按钮(回到 in 前的声明值)', () => {
         slider.dispatch('input');
         resetButton.dispatch('click');
 
-        expect(controller.getValues()).toEqual({ φ: 0 });
+        expect(controller.getValues()).toEqual({ 方位角: 0 });
     });
 
     it('按钮的可访问名带参数名与目标值,悬浮标题给出目标值', () => {

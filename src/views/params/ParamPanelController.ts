@@ -13,7 +13,7 @@
  *   <div class="slider-field-meta">
  *     <label class="slider-field-label" for=滑杆>a</label> ← 命名滑杆(一行里的大热区)
  *     <input class="slider-field-value" type="number">    ← 精调入口,自带 aria-label
- *     <button class="slider-field-reset">↺</button>        ← 重置
+ *     <button class="slider-field-reset">reset</button>    ← 重置
  *   </div>
  * </div>
  * ```
@@ -33,11 +33,11 @@
  *
  * ## 归一化与写回时机(UI-P2.1)
  *
- * 循环类系数(`param φ = 0 in cyclic [...]`)的取值在圆周上,越界输入按区间长度
+ * 循环类系数(`param angle = 0 in cyclic [...]`)的取值在圆周上,越界输入按区间长度
  * 回绕到 `[min, max)`,而不是像普通参数那样夹到端点;回绕口径与编译期共用
  * `math/paramValue.ts` 的 normalizeParamValue.归一化收在**数字框**的
  * `normalize` 选项里(滑块自己不会越界,不需要再过一遍),于是信号里永远不会
- * 出现未归一化的值.标签上的 ↻ 只是**显式声明**的可视提示,不改变取值语义.
+ * 出现未归一化的值.标签上的 cyclic 只是**显式声明**的可视提示,不改变取值语义.
  *
  * 数字输入框的写回时机就是数字框"保守策略"的那一种接线:
  * - `input` 阶段只把**已能解析**的值同步给信号(进而同步滑块与场景),
@@ -47,7 +47,7 @@
  *   用户既清不掉内容,也再打不出小数点;
  * - 归一化后的文本只在 `change`(失焦/回车)时写回输入框.
  *
- * 每条参数行末端还有一个重置按钮(↺):把该参数退回 DSL `in` 前的声明值
+ * 每条参数行末端还有一个重置按钮(reset):把该参数退回 DSL `in` 前的声明值
  * (`param a = 1 in [0, 5, 0.1]` 里的 `1`).它与拖动滑块走同一条链路(写信号 ->
  * 订阅者通知场景),这几条都由库的系数滑块自己接好(目标值走 `resetValue`,
  * 已经停在声明值上时置灰,判据里同时比较数值框文本,见 `widgets/Slider.ts`);
