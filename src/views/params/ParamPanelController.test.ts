@@ -69,7 +69,9 @@ function setup(param: ParamDeclaration): Harness {
     controller.render([param]);
 
     const row = panel.children[0] as StubElement;
-    const [label, slider, numberInput, resetButton] = row.children as StubElement[];
+    // 一行 = 库的系数滑块:根(.slider-field)-> [滑杆, meta];meta -> [名称, 数值框, 重置].
+    const [slider, meta] = row.children as StubElement[];
+    const [label, numberInput, resetButton] = meta.children as StubElement[];
     return { stub, controller, label, slider, numberInput, resetButton, changes };
 }
 
