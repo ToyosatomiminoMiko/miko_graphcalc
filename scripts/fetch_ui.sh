@@ -105,13 +105,30 @@ assert_is_ui_checkout() {
     fi
 }
 
+NEED_CLONE=0
+IS_GIT=0
+
 if [ ! -e "$UI_DIR" ]; then
+    NEED_CLONE=1
+elif [ ! -d "$UI_DIR/.git" ]; then
+    if [ -z "$(ls -A "$UI_DIR" 2>/dev/null)" ]; then
+        # 上一次 clone 中断会留下一个空目录.不处理的话,之后每次都会走到
+        # "不是 git 工作副本"那条告警,再被 assert_is_ui_checkout 判死.
+        warn "${UI_DIR} 是空目录(上次 clone 可能中断),删掉重来"
+        rmdir "$UI_DIR"
+        NEED_CLONE=1
+    else
+        warn "${UI_DIR} 已存在但不是 git 工作副本;跳过更新,直接构建其中的内容"
+    fi
+else
+    IS_GIT=1
+fi
+
+if [ "$NEED_CLONE" = "1" ]; then
     log "克隆 ${REPO_URL} (${REF}) -> ${UI_DIR}"
     mkdir -p "$(dirname "$UI_DIR")"
     git clone --branch "$REF" "$REPO_URL" "$UI_DIR"
-elif [ ! -d "$UI_DIR/.git" ]; then
-    warn "${UI_DIR} 已存在但不是 git 工作副本;跳过更新,直接构建其中的内容"
-elif [ "$UPDATE" = "1" ]; then
+elif [ "$IS_GIT" = "1" ] && [ "$UPDATE" = "1" ]; then
     if [ -n "$(git -C "$UI_DIR" status --porcelain)" ]; then
         warn "工作区有未提交改动,跳过更新(仍按当前内容构建)"
     elif git -C "$UI_DIR" fetch origin "$REF"; then
@@ -123,7 +140,7 @@ elif [ "$UPDATE" = "1" ]; then
     else
         warn "git fetch 失败(网络/代理?),跳过更新(仍按当前内容构建)"
     fi
-else
+elif [ "$IS_GIT" = "1" ]; then
     log "复用已有工作副本(要拉上游最新:bash scripts/fetch_ui.sh --update)"
 fi
 
