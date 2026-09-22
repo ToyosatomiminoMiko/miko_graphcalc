@@ -27,7 +27,7 @@
 # [工作原理(.githooks/pre-commit)]
 #   git diff --cached --name-only -z --diff-filter=ACM
 #     -> 取出本次暂存的新增/修改/复制文件(不含删除)
-#     -> 对每个文件执行 python3 autorun.py <file>(文件模式,原地改写)
+#     -> 对每个文件执行 python3 scripts/autorun.py <file>(文件模式,原地改写)
 #     -> 再 git add 回暂存区,让修正结果直接进入这一次提交
 #
 # [为什么可以对自己生效]

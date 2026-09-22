@@ -292,6 +292,14 @@ npm run build
 前端类型检查与打包,每个阶段都有日志输出;GitHub Actions 只调用这一个
 脚本,不再重复编排各步骤.
 
+> **`@miko/ui`(网页 UI 库)不在这里,也不从 npm 取.** 它是独立仓库
+> [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
+> 由上面那句 `npm ci` 顺带备好:根 `package.json` 的 `preinstall` 会跑
+> `scripts/fetch_ui.sh` -- 不存在就 `git clone` 该仓库的 `main`(存在就复用),
+> 然后在 `packages/miko_ui` 里 `npm ci` + `npm run build` 产出 `dist/`,最后按
+> `"@miko/ui": "file:packages/miko_ui"` 链接进来.要拉上游最新:
+> `npm run ui:update`;规则与理由见 `packages/miko_ui/RELEASING.md`.
+
 四. 重新生成wasm
 
 ```sh

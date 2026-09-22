@@ -54,6 +54,22 @@ export default defineConfig({
     base: '/miko_graphcalc/',
     resolve: {
         alias: [{ find: /^@\//, replacement: `${SRC_ALIAS}/` }],
+        /**
+         * 库是 `file:` 链接进来的(`@miko/ui` -> `packages/miko_ui`),它有自己
+         * 的 `node_modules`:`katex`(可选 peer 的 dev 安装)与
+         * `@preact/signals-core`(运行时依赖)各有一份.不做 dedupe 会同时踩两个
+         * 坑:
+         *
+         * 1. **测试里的 `vi.mock('katex')` 拦不住库**:mock 按"从测试文件解析出
+         *    的模块"注册,而库的 `dist/formula/FormulaView.js` 会就近解析到它自己
+         *    那份 -- 两份是两个模块实例,于是公式相关的用例会真的去跑 katex;
+         * 2. **产物里可能进两份**:peer 依赖的语义本来就是"由消费者提供一份",
+         *    所以这里强制所有 `katex` 都解析到应用根目录那一份.
+         *
+         * `@preact/signals-core` 同理:它是库的响应式真相源,必须只有一个实例,
+         * 否则 signal 与 effect 会跨在两条注册表上,表现是"值变了界面不动".
+         */
+        dedupe: ['katex', '@preact/signals-core'],
     },
     optimizeDeps: {
         include: ['three'],

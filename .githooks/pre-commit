@@ -1,7 +1,7 @@
 #!/bin/bash
 # .githooks/pre-commit -- 提交前自动把暂存文件里的中文全角标点转成半角.
 #
-# 完整的安装步骤与原理说明见仓库根目录 autorun.py 的头部注释.
+# 完整的安装步骤与原理说明见 scripts/autorun.py 的头部注释.
 # 快速启用(每个 clone 各做一次,package.json 的 prepare 已自动执行):
 #     git config --local core.hooksPath .githooks
 # 临时跳过: git commit --no-verify    卸载: git config --unset core.hooksPath
@@ -30,12 +30,12 @@ while IFS= read -r -d '' f; do
     hook_staged=1
     continue
   fi
-  python3 "$root/autorun.py" "$f"
+  python3 "$root/scripts/autorun.py" "$f"
   git add -- "$f"
 done < <(git diff --cached --name-only -z --diff-filter=ACM)
 
 # 补上本 hook 自身(它也在修正范围内,只是必须延后到脚本读完)
 if [ "$hook_staged" = 1 ]; then
-  python3 "$root/autorun.py" "$0"
+  python3 "$root/scripts/autorun.py" "$0"
   git add -- "$0"
 fi

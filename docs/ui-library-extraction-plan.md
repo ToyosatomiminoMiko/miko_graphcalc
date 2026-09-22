@@ -23,21 +23,31 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 
 核对时间:2026-09-22,同一工作区.**P0–P4 已完成并验证**(P4 只差附录 B.2 的补件,见文末).
 
-> **补记(分离已完成):库不再住在本仓库.** `packages/miko_ui` 已搬成独立仓库
-> [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
-> 首个可用版本 `v0.1.0`.本仓库改为一条依赖:
-> `"@miko/ui": "https://github.com/ToyosatomiminoMiko/miko_ui/archive/refs/tags/v0.1.0.tar.gz"`
-> (GitHub 归档 URL,按 tag 固定).三点说明:
+> **补记一(分离已完成):库不再住在本仓库.** `packages/miko_ui` 已搬成独立仓库
+> [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui).
+> 库的**边界守卫与 CI 跟着库走了**(`scripts/check_ui_boundary.mjs`,
+> `.github/workflows/ci.yml`):本仓库不再有库的源码,那些断言无从执行.
+> 下面表格里 P0/P1 的 `npm workspaces` / `npm run dev:ui` /
+> `--workspace @miko/ui` 描述的是**当时的形态**,保留作为过程记录;现在这些
+> 命令在本仓库都不存在了.改库要去独立仓库改.
 >
-> 1. 为什么不是 `github:owner/repo#v0.1.0` 这种 git 依赖:npm 解析**具名 ref**
->    (分支/tag)时会走 `git ls-remote ssh://git@github.com/...`,只有 40 位
->    commit SHA 才走 https.归档 URL 是纯 https,不需要 SSH key,CI 里也不用任何
->    密钥.
-> 2. 库的**边界守卫与 CI 跟着库走了**(`scripts/check-ui-boundary.mjs`,
->    `.github/workflows/ci.yml`):本仓库不再有库的源码,那些断言无从执行.
-> 3. 下面表格里 P0/P1 的 `npm workspaces` / `npm run dev:ui` /
->    `--workspace @miko/ui` 描述的是**当时的形态**,保留作为过程记录;现在这些
->    命令在本仓库都不存在了.改库要去独立仓库改,再打 tag 并更新上面那条 URL.
+> **补记二(改为 GitHub 直取,npm 出局):** 本仓库与 `@miko/ui` 的关系只剩两条:
+>
+> 1. `package.json` 里一条本地依赖 `"@miko/ui": "file:packages/miko_ui"`;
+> 2. 一条 `preinstall` -> `scripts/fetch_ui.sh`:`packages/miko_ui` 不存在就
+>    `git clone` 库仓库的 `main`,存在就原样复用(`--update` 才 fetch + 快进),
+>    然后在库目录里 `npm ci` + `npm run build` 产出 `dist/`.
+>
+> 于是本地的 `npm ci` 与 CI 的 `npm ci` 都自带取库(CI 不需要 submodule,也不
+> 需要任何 npm 凭据).库**不发布 npm,不打 tag,不写版本号**:它只服务本仓库,
+> 还在 demo 阶段 -- 完整取舍见库仓库的 `RELEASING.md`.
+>
+> 一度用过的那条按 tag 固定的 GitHub 归档 URL
+> (`.../archive/refs/tags/v0.1.0.tar.gz`)已经删掉.顺带记下"为什么不用 npm 的
+> git 依赖(`github:owner/repo#ref`)":npm 解析**具名 ref**(分支/tag)时会走
+> `git ls-remote ssh://git@github.com/...`,只有 40 位 commit SHA 才走 https;
+> 现在的做法是自己的 shell 脚本直接 https clone,不经过 npm 的 git 层,也就不
+> 需要 SSH key.
 
 | 期 | 状态 | 落地后的关键形态 |
 | --- | --- | --- |

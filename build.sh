@@ -37,6 +37,11 @@ require_command cargo
 require_command wasm-pack
 
 log "installing pinned dependencies from package-lock.json"
+# 顺序说明:根 package.json 的 preinstall 会先跑 scripts/fetch_ui.sh -- 从
+# GitHub 取 miko_ui(main 分支),在库目录里构建出 dist/,然后把
+# `"@miko/ui": "file:packages/miko_ui"` 这条链接装上.npm 解析 file: 依赖时
+# packages/miko_ui 必须已经存在,所以"取库"只能挂在 preinstall,不能挪到这里
+# 之后;CI 也不需要 checkout submodule,取库由这条链自己完成.
 npm ci --no-audit --no-fund
 
 # 流水线 = lint:rs -> clean -> build:wasm -> test -> build:app(内含 typecheck + vite build)
