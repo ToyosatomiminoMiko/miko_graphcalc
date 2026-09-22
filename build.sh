@@ -42,6 +42,11 @@ log "installing pinned dependencies from package-lock.json"
 # `"@miko/ui": "file:packages/miko_ui"` 这条链接装上.npm 解析 file: 依赖时
 # packages/miko_ui 必须已经存在,所以"取库"只能挂在 preinstall,不能挪到这里
 # 之后;CI 也不需要 checkout submodule,取库由这条链自己完成.
+#
+# 再往下 build:all 的顺序是 lint:rs -> clean -> build:wasm -> test -> build:app;
+# 其中 clean 只删根 dist/ 与 src/generated/,不碰库的 packages/miko_ui/dist,所以
+# "库在第一步就绪,后面全程可用".取库/链接/模块去重的全部规则见
+# scripts/fetch_ui.sh 顶部与 vite.config.ts 的 resolve.dedupe.
 npm ci --no-audit --no-fund
 
 # 流水线 = lint:rs -> clean -> build:wasm -> test -> build:app(内含 typecheck + vite build)

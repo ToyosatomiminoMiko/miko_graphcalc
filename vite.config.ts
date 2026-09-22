@@ -68,6 +68,9 @@ export default defineConfig({
          *
          * `@preact/signals-core` 同理:它是库的响应式真相源,必须只有一个实例,
          * 否则 signal 与 effect 会跨在两条注册表上,表现是"值变了界面不动".
+         *
+         * 库为什么会以 `file:` 链接进来,为什么必须先把它构建出 `dist/`,见
+         * `scripts/fetch_ui.sh` 顶部的"应用侧的依赖契约".
          */
         dedupe: ['katex', '@preact/signals-core'],
     },

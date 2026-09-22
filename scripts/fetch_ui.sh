@@ -1,10 +1,39 @@
 #!/usr/bin/env bash
 # 取 `miko_ui` 并本地构建 -- 本仓库拿 `@miko/ui` 的唯一入口.
 #
-# 为什么不是 npm:
-#   库不再发布到 registry,也不再用 GitHub 归档 tarball.来源只有一个:
-#   GitHub 上的库仓库,跟随 `main` 分支(库目前完全为本项目服务,还没正式
-#   立项,所以不打 tag,不写版本号).
+# ============================================================================
+# 应用侧的依赖契约(这段注释是真身,别处只放指针)
+# ----------------------------------------------------------------------------
+# 1. `@miko/ui` 的**唯一来源**是 GitHub 上的库仓库,跟随 `main`(库还在 demo 期,
+#    完全为本项目服务,所以不打 tag,也不写版本号).四条被否掉的路记在这里,
+#    免得以后重走:
+#      - npm registry:库不发布(npm 账号/2FA/Cloudflare 那条死路,归档见库仓库
+#        的 RELEASING.md);
+#      - GitHub 归档 tarball(`/archive/refs/tags/vX.tar.gz`):按 tag 固定,在
+#        "单消费者 + 同一个工作区"下只会制造"本地改了库,应用却还在用旧 tag"的
+#        假故障;
+#      - npm 的 git 依赖(`github:owner/repo#ref`):npm 解析**具名 ref** 会走
+#        `git ls-remote ssh://git@github.com/...`,只有 40 位 commit SHA 才走
+#        https,于是它要么要 SSH key,要么得把 ref 钉成 SHA;
+#      - git submodule:要把 `packages/` 移出根 `.gitignore`,并把库的 commit 锁进
+#        主仓库的每一次提交;库还在天天改,跟随 `main` 比"改一次库就在主仓库提一次
+#        指针"轻.
+# 2. 落地形态是一条**本地依赖**:根 `package.json` 里
+#    `"@miko/ui": "file:packages/miko_ui"`.链接名(`@miko/ui`)与库目录里的包名
+#    (`miko_ui`)不必一致 -- `file:` 不校验名字,公开面由库的 `exports` 定义.
+# 3. 应用里 `import '@miko/ui'` 解析到的是**构建产物** `dist/index.js`;所以
+#    "把源码取过来"不等于"能用",必须先构建(见下面行为第 3 条).
+# 4. 库的运行时依赖 `@preact/signals-core` 装在库自己的 `node_modules` 里;npm 还
+#    会为这条 `file:` 链接在应用根目录提升一份.同名依赖于是可能有两份实例,必须
+#    在应用侧去重:**模块身份的规则写在 `vite.config.ts` 的 `resolve.dedupe`**,
+#    这里不重复.
+# 5. 本脚本在应用流水线里的位置见 `build.sh`:它是 `npm ci` 的 `preinstall`,而
+#    `build:all` 的 `clean` 只删根 `dist/` 与 `src/generated/`,**不碰**库的
+#    `packages/miko_ui/dist` -- 所以库在第一步就绪之后,后面全程可用.
+# 6. 库侧的交付不变量(不发布 npm / 不写版本号 / `prepare` 必须留 / 锁只能用完整
+#    `npm install` 重建)写在库仓库 `.github/workflows/ci.yml` 顶部:那里是它们被
+#    强制执行的地方.
+# ============================================================================
 #
 # 谁调用它:
 #   - 根 `package.json` 的 `preinstall`:所以 `npm ci` / `npm install` 会自动
