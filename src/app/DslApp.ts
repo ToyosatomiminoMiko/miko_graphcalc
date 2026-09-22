@@ -92,10 +92,6 @@ export class DslApp {
     /** `start()` 只允许生效一次(见该方法的说明). */
     private started = false;
 
-    private readonly onResize = (): void => {
-        this.renderController.resize();
-    };
-
     private keyboardController: KeyboardController | null = null;
 
     /**
@@ -147,6 +143,14 @@ export class DslApp {
             content: views.windowContent,
         });
         this.windowManager = this.desktop.windows;
+
+        // 视口在 `mountDesktop()` 之前是游离节点:此时量 clientWidth/Height 得到
+        // 0,而 SceneManager/CameraManager 已经在上面构造完了 -- 画布被建成 0×0,
+        // 相机 aspect 是 NaN,首帧什么都画不出来,而且铺满层不会自己再变尺寸,
+        // 于是只有窗口 resize(例如开 devtools)才会恢复.挂载后立刻补量一次,
+        // 让第一帧就是对的;之后的尺寸变化由 RenderController 的 ResizeObserver
+        // 接管,这里不再另挂 window 的 resize 监听(同一次变化不重复算两遍).
+        this.renderController.resize();
     }
 
     /**
@@ -206,7 +210,6 @@ export class DslApp {
         });
         this.keyboardController.bind();
 
-        window.addEventListener('resize', this.onResize);
         this.animationFrameId = requestAnimationFrame(this.animate);
 
         // 首屏默认源码:index.html 的编辑器现在是空的,这里先种入默认示例,
@@ -227,8 +230,6 @@ export class DslApp {
 
         this.keyboardController?.dispose();
         this.keyboardController = null;
-
-        window.removeEventListener('resize', this.onResize);
 
         // 桌面:摘监听,把正文节点还回 #app,删掉窗口外壳与三层容器(与 mountDesktop 配对).
         this.unsubscribeGeometry?.();

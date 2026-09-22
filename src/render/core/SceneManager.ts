@@ -201,9 +201,19 @@ export class SceneManager {
         this.renderer.render(this.scene, camera);
     }
 
+    /**
+     * 按容器尺寸重排渲染器与所有 Line2 材质的分辨率.
+     *
+     * 容器量不到尺寸时(还没进 DOM,或整窗被隐藏)原样返回,**不调用 setSize**:
+     * `setSize(0, 0)` 会把画布的绘制缓冲钉成 0×0,而容器是绝对定位的铺满层,
+     * 尺寸变化不会自己找上门,画布会一直空着.调用方按返回的尺寸决定是否更新
+     * 相机(见 RenderController.resize).
+     */
     resize(): { width: number; height: number } {
         const width = this.container.clientWidth;
         const height = this.container.clientHeight;
+        if (width <= 0 || height <= 0) return { width, height };
+
         this.renderer.setSize(width, height);
         for (const material of this.resolutionMaterials) {
             material.resolution.set(width, height);

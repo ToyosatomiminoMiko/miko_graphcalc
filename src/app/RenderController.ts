@@ -40,6 +40,19 @@ export class RenderController {
 
     private controls: OrbitControls | null = null;
     /**
+     * 视口容器的尺寸观察器:渲染尺寸的唯一触发源.
+     *
+     * 为什么盯容器而不是听 `window.resize`:`#viewport` 是 `inset: 0` 的铺满层,
+     * 窗口缩放只是它的上游信号,最终都落在它的 clientWidth/Height 上.盯容器
+     * 既不会漏(窗口系统自己的布局变化不看窗口),也不会和 window.resize 一起
+     * 把同一次变化算两遍.
+     *
+     * 构造期容器还是游离节点(`buildAppViews` 先建节点,`mountDesktop` 才挂),
+     * clientWidth/Height 量到 0;第一次真正的回调要等挂载之后,所以 `DslApp`
+     * 在 `mountDesktop()` 之后还会同步补一次 `resize()`(见那里的说明).
+     */
+    private readonly viewportObserver: ResizeObserver;
+    /**
      * @cache
      * 缓存目的:`bindViewState` 建立的"状态 -> 渲染器"effect 的退订函数.
      * 键/失效策略:重新 bind 时先全部退订;dispose 时清空.
@@ -73,6 +86,8 @@ export class RenderController {
     ) {
         this.sceneManager = new SceneManager(viewport);
         this.cameraManager = new CameraManager(viewport);
+        this.viewportObserver = new ResizeObserver(() => this.resize());
+        this.viewportObserver.observe(viewport);
         this.plotter = new Plotter(this.sceneManager.getScene());
         this.computeEngine = new ComputeFacade();
         this.integralRenderer = new DslIntegralRenderer(
@@ -202,8 +217,16 @@ export class RenderController {
         this.sceneManager.render(this.cameraManager.getCamera());
     }
 
+    /**
+     * 按视口容器尺寸重排渲染器与相机 aspect.
+     *
+     * 容器量不到尺寸(尚未挂载 / 整窗隐藏)时什么都不做:此时 `setSize` 会把
+     * 画布钉成 0×0,`0 / 0` 还会把相机 aspect 变成 NaN.等容器真有尺寸时
+     * ResizeObserver 会再叫一次.
+     */
     resize(): void {
         const { width, height } = this.sceneManager.resize();
+        if (width <= 0 || height <= 0) return;
         this.cameraManager.updateAspect(width, height);
     }
 
@@ -346,6 +369,8 @@ export class RenderController {
 
     dispose(): void {
         this.stopSamplingFailureListener();
+        // 先摘尺寸观察:下面的 dispose 正在拆场景与渲染器,回调不该再进来.
+        this.viewportObserver.disconnect();
         this.cameraManager.detachControls();
         this.controls = null;
         // 视图状态的 effect 统一释放:漏掉退订会让闭包把整个场景图钉在堆上.

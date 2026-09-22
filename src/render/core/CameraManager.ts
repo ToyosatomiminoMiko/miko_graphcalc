@@ -51,6 +51,19 @@ const VIEW_DIRECTIONS: Record<
 };
 
 /**
+ * 由容器像素尺寸算相机 aspect.
+ *
+ * 容器还没进 DOM(或整窗隐藏)时量到 0×0,`0 / 0` 得到 NaN;NaN 一旦写进
+ * `camera.aspect`,投影矩阵整条都是 NaN,画面直接消失且不会自行恢复.
+ * 量不到尺寸时兜底 1:1,等真正量到再由 `updateAspect` 修正.
+ */
+function aspectOf(container: HTMLElement): number {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    return width > 0 && height > 0 ? width / height : 1;
+}
+
+/**
  * 相机管理器
  * - 管理透视/正交投影切换
  * - 管理 ViewCube 的预置观察方向
@@ -80,7 +93,7 @@ export class CameraManager {
 
     constructor(container: HTMLElement) {
         this.container = container;
-        this.aspect = this.container.clientWidth / this.container.clientHeight;
+        this.aspect = aspectOf(container);
 
         this.upAxis = RENDER_CONFIG.scene.upAxis;
         this.upVector.set(...UP_VECTORS[this.upAxis]);
@@ -171,7 +184,15 @@ export class CameraManager {
         }
     }
 
+    /**
+     * 同步相机 aspect.
+     *
+     * 非正尺寸(容器尚未布局)一律忽略:保留上一次可用的 aspect,不让 `0 / 0`
+     * 的 NaN 污染投影矩阵.忽略是安全的 -- 容器真有尺寸时这里还会被再调一次
+     * (见 RenderController 的 ResizeObserver).
+     */
     updateAspect(width: number, height: number): void {
+        if (width <= 0 || height <= 0) return;
         this.aspect = width / height;
         // 只同步当前激活相机;另一台在投影切换时会被 _activateCamera 同步.
         this._syncProjection(this.activeCamera);

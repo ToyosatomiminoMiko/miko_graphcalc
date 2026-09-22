@@ -110,3 +110,31 @@ describe('CameraManager', () => {
             .toBeCloseTo(RENDER_CONFIG.camera.viewDistance, 6);
     });
 });
+
+/**
+ * 视口量到 0×0 的两种时机都真实存在:`mountDesktop()` 之前视口还是游离节点
+ * (构造期量到的就是 0),窗口整体隐藏时容器同样是 0.两条路径都不许把
+ * `0 / 0` 的 NaN 写进相机 -- 投影矩阵一旦变 NaN,画面消失且不会自行恢复.
+ */
+describe('CameraManager 尺寸兜底', () => {
+    const detached = { clientWidth: 0, clientHeight: 0 } as HTMLElement;
+
+    it('容器量不到尺寸时 aspect 兜底 1:1,投影矩阵没有 NaN', () => {
+        const manager = new CameraManager(detached);
+
+        expect(manager.aspect).toBe(1);
+        const projection = manager.getCamera().projectionMatrix.elements;
+        expect(projection.every((value) => Number.isFinite(value))).toBe(true);
+    });
+
+    it('updateAspect 忽略非正尺寸,保留上一次可用 aspect', () => {
+        const manager = new CameraManager(viewport);
+        const aspect = manager.aspect;
+
+        manager.updateAspect(0, 0);
+        expect(manager.aspect).toBe(aspect);
+
+        manager.updateAspect(1024, 768);
+        expect(manager.aspect).toBeCloseTo(1024 / 768, 6);
+    });
+});
