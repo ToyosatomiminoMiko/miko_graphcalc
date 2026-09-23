@@ -103,32 +103,39 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 桌面窗口化
 
-界面形态是"**3D 视口铺满 + 五个浮动窗口 + 底部 Dock**":`#viewport`(Three.js
-画布)仍然铺满 `#app`,五个窗口悬在它上面,桌面空白处照常可以转视角.
+界面形态是"**3D 视口铺满 + 五个浮动窗口 + 顶部任务栏**":`#viewport`(Three.js
+画布)仍然铺满 `#app`,五个窗口悬在它上面,桌面空白处照常可以转视角.任务栏是
+紧贴 `#app` 上沿的一条通栏带,窗口几何被夹在它下面,所以它不会被任何窗口遮住.
 
 ```text
+任务栏(顶部通栏):窗口按钮 ... 全部还原
+
 source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
-过程(递等式)        对象(实体 / 求值两栏)      Dock(任务栏)
+过程(递等式)        对象(实体 / 求值两栏)
 ```
 
-- 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)**由 TS 声明式装配**
-  (`src/ui/desktop/WindowFrame.ts`),`index.html` 里没有任何 `.window` 结构,
-  只有五个正文宿主与三个空容器(`#window-layer` / `#snap-preview` / `#dock`);
+- 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)与任务栏**由库声明式装配**
+  (`packages/miko_ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
+  里只有一个空 `#app`,窗口层 / 吸附预览 / 任务栏 / 每个窗口的正文容器都由库建;
   加窗口只改 `UI_CONFIG.window.windows` 一处.
-- 能力:拖动标题栏移动,八向缩放,最小化,关闭,**Dock**(按钮由窗口清单生成,
-  含"全部还原"),最大化(填满桌面并给 Dock 留出高度),单窗口全屏
-  (`Esc` 或标题栏按钮退出),边缘吸附(左/右半屏,上边缘最大化)与窗口间磁吸.
+- 能力:拖动标题栏移动,八向缩放,最小化(再点任务栏按钮恢复),最大化(填满任务栏
+  之下的工作区),边缘吸附(左/右半屏,拖到顶部任务栏附近最大化)与窗口间磁吸.
+  **没有关闭与全屏**:没有真正的进程可关,关闭与最小化在观感上就是同一件事;
+  全屏与最大化的差别也只剩"遮不遮任务栏",而任务栏不该被遮.
 - 状态与写入点:`WindowManager` 持有 `geometry` / `state` / `restore` /
   `focused` / `zIndex`;**几何的唯一写入点**是 `_applyGeometry`(逐条
   `setProperty`,不碰 `z-index`),**状态的唯一写入点**是 `_applyState`
-  (所有 `.window` 类名,`inert`/`aria-hidden`,按钮文案,Dock 态),
+  (所有 `.window` 类名,`inert`/`aria-hidden`,任务栏按钮的激活态与淡化),
   `z-index` 只有 `focus()` 写.
-- 隐藏态(最小化/关闭)用 `opacity: 0` + `inert` + `aria-hidden`,**不用**
+- 隐藏态(最小化)用 `opacity: 0` + `inert` + `aria-hidden`,**不用**
   `display: none`:编辑器行号与高亮层在隐藏期间必须仍能量到尺寸,否则恢复后
   对齐会整体错乱.
 - `#window-layer` 整层 `pointer-events: none`(只有 `.window` 自己 `auto`),
-  这是"空桌面处仍能转 3D"的前提;Dock 的实心盒子只占内容宽度,两侧留出可点的
-  桌面,窗口南边的缩放手柄才不会被压住.
+  这是"空桌面处仍能转 3D"的前提;任务栏那条带自己收指针--它占的是工作区
+  之上的预留带,工作区里没有任何东西需要让路.
+- 窗口外壳的两个尺寸(任务栏高度 `dockReserve`,标题栏高度 `headerHeight`)在
+  挂载时由库从 `DesktopConfig` 写到 `#app` 的 CSS 变量上,是运行期唯一来源;
+  `packages/miko_ui/styles/tokens.css` 的同名值只是没有 JS 时的兜底.
 - **布局不落 localStorage**:刷新后回到默认几何,与"界面偏好不落本地存储"的
   既有约定一致;设计取舍与逐条理由见
   [面板窗口化设计计划](docs/windowing-plan.md).
@@ -136,10 +143,11 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 ## 界面样式配置
 
 代码区字体,KaTeX 字号与窗口外壳常量**不做运行时设置界面**,也不落 localStorage:
-唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/ui/theme/applyUiConfig.ts`
+唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/app/applyUiConfig.ts`
 写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
-`css/panels.css`(面板与对象列表),`css/controls.css`,`css/window.css`
-(窗口外壳/Dock/吸附高亮)与 `css/base.css` 的 `var()` 消费.
+`css/panels.css` / `css/diagnostics.css` / `css/process.css`(面板与列表)
+与 `packages/miko_ui/styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
+`desktop.css`,编辑器外壳 `editor.css`)的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
@@ -149,15 +157,17 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 - `UI_CONFIG.panel`:只剩参数区与视图控件的**内容下限**
   (`paramsMinHeight` / `viewControlsMinHeight`),由 CSS 消费;
 - `UI_CONFIG.window`:桌面窗口化的全部几何与常量--五个窗口的标题/宿主/
-  默认几何锚点/最小尺寸,标题栏按钮清单,`edgeKeep`/`edgeGap`/
-  `headerMinVisible`/`dockReserve`/`headerHeight`,三层容器的 `z-index`
-  与吸附阈值.**窗口几何不进 CSS**(窗口是 JS 建的,不存在"CSS 首帧"),
-  默认几何由 `WindowGeometry.resolveDefaultGeometry()` 按当前桌面尺寸算出
-  px,由 `WindowManager` 写成行内样式;`css/base.css` 里只有两个窗口外壳
-  常量的兜底(`--window-header-height` 与 `--dock-reserve`).
+  默认几何锚点/最小尺寸,标题栏按钮清单(只有最小化与最大化),
+  `edgeKeep`/`edgeGap`/`headerMinVisible`/`dockReserve`/`headerHeight`,
+  三层容器的 `z-index` 与吸附阈值.**窗口几何不进 CSS**(窗口是 JS 建的,
+  不存在"CSS 首帧"),默认几何由 `WindowGeometry.resolveDefaultGeometry()`
+  按当前桌面尺寸算出 px,由 `WindowManager` 写成行内样式;两个外壳尺寸
+  (`--window-header-height` 与 `--dock-reserve`)在挂载时由库从这份配置
+  写到 `#app`,库样式表里的同名值只是没有 JS 时的兜底.
 
-改完刷新页面即可.`css/base.css` 的 `:root` 兜底只负责脚本执行前的首帧,
-必须与 `UI_CONFIG` 保持一致--这条约定由 `applyUiConfig.test.ts` 逐字断言,
+改完刷新页面即可.库样式表(`packages/miko_ui/styles/tokens.css`)的 `:root`
+兜底只负责脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致--这条约定由
+`applyUiConfig.test.ts` 逐字断言,
 只改 `uiConfig.ts` 或只改 CSS 都会先失败在测试上,不会静默闪一帧旧样式.
 行号槽宽不写死:`EditorLineNumbers` 按当前字体与最大行号位数动态写入
 `--code-gutter-width`.

@@ -14,12 +14,33 @@ Chromium + DevTools Protocol,1280×800 与 1920×1080 两组视口,用真实鼠�
 示例菜单完整展开,"点过程即抬窗口",空桌面穿透与视口 resize,34 项断言全过;
 这一轮查出并修掉了 §11.2 的 E29/E30 两条.
 
+> **后续修订:Dock 移到顶部,并删掉"关闭"与"全屏"**(窗口系统抽成
+> `packages/miko_ui` 之后由用户拍板,与下文原始设计不同,以本条为准):
+>
+> 1. **Dock 是顶部通栏任务栏**,不是底部浮岛.它紧贴桌面上沿,左右与桌面同宽,
+>    只有下沿一条分隔线;`dockReserve` 就是栏高(默认 40px),同时是窗口**工作区
+>    的上沿**--窗口的 `y` 从它下沿量起,夹取,最大化与边缘吸附都不越过它.最大化
+>    铺的是"任务栏之下的工作区",所以任务栏不会被遮.
+> 2. **删掉"关闭"与"全屏"两个动作及其状态**.没有真正的进程可关,关闭与最小化在
+>    观感上就是同一件事;全屏与最大化的差别也只剩"遮不遮任务栏",而任务栏不该被
+>    遮.于是 `WindowState` 从
+>    `normal | maximized | fullscreen | minimized | closed` 收成
+>    `normal | maximized | minimized`,`WindowActionId` 收成
+>    `minimize | maximize`,Dock 的动作区只剩"全部还原",`Esc` 退出全屏那条键盘
+>    绑定与 `.is-fullscreen` 系列规则一并删除.
+> 3. 两个"CSS 必须自己读"的外壳尺寸(`--dock-reserve` / `--window-header-height`)
+>    改由库在挂载时从 `DesktopConfig` 写到桌面根,`styles/tokens.css` 里的同名值
+>    只留作"没有 JS / 纯 CSS"的兜底.
+>
+> 下文 §3–§5 里关于底部 Dock,`fullscreen`,`closed`,`.dock-inner` 的文字与代码
+> 清单是**当时的原始设计**,不再作为实现依据;逐条记录见 §11.2 的 E37.
+
 已拍板的口径(用户 2026-09 指定):
 
 | # | 决定 | 内容 |
 | --- | --- | --- |
 | W1 | 形态 | **浮动窗口 + 3D 铺满背景**.Three.js 视口仍是铺满 `#app` 的一层,现有面板与右栏两页变成悬在它上面的浮窗(**共五个窗口**) |
-| W2 | 窗口外壳功能(一期) | 焦点/z-order 提升,关闭与最小化,**Dock/任务栏**,边缘吸附与磁吸对齐,最大化/单窗口全屏 |
+| W2 | 窗口外壳功能(一期) | 焦点/z-order 提升,关闭与最小化,**Dock/任务栏**,边缘吸附与磁吸对齐,最大化/单窗口全屏(**后续修订:关闭与全屏已删除,Dock 改成顶部通栏任务栏--见上面的修订块与 §11.2 E37**) |
 | W3 | 键盘窗口管理 | **暂缓**,列入本文件的设计与阶段 5,一期不实现 |
 | W4 | 布局持久化 | **不做**.README 已明确"界面偏好不落 localStorage";本方案不推翻该约定 |
 | W5 | 启用方式 | 替换现有固定布局,不做新旧两套布局的运行时开关 |
@@ -57,8 +78,9 @@ Chromium + DevTools Protocol,1280×800 与 1920×1080 两组视口,用真实鼠�
 > 不再是通高窗口.连带订正记在 §11.2 E19/E20.
 
 一句话总结形态:`#viewport`(three.js)继续铺满当背景,**五个**浮动窗口
-(`source code` / `参数` / `视图` / `过程` / `对象`)悬在它上面,Dock 在底部;
-窗口可拖可缩放可最小化/关闭/最大化;固定布局的 `PanelController`,右栏标签页
+(`source code` / `参数` / `视图` / `过程` / `对象`)悬在它上面,顶部一条紧贴
+上沿的通栏任务栏(见文首的后续修订块);窗口可拖可缩放,可最小化/最大化
+(**关闭与全屏已删除**);固定布局的 `PanelController`,右栏标签页
 `RightPanelTabs` 与"参数区/视图区"分隔条 `RightSplitController` 一并删除,
 面板本体(编辑器/参数行/视图控件/过程视图/对象列表)与其全部控制器不动.
 
@@ -161,7 +183,8 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 2. **`#window-layer`**:新容器,`inset: 0`,`pointer-events: none`.它只负责
    建立窗口的定位参照与 z-order 层.**整层不拦截指针**,是 W1 能成立的关键:
    桌面空白处,窗口没盖住的地方,OrbitControls 照常收到事件(§3.4).
-3. **`#dock`**:新容器,底部居中一条,`pointer-events: auto`.
+3. **`#dock`**:新容器,~~底部居中一条~~现在是**紧贴顶部的通栏任务栏**,
+   `pointer-events: auto`(整条自己收指针).
 
 窗口自身 `pointer-events: auto`,内部继续用现有 `.panel` 骨架.
 
@@ -180,30 +203,32 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 
 | 窗口 | 标题 | 正文宿主 | 默认位置/尺寸 | 最小尺寸 |
 | --- | --- | --- | --- | --- |
-| `source` | `source code` | `#left-panel` | 左上,`x=16 y=16 w=420 h=round((dH-116)*0.68)` | 300 × 220 |
-| `view` | `视图` | `#view-controls` | 左下,`x=16 y=source.y+source.h+12 w=420 h=余高` | 280 × 180 |
-| `params` | `参数` | `#right-page-params` | 右上,`x=dW-436 y=16 w=420 h=round((dH-116)*0.55)` | 280 × 200 |
-| `process` | `过程` | `#right-page-process` | 右下,`x=dW-436 y=params.y+params.h+12 w=420 h=余高` | 280 × 180 |
-| `objects` | `对象` | `#bottom-panel` | 中下,居中 `y=dH-376 w=clamp(360, 720, dW-2*436-32) h=260` | 360 × 160 |
+| `source` | `source code` | `#left-panel` | 左上,`x=16 y=dockReserve+16 w=420 h=round((dH-dockReserve-edgeGap)*0.68)` | 300 × 220 |
+| `view` | `视图` | `#view-controls` | 左下,`x=16 y=source.y+source.h+12 w=420 h=dH-edgeGap-y` | 280 × 180 |
+| `params` | `参数` | `#right-page-params` | 右上,`x=dW-436 y=dockReserve+16 w=420 h=round((dH-dockReserve-edgeGap)*0.55)` | 280 × 200 |
+| `process` | `过程` | `#right-page-process` | 右下,`x=dW-436 y=params.y+params.h+12 w=420 h=dH-edgeGap-y` | 280 × 180 |
+| `objects` | `对象` | `#bottom-panel` | 中下,居中 `y=dH-edgeGap-260 w=clamp(360, 720, dW-2*436-32) h=260` | 360 × 160 |
 
-`dW`/`dH` 是桌面宽高.**五个窗口共用同一条底边线 `dH-116`**,
-它等于 `dH - dockReserve(100) - edgeGap(16)`:Dock 占底部 100px,再留 16px 间隙.
-表里所有"余高"与 `objects` 的 `y=dH-376` 都是这条底边线的推论,不是各写各的
+`dW`/`dH` 是桌面宽高.`y` 从**工作区上沿**(`dockReserve`,即顶部任务栏下沿)量起,
+`from: 'bottom'` 与"余高"则相对桌面底边,所以五个窗口共用同一条底边线
+`dH-edgeGap`(原始设计是 `dH-116`,因为 Dock 当时在底部,要一并让出 100px;
+现在 `dockReserve` 从**顶部**让位,底边只剩 `edgeGap=16`,见文首修订块).
+表里所有"余高"与 `objects` 的 `y` 都是这条底边线的推论,不是各写各的
 数字--旧稿把 `source` 写成通高 `dH-116`,把 `objects` 写成 `y=dH-292`,于是出现
 了三条不同的底边(100 / 116 / 32),`objects` 的底边甚至落进 Dock 的 100px 里.
 
-> 这条底边线是硬约束,不是审美:`objects` 与 Dock 都是居中一条,`objects`
-> 的底边一旦进 Dock 的范围,它的南边手柄就正好压在 Dock 底下,§11.1 B4 的
-> "两侧留空"救不了它.阶段 0 的单测要把五个窗口的底边一起断言(§7).
+> 这条底边线是硬约束,不是审美:窗口一旦越到底边线以下,它的南边手柄就压在
+> 桌面边缘上.阶段 0 的单测要把五个窗口的底边一起断言(§7).
 
 **分栏**:左列 = `source` 上 / `view` 下,右列 = `params` 上 / `process` 下,
 两列之外中间留出 3D 视口,`objects` 居中占底部.这样分组是有意的:
 左列是"写与看"(源码 + 视图),右列是"算与解"(参数 + 过程),对象列表横跨中下.
 
 编辑器高度要让出来:旧稿的 `source` 是通高,现在被 `view` 分走 32%.
-`h=round((dH-116)*0.68)` 这个比例是**为了让编辑器在小视口下也够用**定的
-(1920×1080 -> 656px,1280×800 -> 465px,都还有 ~69% 的列高);
-`view` 拿"余高",在 1280×800 下是 191px,刚好过它的最小高 180.
+`h=round((dH-dockReserve-edgeGap)*0.68)` 这个比例是**为了让编辑器在小视口下也够用**
+定的
+(1920×1080 -> 696px,1280×800 -> 506px,都还有 ~69% 的列高);
+`view` 拿"余高",在 1280×800 下是 210px,刚好过它的最小高 180.
 
 > 换一种摆法也可以(比如把 `view` 放进右列与 `params`,`process` 三明治),
 > 但右列三段在 1280×800 下每段只剩 ~190px,`params` 的滑块与 `process` 的
@@ -215,17 +240,18 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 420 加左右各 16 的间隙"之后剩下的宽度,再夹到 `[360, 720]`
 (1280 -> 376,1920 -> 720).这条换算与 §3.4 的夹取共用同一组纯函数.
 
-> **关于"不重叠"这条,核过一次**(数字可以直接当单测断言):
+> **关于"不重叠"这条,核过一次**(数字可以直接当单测断言,和
+> `WindowGeometry.test.ts` 的期望值一致):
 >
 > ```text
 > 1280×800: 左列 16...436 | objects 452...828 | 右列 844...1264   -> 无重叠
 > 1920×1080: 左列 16...436 | objects 600...1320 | 右列 1484...1904 -> 无重叠
-> 底边线(五个窗口共用,一起断言):1280×800 全部 = 684;1920×1080 全部 = 964
-> 左列内部:source 底 481 / view 顶 493(1280×800),source 底 672 / view 顶 684(1920×1080)
+> 底边线(五个窗口共用,一起断言):1280×800 全部 = 784;1920×1080 全部 = 1064
+> 左列内部:source 底 562 / view 顶 574(1280×800),source 底 752 / view 顶 764(1920×1080)
 > ```
 >
 > 三条结论:**① 两个目标视口下都不重叠**;**② 更窄的视口下允许重叠**;**③ 五个
-> 窗口的底边线一致,且都在 Dock 的 100px 之上**.② 的取舍是窗口可以拖,用户
+> 窗口的底边线一致,且都在桌面底边之内**.② 的取舍是窗口可以拖,用户
 > 自己摆,与 §10「明确不做」里的"不做自动平铺"是同一条取舍.真正必须守住的不
 > 变量只有两条:**窗口不越界** 与 **标题栏永远在桌内**,它们由 §3.4 的夹取保证.
 > `x: 'center'` 的换算是
@@ -282,24 +308,29 @@ CSS 变量);右栏内部"参数区 / 视图区"的比例由 `RightSplitControlle
 
 ### 3.1 状态与唯一写入点
 
+> **后续修订**:状态只剩三个(`normal | maximized | minimized`),字段仍是
+> `geometry` / `state` / `restore` / `focused` / `zIndex`;`fullscreen` 与
+> `closed` 两条状态连同它们的动作,类名,键盘绑定一起删除(见文首修订块与
+> §11.2 E37).下文的五态与转移表是原始设计,保留作记录.
+
 一个窗口的状态收敛成五个字段,全部由 `WindowManager` 持有:
 
 ```text
 geometry   { x, y, w, h }          // 普通态几何(px,相对 #app)
-state      'normal' | 'maximized' | 'fullscreen' | 'minimized' | 'closed'
-restore    geometry | null         // 进入 maximized/fullscreen 前的几何,还原用
+state      'normal' | 'maximized' | 'minimized'   // 原设计还有 fullscreen / closed
+restore    geometry | null         // 进入 maximized 前的几何,还原用
 focused    boolean                 // 与 z-order 一起维护
 zIndex     number                  // 该窗口当前的 z-index(焦点独占写入)
 ```
 
 - **几何的唯一写入点**是 `WindowManager._applyGeometry(id)`:普通态把
-  `geometry` 逐条写进该元素的 `left/top/width/height`;`maximized` /
-  `fullscreen` 态则**清掉这四条行内属性**,几何交给 CSS 类的 `inset: 0`.
+  `geometry` 逐条写进该元素的 `left/top/width/height`;`maximized` 态则**清掉
+  这四条行内属性**,几何交给 `.is-maximized` 的 `inset`.
   它不写类名,也不碰 `z-index`(行内属性压过类规则,清不干净就是"最大化没反应").
 - **状态的唯一写入点**是 `WindowManager._applyState(id)`:`.window` 上的
-  **每一个类**(`.is-maximized` / `.is-fullscreen` / `.is-hidden` /
+  **每一个类**(`.is-maximized` / `.is-hidden` /
   `.is-focused` 除外--后者归 `focus()`)都在这里切,并刷新
-  `inert` / `aria-hidden` / 窗口按钮文案 / Dock 按钮的激活态.拖动,按钮,
+  `inert` / `aria-hidden` / 任务栏按钮的激活态与淡化.拖动,按钮,
   Dock,键盘(阶段 5)全部只改状态,由这两个函数落地.
 - `z-index` 有**第三**个写入点,就是 `focus()`:几何写入会清行内样式,两者
   必须分开,否则会出现"拖动时窗口掉到后面"(§11.2 E8).
@@ -312,22 +343,21 @@ zIndex     number                  // 该窗口当前的 z-index(焦点独占写
 | 起点 | 事件 | 终点 | 备注 |
 | --- | --- | --- | --- |
 | normal | 拖标题栏 | normal | 只改 `geometry` |
-| normal | 最大化按钮 / 拖到上边缘 / 标题栏双击 | maximized | 存 `restore` |
-| normal | 全屏按钮 | fullscreen | 存 `restore`;`Esc` 退出 |
+| normal | 最大化按钮 / 拖到顶部任务栏附近 / 标题栏双击 | maximized | 存 `restore` |
+| normal | ~~全屏按钮~~ | ~~fullscreen~~ | **已删除** |
 | normal | 最小化按钮 | minimized | `focused = false`,焦点下移 |
-| normal | 关闭按钮 | closed | 同上;Dock 按钮保留 |
-| maximized | 还原按钮 / 拖标题栏(拖即还原并跟手) | normal | 用 `restore` |
-| maximized | 全屏按钮 | fullscreen | `restore` **保留**(不覆盖) |
-| fullscreen | `Esc` / 退出按钮 | normal | 用 `restore` |
-| maximized / fullscreen | 最小化 / 关闭 | minimized / closed | `restore` **保留**,再开还是最大化前的尺寸 |
-| minimized | Dock 按钮 | normal | 回 `geometry` |
-| closed | Dock 按钮 | normal | 同上 |
-| 任意 | 桌面 `resize` | 同态 | normal 按夹取规则收进桌内;maximized/fullscreen 只需重算类(几何被 CSS 接管) |
+| normal | ~~关闭按钮~~ | ~~closed~~ | **已删除**(与最小化等价);任务栏按钮保留 |
+| maximized | 还原按钮 / 拖标题栏(拖即还原并跟手) / 点任务栏按钮 | normal | 用 `restore` |
+| maximized | ~~全屏按钮~~ | ~~fullscreen~~ | **已删除** |
+| ~~fullscreen~~ | ~~`Esc` / 退出按钮~~ | ~~normal~~ | **已删除** |
+| maximized | 最小化按钮 | minimized | `restore` **保留**,再开还是最大化前的尺寸 |
+| minimized | 任务栏按钮 | normal | 回 `geometry` |
+| ~~closed~~ | ~~任务栏按钮~~ | ~~normal~~ | **已删除** |
+| 任意 | 桌面 `resize` | 同态 | normal 按夹取规则收进工作区;maximized 只需重算类(几何被 CSS 接管) |
 
-`minimized` 与 `closed` 的行为**完全等价**(都进 `is-hidden` + `inert`),
-两者的区别只体现在 Dock 按钮的 `data-state` 上.落地时删掉了原方案里那个
-只写不读的 `.is-closed` 类:它没有 CSS 消费者,留着只会让人以为"改它就能改
-关闭态样式"(见 §11.2 E31).后续若真要"关闭=释放内容",再按新语义加回来,
+`minimized` 是唯一的隐藏态(它与原设计的 `closed` 行为**完全等价**:都进
+`is-hidden` + `inert`),所以 `closed` 连同那个只写不读的 `.is-closed` 类一起
+删掉了(见 §11.2 E31/E37).后续若真要"关闭=释放内容",再按新语义加回来,
 而不是先留一个空类名.
 
 ### 3.2 焦点与 z-order
@@ -347,20 +377,23 @@ zIndex     number                  // 该窗口当前的 z-index(焦点独占写
 - 视觉:聚焦窗口的边框/标题栏亮度提升,复用现有 token(§5.5),不引入
   参考项目那种"青/琥珀两套描边互换"的做法.
 
-### 3.3 最大化与单窗口全屏
+### 3.3 最大化(~~与单窗口全屏~~)
 
-两档,刻意分开:
+> **后续修订**:这一节只剩"最大化",单窗口全屏连同它的按钮 / `Esc` / `.is-fullscreen`
+> 已删除;最大化填的是**顶部任务栏之下的工作区**(`inset: var(--dock-reserve) 0 0 0`),
+> 不是"减去 `dockReserve` 的底部余量".下表是原始设计,保留作记录.
 
 | 档 | 触发 | 效果 |
 | --- | --- | --- |
-| **最大化** | 标题栏右上的 `▣` 按钮;标题栏双击;拖到桌面上边缘 | 填满 `#app` 减去 `dockReserve`(100px)的底部余量,**保留**窗口标题栏与 Dock |
-| **单窗口全屏** | 标题栏右上的 `⤢` 按钮(或 `F11` 语义) | 填满整个 `#app`,标题栏变成一条可悬停浮现的窄条,Dock 自动隐藏,`Esc` 退出 |
+| **最大化** | 标题栏右上的 `▣` 按钮;标题栏双击;拖到顶部任务栏附近(阈值 = 任务栏下沿 + `snap.edge`) | ~~填满 `#app` 减去 `dockReserve`(100px)的底部余量~~ -> 填满工作区,**保留**窗口标题栏与顶部任务栏 |
+| **单窗口全屏** | ~~标题栏右上的 `⤢` 按钮(或 `F11` 语义)~~ | **已删除**(它相对最大化只剩"遮不遮任务栏",而任务栏不该被遮) |
 
-两者都只写一个 CSS 类(`.is-maximized` / `.is-fullscreen`),几何从类里
-`inset: 0` 得到,**不覆盖 `geometry`**;退出时 `restore` 或 `geometry` 原样
+最大化只写一个 CSS 类(`.is-maximized`),几何从类里
+`inset: var(--dock-reserve) 0 0 0` 得到,**不覆盖 `geometry`**;退出时 `restore`
+或 `geometry` 原样
 写回,所以"最大化前拖到一半的窗口"能精确还原.
 
-`resize` 时若处于 maximized/fullscreen,只需重算类(几何被 CSS 接管),不需要
+`resize` 时若处于 maximized,只需重算类(几何被 CSS 接管),不需要
 夹取;处于 normal 的窗口按 §3.4 夹取.
 
 ### 3.4 拖动,八向缩放与指针穿透
@@ -463,19 +496,23 @@ y ∈ [0, desktopH - HEADER_MIN]                   // 标题栏绝不能被拖�
 
 ### 3.6 Dock / 任务栏
 
-一条固定在底边居中的横向容器,内容**由窗口清单生成**(不在 HTML 里手写
-按钮,与"示例菜单由控制器渲染"同一约定):
+> **后续修订**:Dock 现在是**紧贴桌面上沿的通栏任务栏**,`dockReserve` 就是栏高
+> (默认 40),既是任务栏高度也是工作区上沿;动作区只剩"全部还原"(退出全屏按钮
+> 随全屏一起删除).下面的"底边居中"是原始设计,保留作记录.
+
+一条固定在~~底边居中~~顶部通栏的横向容器,内容**由窗口清单生成**(不在 HTML 里
+手写按钮,与"示例菜单由控制器渲染"同一约定):
 
 - 每个窗口一个按钮:**只放标题**,不摆状态标记.点击语义按状态分派:normal ->
-  提升并聚焦(已是焦点则最小化);minimized/closed -> 恢复到 `geometry`;
+  提升并聚焦(已是焦点则最小化);minimized -> 恢复到 `geometry`;
   maximized -> 还原到 `normal`.
 - 按钮自身就是状态指示:当前焦点窗口的按钮带 `.is-active`(背景 + 边框 + 文字色),
-  最小化/关闭的按钮按 `data-state` 淡化(`opacity: 0.6`).
-- Dock 右侧另放一个**桌面动作区**:单窗口全屏退出(`Esc` 同样可退),以及
-  一个"全部还原"入口(把五个窗口一键复位到默认几何,对应参考项目的
-  "恢复默认").
-- Dock 常驻:即使五个窗口全关也必须在,否则用户没有回到窗口的入口.
-  窗口全关时桌面只剩 3D 视口,`:empty` 之外的提示不必做.
+  最小化的按钮按 `data-state` 淡化(`opacity: 0.6`).
+- 任务栏右侧另放一个**桌面动作区**:一个"全部还原"入口(把五个窗口一键复位到
+  默认几何,对应参考项目的"恢复默认").~~单窗口全屏退出(`Esc` 同样可退)~~
+  已随全屏删除.
+- 任务栏常驻:即使五个窗口全最小化也必须在,否则用户没有回到窗口的入口.
+  窗口全最小化时桌面只剩 3D 视口,`:empty` 之外的提示不必做.
 
 ### 3.7 过程窗口的"打开"语义(替代切标签页)
 
@@ -527,6 +564,13 @@ y ∈ [0, desktopH - HEADER_MIN]                   // 标题栏绝不能被拖�
 ---
 
 ## 4 实现规格
+
+> **后续修订**:这一章的**代码清单是当时的原始设计**,现状以 `packages/miko_ui`
+> 的源码为准(差异汇总见文首修订块与 §11.2 E37)--具体地:动作只剩
+> `minimize | maximize`,状态只剩 `normal | maximized | minimized`,`Dock` 是顶部
+> 通栏任务栏,`dockReserve` 默认 40 且是工作区上沿,`--dock-reserve` /
+> `--window-header-height` 由库从 `DesktopConfig` 写到桌面根.类型与公式的口径
+> (夹取 / `fitGeometry` / 吸附 / 单一写入点)不变,只是去掉全屏与关闭那两条分支.
 
 这一章是"照着写"的部分:类型,函数,状态转移,写入点,常量.凡是本文件给出
 签名的,文件名与签名都可以直接用;凡是本文件给出公式的,不要另发明一套.
@@ -1764,8 +1808,8 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 
 **真机回归清单**(浏览器,建议 1280×800 与 1920×1080 各一遍):
 
-1. 五个窗口默认几何互不重叠,不越界,**底边线都在 Dock 之上**(五个窗口的
-   底边应当齐平),Dock 不被窗口压住.
+1. 五个窗口默认几何互不重叠,不越界,**上沿都在顶部任务栏之下**,`view` /
+   `process` / `objects` 的**底边线齐平**(`dH - edgeGap`),任务栏不被窗口压住.
 2. 空桌面处拖拽转视角,滚轮缩放,右键平移全部照常(证明 `pointer-events`
    分层没做错).
 3. 编辑器:**高亮层逐项核对**(这是本方案最该慢慢看的一条,方法见下)--
@@ -1779,31 +1823,31 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 5. **拆三页**(§2.2):参数 / 视图 / 过程三个窗口**打开后都有内容**;三者可
    同屏;过程窗口能单独拖宽;**参数窗口里没有任何分隔条**(`#right-splitter`
    已删除),`#view-controls` 出现在视图窗口而不是参数窗口里;从对象列表点
-   "过程"时,被最小化/关闭的过程窗口会先恢复再抬升聚焦,且参数窗口的几何与
+   "过程"时,被最小化的过程窗口会先恢复再抬升聚焦,且参数窗口的几何与
    数值不变.
 6. **示例菜单完整展开**(B2):点"示例",菜单必须完整可见,不被窗口边缘或
    面板边缘切掉(它有意超出标题栏),滚到底部能选中最后一项;`Esc` 关闭并
    归还焦点.
-7. **对象窗口的底边能拖**(B4):Dock 两侧的桌面区域与窗口南边手柄都要能命中,
-   最小化/关闭后 Dock 仍可点.
+7. **任务栏不挡手柄**:窗口北边手柄贴在工作区上沿时仍能命中(任务栏那条带自己
+   收指针,但它的下沿不压住手柄);全部窗口最小化后任务栏仍可点.
 8. 对象列表:两栏,公式 KaTeX 渲染,点击复制 TeX,显隐开关生效.
 9. 窗口:拖动,八向缩放(八个方向各试一遍,重点看**西/北**方向是否"看着不动
-   右边在跑"),最小化/还原,关闭/恢复,最大化,全屏与 `Esc`.
-10. 窗口**隐藏后恢复**:最小化再还原,关闭再恢复之后,编辑器高亮与行号**仍然
+   右边在跑"),最小化/还原,最大化/还原(双击标题栏与标题栏按钮两条路径都试).
+10. 窗口**隐藏后恢复**:最小化再还原之后,编辑器高亮与行号**仍然
     对齐**(这条专门防"用 `display: none` 隐藏导致尺寸量到 0",见 §5.6).
 11. 视口 resize(改浏览器窗口大小):窗口不越界,3D 画面不变形
     (`renderController.resize()` 仍被调用).
-12. 关掉全部窗口后 3D 仍可操作,Dock 仍在.
+12. 全部窗口最小化后 3D 仍可操作,任务栏仍在.
 13. `index.html` 里**没有**任何 `.window` 结构(窗外壳只在 TS 里);把
     `UI_CONFIG.window.windows` 里某个窗口的 `title` 改一行,刷新后标题栏与
-    Dock 文案同时变(证明清单是唯一真相源).
+    任务栏文案同时变(证明清单是唯一真相源).
 14. 拆页没有留下残留:界面上**没有任何**"参数/过程"标签按钮,
     `#right-tabs` / `#right-panel` / `#right-splitter` 都不出现在 DOM 里,
     两个 `.right-page` 上没有 `role="tabpanel"` 残留,`getComputedStyle` 里
     也没有任何元素在消费 `--right-split-basis`.
 15. **标题栏只有一个**(B8):五个窗口各只有一层标题栏,界面上没有"窗口标题
     + 面板标题"两行的重复,也没有两层边框/阴影;`source code` / `视图` /
-    `参数` / `过程` / `对象` 五个文案与 Dock 上的按钮文案对得上.
+    `参数` / `过程` / `对象` 五个文案与任务栏上的按钮文案对得上.
 
 **高亮层核对的具体做法**(比"看起来对"更可靠):把开发者工具的 Elements 面板
 里 `#dsl-editor-highlight` 与 `#dsl-editor` 并排选中,读各自的盒模型;两者的
@@ -1906,6 +1950,11 @@ move/up 只在捕获元素上触发).所以 `WindowManager.test.ts` 里"拖标�
 调这个比例或给诊断区一条自己的最小高度(它是错误提示,不该被压到看不见).
 
 **B4 Dock 不能通栏,且窗口底边必须留在 Dock 之上.**
+
+> **后续修订:这条以"任务栏在底部"为前提,现已作废.**任务栏移到顶部且通栏:
+> 它占的是工作区之上的预留带(`dockReserve`),窗口几何被夹在它下面,所以不存在
+> "窗口手柄压在任务栏底下";与此同时窗口上沿不能进任务栏,这一条由夹取的 `y`
+> 下界(`y >= dockReserve`)保证,见文首修订块与 §11.2 E37.下面保留原始记录.
 
 两个条件要同时成立,少一个都会表现为"底边拖不动":
 
@@ -2050,6 +2099,7 @@ overflow: hidden }`.这一条已经在 §5.4/§5.6 写过,这里重复是因为�
 | E34 | "谁搬去哪"散在三个文件里:`UI_CONFIG` 只写窗口清单,`WindowFrameSpec` 用 `titleContent` / `actions` / `overlays` 三个平行字段,`DslApp._windowContent()` 用 if 链把它们接起来;槽位词汇在每个文件里各叫一个名字 | 同一件事三处各说一半,加一个标题栏节点要同时改配置示例,spec 字段与 if 链;而且 `titleContent` 按"是什么"命名,`actions` / `overlays` 按"是什么东西"命名,读代码必须来回跳 | 引入唯一的槽位词表 `WindowSlot = 'title' | 'actions' | 'overlays'`(定义在 `uiConfig.ts`,`WindowFrameSpec.slots` 用同一套键),采用关系收成 `UI_CONFIG.window.adopted` 一张表,由 `windowSlotsProvider(chrome)` 一次解析成 provider;`DslApp` 不再参与"谁搬去哪".节点名的强类型由 `WindowChrome = Record<ChromeNodeId, HTMLElement>` 在编译期守住 |
 | E35 | `index.html` 里散着 26 处 `document.getElementById`(视口 / 参数面板 / 诊断 / 七个对象列表 / 编辑器四个槽 / 过程面板 / `#app` / 窗口三容器),旁边还有 `WindowManager` 自己按 `hostId` 查宿主 | `!` 非空断言把"HTML 改名或删节点"推迟到运行期的 `Cannot read properties of null`;而 `ui/widgets/dom.ts` 与 `ui/view/ViewPanel.ts` 早就把"id 当全局注册表"写成淘汰做法,窗口化等于在最后一公里把它请了回来 | 新增 `app/appHosts.ts`:`readAppHosts()` 是全应用唯一按 id 取节点的地方,取不到就抛带 id 的错误,五个正文宿主也在这里按 `hostId` 取好交给 `WindowManager`(此后 `DslApp` 与 `WindowManager` 都不碰 `document`);配两向守卫:`desktopHosts.test.ts`(配置 ↔ HTML)与 `appHosts.test.ts`(HTML ↔ 取节点,用 HTML 的 id 集合构造桩树).`index.html` 的准入清单同时写进 §5.3 |
 | E36 | §3.6 的 Dock 按钮写"标题 + 状态点",窗口清单里另有一枚 per-window 字形图标(`dock.icon`) | 两个装饰件都不承担信息:①图标(✎ / ◫ / ▤ / ≡ / ☰)与按钮文字同义;②状态点的 5 个分支里,`minimized`/`closed` 与按钮自身的 `data-state` 淡化重复(二者本就行为等价),"`normal`"是恒亮的默认灰点,`maximized` 与"窗口铺满桌面"重复,`fullscreen` 更是**永远画不出来**--全屏时 `#dock` 整条 `display: none`,那条 `background: var(--color-accent)` 没有观测者 | 删掉 `dock.icon` 字段(`WindowConfigEntry.dock` 只剩 `label`)与 `dock-btn-icon` 元素 + CSS;删掉状态点元素,`stateClass()` 函数与 `.dock-btn-state` 四条规则,只保留 `data-state`(CSS 按它写 `opacity: 0.6`).状态表达收敛为按钮自身两态:聚焦 = `.is-active`,最小化/关闭 = `data-state` |
+| E37 | §3.1–§3.3/§3.6 的状态机与 Dock:五个状态(`normal`/`maximized`/`fullscreen`/`minimized`/`closed`),四个动作(`minimize`/`maximize`/`fullscreen`/`close`),Dock 贴底且是"内容宽度 + 指针穿透"的浮岛,全屏时整条 `display: none`;外壳尺寸(`--dock-reserve`/`--window-header-height`)由消费者用 `applyTheme` 再传一份 | ①没有真正的进程可关:`closed` 与 `minimized` 都是"藏起来",多一个按钮只是语义重复;②`fullscreen` 与 `maximized` 的差别也只剩"遮不遮任务栏",而任务栏不该被遮;③浮岛的"内容宽度 + 整层 `pointer-events: none`"只服务"两侧要留出能点到的桌面",通栏任务栏不需要;④同一份尺寸被 JS 几何与 CSS 各存一份,改一处忘另一处会出现"窗口盖住任务栏/任务栏下多一条缝",且不报错 | ①`WindowState` 收成 `normal \| maximized \| minimized`,删 `setClosed`/`setFullscreen`/`hasFullscreen`/`exitFullscreen`,`.is-fullscreen` 与 `.is-closed` 系列规则,`Esc` 退出全屏的键盘绑定,Dock 的"退出全屏"按钮与 `is-fullscreen` 隐藏态;②`WindowActionId` 收成 `minimize \| maximize`(`Dock`/`WindowFrame` 的类型同步);③Dock 改成**顶部通栏任务栏**:`.dock` 本身是那个盒子,`WindowManager` 挂载时把 `--dock-reserve`/`--window-header-height` 从 `DesktopConfig` 写到桌面根,`styles/tokens.css` 只留兜底,并加 `theme/tokens.test.ts` 守住三者同值;④`WindowGeometry` 的 y 轴原点改成工作区上沿(`dockReserve`),夹取/收拢/吸附/最大化都从那里量起,顶部吸附阈值改成"任务栏下沿 + `snap.edge`".连带应用侧:`UI_CONFIG.window.dockReserve` 100->40,三处底边 `inset` 116->16(测试逐字断言 tokens.css 与 `UI_CONFIG` 一致,这条改动由它兜住) |
 
 ### 11.3 查过但**不是**阻碍的(留个记录,省得再查一遍)
 

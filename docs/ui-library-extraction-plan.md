@@ -495,7 +495,7 @@ mountDesktop(document.getElementById('app')!, {
       ]),
     },
   ],
-  actions: ['minimize', 'maximize', 'fullscreen', 'close'],
+  actions: ['minimize', 'maximize'],
   dock: true,
 });
 
@@ -1013,7 +1013,8 @@ find src/ui/entity src/ui/evaluation src/ui/objects src/ui/params \
 2. **键盘只有一个出口.** `src/ui/shared/KeyboardController.ts` 的
    `register({ keys, resolve })`,`resolve()` 返回闭包表示"这一层处理了",
    返回 `null` 表示"放行给下一层";优先级靠**注册顺序**表达
-   (见 `DslApp.start()`:示例菜单的 Esc 注册在全屏 Esc 之前).
+   (见 `DslApp.start()`:示例菜单的 Esc 就是一条 `resolve()` 返回闭包的绑定,
+   没有浮层打开时返回 `null` 放行).
    **这条必须在库里保住** -- 否则每个组件各自绑 `keydown`,冲突只能靠
    `stopPropagation` 猜.
 3. **浮层的"点外部关闭"挂在根节点上,不挂在浮层自己.**

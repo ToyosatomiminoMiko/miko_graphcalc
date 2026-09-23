@@ -199,15 +199,6 @@ export class DslApp {
         for (const binding of this.exampleLoader.keyboardBindings()) {
             this.keyboardController.register(binding);
         }
-        // 单窗口全屏的键盘出口:注册在示例浮层的 Esc **之后**,菜单开着时先关
-        // 菜单;没有全屏窗口时本条返回 null,把 Esc 原样放行(见 §3.3;完整键盘
-        // 窗口管理是阶段 5,不在这里做).
-        this.keyboardController.register({
-            keys: ['Escape'],
-            resolve: () => (this.windowManager.hasFullscreen()
-                ? () => this.windowManager.exitFullscreen()
-                : null),
-        });
         this.keyboardController.bind();
 
         this.animationFrameId = requestAnimationFrame(this.animate);

@@ -70,10 +70,11 @@ export interface AppWindowEntry {
 export interface AppWindowConfig {
     /** 五个窗口,顺序即 z 初始序与 Dock 顺序. */
     readonly windows: readonly AppWindowEntry[];
-    /** 标题栏上的窗口按钮:顺序即显示顺序,glyph 进配置不散在 TS 里. */
+    /** 标题栏上的窗口按钮:顺序即显示顺序,文案进配置不散在 TS 里. */
     readonly actions: readonly {
         readonly id: WindowActionId;
         readonly label: string;
+        /** 按钮的可见文案(不随状态变). */
         readonly glyph: string;
     }[];
     readonly adopted: readonly AdoptedNodeSpec[];
@@ -189,8 +190,9 @@ export const UI_CONFIG = {
                     x: { at: 16 },
                     y: { at: 0 }, // 占位:存在 after 时以 after 为准
                     w: { at: 420 },
-                    // h = dH - inset - y,与 process 共用同一条底边
-                    h: { from: 'bottom', inset: 116 },
+                    // h = dH - inset - y,与 process 共用同一条底边(底边只留 edgeGap:
+                    // Dock 在顶部,已由 y 从工作区上沿量起让出)
+                    h: { from: 'bottom', inset: 16 },
                     after: { id: 'source', gap: 12 },
                 },
                 minSize: { w: 280, h: 180 },
@@ -216,7 +218,7 @@ export const UI_CONFIG = {
                     x: { from: 'right', inset: 16 },
                     y: { at: 0 }, // 占位:存在 after 时以 after 为准
                     w: { at: 420 },
-                    h: { from: 'bottom', inset: 116 },
+                    h: { from: 'bottom', inset: 16 },
                     after: { id: 'params', gap: 12 },
                 },
                 minSize: { w: 280, h: 180 },
@@ -228,7 +230,7 @@ export const UI_CONFIG = {
                 defaultGeometry: {
                     // 中列宽度是算出来的:dW - 2 * (420 + 16),夹到 [360, 720]
                     x: 'center',
-                    y: { from: 'bottom', inset: 116 },
+                    y: { from: 'bottom', inset: 16 },
                     w: { clamp: [360, 720], inset: 2 * 436 + 32 },
                     h: { at: 260 },
                 },
@@ -236,10 +238,8 @@ export const UI_CONFIG = {
             },
         ],
         actions: [
-            { id: 'minimize', label: '最小化', glyph: '─' },
-            { id: 'maximize', label: '最大化', glyph: '▣' },
-            { id: 'fullscreen', label: '全屏', glyph: '⤢' },
-            { id: 'close', label: '关闭', glyph: '✕' },
+            { id: 'minimize', label: '最小化', glyph: 'min' },
+            { id: 'maximize', label: '最大化', glyph: 'max' },
         ],
         // 四个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
         // (旧写法是 index.html 里一个 hidden 暂存区 + DslApp 里一条 if 链).
@@ -257,7 +257,9 @@ export const UI_CONFIG = {
         edgeKeep: 80,
         edgeGap: 16,
         headerMinVisible: 36,
-        dockReserve: 100,
+        // Dock 是顶部任务栏,这个数就是栏高(也是窗口工作区上沿);库会把它写到
+        // 桌面根的 --dock-reserve 上,所以 tokens.css 的兜底值也必须是 40.
+        dockReserve: 40,
         headerHeight: 36,
         /**
          * 三层容器的 z-index(由 WindowManager 写成行内样式,是**唯一**来源:
