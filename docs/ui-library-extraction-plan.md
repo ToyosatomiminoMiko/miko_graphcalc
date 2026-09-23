@@ -74,13 +74,29 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 > 本仓库的构建与 CI 从不读工作副本.下面各表里出现的 `packages/miko_ui` 路径都是
 > **当时的形态**,保留作过程记录;要改库请去库仓库的工作副本.
 >
-> 还没做,先搁置的一条:**"每次构建都确认拿到的是最新产物"**.库不写版本号,缓存里
-> 那张 `.miko-ui-source` 纸条只有滚动 tag + 下载时解析到的 commit sha,所以现在
-> 不会因为"缓存旧了"而失败/重取(只有产物不健康才重取).真要做的钩子已经有半个:
-> 库的 `release.yml` 每次都会把 `ui-latest` 这个 tag 强推到**产出这份资产的
-> commit**,所以消费侧只要查一次 tag 指向的 sha 与纸条上的 sha 比对,就能报出
-> "缓存不是最新"(不必改库;要更稳的话让库在资产里带一个 sha 文件,就不受"main
-> 已经前进,release 还没跑完"这个窗口的影响).留待后续单独处理.
+> **补记五(更新检查已做,2026-09):** 补记四里搁置的"每次构建都确认拿到的是最新
+> 产物"落地了.库侧 `scripts/pack_release.mjs` 把**构建 commit** 写进资产清单的
+> `gitHead`(本地工作树脏时是 `<sha>-dirty`;`ci.yml` 的 dry-run 与 `release.yml` 的
+> 交付验收都断言它等于本次构建的 commit,所以"资产说自己是谁"是可信的).消费侧
+> `scripts/fetch_ui.sh` 每次 `npm ci` 都拿它比 `ui-latest` tag 指向的 commit
+> (`git ls-remote --tags`,公开仓库免认证,不吃 GitHub API 限额;**不用** release
+> 对象的 `target_commitish` -- 那个字段不跟着强推 tag 更新):
+>
+> - 相等 -> 直接用;不等 -> **自动重下**(不用手动 `--update`);
+> - 资产没有 `gitHead`(旧资产)时不能确证新鲜,但来源纸条若显示它比 tag 旧,照样
+>   自动重下(纸条只用来触发重取,不用来宣布"最新");
+> - 查不到(断网 / 没 git / 资产不自证版本)时:**CI 里明确失败**(部署出去的不能是
+>   "说不清哪一版"的缓存),本地只警告并沿用缓存.`MIKO_UI_SKIP_CHECK=1` 显式跳过
+>   检查,`MIKO_UI_REQUIRE_LATEST=1` 让本地也严格;手动放置的资产记为 `local-file`,
+>   不参与检查(它是发布坏掉时的兜底).
+> - 下载这条路也补了上界与绕行:`--connect-timeout 10 --max-time 45` + 5 次重试
+>   (github.com 在某些网络里会"DNS 通,TCP 超时",连上了也可能不吐字节),主 URL
+>   不通时改走 GitHub API 的资产端点(`api.github.com` -> `objects.
+>   githubusercontent.com`,同一份字节);显式给过 `MIKO_UI_ASSET_URL` 时不绕行 --
+>   那是人指的路.CI 里给这一步带上 `GITHUB_TOKEN`(匿名 API 限额 60 次/小时/出口 IP).
+>
+> 落地顺序有要求:**先推库**(让带 `gitHead` 的资产挂出来),再推本仓库 -- 在那之前
+> 本仓库的 CI 会因为"资产不自证版本"而红,这是刻意的.
 
 | 期 | 状态 | 落地后的关键形态 |
 | --- | --- | --- |

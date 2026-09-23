@@ -310,9 +310,15 @@ npm run build
 > `preinstall` 会跑 `scripts/fetch_ui.sh` -- 下载 -> 校验 -> 解开到
 > `.cache/miko_ui/current`(gitignore),最后按
 > `"@miko/ui": "file:.cache/miko_ui/current"` 链接进来.本机**没有 TypeScript,
-> 也没有库的源码**;要拉上游最新:`npm run ui:update`.取不到资产会**明确失败**
+> 也没有库的源码**;要拉上游最新:`npm run ui:update`(不用它也够:每次 `npm ci`
+> 都拿资产清单里的 `gitHead` -- 库打包时写入的构建 commit -- 比 `ui-latest` tag
+> 指向的 commit,落后就自动重取).下载先走 github.com;那个主机在部分网络里会
+> **间歇性连不上**(DNS 通,TCP 超时),脚本会重试并绕行 GitHub API 的资产端点
+> (同一份字节,只是换条路).取不到资产会**明确失败**
 > (脚本会打印 release 页面,期望 URL 与手动下载步骤),**没有**"克隆源码自己构建"
-> 的回退.规则与理由见 `scripts/fetch_ui.sh` 顶部与库仓库的 `RELEASING.md`.
+> 的回退;而"查不到是不是最新"(断网 / 资产不自证版本)时本地只警告,**CI 里明确
+> 失败** -- 部署出去的不能是"说不清哪一版"的缓存.规则与理由见
+> `scripts/fetch_ui.sh` 顶部与库仓库的 `RELEASING.md`.
 
 四. 重新生成wasm
 

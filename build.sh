@@ -44,6 +44,11 @@ log "installing pinned dependencies from package-lock.json"
 # preinstall,不能挪到这里之后;CI 也不需要 checkout submodule,不需要任何 npm
 # 凭据 -- 公开 release 资产,能访问 GitHub(actions/checkout 本来就要)就够了.
 #
+# 这次 npm ci 还会核对"缓存是不是最新":资产清单里的 gitHead(库打包时写入的构建
+# commit)与 ui-latest tag 指向的 commit 不一致就自动重取;查不到这个结论(断网 /
+# 资产不自证版本)时本地只警告,CI 里明确失败 -- 所以"库刚推,资产还没带上 gitHead"
+# 时,CI 可能就红在这一步,那不是配置错误(见 fetch_ui.sh 顶部 §7).
+#
 # 再往下 build:all 的顺序是 lint:rs -> clean -> build:wasm -> test -> build:app;
 # 其中 clean 只删根 dist/ 与 src/generated/,不碰 .cache/miko_ui,所以"产物在第一
 # 步就绪,后面全程可用".取产物/链接/模块去重的全部规则见

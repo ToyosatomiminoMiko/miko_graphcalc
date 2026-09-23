@@ -23,6 +23,10 @@ jobs:
   # `miko_ui_dist.tar.gz`,校验后解开到 `.cache/miko_ui/current`,再按 `file:`
   # 依赖链接进来.所以这里不需要 checkout submodule,也不需要任何 npm 凭据 --
   # 只要能访问 GitHub(actions/checkout 本来就要)就够了.
+  # 同一步还会核对"手里这份是不是最新发布的":资产清单里的 `gitHead`(库打包时写入
+  # 的构建 commit)与 `ui-latest` tag 指向的 commit 不一致就自动重取;查不到这个
+  # 结论(资产不自证版本 / 断网)时这里**明确失败** -- 部署出去的不能是"说不清哪一版"
+  # 的缓存(本地开发只警告).见 `scripts/fetch_ui.sh` 顶部 §7.
   # 顺序提醒:库那边的 Release workflow 得先绿,资产挂上了,这里的 CI 才有得取;
   # 在那之前本 job 会**明确失败**(fetch_ui.sh 打印 release 页面与手动步骤),这是
   # 刻意设计,不是配置错误.
@@ -53,6 +57,11 @@ jobs:
       # 生产构建唯一入口:安装锁定依赖 -> Rust lint -> 清理并构建 WASM ->
       # 前端/Rust 测试 -> TypeScript 检查 -> Vite 构建,分阶段日志由脚本输出.
       - name: Install, lint, test and build
+        # GITHUB_TOKEN 是给 preinstall 用的:查 `ui-latest` 的 tag,以及 github.com
+        # 连不上时绕行 API 资产端点.公开仓库匿名也能查,但限额是 60 次/小时/出口 IP,
+        # 而 runner 是共享出口;带上 token(contents: read 就够)才稳.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash ./build.sh
 
       - name: Setup Pages
