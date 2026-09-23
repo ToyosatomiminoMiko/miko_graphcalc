@@ -115,7 +115,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 ```
 
 - 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)与任务栏**由库声明式装配**
-  (`packages/miko_ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
+  (库 `@miko/ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
   里只有一个空 `#app`,窗口层 / 吸附预览 / 任务栏 / 每个窗口的正文容器都由库建;
   加窗口只改 `UI_CONFIG.window.windows` 一处.
 - 能力:拖动标题栏移动,八向缩放,最小化(再点任务栏按钮恢复),最大化(填满任务栏
@@ -135,7 +135,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   之上的预留带,工作区里没有任何东西需要让路.
 - 窗口外壳的两个尺寸(任务栏高度 `dockReserve`,标题栏高度 `headerHeight`)在
   挂载时由库从 `DesktopConfig` 写到 `#app` 的 CSS 变量上,是运行期唯一来源;
-  `packages/miko_ui/styles/tokens.css` 的同名值只是没有 JS 时的兜底.
+  `@miko/ui` 的 `styles/tokens.css` 里的同名值只是没有 JS 时的兜底.
 - **布局不落 localStorage**:刷新后回到默认几何,与"界面偏好不落本地存储"的
   既有约定一致;设计取舍与逐条理由见
   [面板窗口化设计计划](docs/windowing-plan.md).
@@ -146,7 +146,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/app/applyUiConfig.ts`
 写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
 `css/panels.css` / `css/diagnostics.css` / `css/process.css`(面板与列表)
-与 `packages/miko_ui/styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
+与 `@miko/ui` 的 `styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
 `desktop.css`,编辑器外壳 `editor.css`)的 `var()` 消费.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
@@ -165,7 +165,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   (`--window-header-height` 与 `--dock-reserve`)在挂载时由库从这份配置
   写到 `#app`,库样式表里的同名值只是没有 JS 时的兜底.
 
-改完刷新页面即可.库样式表(`packages/miko_ui/styles/tokens.css`)的 `:root`
+改完刷新页面即可.库样式表(`@miko/ui` 的 `styles/tokens.css`)的 `:root`
 兜底只负责脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致--这条约定由
 `applyUiConfig.test.ts` 逐字断言,
 只改 `uiConfig.ts` 或只改 CSS 都会先失败在测试上,不会静默闪一帧旧样式.
@@ -304,11 +304,15 @@ npm run build
 
 > **`@miko/ui`(网页 UI 库)不在这里,也不从 npm 取.** 它是独立仓库
 > [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
-> 由上面那句 `npm ci` 顺带备好:根 `package.json` 的 `preinstall` 会跑
-> `scripts/fetch_ui.sh` -- 不存在就 `git clone` 该仓库的 `main`(存在就复用),
-> 然后在 `packages/miko_ui` 里 `npm ci` + `npm run build` 产出 `dist/`,最后按
-> `"@miko/ui": "file:packages/miko_ui"` 链接进来.要拉上游最新:
-> `npm run ui:update`;规则与理由见 `packages/miko_ui/RELEASING.md`.
+> 交付形态是它的**滚动 release 资产**(`ui-latest` 上的
+> `miko_ui_dist.tar.gz`,由库的 `.github/workflows/release.yml` 在 main 每次
+> 推送后覆盖).上面那句 `npm ci` 顺带把它备好:根 `package.json` 的
+> `preinstall` 会跑 `scripts/fetch_ui.sh` -- 下载 -> 校验 -> 解开到
+> `.cache/miko_ui/current`(gitignore),最后按
+> `"@miko/ui": "file:.cache/miko_ui/current"` 链接进来.本机**没有 TypeScript,
+> 也没有库的源码**;要拉上游最新:`npm run ui:update`.取不到资产会**明确失败**
+> (脚本会打印 release 页面,期望 URL 与手动下载步骤),**没有**"克隆源码自己构建"
+> 的回退.规则与理由见 `scripts/fetch_ui.sh` 顶部与库仓库的 `RELEASING.md`.
 
 四. 重新生成wasm
 

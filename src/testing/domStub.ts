@@ -758,9 +758,8 @@ export interface StubDocument {
 /**
  * 安装一套全局 DOM 桩(每个用例调一次,得到一棵干净的空树).
  *
- * 默认把剪贴板路径设成非安全上下文,让 FormulaCopyController 走 legacy 回退,
- * 从而可在 node 里断言"复制成功/失败提示";需要异步剪贴板路径的用例可以自己
- * 覆盖 `window.isSecureContext` 与 `navigator.clipboard`.
+ * 剪贴板默认缺席(非安全上下文形态):库的公式复制只有 `navigator.clipboard` 一条
+ * 通道,要断言"复制成功"的用例得自己装上它并把 `window.isSecureContext` 置 true.
  */
 export function installDomStub(): DomStub {
     const documentElement = new StubElement('html');

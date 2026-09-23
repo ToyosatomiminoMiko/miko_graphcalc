@@ -55,22 +55,22 @@ export default defineConfig({
     resolve: {
         alias: [{ find: /^@\//, replacement: `${SRC_ALIAS}/` }],
         /**
-         * 库是 `file:` 链接进来的(`@miko/ui` -> `packages/miko_ui`),它有自己
-         * 的 `node_modules`:`katex`(可选 peer 的 dev 安装)与
-         * `@preact/signals-core`(运行时依赖)各有一份.不做 dedupe 会同时踩两个
-         * 坑:
+         * 库是 `file:` 链接进来的(`@miko/ui` -> `.cache/miko_ui/current`,由
+         * `scripts/fetch_ui.sh` 从库的 release 资产解开),那份产物里**没有**
+         * `node_modules`:库的运行时依赖(`@preact/signals-core`,以及引公式时的
+         * `katex`)由**本应用的 package.json 自己声明**.dedupe 在这里是第二道
+         * 保险:把它们钉死到应用根目录的那一份实例上.
          *
-         * 1. **测试里的 `vi.mock('katex')` 拦不住库**:mock 按"从测试文件解析出
-         *    的模块"注册,而库的 `dist/formula/FormulaView.js` 会就近解析到它自己
-         *    那份 -- 两份是两个模块实例,于是公式相关的用例会真的去跑 katex;
-         * 2. **产物里可能进两份**:peer 依赖的语义本来就是"由消费者提供一份",
-         *    所以这里强制所有 `katex` 都解析到应用根目录那一份.
+         * 为什么必须只有一份:
          *
-         * `@preact/signals-core` 同理:它是库的响应式真相源,必须只有一个实例,
-         * 否则 signal 与 effect 会跨在两条注册表上,表现是"值变了界面不动".
+         * 1. **测试里的 `vi.mock('katex')` 要能拦住库**:mock 按"从测试文件解析
+         *    出的模块"注册,库的 `dist/formula/FormulaView.js` 必须解析到同一个
+         *    实例,否则公式相关的用例会真的去跑 katex;
+         * 2. **`@preact/signals-core` 是库的响应式真相源**:两份实例意味着 signal
+         *    与 effect 跨在两条注册表上,表现是"值变了界面不动".
          *
-         * 库为什么会以 `file:` 链接进来,为什么必须先把它构建出 `dist/`,见
-         * `scripts/fetch_ui.sh` 顶部的"应用侧的依赖契约".
+         * 库为什么以 `file:` 链接进来,资产清单里为什么不能有 `scripts`,拿不到
+         * 资产时怎么手动兜底,见 `scripts/fetch_ui.sh` 顶部的"应用侧的依赖契约".
          */
         dedupe: ['katex', '@preact/signals-core'],
     },
@@ -81,10 +81,10 @@ export default defineConfig({
         // 只收本仓库自己的测试.
         //
         // 不写这一条的话 Vitest 用默认 glob(`**/*.test.ts`),会把磁盘上任何
-        // 位置的测试都收进来.分离之后 `packages/miko_ui/` 仍可能是本地那份库
-        // 的工作副本(gitignored,CI 的干净 clone 里不存在),于是本地跑 77 个
-        // 文件,CI 只跑 58 个,数字对不上还看不出来.库的测试现在由库自己的
-        // 仓库和 CI 负责,不该在这里重复跑一遍.
+        // 位置的测试都收进来:开发机上库的工作副本就在别处(本机是
+        // `../__projects_web/miko_ui`),它的测试会被顺带跑一遍.这种"本地多跑
+        // 一批,CI 少跑一批"的差异看不出来.库的测试由库自己的仓库和 CI 负责,
+        // 不该在这里重复跑一遍.
         include: ['src/**/*.test.ts'],
         // 解析器集成测试要跑真正的 Rust/WASM 解析器;wasm-bindgen 的默认
         // 初始化在 Node 里走 `fetch(new URL(..., import.meta.url))`,Node 的

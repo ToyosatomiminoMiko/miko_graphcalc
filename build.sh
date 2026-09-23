@@ -37,15 +37,16 @@ require_command cargo
 require_command wasm-pack
 
 log "installing pinned dependencies from package-lock.json"
-# 顺序说明:根 package.json 的 preinstall 会先跑 scripts/fetch_ui.sh -- 从
-# GitHub 取 miko_ui(main 分支),在库目录里构建出 dist/,然后把
-# `"@miko/ui": "file:packages/miko_ui"` 这条链接装上.npm 解析 file: 依赖时
-# packages/miko_ui 必须已经存在,所以"取库"只能挂在 preinstall,不能挪到这里
-# 之后;CI 也不需要 checkout submodule,取库由这条链自己完成.
+# 顺序说明:根 package.json 的 preinstall 会先跑 scripts/fetch_ui.sh -- 从库
+# 仓库的滚动 release(`ui-latest` 上的 miko_ui_dist.tar.gz)取**产物**,校验后
+# 解开到 .cache/miko_ui/current,然后把 `"@miko/ui": "file:.cache/miko_ui/current"`
+# 这条链接装上.npm 解析 file: 依赖时那个目录必须已经存在,所以"取产物"只能挂在
+# preinstall,不能挪到这里之后;CI 也不需要 checkout submodule,不需要任何 npm
+# 凭据 -- 公开 release 资产,能访问 GitHub(actions/checkout 本来就要)就够了.
 #
 # 再往下 build:all 的顺序是 lint:rs -> clean -> build:wasm -> test -> build:app;
-# 其中 clean 只删根 dist/ 与 src/generated/,不碰库的 packages/miko_ui/dist,所以
-# "库在第一步就绪,后面全程可用".取库/链接/模块去重的全部规则见
+# 其中 clean 只删根 dist/ 与 src/generated/,不碰 .cache/miko_ui,所以"产物在第一
+# 步就绪,后面全程可用".取产物/链接/模块去重的全部规则见
 # scripts/fetch_ui.sh 顶部与 vite.config.ts 的 resolve.dedupe.
 npm ci --no-audit --no-fund
 

@@ -84,8 +84,8 @@
     background-clip: content-box;
 }
 
-/* 单条参数行的样式(名称 / 滑杆 / 数值框 / 重置按钮)已经归库:
-   `@miko/ui` 的 `.slider-field`(见 packages/miko_ui/styles/widgets.css),
+/* 单条参数行的样式(名称 / 滑杆 / 数值框 / 重置按钮)参见:
+   `@miko/ui` 的 `.slider-field`(见库的 `styles/widgets.css`),
    参数面板只负责列表容器(上面的 `#params-panel`). */
 
 /* ==========================================================================

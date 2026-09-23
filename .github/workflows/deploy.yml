@@ -15,13 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # UI 库的检查(边界守卫 / typecheck / vitest)跟着库在它自己的仓库里跑:
-  #   https://github.com/ToyosatomiminoMiko/miko_ui  (.github/workflows/ci.yml)
+  # UI 库的检查(边界守卫 / typecheck / vitest)与**发布**都在库自己的仓库里跑:
+  #   https://github.com/ToyosatomiminoMiko/miko_ui
+  #   (ci.yml 是检查,release.yml 出滚动 release 资产 `ui-latest`)
   # 本仓库不再有库的源码,也不从 npm 取它:`build.sh` 里的 `npm ci` 会触发
-  # package.json 的 preinstall -> `scripts/fetch_ui.sh`,从上面的仓库取 `main`
-  # 分支,在 `packages/miko_ui` 里构建出 `dist/`,再按 `file:` 依赖链接进来.
-  # 所以这里不需要 checkout submodule,也不需要任何 npm 凭据 -- 只要能访问
-  # GitHub(actions/checkout 本来就要)就够了.
+  # package.json 的 preinstall -> `scripts/fetch_ui.sh`,下载库挂出来的公开资产
+  # `miko_ui_dist.tar.gz`,校验后解开到 `.cache/miko_ui/current`,再按 `file:`
+  # 依赖链接进来.所以这里不需要 checkout submodule,也不需要任何 npm 凭据 --
+  # 只要能访问 GitHub(actions/checkout 本来就要)就够了.
+  # 顺序提醒:库那边的 Release workflow 得先绿,资产挂上了,这里的 CI 才有得取;
+  # 在那之前本 job 会**明确失败**(fetch_ui.sh 打印 release 页面与手动步骤),这是
+  # 刻意设计,不是配置错误.
   build-and-deploy:
     runs-on: ubuntu-latest
     environment:

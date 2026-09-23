@@ -5,7 +5,8 @@
   "description": "GraphCalc DSL",
   "type": "module",
   "dependencies": {
-    "@miko/ui": "file:packages/miko_ui",
+    "@miko/ui": "file:.cache/miko_ui/current",
+    "@preact/signals-core": "^1.14.4",
     "katex": "^0.18.5",
     "three": "^0.185.1"
   },

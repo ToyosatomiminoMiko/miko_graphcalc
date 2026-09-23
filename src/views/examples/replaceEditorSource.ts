@@ -21,7 +21,6 @@
  * 行号栏/预览即可(见 `EditorLineNumbers.refresh()`,它本就是为程序化改写
  * 编辑器准备的).
  */
-import { runLegacyEditorCommand } from '@miko/ui';
 
 export function replaceTextareaSource(
     editor: HTMLTextAreaElement,
@@ -57,7 +56,18 @@ function insertTextPreservingUndo(
     } catch {
         return false;
     }
-    // 旧编辑命令收口在库的 dom/legacyCommand:那里是唯一触碰已弃用 API 的地方.
-    // 库不读全局 document,所以把编辑器所属的 document 传进去(D7).
-    return runLegacyEditorCommand(editor.ownerDocument, 'insertText', source);
+
+    // 已弃用的 execCommand(全应用只剩这一处;不受 SecureContext 门禁,代价是要用户手势):
+    // focus + select 之后调用,文本才会落在「整段替换」的位置上.局部类型断言
+    // 也是为了让 `@deprecated` 的删除线只留在这一行.
+    const doc = editor.ownerDocument;
+    const exec = (doc as {
+        execCommand?: (id: string, showUI?: boolean, value?: string) => boolean;
+    }).execCommand;
+    try {
+        // 返回 true 只表示浏览器接受了命令;不存在/被拒/抛错一律 false,由调用方退到 `.value =`.
+        return exec?.call(doc, 'insertText', false, source) === true;
+    } catch {
+        return false;
+    }
 }

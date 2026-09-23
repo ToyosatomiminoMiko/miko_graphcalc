@@ -48,6 +48,39 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 > `git ls-remote ssh://git@github.com/...`,只有 40 位 commit SHA 才走 https;
 > 现在的做法是自己的 shell 脚本直接 https clone,不经过 npm 的 git 层,也就不
 > 需要 SSH key.
+>
+> **补记三(改为 release 产物):** 库不再从 `main` 的源码取,而是取它挂出来的
+> **滚动 release 资产**(`ui-latest` / `miko_ui_dist.tar.gz`,由库的
+> `.github/workflows/release.yml` 在 main 每次推送后覆盖).本仓库与 `@miko/ui`
+> 的关系变成:
+>
+> 1. `package.json` 里一条本地依赖 `"@miko/ui": "file:.cache/miko_ui/current"`,
+>    并自己声明库的运行时依赖 `@preact/signals-core`;
+> 2. 一条 `preinstall` -> `scripts/fetch_ui.sh`:下载 -> 校验 -> 解开 -> 原子替换
+>    缓存,落到 `.cache/miko_ui/current`(gitignore).
+>
+> 于是**消费者机器上没有 TypeScript,也不构建库**;补记二里那条 `git clone` 到
+> `packages/miko_ui` 再本地构建的路径整个作废.`packages/miko_ui` 那时降级成
+> "本机开发库时用的工作副本",不是依赖来源.`--update` / `MIKO_UI_UPDATE`
+> 的语义从"fetch + 快进"变成"重新下载一份产物";取不到资产就明确失败,没有回退到
+> 本地构建的路径.
+>
+> **补记四(工作副本也搬出本仓库):** 补记三里那个"相邻工作副本"`packages/miko_ui`
+> 也搬走了 -- 库既然是上游,就不该躺在消费者仓库的工作树里(它本来靠 `.gitignore`
+> 兜着,但目录在那儿就总会有人顺手改).本机现在放在
+> `/mnt/IVSTINIANVS/__projects_web/miko_ui`(独立仓库,clone 自同一 origin),
+> 本仓库里**没有** `packages/` 目录;`.gitignore` 留着 `packages/` 一条只作护栏.
+> 对消费者毫无影响:依赖一直是 `.cache/miko_ui/current` 那份 release 产物,
+> 本仓库的构建与 CI 从不读工作副本.下面各表里出现的 `packages/miko_ui` 路径都是
+> **当时的形态**,保留作过程记录;要改库请去库仓库的工作副本.
+>
+> 还没做,先搁置的一条:**"每次构建都确认拿到的是最新产物"**.库不写版本号,缓存里
+> 那张 `.miko-ui-source` 纸条只有滚动 tag + 下载时解析到的 commit sha,所以现在
+> 不会因为"缓存旧了"而失败/重取(只有产物不健康才重取).真要做的钩子已经有半个:
+> 库的 `release.yml` 每次都会把 `ui-latest` 这个 tag 强推到**产出这份资产的
+> commit**,所以消费侧只要查一次 tag 指向的 sha 与纸条上的 sha 比对,就能报出
+> "缓存不是最新"(不必改库;要更稳的话让库在资产里带一个 sha 文件,就不受"main
+> 已经前进,release 还没跑完"这个窗口的影响).留待后续单独处理.
 
 | 期 | 状态 | 落地后的关键形态 |
 | --- | --- | --- |
@@ -92,7 +125,7 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 - **CI 拆出 `ui` job**(§7.3):Node + `npm ci` + 库 typecheck + 库 test + 边界
   守卫,`build-and-deploy`(`needs: ui`)照旧跑 Rust/wasm 与整仓测试.
 - **库有了自己的 README**:用法,公开面分组,八条边界契约,三条设计约束,
-  还没做的事(见 `packages/miko_ui/README.md`).
+  还没做的事(见库仓库 miko_ui 的 `README.md`).
 
 ### P4 的编辑器那一刀:`CodeEditor`(D8 的最后一块)
 
