@@ -20,7 +20,8 @@
 #    下载先走 `ASSET_URL`(github.com);那个主机在某些网络里会**间歇性连不上**
 #    (DNS 通,TCP 超时),所以失败后还会走一次 GitHub API 的资产端点
 #    (api.github.com)取同一份字节 -- 换的只是路径,资产是谁仍由产物校验 + `gitHead`
-#    比对说了算.两条都拿不到才失败.
+#    比对说了算.两条都拿不到才失败.用哪个 HTTP 客户端见下面 `MIKO_UI_HTTP_TOOL`:
+#    wget 与 curl 协议上完全等价(不存在"谁更 http"),差的是重试 / 超时语义.
 #
 #    库这一侧的 release job 还没配好时,这个脚本一定会失败 -- 这是预期行为:
 #    先把库的 release.yml 合上并跑出一次资产,再回头跑 `npm ci`.
@@ -100,6 +101,7 @@
 #   MIKO_UI_UPDATE=1      等同 --update
 #   MIKO_UI_SKIP_CHECK=1  跳过新旧检查,缓存健康就直接用(离线 / 手动放资产时)
 #   MIKO_UI_REQUIRE_LATEST=1  查不到新旧也算失败(默认只有 CI 里才这样)
+#   MIKO_UI_HTTP_TOOL     下载 / 查 API 用哪个客户端:auto(默认,wget 优先)/ wget / curl
 #   GITHUB_TOKEN / GH_TOKEN  查 tag 退到 REST,或下载绕行 API 资产端点时用:有就走
 #                         认证,免撞匿名限额(60 次/小时)
 #
@@ -133,11 +135,11 @@ API_URL="https://api.github.com/repos/${REPO_SLUG}"
 
 # 走 API 的两处(查 tag 的退路,下载绕行)在有限额时用 token:CI 里 `github.token`
 # 就够,本地没有也能跑(匿名 60 次/小时).数组的展开写成
-# `${CURL_AUTH[@]+"${CURL_AUTH[@]}"}`,是为了 macOS 自带的 bash 3.2(set -u 下展开
+# `${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"}`,是为了 macOS 自带的 bash 3.2(set -u 下展开
 # 空数组会报错).
-CURL_AUTH=()
+HTTP_HDRS=()
 if [ -n "${GITHUB_TOKEN:-${GH_TOKEN:-}}" ]; then
-    CURL_AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN:-${GH_TOKEN:-}}")
+    HTTP_HDRS=("Authorization: Bearer ${GITHUB_TOKEN:-${GH_TOKEN:-}}")
 fi
 
 UPDATE=0
@@ -177,9 +179,114 @@ require_command() {
     fi
 }
 
-require_command curl
 require_command tar
 require_command node
+
+# ---------- HTTP 客户端:wget 优先,curl 兜底 ----------
+# 两者都是普通 HTTP 客户端,**协议上没有区别**(不存在"谁更 http");差别在重试 /
+# 超时语义和 TLS 栈.本机实测(GNU Wget2 2.2.1 vs curl 8.x,同一条线路交替下载同一个
+# 资产)wget 更能过:github.com 在这个网络里是间歇性连不上,curl 撞上就是 28.
+# 所以 auto 优先 wget;想固定用某一个:`MIKO_UI_HTTP_TOOL=wget|curl`.
+# 两个客户端在这里被要求的语义是一样的:每次尝试有上界,失败要重试,总时长有硬上限.
+HTTP_TOOL=''
+WGET_RETRY_HTTP=0
+
+detect_http_tool() {
+    local want="${MIKO_UI_HTTP_TOOL:-auto}"
+    local have_wget=0 have_curl=0
+    command -v wget >/dev/null 2>&1 && have_wget=1
+    command -v curl >/dev/null 2>&1 && have_curl=1
+    # 资产是**原地覆盖**同一个文件名的:覆盖的一瞬间会短暂 404/5xx.curl 用
+    # --retry-all-errors 兜,wget 靠这个开关(需要 wget >= 1.20).
+    if [ "$have_wget" = 1 ] && wget --help 2>&1 | grep -q -- '--retry-on-http-error'; then
+        WGET_RETRY_HTTP=1
+    fi
+    case "$want" in
+        auto)
+            if [ "$have_wget" = 1 ]; then
+                HTTP_TOOL=wget
+            elif [ "$have_curl" = 1 ]; then
+                HTTP_TOOL=curl
+            else
+                err "既没有 wget 也没有 curl,取不了 release 资产"
+                exit 127
+            fi
+            ;;
+        wget)
+            if [ "$have_wget" != 1 ]; then
+                err "MIKO_UI_HTTP_TOOL=wget,但找不到 wget 命令"
+                exit 127
+            fi
+            HTTP_TOOL=wget
+            ;;
+        curl)
+            if [ "$have_curl" != 1 ]; then
+                err "MIKO_UI_HTTP_TOOL=curl,但找不到 curl 命令"
+                exit 127
+            fi
+            HTTP_TOOL=curl
+            ;;
+        *)
+            err "MIKO_UI_HTTP_TOOL 只能是 auto / wget / curl,拿到的是: ${want}"
+            exit 2
+            ;;
+    esac
+    if [ "$HTTP_TOOL" = wget ] && [ "$WGET_RETRY_HTTP" != 1 ]; then
+        warn "这个 wget 不带 --retry-on-http-error(要 wget >= 1.20):资产被原地覆盖的一瞬间可能吃 404,失败就再跑一次"
+    fi
+}
+
+# 下载到文件:$1 = URL,$2 = 输出路径,其余参数是 HTTP 头("Name: value").
+#   wget: --tries/--waitretry ≈ curl 的 --retry/--retry-delay
+#         --retry-on-http-error ≈ --retry-all-errors(只覆盖瞬时状态码)
+#         --connect-timeout 10 ≈ --connect-timeout 10
+#         --timeout/--read-timeout 45 ≈ --max-time 45(连上却不吐字节那个卡法)
+#   外面再套 with_timeout:即便客户端自己不守时,preinstall 也不会挂成几分钟.
+http_download() {
+    local url="$1" out="$2"
+    shift 2
+    local h
+    if [ "$HTTP_TOOL" = wget ]; then
+        local -a hdr=()
+        local -a retry_http=()
+        for h in "$@"; do hdr+=(--header="$h"); done
+        if [ "$WGET_RETRY_HTTP" = 1 ]; then
+            retry_http=(--retry-on-http-error=404,408,429,500,502,503,504)
+        fi
+        with_timeout 180 wget -q -O "$out" --tries=5 --waitretry=2 --timeout=45 \
+            --connect-timeout=10 --read-timeout=45 --retry-connrefused --max-redirect=20 \
+            ${retry_http[@]+"${retry_http[@]}"} ${hdr[@]+"${hdr[@]}"} "$url"
+    else
+        local -a hdr=()
+        for h in "$@"; do hdr+=(-H "$h"); done
+        with_timeout 180 curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 45 ${hdr[@]+"${hdr[@]}"} -o "$out" "$url"
+    fi
+    # 不能只看退出码:wget2 在 URI 解析失败(比如给了 file:// 或不认识的 scheme)时
+    # 打印一句 "Nothing to do - goodbye" 却**返回 0**(2.2.1 实测),"文件其实没落地"
+    # 会被当成下载成功.所以成功与否由"文件真的在,且非空"说了算.
+    [ -s "$out" ]
+}
+
+# 取一段文本(API 的 JSON)到 stdout.失败就是失败,调用处各自决定怎么办.
+http_get_text() {
+    local url="$1"
+    shift
+    local h
+    if [ "$HTTP_TOOL" = wget ]; then
+        local -a hdr=()
+        for h in "$@"; do hdr+=(--header="$h"); done
+        with_timeout 25 wget -q -O - --tries=2 --waitretry=1 --timeout=20 \
+            --connect-timeout=10 --max-redirect=20 ${hdr[@]+"${hdr[@]}"} "$url"
+    else
+        local -a hdr=()
+        for h in "$@"; do hdr+=(-H "$h"); done
+        with_timeout 25 curl -fsSL --retry 2 --retry-delay 1 --retry-all-errors \
+            --connect-timeout 10 --max-time 20 ${hdr[@]+"${hdr[@]}"} "$url"
+    fi
+}
+
+detect_http_tool
 
 # ---------- 新旧检查:手里这份是不是最新发布的?(规则见文件头 §7) ----------
 # 三个前提:库打包时把构建 commit 写进了清单的 `gitHead`;release.yml 每次都把
@@ -222,9 +329,8 @@ resolve_tag_sha() {
     # github.com 是两个主机,这个网络里前者通常稳得多).注解 tag 这一路解不出
     # commit(object.type=tag),会返回空 -- 本仓库的滚动 tag 是轻量 tag.
     local json
-    json="$(with_timeout 20 curl -fsSL ${CURL_AUTH[@]+"${CURL_AUTH[@]}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "${API_URL}/git/ref/tags/${RELEASE_TAG}" 2>/dev/null || true)"
+    json="$(http_get_text "${API_URL}/git/ref/tags/${RELEASE_TAG}" \
+        ${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"} 'Accept: application/vnd.github+json' 2>/dev/null || true)"
     printf '%s' "$json" | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write(j.object?.type==="commit"?(j.object?.sha??""):"")}catch{}})'
 }
 
@@ -235,9 +341,8 @@ resolve_tag_sha() {
 # `MIKO_UI_ASSET_URL` 时才用它:显式覆盖(镜像 / 代理)是人指的路,不该被悄悄换掉.
 download_asset_via_api() {
     local out="$1" json id
-    json="$(with_timeout 20 curl -fsSL ${CURL_AUTH[@]+"${CURL_AUTH[@]}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "${API_URL}/releases/tags/${RELEASE_TAG}" 2>/dev/null || true)"
+    json="$(http_get_text "${API_URL}/releases/tags/${RELEASE_TAG}" \
+        ${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"} 'Accept: application/vnd.github+json' 2>/dev/null || true)"
     id="$(printf '%s' "$json" | node -e '
 let s = "";
 process.stdin.on("data", (d) => (s += d)).on("end", () => {
@@ -252,11 +357,9 @@ process.stdin.on("data", (d) => (s += d)).on("end", () => {
         warn "API 里没找到 release ${RELEASE_TAG} 的资产 ${ASSET_NAME}(release 还没建好?或撞了匿名限额)"
         return 1
     fi
-    log "改走 API 资产端点: ${API_URL}/releases/assets/${id}"
-    with_timeout 120 curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
-        --connect-timeout 10 --max-time 45 ${CURL_AUTH[@]+"${CURL_AUTH[@]}"} \
-        -H 'Accept: application/octet-stream' -o "$out" \
-        "${API_URL}/releases/assets/${id}"
+    log "改走 API 资产端点(${HTTP_TOOL}): ${API_URL}/releases/assets/${id}"
+    http_download "${API_URL}/releases/assets/${id}" "$out" \
+        ${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"} 'Accept: application/octet-stream'
 }
 
 # 这份产物**自己声明**的 commit(清单里的 gitHead).空 = 它不自证版本(旧资产,或
@@ -322,9 +425,9 @@ print_manual_guide() {
      库仓库的 \`.github/workflows/release.yml\` 还没配好 / 还没跑成功,先去把它合上并
      触发一次(main 推送或 workflow_dispatch),产出一个资产再说.
 
-  2. 手动下载资产(浏览器或 curl 都行):
-         curl -fL -o ${ASSET_NAME} \\
-             "${ASSET_URL}"
+  2. 手动下载资产(浏览器 / wget / curl 都行):
+         wget -O ${ASSET_NAME} "${ASSET_URL}"
+         curl -fL -o ${ASSET_NAME} "${ASSET_URL}"
 
      这个主机(github.com)在部分网络里会间歇性连不上(DNS 通,TCP 超时,脚本自己
      会重试并绕行).手动下载时也可以换 API 资产端点 -- 同一份字节:
@@ -484,21 +587,10 @@ if [ -n "${MIKO_UI_ASSET_FILE:-}" ]; then
     cp "$MIKO_UI_ASSET_FILE" "${WORK}/${ASSET_NAME}"
 else
     # 到 github.com 的路**会间歇性不通**:DNS 解析得出,TCP 却连不上,重试一两次
-    # 才过.所以这里两件事都要有 -- 每次尝试有上界,失败了还能换一条路.四个参数
-    # 各自解决一件事:
-    #   --retry-all-errors  资产是**原地覆盖**同一个文件名的(见库的 release.yml),
-    #                       覆盖的那一瞬间旧资产已删,新的还没上.此时的 404/5xx 是
-    #                       暂时的,不该让消费者 CI 变红;真没有这个 release 时,
-    #                       重试完照样明确失败.
-    #   --connect-timeout   连不上时按系统默认会挂上百秒,再乘上重试次数 --
-    #                       preinstall 变成"卡住好几分钟然后失败",而不是快速说清.
-    #                       抖动是这种网络的常态,5 次 × 10 秒通常能撞上一次通的.
-    #   --max-time          连上了却**不吐字节**(这次真遇到的另一种卡法)必须有
-    #                       天花板,否则 curl 默认无限等.资产只有几十 KB,45 秒足够.
-    #   --retry-delay       两次尝试之间留两秒,避开纯粹的瞬间抖动.
-    log "下载 release 资产: ${ASSET_URL}"
-    if ! curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
-        --connect-timeout 10 --max-time 45 -o "${WORK}/${ASSET_NAME}" "$ASSET_URL"; then
+    # 才过.重试 / 超时 / 硬上限由 http_download 统一规定(两个客户端语义对齐),这里
+    # 只管"失败了就换一条路".
+    log "下载 release 资产(${HTTP_TOOL}): ${ASSET_URL}"
+    if ! http_download "$ASSET_URL" "${WORK}/${ASSET_NAME}"; then
         # 第二条路:GitHub API 的资产端点(见 download_asset_via_api).显式给过
         # MIKO_UI_ASSET_URL 时不绕行 -- 那是人明确指的路.
         if [ -n "${MIKO_UI_ASSET_URL:-}" ] || ! download_asset_via_api "${WORK}/${ASSET_NAME}"; then

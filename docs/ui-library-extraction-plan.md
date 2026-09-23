@@ -89,11 +89,16 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 >   "说不清哪一版"的缓存),本地只警告并沿用缓存.`MIKO_UI_SKIP_CHECK=1` 显式跳过
 >   检查,`MIKO_UI_REQUIRE_LATEST=1` 让本地也严格;手动放置的资产记为 `local-file`,
 >   不参与检查(它是发布坏掉时的兜底).
-> - 下载这条路也补了上界与绕行:`--connect-timeout 10 --max-time 45` + 5 次重试
->   (github.com 在某些网络里会"DNS 通,TCP 超时",连上了也可能不吐字节),主 URL
->   不通时改走 GitHub API 的资产端点(`api.github.com` -> `objects.
->   githubusercontent.com`,同一份字节);显式给过 `MIKO_UI_ASSET_URL` 时不绕行 --
->   那是人指的路.CI 里给这一步带上 `GITHUB_TOKEN`(匿名 API 限额 60 次/小时/出口 IP).
+> - 下载这条路也补了上界与绕行:每次尝试 `--connect-timeout 10`,整次 `45s`(wget 是
+>   `--timeout/--read-timeout`,curl 是 `--max-time`),5 次重试(github.com 在某些网络
+>   里会"DNS 通,TCP 超时",连上了也可能不吐字节),主 URL 不通时改走 GitHub API 的
+>   资产端点(`api.github.com` -> `objects.githubusercontent.com`,同一份字节);显式
+>   给过 `MIKO_UI_ASSET_URL` 时不绕行 -- 那是人指的路.CI 里给这一步带上
+>   `GITHUB_TOKEN`(匿名 API 限额 60 次/小时/出口 IP).
+> - HTTP 客户端**默认 wget**(GNU Wget2 在本机这条线路上实测比 curl 更容易连上
+>   github.com;两者协议上完全等价,不存在"谁更 http"),`MIKO_UI_HTTP_TOOL=curl` 可切,
+>   两边重试 / 超时语义在 `http_download` 里对齐.另:wget2 在 URI 解析失败时会**静默
+>   返回 0**,所以"下载成功"以**文件真的落地且非空**判定,不看退出码.
 >
 > 落地顺序有要求:**先推库**(让带 `gitHead` 的资产挂出来),再推本仓库 -- 在那之前
 > 本仓库的 CI 会因为"资产不自证版本"而红,这是刻意的.
