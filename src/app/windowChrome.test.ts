@@ -26,7 +26,8 @@ describe('createWindowChrome', () => {
         expect(chrome.exampleButton.textContent).toBe(UI_CONFIG.window.chrome.exampleLabel);
         expect(chrome.runButton.textContent).toBe(UI_CONFIG.window.chrome.runLabel);
         expect(chrome.formulaCopyHint.textContent).toBe(UI_CONFIG.window.chrome.copyHint);
-        // 浮层的分组与菜单项由 ExampleLoaderController 渲染,这里必须是空的.
+        // 浮层的类名 / role / aria 与分组,菜单项由库的 createMenu 建
+        // (见 ExampleLoaderController),这里必须是空的.
         expect(chrome.exampleMenu.children).toHaveLength(0);
     });
 
@@ -51,7 +52,7 @@ describe('createWindowChrome', () => {
         }
     });
 
-    it('示例按钮与浮层的 aria 配对成立(Popover 依赖这一对 id)', () => {
+    it('示例按钮与浮层的 aria-controls 配对成立(Popover 依赖这一对 id)', () => {
         const chrome = createWindowChrome();
         createPopover({ trigger: chrome.exampleButton, panel: chrome.exampleMenu });
 
@@ -59,10 +60,11 @@ describe('createWindowChrome', () => {
         expect((chrome.exampleButton as unknown as StubElement).getAttribute('aria-controls'))
             .toBe(chrome.exampleMenu.id);
         expect((chrome.exampleButton as unknown as StubElement).getAttribute('aria-expanded')).toBe('false');
-        // 浮层的读屏名指回触发按钮.
-        expect((chrome.exampleMenu as unknown as StubElement).getAttribute('aria-labelledby'))
-            .toBe(chrome.exampleButton.id);
-        expect(chrome.exampleMenu.className).toBe('example-menu');
+        // 容器只负责 id:类名 / role / aria-label 与内容都由库的 createMenu 写,
+        // 所以这里既没有 `.example-menu` 类,也没有 role / aria-labelledby.
+        expect(chrome.exampleMenu.id).toBe('example-menu');
+        expect(chrome.exampleMenu.className).toBe('');
+        expect((chrome.exampleMenu as unknown as StubElement).getAttribute('role')).toBeNull();
     });
 
     it('复制提示沿用对象列表的提示类名(样式来自 panels.css)', () => {

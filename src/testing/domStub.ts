@@ -169,9 +169,8 @@ function matchesSimple(element: StubElement, selector: string): boolean {
 /**
  * 把复合选择器拆成简单选择器.
  *
- * 只在**方括号/引号之外**的 `.` / `#` / `[` 处切:`[data-example="a.miko"]` 里
- * 那个点属于属性值,切开会得到两个都匹配不上的碎片(这个坑在
- * `ExampleLoaderController.test.ts` 上真的踩到过).
+ * 只在**方括号/引号之外**的 `.` / `#` / `[` 处切:`[data-file="a.miko"]` 里那个
+ * 点属于属性值,切开会得到两个都匹配不上的碎片.
  */
 function splitCompound(selector: string): string[] {
     const parts: string[] = [];

@@ -69,7 +69,7 @@ describe('示例目录', () => {
         expect(groupedExamples().map((section) => section.group)).toEqual(groups);
     });
 
-    it('文件名不重复:菜单项靠 data-example 定位,重复会点错示例', () => {
+    it('文件名不重复:菜单项靠 value 定位,重复会点错示例', () => {
         const files = allExamples().map((entry) => entry.file);
         expect(new Set(files).size).toBe(files.length);
     });

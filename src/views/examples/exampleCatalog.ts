@@ -38,7 +38,7 @@
  * 只有"是哪个文件"与"叫什么"两件事:分组是清单里的键,不是条目的字段.
  */
 export interface ExampleEntry {
-    /** `example/` 下的文件名(含扩展名),同时是菜单项的 `data-example` 值. */
+    /** `example/` 下的文件名(含扩展名),同时是菜单项的 `value`(选中回调与 `setActive` 都用它). */
     readonly file: string;
     /** 菜单里显示的中文标题;完整说明仍以 `example/README.md` 为准. */
     readonly title: string;
@@ -133,8 +133,8 @@ export function exampleSource(file: string): string | null {
 /**
  * 全部课程,按分组的书写顺序拍平;组内顺序不变.
  *
- * 菜单渲染走 {@link groupedExamples},需要**按文件名反查**时(点击委托只拿到
- * `data-example`,拿不到分组)走这里.
+ * 菜单渲染走 {@link groupedExamples},需要**按文件名反查**时(菜单的选中回调
+ * 只拿到文件名 `value`,拿不到分组)走这里.
  */
 export function allExamples(): readonly ExampleEntry[] {
     return Object.values(EXAMPLE_CATALOG).flat();

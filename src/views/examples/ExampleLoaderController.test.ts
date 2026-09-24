@@ -1,19 +1,21 @@
 /**
  * 示例菜单控制器单测.
  *
- * 覆盖四块:
- * - 渲染:分组与菜单项来自 `exampleCatalog`,文件集一致;
+ * 控制器现在只是库 `createMenu` 的一层适配(清单 -> `MenuGroup[]`,选中 -> 装配
+ * 层),所以这里覆盖的是**接线**,菜单本身的实现由库自己的单测覆盖:
+ * - 渲染:分组与菜单项来自 `exampleCatalog`,顺序与文件集一致;
+ * - 结构:类名 / `role` / `aria-label` 由库写,读屏名来自配置;
  * - 开合:按钮切换,点浮层外部关闭,点按钮的冒泡不会把自己刚打开的浮层关掉;
- * - 选中:点菜单项(含点到项内的子元素)回调对应条目并关闭;
- * - 键盘:Esc 关闭并把焦点交还按钮,上下键从"焦点还在按钮上"进第一项,回绕.
+ * - 选中:点菜单项回调对应条目并关闭浮层;
+ * - 当前项:setActive 由库写成 `.is-active` + `aria-current`;
+ * - 销毁:dispose 关闭浮层并摘掉监听.
  *
- * 键盘监听按项目约定不绑在控制器里,所以这里直接取 `keyboardBindings()` 的
- * `resolve` 来跑,而不是伪造 document keydown(路由本身由
- * KeyboardController.test.ts 覆盖).
+ * 键盘已从上下游一并移除,这里不再有键盘用例.桩不冒泡,所以"点到菜单项内部
+ * 子元素"这类依赖真 DOM 冒泡的行为没法在桩里伪造,交给浏览器.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { UI_CONFIG } from '@/config/uiConfig';
 import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
-import type { KeyboardBinding } from '@miko/ui';
 import { ExampleLoaderController } from './ExampleLoaderController';
 import { allExamples } from './exampleCatalog';
 
@@ -22,7 +24,6 @@ interface Harness {
     readonly root: StubElement;
     readonly button: StubElement;
     readonly menu: StubElement;
-    readonly buttonFocus: ReturnType<typeof vi.spyOn>;
     readonly onSelect: ReturnType<typeof vi.fn>;
     readonly controller: ExampleLoaderController;
 }
@@ -39,7 +40,6 @@ function setup(): Harness {
     stub.document.body.append(root);
 
     const onSelect = vi.fn();
-    const buttonFocus = vi.spyOn(button, 'focus');
     const controller = new ExampleLoaderController(
         {
             button: button as unknown as HTMLElement,
@@ -49,18 +49,15 @@ function setup(): Harness {
     );
     controller.bind(root as unknown as HTMLElement);
 
-    return { stub, root, button, menu, buttonFocus, onSelect, controller };
+    return { stub, root, button, menu, onSelect, controller };
 }
 
-function bindingFor(controller: ExampleLoaderController, key: string): KeyboardBinding {
-    const binding = controller.keyboardBindings()
-        .find((candidate) => candidate.keys.includes(key));
-    if (!binding) throw new Error(`没有 ${key} 的键盘绑定`);
-    return binding;
-}
-
+/** 按文件名找菜单项:注记(`.menu-item-hint`)就是去掉 `.miko` 的文件名. */
 function itemOf(menu: StubElement, file: string): StubElement {
-    const item = menu.querySelector<StubElement>(`[data-example="${file}"]`);
+    const hint = file.replace(/\.miko$/, '');
+    const item = menu
+        .querySelectorAll<StubElement>('.menu-item')
+        .find((node) => node.querySelector<StubElement>('.menu-item-hint')?.textContent === hint);
     if (!item) throw new Error(`菜单里没有 ${file}`);
     return item;
 }
@@ -70,19 +67,30 @@ beforeEach(() => {
 });
 
 describe('菜单渲染', () => {
-    it('分组与菜单项都来自示例清单', () => {
+    it('分组与菜单项都来自示例清单,顺序一致', () => {
         const h = setup();
 
-        const files = h.menu
-            .querySelectorAll<StubElement>('[data-example]')
-            .map((item) => item.dataset.example);
-        expect(files).toEqual(allExamples().map((entry) => entry.file));
+        const items = h.menu.querySelectorAll<StubElement>('.menu-item');
+        // 菜单项 = 中文标题(按钮自己的文本)+ 右侧文件名注记(去掉 .miko)
+        expect(items.map((node) => node.textContent)).toEqual(
+            allExamples().map((entry) => entry.title + entry.file.replace(/\.miko$/, '')),
+        );
 
         // 分组标题是可读文本,不是菜单项
         const titles = h.menu
-            .querySelectorAll<StubElement>('.example-menu-group-title')
+            .querySelectorAll<StubElement>('.menu-group-title')
             .map((node) => node.textContent);
         expect(titles).toEqual(['求导 / 偏导', '其他主题']);
+    });
+
+    it('菜单的类名 / role / 读屏名由库写(不再由应用侧手写)', () => {
+        const h = setup();
+
+        expect(h.menu.getAttribute('role')).toBe('menu');
+        expect(h.menu.getAttribute('aria-label')).toBe(UI_CONFIG.window.chrome.exampleLabel);
+        expect(h.menu.classList.contains('menu-panel')).toBe(true);
+        // 给了 trigger -> 库叠 .menu-popover 并自己建 Popover
+        expect(h.menu.classList.contains('menu-popover')).toBe(true);
     });
 
     it('浮层初始关闭,aria 关系指向菜单', () => {
@@ -139,7 +147,7 @@ describe('选中示例', () => {
         const h = setup();
         h.button.dispatch('click');
 
-        h.menu.dispatch('click', { target: itemOf(h.menu, 'sphere_gradient.miko') });
+        itemOf(h.menu, 'sphere_gradient.miko').dispatch('click');
 
         expect(h.onSelect).toHaveBeenCalledTimes(1);
         expect(h.onSelect.mock.calls[0][0]).toMatchObject({
@@ -148,67 +156,9 @@ describe('选中示例', () => {
         });
         expect(h.controller.isOpen).toBe(false);
     });
-
-    it('点到菜单项内部子元素也能命中该项', () => {
-        const h = setup();
-        h.button.dispatch('click');
-
-        const item = itemOf(h.menu, 'Zemlya.miko');
-        const label = item.querySelector<StubElement>('.example-menu-label')!;
-        h.menu.dispatch('click', { target: label });
-
-        expect(h.onSelect).toHaveBeenCalledTimes(1);
-        expect(h.onSelect.mock.calls[0][0]).toMatchObject({ file: 'Zemlya.miko' });
-    });
 });
 
-describe('键盘', () => {
-    it('浮层关着时 Esc 与上下键都放行', () => {
-        const h = setup();
-
-        expect(bindingFor(h.controller, 'Escape').resolve({ key: 'Escape' } as KeyboardEvent))
-            .toBeNull();
-        expect(bindingFor(h.controller, 'ArrowDown').resolve({ key: 'ArrowDown' } as KeyboardEvent))
-            .toBeNull();
-    });
-
-    it('Esc 关闭浮层并把焦点交还按钮', () => {
-        const h = setup();
-        h.button.dispatch('click');
-
-        const run = bindingFor(h.controller, 'Escape').resolve({ key: 'Escape' } as KeyboardEvent);
-        expect(run).not.toBeNull();
-        run!();
-
-        expect(h.controller.isOpen).toBe(false);
-        expect(h.buttonFocus).toHaveBeenCalledTimes(1);
-    });
-
-    it('上下键从按钮进第一项,到头回绕', () => {
-        const h = setup();
-        h.button.dispatch('click');
-
-        const items = h.menu.querySelectorAll<StubElement>('.example-menu-item');
-        const focusSpies = items.map((item) => vi.spyOn(item, 'focus'));
-        const down = bindingFor(h.controller, 'ArrowDown');
-        const up = bindingFor(h.controller, 'ArrowUp');
-
-        down.resolve({ key: 'ArrowDown' } as KeyboardEvent)!();
-        expect(focusSpies[0]).toHaveBeenCalledTimes(1);
-
-        down.resolve({ key: 'ArrowDown' } as KeyboardEvent)!();
-        expect(focusSpies[1]).toHaveBeenCalledTimes(1);
-
-        up.resolve({ key: 'ArrowUp' } as KeyboardEvent)!();
-        expect(focusSpies[0]).toHaveBeenCalledTimes(2);
-
-        // 在第一项上再按向上:回绕到末项,而不是卡住
-        up.resolve({ key: 'ArrowUp' } as KeyboardEvent)!();
-        expect(focusSpies[focusSpies.length - 1]).toHaveBeenCalledTimes(1);
-    });
-});
-
-describe('高亮与销毁', () => {
+describe('当前项与销毁', () => {
     it('setActive 标记当前示例,切换时旧标记被清掉', () => {
         const h = setup();
         const first = itemOf(h.menu, 'object_addition.miko');
@@ -222,6 +172,18 @@ describe('高亮与销毁', () => {
         expect(first.classList.contains('is-active')).toBe(false);
         expect(first.getAttribute('aria-current')).toBeNull();
         expect(second.classList.contains('is-active')).toBe(true);
+    });
+
+    it('清单外的文件名:全部取消标记', () => {
+        const h = setup();
+
+        h.controller.setActive('object_addition.miko');
+        h.controller.setActive('no_such_example.miko');
+
+        const active = h.menu
+            .querySelectorAll<StubElement>('.menu-item')
+            .filter((node) => node.classList.contains('is-active'));
+        expect(active).toHaveLength(0);
     });
 
     it('dispose 关闭浮层并摘掉监听', () => {

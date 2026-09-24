@@ -185,8 +185,7 @@ export class DslApp {
             },
         );
         this.formulaCopyController.bind(this.appRoot);
-        // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听
-        // (键盘那条路仍然只走 KeyboardController).
+        // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听.
         this.exampleLoader.bind(this.appRoot);
 
         this.keyboardController = new KeyboardController(this.editor, {
@@ -195,10 +194,8 @@ export class DslApp {
         });
         // 公式复制的 Enter/Space 也注册进唯一的键盘出口,控制器本身不再绑 keydown.
         this.keyboardController.register(this.formulaCopyController.keyboardBinding());
-        // 示例浮层的 Esc / 上下键同样注册进唯一出口.
-        for (const binding of this.exampleLoader.keyboardBindings()) {
-            this.keyboardController.register(binding);
-        }
+        // 示例浮层一条键盘规则都不注册:库与控制器都不负责菜单键盘
+        // (见 ExampleLoaderController 的文件头),浮层靠点按钮开合.
         this.keyboardController.bind();
 
         this.animationFrameId = requestAnimationFrame(this.animate);

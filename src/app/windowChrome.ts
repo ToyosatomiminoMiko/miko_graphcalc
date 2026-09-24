@@ -17,8 +17,9 @@
  * 不订阅任何状态.
  *
  * **id 仍保留**:`example-btn` / `example-menu` 这一对是 `Popover` 建立
- * `aria-controls` / `aria-labelledby` 关系用的(见 `widgets/Popover.ts`),
- * 配对靠 id;它们不再被任何 `getElementById` 查找(装配层拿的是句柄).
+ * `aria-controls` 关系用的(见 `widgets/Popover.ts`),配对靠 id;它们不再被任何
+ * `getElementById` 查找(装配层拿的是句柄).菜单的读屏名(`aria-label`)与
+ * `role` 由库的 `createMenu` 写,不在这里.
  */
 import { createButton, create_element } from '@miko/ui';
 import { UI_CONFIG, type ChromeNodeId } from '@/config/uiConfig';
@@ -55,13 +56,10 @@ export function createWindowChrome(): WindowChrome {
     }).element;
     runButton.id = 'run-btn';
 
-    // 分组与菜单项由 ExampleLoaderController 按 exampleCatalog 渲染,这里只给
-    // 空浮层容器与它的无障碍关系.
-    const exampleMenu = create_element('div', {
-        class: 'example-menu',
-        role: 'menu',
-        'aria-labelledby': exampleButton.id,
-    });
+    // 示例浮层只给一个**带 id 的空容器**:菜单的类名 / `role` / `aria-label` 与
+    // 分组,菜单项全由库的 `createMenu` 建(见 ExampleLoaderController).id 必须在
+    // 这里就有 -- `Popover` 构造时按面板 id 写 `aria-controls`.
+    const exampleMenu = create_element('div');
     exampleMenu.id = 'example-menu';
 
     const formulaCopyHint = create_element('span', {

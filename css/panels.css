@@ -564,88 +564,12 @@
 }
 
 /* ==========================================================================
- * 示例浮层
+ * 示例浮层的外观不在这里
  * --------------------------------------------------------------------------
- * 锚在标题栏正下方,盖住源码编辑区,宽度撑满面板.
- * 开合只有一个状态源:菜单上的 .is-open(与按钮 aria-expanded 一起由
- * ExampleLoaderController 维护),这里只负责视觉.
+ * 面板 / 分组 / 组标题 / 菜单项 / 右侧注记全由库的 `styles/widgets.css` 提供
+ * (`.menu-panel` / `.menu-group` / `.menu-group-title` / `.menu-item` /
+ * `.menu-item-hint`),浮层位置与开合是 `.menu-popover` + `.is-open`.应用侧
+ * 只给一个带 id 的空容器(见 `src/app/windowChrome.ts`),一条外观规则都不写.
  * ========================================================================== */
 
-.example-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 40;
-    display: none;
-    box-sizing: border-box;
-    /* 高度按**所属窗口的正文**算(WindowManager 写 --window-body-height):
-       浮层挂在窗口标题栏下,按视口留余量会在窗口比视口矮时超出窗口,再被裁掉
-       就是"菜单被切一半"(见 §11.2 E5). */
-    max-height: calc(var(--window-body-height, 40vh) - 8px);
-    overflow-y: auto;
-    padding: 6px;
-    background: var(--color-bg-popover);
-    border: 1px solid var(--color-border-strong);
-    border-top: none;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    box-shadow: 0 12px 28px var(--color-shadow-popover);
-}
 
-.example-menu.is-open {
-    display: block;
-}
-
-/* 分组:组标题 + 若干菜单项;组间用细分隔线,不再单独占一行留白 */
-.example-menu-group + .example-menu-group {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid var(--color-border-group);
-}
-
-.example-menu-group-title {
-    padding: 4px 8px;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    color: var(--color-text-group);
-}
-
-/* 菜单项:中文标题在左,文件名做次要对照靠右 */
-.example-menu-item {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    box-sizing: border-box;
-    width: 100%;
-    padding: 6px 8px;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-menu);
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.example-menu-item:hover,
-.example-menu-item:focus-visible {
-    background: var(--color-accent-hover-bg);
-    color: var(--color-text-menu-hover);
-    outline: none;
-}
-
-/* 已载入的示例:持续可见的左侧标记,不用底色抢注意力 */
-.example-menu-item.is-active {
-    background: var(--color-accent-active-bg);
-    box-shadow: inset 2px 0 0 var(--color-accent);
-    color: var(--color-text-active);
-}
-
-.example-menu-file {
-    flex: 0 0 auto;
-    font-family: var(--code-font-family);
-    font-size: 10px;
-    color: var(--color-text-faint);
-}
