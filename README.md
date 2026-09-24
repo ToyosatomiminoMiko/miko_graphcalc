@@ -276,9 +276,15 @@ npm run build
 
 该命令会依次执行:
 
-一. `npm run clean`:清空旧的 `dist/` 与 `src/generated/`
+一. `npm run ui:fetch`:`scripts/fetch_ui.sh` 核对(落后就自动重取)`@miko/ui`
+的 release 产物.这一步挂在 `build:all` 的**第一步**上,而不是只挂在 `npm ci`
+的 `preinstall` 上 -- `npm run build` 不经过 `npm ci`,只挂 preinstall 会让
+"日常只跑 `npm run build`"的人拿着旧缓存安静地构建
 
-二. `npm run build:wasm`:分别重建 `src/math/math_rs`/
+二. `npm run lint:rs` / `npm run clean`:Rust `fmt` + `clippy`,然后清空旧的
+`dist/` 与 `src/generated/`
+
+三. `npm run build:wasm`:分别重建 `src/math/math_rs`/
 `src/compiler/compiler_rs`/`src/render/render_rs`
 三个 Rust crate,并把产物输出到对应的 `src/generated/*` 目录
 
@@ -294,27 +300,36 @@ npm run build
 > 初始化),`wasm/workerRuntime.ts`(Worker 侧消息壳),`wasm/matrixOps.ts`
 > (矩阵后端);生成产物只被这三个文件与各 `*Worker` 直接引用.
 
-`npm run typecheck`:执行 `tsc --noEmit`
-`vite build`
+四. `npm run test`(vitest),最后 `npm run build:app`:先 `npm run typecheck`
+(`tsc --noEmit`),再 `vite build`
 
-三. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行
-`npm ci`,Rust lint,清理旧产物与 WASM 构建,前端/Rust 测试,
-前端类型检查与打包,每个阶段都有日志输出;GitHub Actions 只调用这一个
-脚本,不再重复编排各步骤.
+五. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行
+`npm ci`,再跑上面整条 `build:all`(Rust lint,清理旧产物与 WASM 构建,
+前端/Rust 测试,前端类型检查与打包),每个阶段都有日志输出;GitHub Actions 只调用这一个
+脚本,不再重复编排各步骤.`bash ./build.sh` 里 `npm ci` 与 `build:all` 会各核对一次
+`@miko/ui` 新鲜度(第二次通常就是一句"已是最新");查不到新旧时 CI 明确失败,本机
+只警告(见 `scripts/fetch_ui.sh` 顶部 §7).
 
 > **`@miko/ui`(网页 UI 库)不在这里,也不从 npm 取.** 它是独立仓库
 > [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
 > 交付形态是它的**滚动 release 资产**(`ui-latest` 上的
 > `miko_ui_dist.tar.gz`,由库的 `.github/workflows/release.yml` 在 main 每次
-> 推送后覆盖).上面那句 `npm ci` 顺带把它备好:根 `package.json` 的
-> `preinstall` 会跑 `scripts/fetch_ui.sh` -- 下载 -> 校验 -> 解开到
+> 推送后覆盖).`npm ci` 的 `preinstall` 与 `npm run build` / `npm run build:all`
+> 的第一步都会跑 `scripts/fetch_ui.sh` -- 下载 -> 校验 -> 解开到
 > `.cache/miko_ui/current`(gitignore),最后按
-> `"@miko/ui": "file:.cache/miko_ui/current"` 链接进来.本机**没有 TypeScript,
+> `"@miko/ui": "file:.cache/miko_ui/current"` 链接进来(两条入口缺一不可:
+> `npm run build` 不经过 `npm ci`).本机**没有 TypeScript,
 > 也没有库的源码**;要拉上游最新:`npm run ui:update`(不用它也够:每次 `npm ci`
-> 都拿资产清单里的 `gitHead` -- 库打包时写入的构建 commit -- 比 `ui-latest` tag
-> 指向的 commit,落后就自动重取).下载先走 github.com;那个主机在部分网络里会
-> **间歇性连不上**(DNS 通,TCP 超时),脚本会重试并绕行 GitHub API 的资产端点
-> (同一份字节,只是换条路).下载默认用 wget(GNU Wget2 在这条线路上实测比 curl
+> 或 `npm run build` 都拿资产清单里的 `gitHead` -- 库打包时写入的构建 commit --
+> 比 `ui-latest` tag
+> 指向的 commit,落后就自动重取).**下载默认走 GitHub API 的资产端点**
+> (`api.github.com/repos/.../releases/assets/<id>`,它会 302 到
+> `objects.githubusercontent.com`),因为 github.com 的 release 直链在本机**老是**
+> TCP 超时(DNS 通,TCP 连不上);失败会自动改走 github.com 直链,两条都拿不到才
+> 失败.要固定先走哪条:`MIKO_UI_ASSET_SOURCE=api|direct`(默认 `api`).这个默认值
+> 会让下载吃 GitHub API 限额(匿名 60 次/小时;查新旧用的是 `git ls-remote`,不吃
+> 限额),本地频繁重下时给 `GITHUB_TOKEN` 更稳,CI 里本来就带.下载默认用 wget
+> (GNU Wget2 在这条线路上实测比 curl
 > 更容易连上;curl 也支持,`MIKO_UI_HTTP_TOOL=curl` 可切).取不到资产会**明确失败**
 > (脚本会打印 release 页面,期望 URL 与手动下载步骤),**没有**"克隆源码自己构建"
 > 的回退;而"查不到是不是最新"(断网 / 资产不自证版本)时本地只警告,**CI 里明确

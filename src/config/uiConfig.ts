@@ -73,9 +73,8 @@ export interface AppWindowConfig {
     /** 标题栏上的窗口按钮:顺序即显示顺序,文案进配置不散在 TS 里. */
     readonly actions: readonly {
         readonly id: WindowActionId;
-        readonly label: string;
-        /** 按钮的可见文案(不随状态变). */
-        readonly glyph: string;
+        /** 按钮的可见文案(不随状态变).库的 `WindowAction` 只读 `text` 这一个字段. */
+        readonly text: string;
     }[];
     readonly adopted: readonly AdoptedNodeSpec[];
     readonly chrome: {
@@ -238,8 +237,10 @@ export const UI_CONFIG = {
             },
         ],
         actions: [
-            { id: 'minimize', label: '最小化', glyph: 'min' },
-            { id: 'maximize', label: '最大化', glyph: 'max' },
+            // 库的 `WindowAction` 只有 `text`(必填):按钮一直显示自己那一个词
+            // (`min` / `max`),"已最大化"由窗口尺寸与 `.is-maximized` 表达.
+            { id: 'minimize', text: 'min' },
+            { id: 'maximize', text: 'max' },
         ],
         // 四个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
         // (旧写法是 index.html 里一个 hidden 暂存区 + DslApp 里一条 if 链).

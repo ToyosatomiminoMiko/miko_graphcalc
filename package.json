@@ -31,7 +31,7 @@
     "build:wasm:render": "cd src/render/render_rs && wasm-pack build --release --target web --out-dir ../../generated/render_rs",
     "build:wasm": "npm run build:wasm:math && npm run build:wasm:compiler && npm run build:wasm:render",
     "build:app": "npm run typecheck && vite build",
-    "build:all": "npm run lint:rs && npm run clean && npm run build:wasm && npm test && npm run build:app",
+    "build:all": "npm run ui:fetch && npm run lint:rs && npm run clean && npm run build:wasm && npm test && npm run build:app",
     "build": "npm run build:all",
     "lint:rs": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
     "preview": "vite preview",

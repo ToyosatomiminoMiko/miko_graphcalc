@@ -49,14 +49,23 @@ log "installing pinned dependencies from package-lock.json"
 # 资产不自证版本)时本地只警告,CI 里明确失败 -- 所以"库刚推,资产还没带上 gitHead"
 # 时,CI 可能就红在这一步,那不是配置错误(见 fetch_ui.sh 顶部 §7).
 #
-# 再往下 build:all 的顺序是 lint:rs -> clean -> build:wasm -> test -> build:app;
-# 其中 clean 只删根 dist/ 与 src/generated/,不碰 .cache/miko_ui,所以"产物在第一
-# 步就绪,后面全程可用".取产物/链接/模块去重的全部规则见
+# 再往下 build:all 的顺序是 ui:fetch -> lint:rs -> clean -> build:wasm -> test
+# -> build:app;其中 clean 只删根 dist/ 与 src/generated/,不碰 .cache/miko_ui,
+# 所以"产物在第一步就绪,后面全程可用".取产物/链接/模块去重的全部规则见
 # scripts/fetch_ui.sh 顶部与 vite.config.ts 的 resolve.dedupe.
+#
+# 为什么 build:all 的**第一步**还是 ui:fetch(这里刚跑过 npm ci,看起来重复):
+# preinstall 只在 npm install / npm ci 时触发,而 README 里推荐的日常命令是
+# `npm run build`(= build:all),它**不经过 npm ci** -- 只把核对挂在 preinstall
+# 上,"日常只跑 npm run build"的人就会拿着旧缓存安静地构建.所以核对必须同时挂在
+# build:all 上,两条入口共用同一条检查.这里第二次跑的代价是一次"已是最新"的
+# ls-remote(缓存落后时才会真的重下),换来的是"任何一条构建入口都不会拿到说不清
+# 哪一版的 @miko/ui".
 npm ci --no-audit --no-fund
 
-# 流水线 = lint:rs -> clean -> build:wasm -> test -> build:app(内含 typecheck + vite build)
-log "running full build pipeline (lint -> clean -> wasm -> test -> app)"
+# 流水线 = ui:fetch -> lint:rs -> clean -> build:wasm -> test -> build:app
+# (后者内含 typecheck + vite build)
+log "running full build pipeline (ui -> lint -> clean -> wasm -> test -> app)"
 npm run build:all
 
 log "build succeeded"

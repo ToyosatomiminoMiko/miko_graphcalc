@@ -198,7 +198,9 @@ describe('求值条目的折叠结构', () => {
         // 点 summary 只开合,点按钮只切换显隐,两者不互相触发.
         const buttons = analysisList.querySelectorAll<StubElement>('button');
         expect(buttons).toHaveLength(1);
-        expect(buttons[0].className).toBe('row-visibility-btn');
+        // 只断言"带有"这个类,不用 `className` 精确相等:库的 Button 会往上追加
+        // 自己的类(如 `ui-button`),精确相等会把库的内部类名变化变成这里的红灯.
+        expect(buttons[0].classList.contains('row-visibility-btn')).toBe(true);
         expect(summary.querySelectorAll<StubElement>('.row-visibility-btn')).toHaveLength(0);
 
         // 彩色类型标签 + 变量名回来了.
@@ -640,7 +642,8 @@ describe('三级披露:长过程的 L2 入口', () => {
         const actions = analysisList.querySelector<StubElement>('.row-actions')!;
         expect(actions.children[0]).toBe(entry);
         const last = actions.children[actions.children.length - 1] as StubElement;
-        expect(last.className).toBe('row-visibility-btn');
+        // 同上:只断言带有这个类(库会追加 `ui-button`).
+        expect(last.classList.contains('row-visibility-btn')).toBe(true);
 
         entry.dispatch('click');
         expect(calls.process).toEqual([]);

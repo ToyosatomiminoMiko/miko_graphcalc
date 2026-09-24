@@ -10,18 +10,22 @@
 #
 #    由库的 `.github/workflows/release.yml` 在 main 每次推送后构建并挂上(tag
 #    `ui-latest` 是一个滚动 tag,不是版本承诺 -- 库不写版本号,理由见库仓库
-#    `RELEASING.md`).本脚本做五件事:`curl` 下来 -> 校验 -> 解开 -> 原子替换缓存,
+#    `RELEASING.md`).本脚本做五件事:下载下来 -> 校验 -> 解开 -> 原子替换缓存,
 #    外加**复用时先确认手里这份是不是最新发布的**(见 §7).
 #
 #    **没有"克隆源码自己构建"这条回退**.这是刻意的:回退会把"资产没挂上 / release
 #    配错了 / 网络断了"这类故障掩盖成绿色,而消费者拿到的到底是不是库的产物也再说不清.
 #    拿不到就**明确失败**,并把 release 页面,期望 URL 与手动配置步骤打出来(见下面的
 #    `print_manual_guide`).要用本机下载好的资产时,`MIKO_UI_ASSET_FILE=<路径>`.
-#    下载先走 `ASSET_URL`(github.com);那个主机在某些网络里会**间歇性连不上**
-#    (DNS 通,TCP 超时),所以失败后还会走一次 GitHub API 的资产端点
-#    (api.github.com)取同一份字节 -- 换的只是路径,资产是谁仍由产物校验 + `gitHead`
-#    比对说了算.两条都拿不到才失败.用哪个 HTTP 客户端见下面 `MIKO_UI_HTTP_TOOL`:
-#    wget 与 curl 协议上完全等价(不存在"谁更 http"),差的是重试 / 超时语义.
+#    下载**默认先走 GitHub API 的资产端点**(api.github.com,见下面
+#    `MIKO_UI_ASSET_SOURCE`):先问 `/releases/tags/<tag>` 要资产 id,再按
+#    `Accept: application/octet-stream` 拉它(会 302 到 objects.githubusercontent.com).
+#    本机实测 github.com 的 release 直链**老是 TCP 超时**(DNS 通,TCP 连不上),而
+#    api.github.com 稳得多,所以它不再是"退路"而是默认;失败会自动改走 github.com
+#    直链.换的只是**路径**,资产是谁仍由产物校验 + `gitHead` 比对说了算.两条都拿不到
+#    才失败.要固定顺序:`MIKO_UI_ASSET_SOURCE=api|direct`.用哪个 HTTP 客户端见下面
+#    `MIKO_UI_HTTP_TOOL`:wget 与 curl 协议上完全等价(不存在"谁更 http"),差的是
+#    重试 / 超时语义.
 #
 #    库这一侧的 release job 还没配好时,这个脚本一定会失败 -- 这是预期行为:
 #    先把库的 release.yml 合上并跑出一次资产,再回头跑 `npm ci`.
@@ -43,10 +47,13 @@
 #     `scripts.prepare = npm run build`,而 npm 在装 `file:` 链接的包时会先跑 prepare
 #     (npm 10 实测);产物里没有 `scripts/` 与 devDependencies,那一步必炸
 #     (`MODULE_NOT_FOUND: scripts/clean.mjs`).本脚本会校验资产清单里**没有** scripts.
-# 5. 本脚本在应用流水线里的位置见 `build.sh`:它是 `npm ci` 的 `preinstall`,所以
-#    "产物没就绪"这件事一定发生在 npm 解析 `file:` 依赖之前(失败即整体失败,不会
-#    出现"装了半个依赖树");`build:all` 的 `clean` 只删根 `dist/` 与
-#    `src/generated/`,**不碰**这份缓存.
+# 5. 本脚本在应用流水线里的位置有**两个**,缺一不可:一是 `npm ci` / `npm install`
+#    的 `preinstall`,所以"产物没就绪"这件事一定发生在 npm 解析 `file:` 依赖之前
+#    (失败即整体失败,不会出现"装了半个依赖树");二是 `build:all` 的**第一步**
+#    (`npm run ui:fetch`),因为 README 推荐的日常命令 `npm run build` 不经过
+#    `npm ci` -- 只挂在 preinstall 上就会让"日常只跑 npm run build"的人拿着旧缓存
+#    安静地构建.两条入口共用同一条检查,代价只是多一次"已是最新"的 ls-remote.
+#    `build:all` 的 `clean` 只删根 `dist/` 与 `src/generated/`,**不碰**这份缓存.
 # 6. 库侧的交付不变量(不发 npm / 不写版本号 / `prepare` 必须留 / 锁只能用完整
 #    `npm install` 重建 / 资产必须自证 commit)写在库仓库 `.github/workflows/ci.yml`
 #    与 `RELEASING.md`,发布本身在 `.github/workflows/release.yml`.
@@ -78,14 +85,19 @@
 # 谁调用它:
 #   - 根 `package.json` 的 `preinstall`:所以 `npm ci` / `npm install` 会自动
 #     补齐产物(npm 解析 `"@miko/ui": "file:.cache/miko_ui/current"` 之前必须已经有它);
-#   - `bash ./build.sh` 里的 `npm ci`,因此 CI 也自动经过这里;
+#   - 根 `package.json` 的 `build:all` 第一步(`npm run ui:fetch`),因此
+#     `npm run build`(以及直接的 `npm run build:all`)也会先核对新鲜度 --
+#     这条路不经过 `npm ci`,只靠 preinstall 会漏;
+#   - `bash ./build.sh` 里的 `npm ci` + `npm run build:all`,所以 CI 会经过这里两次
+#     (第二次是"已是最新"的确认;核对不出来时同样按 CI 口径失败);
 #   - 手动:`npm run ui:fetch`(已有产物就复用)/ `npm run ui:update`(强制重取).
 #
 # 行为:
 #   1. 已缓存且没要更新 -> **先确认它是不是最新发布的**(§7):是最新就直接用(报出
 #      它是从哪来的 / 哪个 commit);落后就自动重新下载;查不到则本地警告后沿用,
 #      CI 里明确失败;
-#   2. 没缓存 / 缓存不健康 / `--update` -> 下载资产,校验,原子替换缓存;
+#   2. 没缓存 / 缓存不健康 / `--update` -> 下载资产(默认 API 资产端点,失败换
+#      github.com 直链),校验,原子替换缓存;
 #   3. 任何一步失败 -> 打印 release 页面 / 期望 URL / 手动下载与放置步骤,退出非 0.
 #
 # 用法:bash scripts/fetch_ui.sh [--update]
@@ -96,14 +108,18 @@
 #   MIKO_UI_RELEASE       滚动 release 的 tag(默认 ui-latest)
 #   MIKO_UI_ASSET         资产文件名(默认 miko_ui_dist.tar.gz)
 #   MIKO_UI_ASSET_URL     直接给定资产 URL(默认按 repo/tag/资产名拼;镜像 / 代理时用)
+#   MIKO_UI_ASSET_SOURCE  资产先走哪条路:api(默认,GitHub API 资产端点,会 302 到
+#                         objects.githubusercontent.com)/ direct(github.com release
+#                         直链).失败都会自动换另一条
 #   MIKO_UI_ASSET_FILE    用本机已下载好的资产文件,跳过下载(手动配置时用)
 #   MIKO_UI_DIR           产物落地目录(默认 <仓库根>/.cache/miko_ui/current)
 #   MIKO_UI_UPDATE=1      等同 --update
 #   MIKO_UI_SKIP_CHECK=1  跳过新旧检查,缓存健康就直接用(离线 / 手动放资产时)
 #   MIKO_UI_REQUIRE_LATEST=1  查不到新旧也算失败(默认只有 CI 里才这样)
 #   MIKO_UI_HTTP_TOOL     下载 / 查 API 用哪个客户端:auto(默认,wget 优先)/ wget / curl
-#   GITHUB_TOKEN / GH_TOKEN  查 tag 退到 REST,或下载绕行 API 资产端点时用:有就走
-#                         认证,免撞匿名限额(60 次/小时)
+#   GITHUB_TOKEN / GH_TOKEN  查 tag 退到 REST,以及在 API 资产端点下载时用:有就走
+#                         认证,免撞匿名限额(60 次/小时).默认下载路径就走 API,
+#                         所以本地频繁重下时这个 token 比过去更有用(CI 里本来就带)
 #
 # 退出码:0 = 产物可用;非 0 = 明确失败(缺工具 / 下载失败 / 校验失败 / 查不到新旧
 # 且不许将就).
@@ -133,7 +149,7 @@ RELEASE_PAGE_URL="https://github.com/${REPO_SLUG}/releases"
 ASSET_URL="${MIKO_UI_ASSET_URL:-https://github.com/${REPO_SLUG}/releases/download/${RELEASE_TAG}/${ASSET_NAME}}"
 API_URL="https://api.github.com/repos/${REPO_SLUG}"
 
-# 走 API 的两处(查 tag 的退路,下载绕行)在有限额时用 token:CI 里 `github.token`
+# 走 API 的两处(查 tag 的退路,下载)在有限额时用 token:CI 里 `github.token`
 # 就够,本地没有也能跑(匿名 60 次/小时).数组的展开写成
 # `${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"}`,是为了 macOS 自带的 bash 3.2(set -u 下展开
 # 空数组会报错).
@@ -141,6 +157,21 @@ HTTP_HDRS=()
 if [ -n "${GITHUB_TOKEN:-${GH_TOKEN:-}}" ]; then
     HTTP_HDRS=("Authorization: Bearer ${GITHUB_TOKEN:-${GH_TOKEN:-}}")
 fi
+
+# 资产先走哪条路(见文件头 §1).两条拿到的**是同一份字节**,差别只在主机:
+#   api    (默认)先问 api.github.com 要资产 id,再拉它的 octet-stream 端点
+#          (302 -> objects.githubusercontent.com).本机实测 github.com 的
+#          release 直链**老是** TCP 超时,而 api.github.com 稳得多,所以默认它.
+#   direct 直接下 github.com/releases/download/...(-- 老默认,看网络)
+# 任一条失败都会自动换另一条,所以这个值只决定"先试哪条",不是"只走哪条".
+ASSET_SOURCE="${MIKO_UI_ASSET_SOURCE:-api}"
+case "$ASSET_SOURCE" in
+    api | direct) ;;
+    *)
+        printf '[UI][ERROR] MIKO_UI_ASSET_SOURCE 只能是 api / direct,拿到的是: %s\n' "$ASSET_SOURCE" >&2
+        exit 2
+        ;;
+esac
 
 UPDATE=0
 SKIP_CHECK="${MIKO_UI_SKIP_CHECK:-0}"
@@ -334,11 +365,11 @@ resolve_tag_sha() {
     printf '%s' "$json" | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write(j.object?.type==="commit"?(j.object?.sha??""):"")}catch{}})'
 }
 
-# 主 URL(github.com)不通时的第二条路:先问 API 要 release 的资产清单,再按
-# `Accept: application/octet-stream` 拉同一个资产(它会 302 到
-# objects.githubusercontent.com -- 那个主机通常没问题).换的只是**路径**,字节是
-# 同一份;它到底对不对,由后面的产物校验与 gitHead 比对负责.只在没显式给
-# `MIKO_UI_ASSET_URL` 时才用它:显式覆盖(镜像 / 代理)是人指的路,不该被悄悄换掉.
+# GitHub API 的资产端点(**默认下载路径**,见文件头 §1):先问 API 要 release 的
+# 资产清单,再按 `Accept: application/octet-stream` 拉那个 id(它会 302 到
+# objects.githubusercontent.com).github.com 的 release 直链在本机老超时,所以
+# 这条是首选;换的只是**路径**,字节是同一份,它到底对不对,由后面的产物校验与
+# gitHead 比对负责.
 download_asset_via_api() {
     local out="$1" json id
     json="$(http_get_text "${API_URL}/releases/tags/${RELEASE_TAG}" \
@@ -357,9 +388,35 @@ process.stdin.on("data", (d) => (s += d)).on("end", () => {
         warn "API 里没找到 release ${RELEASE_TAG} 的资产 ${ASSET_NAME}(release 还没建好?或撞了匿名限额)"
         return 1
     fi
-    log "改走 API 资产端点(${HTTP_TOOL}): ${API_URL}/releases/assets/${id}"
+    log "走 API 资产端点(${HTTP_TOOL}): ${API_URL}/releases/assets/${id}"
     http_download "${API_URL}/releases/assets/${id}" "$out" \
         ${HTTP_HDRS[@]+"${HTTP_HDRS[@]}"} 'Accept: application/octet-stream'
+}
+
+# 按 `MIKO_UI_ASSET_SOURCE` 决定先走哪条路,失败就换另一条.两条拿到的字节相同,
+# 产物校验与 gitHead 比对都在后面,不因走哪条路而放松.显式给过
+# `MIKO_UI_ASSET_URL` 时只走那一条:那是人明确指的路(镜像 / 代理),不该被悄悄换掉.
+fetch_asset() {
+    local out="$1"
+    if [ -n "${MIKO_UI_ASSET_URL:-}" ]; then
+        log "下载 release 资产(${HTTP_TOOL},MIKO_UI_ASSET_URL 指定的路径): ${ASSET_URL}"
+        http_download "$ASSET_URL" "$out"
+        return
+    fi
+    if [ "$ASSET_SOURCE" = api ]; then
+        if download_asset_via_api "$out"; then
+            return 0
+        fi
+        warn "API 资产端点没取到(限额撞满 / 网络不通);改用 github.com 直链再试一次"
+        http_download "$ASSET_URL" "$out"
+    else
+        log "下载 release 资产(${HTTP_TOOL}): ${ASSET_URL}"
+        if http_download "$ASSET_URL" "$out"; then
+            return 0
+        fi
+        warn "github.com 直链不通;改用 API 资产端点再试一次"
+        download_asset_via_api "$out"
+    fi
 }
 
 # 这份产物**自己声明**的 commit(清单里的 gitHead).空 = 它不自证版本(旧资产,或
@@ -414,7 +471,7 @@ print_manual_guide() {
  拿不到 miko_ui 的 release 产物:${reason}
 ================================================================================
 
-期望的资产地址(就是本脚本要下的那一个):
+期望的资产地址(两条下载路径取的都是这一份):
     ${ASSET_URL}
 
 手动配置步骤:
@@ -425,16 +482,16 @@ print_manual_guide() {
      库仓库的 \`.github/workflows/release.yml\` 还没配好 / 还没跑成功,先去把它合上并
      触发一次(main 推送或 workflow_dispatch),产出一个资产再说.
 
-  2. 手动下载资产(浏览器 / wget / curl 都行):
-         wget -O ${ASSET_NAME} "${ASSET_URL}"
-         curl -fL -o ${ASSET_NAME} "${ASSET_URL}"
-
-     这个主机(github.com)在部分网络里会间歇性连不上(DNS 通,TCP 超时,脚本自己
-     会重试并绕行).手动下载时也可以换 API 资产端点 -- 同一份字节:
+  2. 手动下载资产(浏览器 / wget / curl 都行).**先试 API 资产端点** -- 脚本默认走
+     的就是这条,github.com 的 release 直链在本机老超时:
          ID=\$(curl -fsSL "${API_URL}/releases/tags/${RELEASE_TAG}" \\
              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const a=(j.assets||[]).find(x=>x.name===process.argv[1]);process.stdout.write(a?String(a.id):"")})' "${ASSET_NAME}")
          curl -fL -H 'Accept: application/octet-stream' -o ${ASSET_NAME} \\
              "${API_URL}/releases/assets/\${ID}"
+
+     或直接下 github.com 直链(同一份字节,看网络哪条通):
+         wget -O ${ASSET_NAME} "${ASSET_URL}"
+         curl -fL -o ${ASSET_NAME} "${ASSET_URL}"
 
   3. 用它生成产物(跳过下载;脚本会照常校验并解到缓存目录):
          MIKO_UI_ASSET_FILE=\$PWD/${ASSET_NAME} bash scripts/fetch_ui.sh --update
@@ -586,19 +643,13 @@ if [ -n "${MIKO_UI_ASSET_FILE:-}" ]; then
     log "使用本机资产: ${MIKO_UI_ASSET_FILE}"
     cp "$MIKO_UI_ASSET_FILE" "${WORK}/${ASSET_NAME}"
 else
-    # 到 github.com 的路**会间歇性不通**:DNS 解析得出,TCP 却连不上,重试一两次
-    # 才过.重试 / 超时 / 硬上限由 http_download 统一规定(两个客户端语义对齐),这里
-    # 只管"失败了就换一条路".
-    log "下载 release 资产(${HTTP_TOOL}): ${ASSET_URL}"
-    if ! http_download "$ASSET_URL" "${WORK}/${ASSET_NAME}"; then
-        # 第二条路:GitHub API 的资产端点(见 download_asset_via_api).显式给过
-        # MIKO_UI_ASSET_URL 时不绕行 -- 那是人明确指的路.
-        if [ -n "${MIKO_UI_ASSET_URL:-}" ] || ! download_asset_via_api "${WORK}/${ASSET_NAME}"; then
-            err "下载失败: ${ASSET_URL}"
-            print_manual_guide '下载失败(没有这个 release / 资产名不对 / 网络不通)'
-            exit 1
-        fi
-        log "主 URL 不通,已从 API 资产端点取回同一份资产"
+    # 两条路:API 资产端点(默认)与 github.com release 直链,谁先谁后由
+    # MIKO_UI_ASSET_SOURCE 决定,失败自动换另一条.重试 / 超时 / 硬上限由
+    # http_download 统一规定(两个客户端语义对齐),fetch_asset 只管"失败了就换一条".
+    if ! fetch_asset "${WORK}/${ASSET_NAME}"; then
+        err "两条路都没取到 release 资产(API 资产端点 / ${ASSET_URL})"
+        print_manual_guide '下载失败(没有这个 release / 资产名不对 / 网络不通)'
+        exit 1
     fi
 fi
 
