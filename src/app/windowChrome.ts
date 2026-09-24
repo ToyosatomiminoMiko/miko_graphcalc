@@ -20,7 +20,7 @@
  * `aria-controls` / `aria-labelledby` 关系用的(见 `widgets/Popover.ts`),
  * 配对靠 id;它们不再被任何 `getElementById` 查找(装配层拿的是句柄).
  */
-import { create_element } from '@miko/ui';
+import { createButton, create_element } from '@miko/ui';
 import { UI_CONFIG, type ChromeNodeId } from '@/config/uiConfig';
 
 /**
@@ -33,17 +33,26 @@ import { UI_CONFIG, type ChromeNodeId } from '@/config/uiConfig';
 export type WindowChrome = Record<ChromeNodeId, HTMLElement>;
 
 export function createWindowChrome(): WindowChrome {
+    // 标题栏按钮走库的 `createButton`:它给每个按钮叠上基线类 `.ui-button`
+    // (appearance / 盒模型 / 描边 / 悬停 / 焦点 / 禁用都在库的 `widgets.css` 里).
+    // 自己 `create_element('button')` 会吃到浏览器 UA 的那套外观 -- 自带圆角与
+    // 底色,而 token 里四个 `--radius-*` 都是 0,看上去就像"这颗按钮从别处继承了
+    // 圆角",和库示例里的按钮明显不是同一种东西(见库 `widgets/Button.ts` 的说明).
+    //
+    // 只取 `.element`:点击接线仍由各自的控制器 `addEventListener` 负责,与另外
+    // 两个节点一致,不在这里多养一份回调表.
+    //
     // `aria-haspopup` 是静态语义,写在这里;`aria-expanded` 是状态,由 Popover
     // 在构造与每次开合时独占写入(见 Popover 的"开合态唯一"约定).
-    const exampleButton = create_element('button', {
-        type: 'button',
-        'aria-haspopup': 'true',
-    }, UI_CONFIG.window.chrome.exampleLabel);
+    const exampleButton = createButton({
+        text: UI_CONFIG.window.chrome.exampleLabel,
+    }).element;
+    exampleButton.setAttribute('aria-haspopup', 'true');
     exampleButton.id = 'example-btn';
 
-    const runButton = create_element('button', {
-        type: 'button',
-    }, UI_CONFIG.window.chrome.runLabel);
+    const runButton = createButton({
+        text: UI_CONFIG.window.chrome.runLabel,
+    }).element;
     runButton.id = 'run-btn';
 
     // 分组与菜单项由 ExampleLoaderController 按 exampleCatalog 渲染,这里只给

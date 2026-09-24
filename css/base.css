@@ -20,6 +20,14 @@
     box-sizing: border-box;
 }
 
+/* 页面是深色的:声明 `color-scheme` 之后,浏览器才会按深色画**原生控件**
+   (range 的轨道,滚动条,输入框的光标与选区),否则它用的是浅色那一套.
+   库的样式表只管它自己的组件,页面这一层归消费者 -- 上游示例
+   (`miko_ui/example/example.css`)装的就是这一条,缺了它滑杆轨道会按浅色画. */
+:root {
+    color-scheme: dark;
+}
+
 /* 页面根容器:铺满视口,并统一基础视觉风格 */
 html,
 body {

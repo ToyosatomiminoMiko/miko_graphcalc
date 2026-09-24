@@ -16,9 +16,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="GraphCalc">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <!-- 样式不在这里挂载:全部由 `src/main.ts` 按固定顺序 import(库的 token /
-         控件 / 桌面样式 + 应用的面板 / 编辑器 / 诊断 / 过程样式).Vite 会把它们
-         抽成产物里的一个 <link>,所以生产构建的首帧与以前一样,不吃 FOUC. -->
+    <!-- 样式不在这里挂载:全部由 `src/main.ts` 分**两层** import -- 先库的聚合
+         入口(`@miko/ui/styles.css`:token + 控件 + 桌面窗口 + 编辑器外壳),再
+         应用的五份(base / panels / editor / diagnostics / process).Vite 会把
+         它们抽成产物里的一个 <link>,所以生产构建的首帧与以前一样,不吃 FOUC. -->
 </head>
 
 <body>
