@@ -266,7 +266,7 @@ mod tests {
     }
 
     // ============================================================
-    // 旧 -> 新 逐点对拍(语义等价的唯一证明方式)
+    // 参照(改造前查表版) vs 绑定版 逐点对拍(语义等价的唯一证明方式)
     // ============================================================
 
     /// 求值维度;决定哪些坐标槽被覆写.
@@ -277,11 +277,13 @@ mod tests {
         ThreeD,
     }
 
-    /// 旧实现(查表版)的一次求值:重建 HashMap 上下文 -> 覆写坐标 -> 求值.
+    /// 参照实现(改造前查表版)的一次求值:重建 HashMap 上下文 -> 覆写坐标 -> 求值.
     ///
-    /// 与改造前的 `CompiledEvaluator` 完全同构:`compile_expression` 之后
-    /// `HashMap<String, f64>` + `set_variable` + `evaluate_runtime_expr`.
-    fn legacy_eval(
+    /// **这是对拍参照物,不是待删的旧代码**:它的可信度恰恰来自"与改造前的
+    /// `CompiledEvaluator` 完全同构"(`compile_expression` 之后
+    /// `HashMap<String, f64>` + `set_variable` + `evaluate_runtime_expr`);
+    /// 既不要跟着新实现一起改,也不要连同下面的对拍用例一起删.
+    fn reference_eval(
         expr: &str,
         coeff_names: &[String],
         coeff_values: &[f64],
@@ -338,22 +340,22 @@ mod tests {
     #[track_caller]
     fn assert_same_result(
         context: &str,
-        legacy: Result<Option<f64>, String>,
+        reference: Result<Option<f64>, String>,
         bound: Result<Option<f64>, String>,
     ) {
-        match (&legacy, &bound) {
+        match (&reference, &bound) {
             (Ok(Some(a)), Ok(Some(b))) => {
                 assert_eq!(
                     a.to_bits(),
                     b.to_bits(),
-                    "{context}: 数值不一致 legacy={a} bound={b}"
+                    "{context}: 数值不一致 reference={a} bound={b}"
                 );
             }
             (Ok(None), Ok(None)) => {}
             (Err(a), Err(b)) => {
                 assert_eq!(a, b, "{context}: 错误文案不一致");
             }
-            _ => panic!("{context}: 形态不一致 legacy={legacy:?} bound={bound:?}"),
+            _ => panic!("{context}: 形态不一致 reference={reference:?} bound={bound:?}"),
         }
     }
 
@@ -416,13 +418,13 @@ mod tests {
                 // 冲突系数(会被 build_coefficients 拒绝)也要对齐错误文案.
                 for mode in modes {
                     for (x, y, z) in coordinates {
-                        let legacy = legacy_eval(expr, &names, values, mode, x, y, z);
+                        let reference = reference_eval(expr, &names, values, mode, x, y, z);
                         let bound = bound_eval(expr, &names, values, mode, x, y, z);
                         assert_same_result(
                             &format!(
                                 "expr={expr:?} coeffs={names:?} mode={mode:?} xyz=({x},{y},{z})"
                             ),
-                            legacy,
+                            reference,
                             bound,
                         );
                         checked += 1;
@@ -433,15 +435,15 @@ mod tests {
         assert!(checked > 1000, "对拍样本太少: {checked}");
     }
 
-    /// 系数名与坐标名冲突时,新旧一致报错(含错误文案).
+    /// 系数名与坐标名冲突时,参照与绑定版一致报错(含错误文案).
     #[test]
     fn bound_path_rejects_conflicting_coefficient_names_like_before() {
         for name in ["x", "e", "pi", "Infinity", "NaN", "PI"] {
             let names = vec![name.to_string(), "a0".to_string()];
             let values = vec![1.0, 2.0];
-            let legacy = legacy_eval("a0 * x", &names, &values, Mode::OneD, 1.0, 0.0, 0.0);
+            let reference = reference_eval("a0 * x", &names, &values, Mode::OneD, 1.0, 0.0, 0.0);
             let bound = bound_eval("a0 * x", &names, &values, Mode::OneD, 1.0, 0.0, 0.0);
-            assert_same_result(name, legacy, bound);
+            assert_same_result(name, reference, bound);
             assert!(
                 CompiledEvaluator::new("a0 * x", &names, &values).is_err(),
                 "{name} 应被拒绝"
