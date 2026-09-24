@@ -84,29 +84,6 @@ describe('编辑区样式归属', () => {
         expect(panelsCss).not.toContain('.code-editor');
     });
 
-    it('样式入口按 token -> 桌面 -> 面板 -> 编辑器 -> 控件的顺序加载', () => {
-        // 顺序即层叠顺序.把它写成断言而不是注释:样式入口换地方(HTML link ->
-        // main.ts import)时不会有人记得同步注释,但会记得让测试过.
-        const main = read('../main.ts');
-        const order = [
-            '@miko/ui/styles/tokens.css',
-            '../css/base.css',
-            '@miko/ui/styles/desktop.css',
-            '../css/panels.css',
-            '../css/editor.css',
-            '@miko/ui/styles/editor.css',
-            '@miko/ui/styles/widgets.css',
-            '../css/diagnostics.css',
-            '../css/process.css',
-        ];
-        const positions = order.map((specifier) => main.indexOf(`'${specifier}'`));
-
-        for (const [index, position] of positions.entries()) {
-            expect(position, `main.ts 里缺少 ${order[index]}`).toBeGreaterThanOrEqual(0);
-            if (index > 0) expect(position).toBeGreaterThan(positions[index - 1]);
-        }
-    });
-
     it('高亮层与 textarea 的对齐样式逐项相同(窗口化不许碰的五条轴之一)', () => {
         const textarea = ruleOf(libEditorCss, '.code-editor-textarea');
         const highlightCode = ruleOf(libEditorCss, '.code-editor-highlight-code');

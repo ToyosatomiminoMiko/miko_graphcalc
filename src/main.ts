@@ -1,13 +1,26 @@
-// 样式入口:**顺序即层叠顺序**,与拆分前 `index.html` 的 7 个 <link> 一致.
-// Vite 会把它们(含从包里 import 的那三份)抽成产物里的一个 <link>,所以生产
-// 构建的首帧不依赖 JS;开发态由 Vite 注入,顺序同上.
-import '@miko/ui/styles/tokens.css';
+// 样式入口:**两层,库层在前,应用层在后**(顺序即层叠顺序).
+//
+// 为什么是"整层压"而不是逐份交错:赢家该由"谁负责这块样式"决定,不该由"文件
+// 排在第几位"决定.库的按钮基线本来就写成零优先级的 `:where(.ui-button)`,是
+// "库在前,消费方在后"的用法;应用层整层压上去之后,没有任何一条应用规则会因为
+// "库的某份样式表恰好排在它后面"而静默失效 -- 旧的交错顺序就踩过这个坑:
+// `panels.css` 里的 `.row-visibility-btn` 被排在后面的 `widgets.css` 盖掉了.
+//
+// 这条界限由 `src/config/styleLayers.test.ts` 守着:应用层只写库不拥有的类,
+// 不重复库已有的东西.要改样式就改库(或往库里加),不要在应用里覆盖.
+//
+// Vite 会把下面这些抽成产物里的一个 <link>,所以生产构建的首帧不依赖 JS;
+// 开发态由 Vite 注入,顺序同上.
+//
+// 1) 库层:一行 = 库的全部默认样式.内部顺序(tokens -> 控件 -> 桌面 -> 编辑器
+//    外壳)由库自己的 `styles.css` 决定,应用不插手;库以后新增样式表,这里
+//    也不用改.
+import '@miko/ui/styles.css';
+//
+// 2) 应用层:只写应用自己的类 / id / 页面级规则,按用途拆成五份.
 import '../css/base.css';
-import '@miko/ui/styles/desktop.css';
 import '../css/panels.css';
 import '../css/editor.css';
-import '@miko/ui/styles/editor.css';
-import '@miko/ui/styles/widgets.css';
 import '../css/diagnostics.css';
 import '../css/process.css';
 

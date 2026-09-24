@@ -235,33 +235,13 @@
     border-color: var(--color-error-border);
 }
 
-/* 行末显隐按钮:业务动作(隐藏 = Three.js 里不渲染且不参与计算),
-   与 <details> 的开合无关--它挂在行末(见 createObjectRow),不在
-   <summary> 里,点它不会开合细节.主内容 `.row-main` 是 flex:1,所以按钮
-   自然贴右;`align-self` 与行的 align-items 一致,内容变高时仍停在顶部. */
-.row-visibility-btn {
-    flex: 0 0 auto;
-    align-self: flex-start;
-    padding: 3px 7px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--color-fill-control-strong);
-    color: var(--color-text-muted);
-    font-size: 12px;
-    line-height: 1.2;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.row-visibility-btn:hover {
-    color: var(--color-text-strong);
-    border-color: var(--color-accent-border);
-}
-
-.row-visibility-btn:focus-visible {
-    outline: 2px solid var(--color-accent-focus);
-    outline-offset: 1px;
-}
+/* 行末显隐按钮的外观**不在这里**:`.row-visibility-btn` 是库的类,由库的
+   `shared/rowDom.ts` 生成,库的 `widgets.css` 已经给了它"按钮基线 + 实心底 +
+   行内定位".应用只负责旁边的容器(`.row-actions` 竖排)与行的布局
+   (`.row-main` 的 flex:1).
+   这里原本有一份 15 条声明的副本,逐字与库相同(其中 flex/align-self/background
+   还被排在后面的 `widgets.css` 盖掉),已删 -- 要改这个按钮就看库,不要在应用里
+   覆盖(理由见 src/config/styleLayers.test.ts). */
 
 /* 行末动作容器:把"过程"入口与显隐按钮收成**一个**直接子节点(见
    ui/shared/rowDom.ts 的 createRowActions).整组贴右靠 .row-main 的 flex:1;
@@ -276,35 +256,11 @@
     gap: 4px;
 }
 
-/* "过程"入口(三级披露的 L2):与显隐按钮同一套盒模型,只是用透明底表示
-   "这是进入另一页"的次级动作;不可用(隐藏对象)时置灰并保留理由在
-   title/aria-label 上. */
-.row-process-btn {
-    padding: 3px 7px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--color-text-muted);
-    font-size: 12px;
-    line-height: 1.2;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.row-process-btn:hover:not(:disabled) {
-    color: var(--color-text-strong);
-    border-color: var(--color-accent-border);
-}
-
-.row-process-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.row-process-btn:focus-visible {
-    outline: 2px solid var(--color-accent-focus);
-    outline-offset: 1px;
-}
+/* "过程"入口(三级披露的 L2):类名只当 DOM 钩子(测试与语义)留着,外观**全部
+   来自库的按钮基线** `:where(.ui-button)` -- 库给每个 `createButton` 的按钮都
+   带这份默认外观(透明底 = 次级动作,外加悬停/焦点/禁用三态).
+   这里原本把基线的 9 条声明 + 3 条状态逐字抄了一遍,已删:抄一遍不会改变外观,
+   只会让"改样式该改哪里"变成两个地方(理由见 src/config/styleLayers.test.ts). */
 
 .kind-badge {
     flex: 0 0 auto;

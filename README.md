@@ -149,6 +149,21 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 与 `@miko/ui` 的 `styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
 `desktop.css`,编辑器外壳 `editor.css`)的 `var()` 消费.
 
+**样式表按两层加载,顺序即层叠顺序**(入口在 `src/main.ts`):
+
+1. **库层**:`import '@miko/ui/styles.css'` 一行拿到库的全部默认样式,内部顺序
+   (token -> 控件 -> 桌面 -> 编辑器外壳)由库自己的 `styles.css` 决定,应用不
+   插手;库以后加样式表,应用入口不用改;
+2. **应用层**:`css/base.css` -> `panels.css` -> `editor.css` ->
+   `diagnostics.css` -> `process.css`,只写应用自己的类 / id / 页面级规则.
+
+整层压而不是逐份交错:交错时"谁赢"由"文件排在第几位"决定,而不是"这块样式归谁
+负责".踩过的坑是应用层的 `.row-visibility-btn` 被排在它后面的库 `widgets.css`
+盖掉,在应用里改 `background` 完全无效而且不报错.所以应用层不许出现"只由库的类
+构成"的选择器,也不许整组照抄库的按钮基线 `:where(.ui-button)` -- 要改外观就改库
+(或给节点加一个应用自有的变体类,只写增量).这条界限由
+`src/config/styleLayers.test.ts` 断言,配色纪律由 `cssPalette.test.ts` 断言.
+
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
   `gutterMinWidth` 是行号槽宽下限;
