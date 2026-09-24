@@ -44,7 +44,7 @@ import {
     signal,
     type ReadonlySignal,
     type Signal,
-} from '@miko/ui';
+} from 'miko_ui';
 
 /** 相机模式的两个字面量:勾选 = 正交.面板与状态源共用这一份映射. */
 export const CAM_MODE_WHEN_CHECKED: CamMode = 'orthographic';

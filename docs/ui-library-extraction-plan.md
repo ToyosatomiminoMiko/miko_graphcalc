@@ -102,6 +102,19 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 >
 > 落地顺序有要求:**先推库**(让带 `gitHead` 的资产挂出来),再推本仓库 -- 在那之前
 > 本仓库的 CI 会因为"资产不自证版本"而红,这是刻意的.
+>
+> **补记六(回归 npm,2026-09):** 库发布到 npm 之后(`miko_ui@0.1.2`),本仓库改回
+> npm 依赖:根 `package.json` 里一条 `"miko_ui": "^0.1.2"`,源码里的导入从
+> `@miko/ui` 改成包名 `miko_ui`(补记二里"npm 出局"的那半条判断作废).补记三/四/五
+> 的取产物机制整个删掉:`scripts/fetch_ui.sh`,`preinstall` / `ui:fetch` /
+> `ui:update` 三条脚本,`build:all` 的第一步,`.gitignore` 的 `/.cache/` 与相关注释,
+> CI 里的 `GITHUB_TOKEN` 与说明,以及 `vite.config.ts` / `build.sh` 里关于 `file:`
+> 链接的段落.版本新鲜度不再靠构建期比对资产清单的 `gitHead`,而是回到
+> `package-lock.json`:要升级就 `npm install miko_ui@latest` 并提交新 lock.
+> 补记五里那条"构建期自动重取最新"由 `build.sh` 里的 miko_ui 版本同步接手:
+> 装完锁定依赖后把 `miko_ui` 对齐到 npm `latest`(默认 `MIKO_UI_SYNC=auto`,
+> 也可设 `check` 只校验 / `off` 跳过),所以每次 GitHub Pages 构建拿到的都是库的
+> 最新发布版;查不到 latest 时本机警告,CI 明确失败.
 
 | 期 | 状态 | 落地后的关键形态 |
 | --- | --- | --- |

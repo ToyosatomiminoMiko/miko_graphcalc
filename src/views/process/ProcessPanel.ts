@@ -14,9 +14,9 @@
  * 不在这里扩:步骤 LaTeX 键是"表达式签名 × 步数",是有限集合.
  */
 import { UI_CONFIG } from '@/config/uiConfig';
-import { createFormulaElement } from '@miko/ui';
-import { KeyedRowList, type KeyedRowHandles } from '@miko/ui';
-import { create_element } from '@miko/ui';
+import { createFormulaElement } from 'miko_ui';
+import { KeyedRowList, type KeyedRowHandles } from 'miko_ui';
+import { create_element } from 'miko_ui';
 import {
     PROCESS_STEP_KIND_LABELS,
     partitionStepsByKind,

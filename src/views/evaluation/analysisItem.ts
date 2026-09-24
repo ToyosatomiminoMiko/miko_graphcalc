@@ -17,7 +17,7 @@ import {
     analysisLatexSummary,
     detailLinesOf,
 } from '@/compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildGradientProcess } from '@/adapters/evaluationToSteps';
 import { needsProcessPage } from '@/views/process/disclosure';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';

@@ -15,7 +15,7 @@ import {
     intersectionLatexDetails,
     intersectionLatexSummary,
 } from '@/compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

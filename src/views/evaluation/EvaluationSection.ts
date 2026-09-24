@@ -22,7 +22,7 @@
  * latest-only 语义(`LatestRequestExecutor`)在上游丢弃.这里没有"请求发出时的键"
  * 可比较,因此注释不再承诺本层能识别改写.
  */
-import { KeyedRowList } from '@miko/ui';
+import { KeyedRowList } from 'miko_ui';
 import {
     EvaluationItem,
     type EvaluationContext,

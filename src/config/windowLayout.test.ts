@@ -10,7 +10,7 @@
  * 这里不需要先排好序.
  */
 import { describe, expect, it } from 'vitest';
-import { resolveRelativeGeometries, type Desktop, type AbsoluteGeometry } from '@miko/ui';
+import { resolveRelativeGeometries, type Desktop, type AbsoluteGeometry } from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from './uiConfig';
 
 const CONFIG = desktopConfig();

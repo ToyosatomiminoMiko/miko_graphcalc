@@ -38,9 +38,9 @@
  * 还是重建--颜色已经画在行上,所以它必须进键,否则改颜色不会刷新.
  */
 import type { SceneObject } from '@/contract/ir';
-import { createFormulaElement } from '@miko/ui';
-import { createObjectRow, createRowActions, createVisibilityButton } from '@miko/ui';
-import { create_element } from '@miko/ui';
+import { createFormulaElement } from 'miko_ui';
+import { createObjectRow, createRowActions, createVisibilityButton } from 'miko_ui';
+import { create_element } from 'miko_ui';
 import { sceneObjectExpression, sceneObjectKindLabel } from '@/adapters/entityText';
 
 export class EntityItem {

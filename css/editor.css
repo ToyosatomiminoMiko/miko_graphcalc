@@ -5,7 +5,7 @@
  *    padding 并让它吃掉剩余高度);
  * 2. **DSL 词法配色**:`.dsl-*` 这些类名由**应用的分词器**产出
  *    (`src/editor/dslHighlight.ts`),所以配色归应用 -- 库的
- *    `@miko/ui/styles/editor.css` 只管编辑器外壳的结构与对齐,不认识 DSL.
+ *    `miko_ui/styles/editor.css` 只管编辑器外壳的结构与对齐,不认识 DSL.
  *
  * 编辑器的结构选择器(`.code-editor*`)已经随库走;这里出现它们只是作为
  * 配色规则的**作用域**(作用域是库的公开类名,不是消费者的 id).

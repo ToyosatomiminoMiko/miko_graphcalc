@@ -141,11 +141,11 @@ describe('applyUiConfig', () => {
 
 describe('token 层的默认值(P4/D8 之后在库里)', () => {
     it('每个默认值都与 UI_CONFIG 映射出的值逐字一致', () => {
-        // 默认值层随库走(@miko/ui/styles/tokens.css):它就是"脚本执行前的首帧".
+        // 默认值层随库走(miko_ui/styles/tokens.css):它就是"脚本执行前的首帧".
         // 值不一致就会闪一下旧字号/旧面板宽度,所以两边必须逐字相同.
         // 这条断言也覆盖"新加变量忘了写默认值":漏掉时 toMatchObject 直接失败.
         const css = readFileSync(
-            createRequire(import.meta.url).resolve('@miko/ui/styles/tokens.css'),
+            createRequire(import.meta.url).resolve('miko_ui/styles/tokens.css'),
             'utf8',
         );
         const fallbacks = readRootCssVariables(css);

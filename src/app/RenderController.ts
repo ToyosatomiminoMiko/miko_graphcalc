@@ -18,11 +18,11 @@ import { IntersectionRenderer } from '@/render/core/renderers/IntersectionRender
 import { DslIntegralRenderer } from '@/render/visualization/DslIntegralRenderer';
 import { ComputeFacade } from '@/compute';
 import type { SceneIR, SceneObject } from '@/contract/ir';
-import { effect } from '@miko/ui';
+import { effect } from 'miko_ui';
 import { onSamplingFailure } from '@/render/core/samplingErrors';
 import { SceneStore } from './SceneStore';
-import { MessageList } from '@miko/ui';
-import type { MessageEntry } from '@miko/ui';
+import { MessageList } from 'miko_ui';
+import type { MessageEntry } from 'miko_ui';
 import { ObjectListController } from '@/views/objects/ObjectListController';
 import type { ViewState } from '@/views/view/viewState';
 

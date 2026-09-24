@@ -7,7 +7,7 @@
  * `groupedExamples()` 翻成库的菜单数据,再把选中回调转给装配层.
  *
  * 结构 / 分组 / 菜单项 / 当前项 / 开合 / 点外部关闭 / aria 全在库的
- * `createMenu` 里(见 `@miko/ui` 的 `widgets/Menu.ts`):面板节点由窗口标题栏的
+ * `createMenu` 里(见 `miko_ui` 的 `widgets/Menu.ts`):面板节点由窗口标题栏的
  * overlays 槽位提供(见 `windowChrome.ts` 与 `UI_CONFIG.window.adopted`),
  * 触发元素就是标题栏那颗「示例」按钮.
  *
@@ -17,7 +17,7 @@
  * 为什么是浮层而不是一个 `<select>`:示例要按主题分组,每项还要显示中文标题;
  * 面板默认宽只有 300px,下拉里标题只能截断,也没有分组.
  */
-import { createMenu, type MenuGroup, type MenuHandle } from '@miko/ui';
+import { createMenu, type MenuGroup, type MenuHandle } from 'miko_ui';
 import { UI_CONFIG } from '@/config/uiConfig';
 import { allExamples, groupedExamples, type ExampleEntry } from './exampleCatalog';
 
@@ -54,7 +54,7 @@ export class ExampleLoaderController {
         private readonly onSelect: (entry: ExampleEntry) => void,
     ) {
         if (!elements.button || !elements.menu) {
-            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 @miko/ui/src/desktop/windowChrome.ts)');
+            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 miko_ui/src/desktop/windowChrome.ts)');
         }
 
         this.menu = createMenu({

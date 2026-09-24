@@ -2,7 +2,7 @@
  * 界面样式默认值.
  *
  * 与 `numericConfig` / `renderConfig` 同一约定:这里只放纯数据,不含 DOM
- * 或渲染逻辑.真正落到页面的是 `@miko/ui/src/theme/applyUiConfig.ts`,它把这些值写成
+ * 或渲染逻辑.真正落到页面的是 `miko_ui/src/theme/applyUiConfig.ts`,它把这些值写成
  * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
  * 例外:`panel` 里的拖拽夹取范围与整个 `view` 段落**只有 TS 消费**,CSS 没有
@@ -19,7 +19,7 @@ import type {
     WindowActionId,
     RelativeGeometry,
     WindowSlot,
-} from '@miko/ui';
+} from 'miko_ui';
 
 // 窗口系统的**通用词汇**(锚点/槽位/动作)由库定义(D4):应用侧只再导出,
 // 不重复写第二份,否则"库说 slot 有 3 个,应用说有 4 个"这种事没有编译错误.
@@ -31,11 +31,20 @@ export type WindowId = 'source' | 'view' | 'params' | 'process' | 'entities' | '
 /**
  * 标题栏采用节点的名字.
  *
- * 与 `WindowChrome` 的字段名一一对应(见 @miko/ui/src/desktop/windowChrome.ts):
+ * 与 `WindowChrome` 的字段名一一对应(见 miko_ui/src/desktop/windowChrome.ts):
  * 那边把它当 `Record<ChromeNodeId, HTMLElement>` 的键,所以这里少写一个名字
  * 或多写一个都会编译不过,不存在"配置里有,代码里没有"的漂移.
+ *
+ * 复制提示有**两个**节点:对象列表拆成"实体"/"求值"两个窗口之后,两处正文里
+ * 都有可复制的公式,两处标题栏就都该有那句提示.两个节点由同一个控制器驱动
+ * (见库的 `FormulaCopyController` "一组提示节点"),所以回显是同步的.
  */
-export type ChromeNodeId = 'exampleButton' | 'runButton' | 'exampleMenu' | 'formulaCopyHint';
+export type ChromeNodeId =
+    | 'exampleButton'
+    | 'runButton'
+    | 'exampleMenu'
+    | 'formulaCopyHint'
+    | 'formulaCopyHintEvaluations';
 
 /** 采用关系:节点由 `createWindowChrome` 建,落在哪个窗口的哪个槽由这条给. */
 export interface AdoptedNodeSpec {
@@ -260,15 +269,16 @@ export const UI_CONFIG = {
             { id: 'minimize', text: 'min' },
             { id: 'maximize', text: 'max' },
         ],
-        // 四个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
+        // 五个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
         // (旧写法是 index.html 里一个 hidden 暂存区 + DslApp 里一条 if 链).
         adopted: [
             { node: 'exampleButton', window: 'source', slot: 'actions' },
             { node: 'runButton', window: 'source', slot: 'actions' },
             { node: 'exampleMenu', window: 'source', slot: 'overlays' },
-            // 复制提示跟着**实体**窗口走:它是对象列表那一列的回显,窗口拆开之后
-            // 跟着左半(实体)比跟着右半更贴近它提示的内容.
+            // 复制提示两处:两个对象窗口的正文里都有可复制的公式,所以两边标题栏
+            // 各挂一句.同一个控制器驱动两个节点,回显是同步的(不是"各管各的").
             { node: 'formulaCopyHint', window: 'entities', slot: 'title' },
+            { node: 'formulaCopyHintEvaluations', window: 'evaluations', slot: 'title' },
         ],
         chrome: {
             exampleLabel: '示例',

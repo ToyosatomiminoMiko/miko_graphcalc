@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
  * 样式分层契约:两层,库层在前,应用层在后.
  *
  * ```text
- *   库层  @miko/ui/styles.css     默认主题 token + 控件 + 桌面窗口 + 编辑器外壳
+ *   库层  miko_ui/styles.css     默认主题 token + 控件 + 桌面窗口 + 编辑器外壳
  *   应用层 css/*.css              应用自己的类 / id / 页面级规则
  * ```
  *
@@ -44,11 +44,11 @@ const APP_CSS = [
  * "是哪个类被应用重定义了"的报错.
  */
 const LIB_CSS = [
-    '@miko/ui/styles/tokens.css',
-    '@miko/ui/styles/widgets.css',
-    '@miko/ui/styles/desktop.css',
-    '@miko/ui/styles/editor.css',
-    '@miko/ui/styles/feedback.css',
+    'miko_ui/styles/tokens.css',
+    'miko_ui/styles/widgets.css',
+    'miko_ui/styles/desktop.css',
+    'miko_ui/styles/editor.css',
+    'miko_ui/styles/feedback.css',
 ] as const;
 
 const require = createRequire(import.meta.url);
@@ -113,7 +113,7 @@ describe('样式分层', () => {
         );
 
         expect(imported).toEqual([
-            '@miko/ui/styles.css',
+            'miko_ui/styles.css',
             ...APP_CSS.map((name) => `../css/${name}`),
         ]);
     });

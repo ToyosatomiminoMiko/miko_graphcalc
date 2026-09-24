@@ -21,5 +21,5 @@ views/       展示数据 + 控件 -> DOM(行/列表/面板;不认识编译器)
 
 为什么单独一层(而不是让 `views/` 直接读 IR):`views/` 的职责是"渲染",
 把"读哪些字段,拼成什么文本"混进去之后,渲染模块就没法在不构造 DOM 的情况下
-单测,而且"库能不能不认识 IR"这条边界会从 `views/` 一路洇到 `@miko/ui`
+单测,而且"库能不能不认识 IR"这条边界会从 `views/` 一路洇到 `miko_ui`
 (docs/ui-library-extraction-plan.md D2).

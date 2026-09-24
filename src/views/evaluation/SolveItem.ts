@@ -19,7 +19,7 @@ import {
     solveLatexSummary,
     solvePlainText,
 } from '@/compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildSolveProcess } from '@/adapters/evaluationToSteps';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {

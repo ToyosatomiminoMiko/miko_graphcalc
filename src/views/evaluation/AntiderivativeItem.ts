@@ -20,7 +20,7 @@ import {
     detailLinesOf,
     antiderivativeLatexSummary,
 } from '@/compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildAntiderivativeProcess } from '@/adapters/evaluationToSteps';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {

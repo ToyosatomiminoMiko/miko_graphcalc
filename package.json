@@ -5,9 +5,9 @@
   "description": "GraphCalc DSL",
   "type": "module",
   "dependencies": {
-    "@miko/ui": "file:.cache/miko_ui/current",
     "@preact/signals-core": "^1.14.4",
     "katex": "^0.18.5",
+    "miko_ui": "^0.1.2",
     "three": "^0.185.1"
   },
   "devDependencies": {
@@ -20,9 +20,6 @@
     "vitest": "^4.1.10"
   },
   "scripts": {
-    "preinstall": "bash scripts/fetch_ui.sh",
-    "ui:fetch": "bash scripts/fetch_ui.sh",
-    "ui:update": "bash scripts/fetch_ui.sh --update",
     "dev": "vite",
     "clean": "node -e 'const fs = require(\"node:fs\"); for (const p of [\"dist\", \"src/generated\"]) fs.rmSync(p, { recursive: true, force: true });'",
     "prepare": "node -e \"try{require('node:child_process').execSync('git config --local core.hooksPath .githooks',{stdio:'ignore'})}catch{}\"",
@@ -31,7 +28,7 @@
     "build:wasm:render": "cd src/render/render_rs && wasm-pack build --release --target web --out-dir ../../generated/render_rs",
     "build:wasm": "npm run build:wasm:math && npm run build:wasm:compiler && npm run build:wasm:render",
     "build:app": "npm run typecheck && vite build",
-    "build:all": "npm run ui:fetch && npm run lint:rs && npm run clean && npm run build:wasm && npm test && npm run build:app",
+    "build:all": "npm run lint:rs && npm run clean && npm run build:wasm && npm test && npm run build:app",
     "build": "npm run build:all",
     "lint:rs": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
     "preview": "vite preview",

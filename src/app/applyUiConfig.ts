@@ -14,7 +14,7 @@
  * `EditorLineNumbers` 构造时会按最终字体度量行号宽度,晚一步就会量到兜底字体
  * (计划附录 C1).
  */
-import { applyTheme, type ThemeTokens } from '@miko/ui';
+import { applyTheme, type ThemeTokens } from 'miko_ui';
 import { UI_CONFIG } from '@/config/uiConfig';
 
 /**

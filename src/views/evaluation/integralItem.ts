@@ -22,13 +22,13 @@ import {
     integralLatexSummary,
 } from '@/compiler/dsl/evaluationLatex';
 import { latexResultNumber } from '@/math/latexNumber';
-import { formatNumber } from '@miko/ui';
-import { createFormulaElement } from '@miko/ui';
+import { formatNumber } from 'miko_ui';
+import { createFormulaElement } from 'miko_ui';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildIntegralProcess } from '@/adapters/evaluationToSteps';
 import { needsProcessPage } from '@/views/process/disclosure';
-import { create_element } from '@miko/ui';
+import { create_element } from 'miko_ui';
 import {
     createDetailSections,
     createEvaluationRow,

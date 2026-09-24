@@ -22,7 +22,7 @@ import {
     WindowManager,
     mountDesktop,
     type DesktopHandle,
-} from '@miko/ui';
+} from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
 import { highlightDsl } from '@/editor/dslHighlight';
 import type { AppViews } from './appViews';
@@ -120,7 +120,12 @@ export class DslApp {
             views.paramsPanel,
             (name) => this._scheduleRefresh(name),
         );
-        this.formulaCopyController = new FormulaCopyController(views.chrome.formulaCopyHint);
+        // 两处复制提示(实体 / 求值两个窗口标题栏各一句)交给**同一个**控制器:
+        // 复制成功/失败要两处一起回显,不能一处变了另一处还写着旧文案.
+        this.formulaCopyController = new FormulaCopyController([
+            views.chrome.formulaCopyHint,
+            views.chrome.formulaCopyHintEvaluations,
+        ]);
         this.viewState = createViewState();
         this.viewPanel = createViewPanel(views.viewControls, this.viewState);
         this.exampleLoader = new ExampleLoaderController(

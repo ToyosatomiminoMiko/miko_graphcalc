@@ -16,7 +16,7 @@
  */
 import type { SceneObject } from '@/contract/ir';
 import type { ProcessDocument } from '@/adapters/processSteps';
-import { carryDetailsOpen } from '@miko/ui';
+import { carryDetailsOpen } from 'miko_ui';
 
 /**
  * 打开过程页的请求:已经重组好的过程文档.

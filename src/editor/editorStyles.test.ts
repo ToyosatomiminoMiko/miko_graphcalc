@@ -9,13 +9,13 @@ import { installDomStub, type StubElement } from '@/testing/domStub';
  *
  * 编辑器样式分成两半(P4/D8 之后):
  * - **结构/对齐**(外框,行号槽,textarea 与高亮层的重叠)随库走
- *   (`@miko/ui/styles/editor.css`,选择器是 `.code-editor*` 类名);
+ *   (`miko_ui/styles/editor.css`,选择器是 `.code-editor*` 类名);
  * - **DSL 词法配色**留应用(`css/editor.css`),因为产出 `.dsl-*` 类名的是应用的
  *   分词器.
  * 这个划分是"改编辑器只开对应的那一个文件"的前提,靠注释守不住:一旦有人把
  * 结构规则挪回应用,或者排版样式散进 panels.css,这里会直接失败.
  *
- * P4/D8 之后两处路径变了:窗口样式搬进库(`@miko/ui/styles/desktop.css`,所以
+ * P4/D8 之后两处路径变了:窗口样式搬进库(`miko_ui/styles/desktop.css`,所以
  * 这里按**包路径**导入而不是相对文件路径),样式入口从 index.html 的 <link>
  * 变成 `src/main.ts` 的 import 顺序.
  */
@@ -32,9 +32,9 @@ function read(relative: string): string {
 const require = createRequire(import.meta.url);
 const readLib = (specifier: string): string => readFileSync(require.resolve(specifier), 'utf8');
 
-const desktopCss = readLib('@miko/ui/styles/desktop.css');
+const desktopCss = readLib('miko_ui/styles/desktop.css');
 /** 编辑器外壳的结构与对齐样式:随库走(P4/D8). */
-const libEditorCss = readLib('@miko/ui/styles/editor.css');
+const libEditorCss = readLib('miko_ui/styles/editor.css');
 
 /** 取出某个选择器的声明体(选择器写法固定,不做通用 CSS 解析). */
 function ruleOf(css: string, selector: string): string {

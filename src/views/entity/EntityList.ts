@@ -7,7 +7,7 @@
  * 因此"顺序/缓存"策略只有一处.
  */
 import type { SceneObject } from '@/contract/ir';
-import { KeyedRowList } from '@miko/ui';
+import { KeyedRowList } from 'miko_ui';
 import { EntityItem } from './EntityItem';
 
 /**

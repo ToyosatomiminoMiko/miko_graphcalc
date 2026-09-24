@@ -84,7 +84,7 @@
 }
 
 /* 单条参数行的样式(名称 / 滑杆 / 数值框 / 重置按钮)参见:
-   `@miko/ui` 的 `.slider-field`(见库的 `styles/widgets.css`),
+   `miko_ui` 的 `.slider-field`(见库的 `styles/widgets.css`),
    参数面板只负责列表容器(上面的 `#params-panel`). */
 
 /* ==========================================================================
@@ -149,20 +149,15 @@
 /* 栏标题(`.object-list-title`)已随拆分删除:窗口标题就是分组标识
    (见 src/app/appViews.ts 的 buildEntitiesWindow). */
 
-/* 复制提示:唯一一处"公式可点"文案,复制成功/失败复用同一元素回显. */
+/* 复制提示:两处对象窗口标题栏各一句(都是"公式可点"的说明).
+   回显的**颜色**归库:`is-copied` / `is-error` 由库的 `styles/feedback.css` 给,
+   应用只负责这句提示自己的大小与不换行 -- 这里原本有一份 `.is-copied` /
+   `.is-error` 的颜色副本,随库补上默认值一并删除(理由见 styleLayers.test.ts). */
 .object-list-hint {
     font-size: 10px;
     color: var(--color-text-hint);
     white-space: nowrap;
     transition: color 0.2s ease;
-}
-
-.object-list-hint.is-copied {
-    color: var(--color-success);
-}
-
-.object-list-hint.is-error {
-    color: var(--color-error);
 }
 
 .object-list-body {

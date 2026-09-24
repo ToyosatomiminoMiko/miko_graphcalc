@@ -48,7 +48,7 @@ import {
     create_element,
     watchValue,
     type NumberFieldHandle,
-} from '@miko/ui';
+} from 'miko_ui';
 import {
     CAM_MODE_WHEN_CHECKED,
     CAM_MODE_WHEN_UNCHECKED,

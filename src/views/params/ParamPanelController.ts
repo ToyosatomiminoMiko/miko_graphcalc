@@ -3,7 +3,7 @@
  * 从 DslApp 拆出,负责根据 ParamDeclaration 生成滑块与数字输入,
  * 并维护当前参数值.
  *
- * DOM 与交互件走 `@miko/ui` 的 `widgets/`:一行参数就是库的**系数滑块**
+ * DOM 与交互件走 `miko_ui` 的 `widgets/`:一行参数就是库的**系数滑块**
  * (`createSlider` = 名称 + 滑杆 + 数值框 + 重置按钮),本类只保留**业务语义** --
  * 取值口径,归一化函数,以及"值变了通知场景".行的结构由库定义:
  *
@@ -22,7 +22,7 @@
  *
  * 过去这一行有**两个状态源**:滑块的 `input.value` 与数字框的 `input.value`,
  * 外加本类的一份 `values` 缓存;三者在 `writeValue()` 里手工对齐.现在一行只有
- * 一个 `signal<number>`(见 `@miko/ui` 的 `reactive/`),滑块与数字框都以它为
+ * 一个 `signal<number>`(见 `miko_ui` 的 `reactive/`),滑块与数字框都以它为
  * `value` 绑定:
  *
  * - 滑块拖动 -> 写信号 -> 数字框自己更新;
@@ -61,7 +61,7 @@ import {
     signal,
     type Signal,
     type SliderHandle,
-} from '@miko/ui';
+} from 'miko_ui';
 
 export type ParamChangeHandler = (name: string, value: number) => void;
 

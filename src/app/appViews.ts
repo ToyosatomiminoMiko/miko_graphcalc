@@ -19,7 +19,7 @@ import {
     windowSlotsProvider,
     type Child,
     type WindowContentSpec,
-} from '@miko/ui';
+} from 'miko_ui';
 import { UI_CONFIG, type WindowId } from '@/config/uiConfig';
 import { highlightDsl } from '@/editor/dslHighlight';
 import type { ObjectListContainers } from '@/views/objects/ObjectListController';

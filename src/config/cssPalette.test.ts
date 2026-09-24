@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * 应用侧的配色纪律.
  *
- * 色板的**真相源**已经随 UI 库走(`@miko/ui/styles/tokens.css`,P4/D8).应用这边
+ * 色板的**真相源**已经随 UI 库走(`miko_ui/styles/tokens.css`,P4/D8).应用这边
  * 要守的是三条"消费者纪律":
  * 1. 应用的样式表里不出现颜色字面量 -- 想加色就加进库的色板(或先想清楚
  *    它是不是该由主题覆盖);
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  *    会让下一个人以为改了它就能改样式.
  *
  * 库自己那半(字面量只有一处,别名指向真实 token)在
- * `@miko/ui/src/theme/cssPalette.test.ts`.
+ * `miko_ui/src/theme/cssPalette.test.ts`.
  */
 
 /** 应用自己的样式表(库的不在此列). */
@@ -28,11 +28,11 @@ const APP_CSS = [
 
 /** 库的样式表:按**包路径**解析,遵循 exports 映射. */
 const LIB_CSS = [
-    '@miko/ui/styles/tokens.css',
-    '@miko/ui/styles/widgets.css',
-    '@miko/ui/styles/desktop.css',
-    '@miko/ui/styles/editor.css',
-    '@miko/ui/styles/feedback.css',
+    'miko_ui/styles/tokens.css',
+    'miko_ui/styles/widgets.css',
+    'miko_ui/styles/desktop.css',
+    'miko_ui/styles/editor.css',
+    'miko_ui/styles/feedback.css',
 ] as const;
 
 const require = createRequire(import.meta.url);
@@ -54,7 +54,7 @@ function stripComments(css: string): string {
 }
 
 describe('应用配色纪律(P4/D8 之后:色板在库里)', () => {
-    const tokensCss = stripComments(readLib('@miko/ui/styles/tokens.css'));
+    const tokensCss = stripComments(readLib('miko_ui/styles/tokens.css'));
     const block = /:root\s*\{([\s\S]*?)\n\}/.exec(tokensCss)?.[1] ?? '';
     const defined = new Set(
         [...block.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]),

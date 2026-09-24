@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { mountDesktop } from '@miko/ui';
+import { mountDesktop } from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
 import { installDomStub, type StubElement } from '@/testing/domStub';
 import { buildAppViews, type AppViews } from './appViews';
@@ -113,7 +113,7 @@ describe('buildAppViews', () => {
         expect(views.windowContent('nope')).toEqual({ slots: {}, body: [] });
     });
 
-    it('标题栏四个节点按 adopted 表落进各自的窗口', () => {
+    it('标题栏五个节点按 adopted 表落进各自的窗口', () => {
         const { views } = build();
 
         expect(Object.keys(views.chrome).sort()).toEqual(
@@ -123,9 +123,14 @@ describe('buildAppViews', () => {
             views.chrome.exampleButton,
             views.chrome.runButton,
         ]);
-        // 复制提示跟着实体窗口走(对象窗口拆成实体 / 求值两个之后).
-        expect(views.windowContent('entities').slots?.title).toEqual([views.chrome.formulaCopyHint]);
-        // 求值窗口没有标题栏节点.
-        expect(views.windowContent('evaluations').slots?.title).toBeUndefined();
+        // 两处复制提示:两个对象窗口的正文里都有可复制的公式,所以两处标题栏
+        // 各挂一句(两个**不同**的节点,同一个控制器驱动).
+        expect(views.windowContent('entities').slots?.title).toEqual([
+            views.chrome.formulaCopyHint,
+        ]);
+        expect(views.windowContent('evaluations').slots?.title).toEqual([
+            views.chrome.formulaCopyHintEvaluations,
+        ]);
+        expect(views.chrome.formulaCopyHint).not.toBe(views.chrome.formulaCopyHintEvaluations);
     });
 });

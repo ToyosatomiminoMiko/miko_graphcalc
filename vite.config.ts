@@ -55,10 +55,10 @@ export default defineConfig({
     resolve: {
         alias: [{ find: /^@\//, replacement: `${SRC_ALIAS}/` }],
         /**
-         * 库是 `file:` 链接进来的(`@miko/ui` -> `.cache/miko_ui/current`,由
-         * `scripts/fetch_ui.sh` 从库的 release 资产解开),那份产物里**没有**
-         * `node_modules`:库的运行时依赖(`@preact/signals-core`,以及引公式时的
-         * `katex`)由**本应用的 package.json 自己声明**.dedupe 在这里是第二道
+         * 库从 npm 装进来(`miko_ui`),它自己的运行时依赖只有
+         * `@preact/signals-core` 一个,`katex` 是可选 peer.本应用的
+         * package.json 也**显式**声明了这两个:应用自己要直接用它们,而且
+         * 声明在这里才能保证解析到应用根目录的那一份实例.dedupe 是第二道
          * 保险:把它们钉死到应用根目录的那一份实例上.
          *
          * 为什么必须只有一份:
@@ -68,9 +68,6 @@ export default defineConfig({
          *    实例,否则公式相关的用例会真的去跑 katex;
          * 2. **`@preact/signals-core` 是库的响应式真相源**:两份实例意味着 signal
          *    与 effect 跨在两条注册表上,表现是"值变了界面不动".
-         *
-         * 库为什么以 `file:` 链接进来,资产清单里为什么不能有 `scripts`,拿不到
-         * 资产时怎么手动兜底,见 `scripts/fetch_ui.sh` 顶部的"应用侧的依赖契约".
          */
         dedupe: ['katex', '@preact/signals-core'],
     },
@@ -86,6 +83,17 @@ export default defineConfig({
         // 一批,CI 少跑一批"的差异看不出来.库的测试由库自己的仓库和 CI 负责,
         // 不该在这里重复跑一遍.
         include: ['src/**/*.test.ts'],
+        // 库从 npm 装进来后落在 `node_modules/` 里,Vitest 默认把它当外部依赖交给
+        // Node 原生 ESM 解析 -- 而库产物里的相对导入不带扩展名(如
+        // `dist/index.js` 里的 `./reactive`),Node 会报
+        // `ERR_UNSUPPORTED_DIR_IMPORT`.把它 inline 进来走 Vite 的解析器 / 转换链,
+        // 顺带处理 `dist/formula/FormulaView.js` 里的 `katex/dist/katex.min.css`.
+        // 以前库是 `file:` 软链(指向仓库外的 `.cache/`),Vite 按源码处理,所以没暴露.
+        server: {
+            deps: {
+                inline: ['miko_ui'],
+            },
+        },
         // 解析器集成测试要跑真正的 Rust/WASM 解析器;wasm-bindgen 的默认
         // 初始化在 Node 里走 `fetch(new URL(..., import.meta.url))`,Node 的
         // fetch 不认 file://,会直接 "fetch failed".setup 文件用 initSync

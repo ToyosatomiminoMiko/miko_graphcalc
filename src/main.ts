@@ -15,10 +15,10 @@
 // 1) 库层:一行 = 库的全部默认样式.内部顺序(tokens -> 控件 -> 桌面 -> 编辑器
 //    外壳)由库自己的 `styles.css` 决定,应用不插手;库以后新增样式表,这里
 //    也不用改.
-import '@miko/ui/styles.css';
+import 'miko_ui/styles.css';
 //
 // 2) 应用层:只写应用自己的类 / id / 页面级规则,按用途拆成四份.
-//    (诊断条目的外观已随库走 `@miko/ui/styles/feedback.css`,原来的
+//    (诊断条目的外观已随库走 `miko_ui/styles/feedback.css`,原来的
 //    `diagnostics.css` 整份删除;列表容器改由 `.diagnostic-list` 在 panels.css 里排布.)
 import '../css/base.css';
 import '../css/panels.css';

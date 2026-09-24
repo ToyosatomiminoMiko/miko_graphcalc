@@ -13,7 +13,7 @@
  */
 import type { OdeTask } from '@/contract/ir';
 import { detailLinesOf, odeLatexDetailEntries, odeLatexSummary } from '@/compiler/dsl/evaluationLatex';
-import { createRowActions, createVisibilityButton } from '@miko/ui';
+import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildOdeProcess } from '@/adapters/evaluationToSteps';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {

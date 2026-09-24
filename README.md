@@ -115,7 +115,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 ```
 
 - 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)与任务栏**由库声明式装配**
-  (库 `@miko/ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
+  (库 `miko_ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
   里只有一个空 `#app`,窗口层 / 吸附预览 / 任务栏 / 每个窗口的正文容器都由库建;
   加窗口只改 `UI_CONFIG.window.windows` 一处.
 - 能力:拖动标题栏移动,八向缩放,最小化(再点任务栏按钮恢复),最大化(填满任务栏
@@ -135,7 +135,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   之上的预留带,工作区里没有任何东西需要让路.
 - 窗口外壳的两个尺寸(任务栏高度 `dockReserve`,标题栏高度 `headerHeight`)在
   挂载时由库从 `DesktopConfig` 写到 `#app` 的 CSS 变量上,是运行期唯一来源;
-  `@miko/ui` 的 `styles/tokens.css` 里的同名值只是没有 JS 时的兜底.
+  `miko_ui` 的 `styles/tokens.css` 里的同名值只是没有 JS 时的兜底.
 - **布局不落 localStorage**:刷新后回到默认几何,与"界面偏好不落本地存储"的
   既有约定一致;设计取舍与逐条理由见
   [面板窗口化设计计划](docs/windowing-plan.md).
@@ -146,12 +146,12 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/app/applyUiConfig.ts`
 写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
 `css/panels.css` / `css/diagnostics.css` / `css/process.css`(面板与列表)
-与 `@miko/ui` 的 `styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
+与 `miko_ui` 的 `styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
 `desktop.css`,编辑器外壳 `editor.css`)的 `var()` 消费.
 
 **样式表按两层加载,顺序即层叠顺序**(入口在 `src/main.ts`):
 
-1. **库层**:`import '@miko/ui/styles.css'` 一行拿到库的全部默认样式,内部顺序
+1. **库层**:`import 'miko_ui/styles.css'` 一行拿到库的全部默认样式,内部顺序
    (token -> 控件 -> 桌面 -> 编辑器外壳)由库自己的 `styles.css` 决定,应用不
    插手;库以后加样式表,应用入口不用改;
 2. **应用层**:`css/base.css` -> `panels.css` -> `editor.css` ->
@@ -180,7 +180,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   (`--window-header-height` 与 `--dock-reserve`)在挂载时由库从这份配置
   写到 `#app`,库样式表里的同名值只是没有 JS 时的兜底.
 
-改完刷新页面即可.库样式表(`@miko/ui` 的 `styles/tokens.css`)的 `:root`
+改完刷新页面即可.库样式表(`miko_ui` 的 `styles/tokens.css`)的 `:root`
 兜底只负责脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致--这条约定由
 `applyUiConfig.test.ts` 逐字断言,
 只改 `uiConfig.ts` 或只改 CSS 都会先失败在测试上,不会静默闪一帧旧样式.
@@ -291,15 +291,10 @@ npm run build
 
 该命令会依次执行:
 
-一. `npm run ui:fetch`:`scripts/fetch_ui.sh` 核对(落后就自动重取)`@miko/ui`
-的 release 产物.这一步挂在 `build:all` 的**第一步**上,而不是只挂在 `npm ci`
-的 `preinstall` 上 -- `npm run build` 不经过 `npm ci`,只挂 preinstall 会让
-"日常只跑 `npm run build`"的人拿着旧缓存安静地构建
-
-二. `npm run lint:rs` / `npm run clean`:Rust `fmt` + `clippy`,然后清空旧的
+一. `npm run lint:rs` / `npm run clean`:Rust `fmt` + `clippy`,然后清空旧的
 `dist/` 与 `src/generated/`
 
-三. `npm run build:wasm`:分别重建 `src/math/math_rs`/
+二. `npm run build:wasm`:分别重建 `src/math/math_rs`/
 `src/compiler/compiler_rs`/`src/render/render_rs`
 三个 Rust crate,并把产物输出到对应的 `src/generated/*` 目录
 
@@ -315,43 +310,41 @@ npm run build
 > 初始化),`wasm/workerRuntime.ts`(Worker 侧消息壳),`wasm/matrixOps.ts`
 > (矩阵后端);生成产物只被这三个文件与各 `*Worker` 直接引用.
 
-四. `npm run test`(vitest),最后 `npm run build:app`:先 `npm run typecheck`
+三. `npm run test`(vitest),最后 `npm run build:app`:先 `npm run typecheck`
 (`tsc --noEmit`),再 `vite build`
 
-五. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行
-`npm ci`,再跑上面整条 `build:all`(Rust lint,清理旧产物与 WASM 构建,
-前端/Rust 测试,前端类型检查与打包),每个阶段都有日志输出;GitHub Actions 只调用这一个
-脚本,不再重复编排各步骤.`bash ./build.sh` 里 `npm ci` 与 `build:all` 会各核对一次
-`@miko/ui` 新鲜度(第二次通常就是一句"已是最新");查不到新旧时 CI 明确失败,本机
-只警告(见 `scripts/fetch_ui.sh` 顶部 §7).
+四. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行 `npm ci`,把
+`miko_ui` 对齐到 npm 的 `latest`(见下面的版本同步),再跑上面整条 `build:all`
+(Rust lint,清理旧产物与 WASM 构建,前端/Rust 测试,前端类型检查与打包),
+每个阶段都有日志输出;GitHub Actions 只调用这一个脚本,不再重复编排各步骤.
 
-> **`@miko/ui`(网页 UI 库)不在这里,也不从 npm 取.** 它是独立仓库
+> **`miko_ui`(网页 UI 库)是 npm 依赖,不在这里.** 它是独立仓库
 > [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
-> 交付形态是它的**滚动 release 资产**(`ui-latest` 上的
-> `miko_ui_dist.tar.gz`,由库的 `.github/workflows/release.yml` 在 main 每次
-> 推送后覆盖).`npm ci` 的 `preinstall` 与 `npm run build` / `npm run build:all`
-> 的第一步都会跑 `scripts/fetch_ui.sh` -- 下载 -> 校验 -> 解开到
-> `.cache/miko_ui/current`(gitignore),最后按
-> `"@miko/ui": "file:.cache/miko_ui/current"` 链接进来(两条入口缺一不可:
-> `npm run build` 不经过 `npm ci`).本机**没有 TypeScript,
-> 也没有库的源码**;要拉上游最新:`npm run ui:update`(不用它也够:每次 `npm ci`
-> 或 `npm run build` 都拿资产清单里的 `gitHead` -- 库打包时写入的构建 commit --
-> 比 `ui-latest` tag
-> 指向的 commit,落后就自动重取).**下载默认走 GitHub API 的资产端点**
-> (`api.github.com/repos/.../releases/assets/<id>`,它会 302 到
-> `objects.githubusercontent.com`),因为 github.com 的 release 直链在本机**老是**
-> TCP 超时(DNS 通,TCP 连不上);失败会自动改走 github.com 直链,两条都拿不到才
-> 失败.要固定先走哪条:`MIKO_UI_ASSET_SOURCE=api|direct`(默认 `api`).这个默认值
-> 会让下载吃 GitHub API 限额(匿名 60 次/小时;查新旧用的是 `git ls-remote`,不吃
-> 限额),本地频繁重下时给 `GITHUB_TOKEN` 更稳,CI 里本来就带.下载默认用 wget
-> (GNU Wget2 在这条线路上实测比 curl
-> 更容易连上;curl 也支持,`MIKO_UI_HTTP_TOOL=curl` 可切).取不到资产会**明确失败**
-> (脚本会打印 release 页面,期望 URL 与手动下载步骤),**没有**"克隆源码自己构建"
-> 的回退;而"查不到是不是最新"(断网 / 资产不自证版本)时本地只警告,**CI 里明确
-> 失败** -- 部署出去的不能是"说不清哪一版"的缓存.规则与理由见
-> `scripts/fetch_ui.sh` 顶部与库仓库的 `RELEASING.md`.
+> 发布在 npm registry 上.根 `package.json` 里一条 `"miko_ui": "^0.1.2"`,
+> `npm ci` / `npm install` 直接从 registry 装好,和 `three` / `katex` 没有区别:
+> **本仓库里没有取库的脚本,没有 `preinstall`,也没有 `.cache/` 缓存**.库的检查
+> (边界守卫 / typecheck / vitest)与发布都在库自己的仓库里跑,本仓库不构建库;
+> 源码里的 `import ... from 'miko_ui'` 解析到的是 npm 包里的 `dist/` 构建产物
+> (纯 ESM,自带类型声明).库的运行时依赖只有 `@preact/signals-core`(必装)与
+> `katex`(可选 peer),本应用在 `package.json` 里显式声明了这两个,并由
+> `vite.config.ts` 的 `resolve.dedupe` 保证全程只有一份实例.
+>
+> **每次构建对齐最新版:** `build.sh` 在 `npm ci` 之后,流水线之前跑一步版本
+> 同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就 `npm install miko_ui@latest`
+> 并更新 `package.json` / `package-lock.json`.所以 **GitHub Pages 每次部署用的
+> 都是库的最新发布版**(`deploy.yml` 走的就是 `build.sh`);本地跑完
+> `bash ./build.sh` 记得把这两个文件提交.策略由 `MIKO_UI_SYNC` 控制:
+>
+> - `auto`(默认):落后就更新;
+> - `check`:落后就失败,不改文件(只校验);
+> - `off`:完全按 lock 构建,跳过同步.
+>
+> 查不到 `latest`(断网 / npm 不可用)时本机警告并沿用 lock,CI(`CI=true`,或显式
+> `MIKO_UI_REQUIRE_LATEST=1`)明确失败 -- 部署出去的不能是"说不清哪一版"的产物.
+> 注意 `npm run build`(=`build:all`)不经过 `build.sh`,它按 lock 构建,不会自动
+> 更新;要手动升到最新就是 `npm install miko_ui@latest` 后提交 lock.
 
-四. 重新生成wasm
+只重新生成 WASM(不动其余步骤):
 
 ```sh
 npm run build:wasm

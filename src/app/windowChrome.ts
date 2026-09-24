@@ -1,7 +1,7 @@
 /**
- * 窗口标题栏上的四个"应用节点":示例按钮 / RUN / 示例浮层 / 复制提示.
+ * 窗口标题栏上的应用节点:示例按钮 / RUN / 示例浮层 / **两处**复制提示.
  *
- * **为什么在这里建,而不是留在 `index.html`**:这四个节点的 id 与监听归各自的
+ * **为什么在这里建,而不是留在 `index.html`**:这些节点的 id 与监听归各自的
  * 控制器(`ExampleLoaderController` / `FormulaCopyController` / `DslApp`),位置
  * 却归窗口外壳.留在 HTML 就得同时维持三套机制:一个"启动前不参与布局"的
  * 隐藏暂存区,一次按 id 取节点,一次"搬进标题栏"的搬运;任何一处漏掉都是静默
@@ -21,17 +21,31 @@
  * `getElementById` 查找(装配层拿的是句柄).菜单的读屏名(`aria-label`)与
  * `role` 由库的 `createMenu` 写,不在这里.
  */
-import { createButton, create_element } from '@miko/ui';
+import { createButton, create_element } from 'miko_ui';
 import { UI_CONFIG, type ChromeNodeId } from '@/config/uiConfig';
 
 /**
- * 四个节点的句柄.
+ * 应用节点句柄.
  *
  * 形状由 `ChromeNodeId` 锁死:配置里 `adopted[].node` 用到的每个名字都必须是
  * 这里的字段,反之少建一个节点即编译不过 -- 旧写法(按 id 查)漏一个只在
  * 运行期表现为 `null`,这条约束因此不需要额外的测试来守.
  */
 export type WindowChrome = Record<ChromeNodeId, HTMLElement>;
+
+/**
+ * 建一句"公式可复制"提示.
+ *
+ * 两个对象窗口各要一句,所以抽成工厂:`class` 与初始文案是同一条口径,抄两遍
+ * 就有"改了一处忘了另一处"的余地.差别只有 id(节点在 DOM 里仍要分得开).
+ */
+function createCopyHint(id: string): HTMLElement {
+    const hint = create_element('span', {
+        class: 'object-list-hint',
+    }, UI_CONFIG.window.chrome.copyHint);
+    hint.id = id;
+    return hint;
+}
 
 export function createWindowChrome(): WindowChrome {
     // 标题栏按钮走库的 `createButton`:它给每个按钮叠上基线类 `.ui-button`
@@ -62,10 +76,11 @@ export function createWindowChrome(): WindowChrome {
     const exampleMenu = create_element('div');
     exampleMenu.id = 'example-menu';
 
-    const formulaCopyHint = create_element('span', {
-        class: 'object-list-hint',
-    }, UI_CONFIG.window.chrome.copyHint);
-    formulaCopyHint.id = 'formula-copy-hint';
-
-    return { exampleButton, runButton, exampleMenu, formulaCopyHint };
+    return {
+        exampleButton,
+        runButton,
+        exampleMenu,
+        formulaCopyHint: createCopyHint('formula-copy-hint'),
+        formulaCopyHintEvaluations: createCopyHint('formula-copy-hint-evaluations'),
+    };
 }

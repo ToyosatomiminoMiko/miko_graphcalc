@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Production build entrypoint.
-# 这里只负责"安装锁定依赖"和"调用统一流水线",真正的构建/检查步骤序列
-# 定义在 package.json 的 build:all 脚本(单一事实源,避免两处重复).
+# 这里负责"安装锁定依赖""把 miko_ui 对齐到 npm 最新版"和"调用统一流水线",
+# 真正的构建/检查步骤序列定义在 package.json 的 build:all 脚本(单一事实源,
+# 避免两处重复).
 #
 # 为什么要保留这个壳而非直接内联到 CI:
-#   - 提供可复现的本地入口(bash ./build.sh 与 CI 完全一致);
+#   - 提供本地入口(bash ./build.sh 与 CI 走同一条;想严格按 lock 构建就设
+#     MIKO_UI_SYNC=off);
 #   - 覆盖 npm run 无法提供的缺工具快速失败(require_command)
 #     与失败时的行号上下文(trap ... ERR),以及分阶段日志前缀.
 
@@ -36,36 +38,83 @@ require_command npm
 require_command cargo
 require_command wasm-pack
 
+# ---------------------------------------------------------------------------
+# miko_ui 版本同步
+#
+# 库在 npm 上独立发版,`package-lock.json` 不会自己跟着走.这一步在锁定依赖装好
+# 之后,把 `miko_ui` 对齐到 npm 的 `latest`:
+#
+#   MIKO_UI_SYNC=auto  (默认) 落后就 `npm install miko_ui@latest`,并更新
+#                             `package.json` / `package-lock.json`
+#                             (本地跑完记得提交这两个文件);
+#   MIKO_UI_SYNC=check        落后就失败,不改任何文件(只想校验时用);
+#   MIKO_UI_SYNC=off          完全按 lock 构建,跳过这一步.
+#
+# 查不到 latest(断网 / npm 不可用)时:本机警告并沿用 lock;CI(`CI=true`,或显式
+# `MIKO_UI_REQUIRE_LATEST=1`)明确失败 -- 部署出去的必须是能说清哪一版的产物.
+# 想跳过网络查询(测试这个函数)可以预设 `MIKO_UI_LATEST_VERSION`.
+# ---------------------------------------------------------------------------
+MIKO_UI_PKG="miko_ui"
+MIKO_UI_SYNC="${MIKO_UI_SYNC:-auto}"
+
+sync_miko_ui() {
+    if [ "$MIKO_UI_SYNC" = "off" ]; then
+        log "miko_ui sync skipped (MIKO_UI_SYNC=off)"
+        return 0
+    fi
+    if [ "$MIKO_UI_SYNC" != "auto" ] && [ "$MIKO_UI_SYNC" != "check" ]; then
+        err "invalid MIKO_UI_SYNC='${MIKO_UI_SYNC}' (expected auto|check|off)"
+        return 1
+    fi
+
+    local locked latest
+    locked="$(node -p "require('./node_modules/${MIKO_UI_PKG}/package.json').version" 2>/dev/null || true)"
+
+    latest="${MIKO_UI_LATEST_VERSION:-}"
+    if [ -z "$latest" ]; then
+        latest="$(npm view "${MIKO_UI_PKG}@latest" version 2>/dev/null | head -n 1 | tr -d '[:space:]')"
+    fi
+
+    if [ -z "$latest" ]; then
+        if [ -n "${CI:-}" ] || [ "${MIKO_UI_REQUIRE_LATEST:-0}" = "1" ]; then
+            err "cannot resolve the latest ${MIKO_UI_PKG} from npm, and this build must not ship a stale version"
+            return 1
+        fi
+        log "WARN: cannot resolve the latest ${MIKO_UI_PKG} from npm; continuing with locked ${locked:-unknown}"
+        return 0
+    fi
+
+    if [ "$locked" = "$latest" ]; then
+        log "miko_ui is already the latest (${latest})"
+        return 0
+    fi
+
+    if [ "$MIKO_UI_SYNC" = "check" ]; then
+        err "${MIKO_UI_PKG} is ${locked:-unknown} but npm latest is ${latest}; run 'npm install ${MIKO_UI_PKG}@latest'"
+        return 1
+    fi
+
+    log "updating ${MIKO_UI_PKG}: ${locked:-unknown} -> ${latest}"
+    npm install "${MIKO_UI_PKG}@${latest}" --no-audit --no-fund
+    log "miko_ui is now $(node -p "require('./node_modules/${MIKO_UI_PKG}/package.json').version") (package.json / package-lock.json changed; commit them when building locally)"
+}
+
 log "installing pinned dependencies from package-lock.json"
-# 顺序说明:根 package.json 的 preinstall 会先跑 scripts/fetch_ui.sh -- 从库
-# 仓库的滚动 release(`ui-latest` 上的 miko_ui_dist.tar.gz)取**产物**,校验后
-# 解开到 .cache/miko_ui/current,然后把 `"@miko/ui": "file:.cache/miko_ui/current"`
-# 这条链接装上.npm 解析 file: 依赖时那个目录必须已经存在,所以"取产物"只能挂在
-# preinstall,不能挪到这里之后;CI 也不需要 checkout submodule,不需要任何 npm
-# 凭据 -- 公开 release 资产,能访问 GitHub(actions/checkout 本来就要)就够了.
+# 依赖全部来自 npm registry:`miko_ui` 是上游库
+# (https://github.com/ToyosatomiminoMiko/miko_ui)发布到 npm 的包
 #
-# 这次 npm ci 还会核对"缓存是不是最新":资产清单里的 gitHead(库打包时写入的构建
-# commit)与 ui-latest tag 指向的 commit 不一致就自动重取;查不到这个结论(断网 /
-# 资产不自证版本)时本地只警告,CI 里明确失败 -- 所以"库刚推,资产还没带上 gitHead"
-# 时,CI 可能就红在这一步,那不是配置错误(见 fetch_ui.sh 顶部 §7).
-#
-# 再往下 build:all 的顺序是 ui:fetch -> lint:rs -> clean -> build:wasm -> test
-# -> build:app;其中 clean 只删根 dist/ 与 src/generated/,不碰 .cache/miko_ui,
-# 所以"产物在第一步就绪,后面全程可用".取产物/链接/模块去重的全部规则见
-# scripts/fetch_ui.sh 顶部与 vite.config.ts 的 resolve.dedupe.
-#
-# 为什么 build:all 的**第一步**还是 ui:fetch(这里刚跑过 npm ci,看起来重复):
-# preinstall 只在 npm install / npm ci 时触发,而 README 里推荐的日常命令是
-# `npm run build`(= build:all),它**不经过 npm ci** -- 只把核对挂在 preinstall
-# 上,"日常只跑 npm run build"的人就会拿着旧缓存安静地构建.所以核对必须同时挂在
-# build:all 上,两条入口共用同一条检查.这里第二次跑的代价是一次"已是最新"的
-# ls-remote(缓存落后时才会真的重下),换来的是"任何一条构建入口都不会拿到说不清
-# 哪一版的 @miko/ui".
+# 再往下 build:all 的顺序是 lint:rs -> clean -> build:wasm -> test -> build:app;
+# 其中 clean 只删根 dist/ 与 src/generated/,不碰 node_modules.
+# 生产构建里唯一一份 miko_ui / @preact/signals-core 的实例约束见
+# vite.config.ts 的 resolve.dedupe.
 npm ci --no-audit --no-fund
 
-# 流水线 = ui:fetch -> lint:rs -> clean -> build:wasm -> test -> build:app
+# 装完锁定依赖后再对齐 miko_ui:增量装一个包,不必推倒 node_modules 重来.
+sync_miko_ui
+
+# 流水线 = lint:rs -> clean -> build:wasm -> test -> build:app
 # (后者内含 typecheck + vite build)
-log "running full build pipeline (ui -> lint -> clean -> wasm -> test -> app)"
+log "running full build pipeline (lint -> clean -> wasm -> test -> app)"
 npm run build:all
 
 log "build succeeded"

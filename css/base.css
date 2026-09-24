@@ -7,7 +7,7 @@
  *   3. 应用根节点与 3D 视口的铺满方式.
  *
  * 设计 token(色板 / 圆角 / 代码字体 / 面板下限 / 窗口外壳常量)不在这里:
- * 它们已经随 UI 库走(`@miko/ui/styles/tokens.css`),由 `src/main.ts` 在样式
+ * 它们已经随 UI 库走(`miko_ui/styles/tokens.css`),由 `src/main.ts` 在样式
  * 入口处最先加载.颜色/圆角的"唯一真相源"因此在那份文件里,由库自己的
  * `cssPalette.test.ts` 断言.
  *

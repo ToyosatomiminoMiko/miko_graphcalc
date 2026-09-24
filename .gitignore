@@ -5,11 +5,3 @@ dist/
 .vscode
 __pycache__/
 prompt
-# 库源码的工作副本(miko_ui 是个独立仓库)**已经搬出本仓库**
-# 依赖来源是下面的 .cache/ 产物.
-# `@miko/ui` 的**产物**落地处:由 scripts/fetch_ui.sh 从库仓库的滚动 release
-# (`ui-latest` 上的 miko_ui_dist.tar.gz)下载,校验,解开而来,根 package.json 的
-# `"@miko/ui": "file:.cache/miko_ui/current"` 就指这里.里面只有库的构建产物
-# (dist/ + styles/ + LICENSE + 由库生成的运行期清单),没有库源码,也不入库 --
-# 契约见 fetch_ui.sh 顶部.
-/.cache/

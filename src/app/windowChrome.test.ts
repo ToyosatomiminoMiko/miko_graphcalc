@@ -7,7 +7,7 @@
  * .adopted` 声明的落点与 `windowSlotsProvider()` 的输出一致.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createPopover, windowSlotsProvider } from '@miko/ui';
+import { createPopover, windowSlotsProvider } from 'miko_ui';
 import { UI_CONFIG } from '@/config/uiConfig';
 import { installDomStub, type StubElement } from '@/testing/domStub';
 import { createWindowChrome } from './windowChrome';
@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe('createWindowChrome', () => {
-    it('四个节点按 ChromeNodeId 建齐,文案来自配置', () => {
+    it('五个节点按 ChromeNodeId 建齐,文案来自配置', () => {
         const chrome = createWindowChrome();
 
         expect(Object.keys(chrome).sort()).toEqual(
@@ -25,7 +25,9 @@ describe('createWindowChrome', () => {
         );
         expect(chrome.exampleButton.textContent).toBe(UI_CONFIG.window.chrome.exampleLabel);
         expect(chrome.runButton.textContent).toBe(UI_CONFIG.window.chrome.runLabel);
+        // 两处复制提示:同一句文案,两个节点(各进一个对象窗口的标题栏).
         expect(chrome.formulaCopyHint.textContent).toBe(UI_CONFIG.window.chrome.copyHint);
+        expect(chrome.formulaCopyHintEvaluations.textContent).toBe(UI_CONFIG.window.chrome.copyHint);
         // 浮层的类名 / role / aria 与分组,菜单项由库的 createMenu 建
         // (见 ExampleLoaderController),这里必须是空的.
         expect(chrome.exampleMenu.children).toHaveLength(0);
@@ -92,8 +94,12 @@ describe('windowSlotsProvider', () => {
         expect(content('view')).toEqual({});
         expect(content('params')).toEqual({});
         expect(content('process')).toEqual({});
-        // 对象窗口拆成两个之后,求值窗口一个节点都不挂.
-        expect(content('evaluations')).toEqual({});
+        // 求值窗口也有自己的那句复制提示(与实体窗口是**两个**节点).
+        expect(content('evaluations')).toEqual({
+            title: [chrome.formulaCopyHintEvaluations],
+            actions: [],
+            overlays: [],
+        });
     });
 
     it('同一个节点不会被放进两个窗口', () => {
