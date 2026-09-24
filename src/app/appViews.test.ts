@@ -5,7 +5,7 @@
  * `buildAppViews()`.这条接缝过去由 `appHosts.test.ts` 守着(HTML 里的 id 够不够
  * 取齐宿主),现在改成两条更直接的断言:
  * 1. `index.html` 里**只剩** `#app`(D1 的验收线,防止宿主 id 又长回来);
- * 2. 建出来的桩树里,CSS 依赖的结构 id 一个不少,五个窗口都拿得到内容.
+ * 2. 建出来的桩树里,CSS 依赖的结构 id 一个不少,六个窗口都拿得到内容.
  *
  * 用桩而不是真浏览器:这里只验结构,桩不做布局(见 docs/windowing-plan.md §8.1).
  */
@@ -104,7 +104,7 @@ describe('buildAppViews', () => {
         expect(input.children[1]).toBe(views.editorHighlight as unknown as StubElement);
     });
 
-    it('五个窗口都拿到正文,未知窗口给空内容', () => {
+    it('六个窗口都拿到正文,未知窗口给空内容', () => {
         const { views } = build();
 
         for (const spec of UI_CONFIG.window.windows) {
@@ -123,6 +123,9 @@ describe('buildAppViews', () => {
             views.chrome.exampleButton,
             views.chrome.runButton,
         ]);
-        expect(views.windowContent('objects').slots?.title).toEqual([views.chrome.formulaCopyHint]);
+        // 复制提示跟着实体窗口走(对象窗口拆成实体 / 求值两个之后).
+        expect(views.windowContent('entities').slots?.title).toEqual([views.chrome.formulaCopyHint]);
+        // 求值窗口没有标题栏节点.
+        expect(views.windowContent('evaluations').slots?.title).toBeUndefined();
     });
 });

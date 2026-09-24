@@ -17,16 +17,16 @@ import type {
     AxisSpec,
     DesktopConfig,
     WindowActionId,
-    WindowGeometrySpec,
+    RelativeGeometry,
     WindowSlot,
 } from '@miko/ui';
 
 // 窗口系统的**通用词汇**(锚点/槽位/动作)由库定义(D4):应用侧只再导出,
 // 不重复写第二份,否则"库说 slot 有 3 个,应用说有 4 个"这种事没有编译错误.
-export type { AxisSpec, WindowActionId, WindowGeometrySpec, WindowSlot };
+export type { AxisSpec, WindowActionId, RelativeGeometry, WindowSlot };
 
 /** 窗口 id;数组顺序即 Dock 顺序与默认几何的依赖顺序(应用自己的清单). */
-export type WindowId = 'source' | 'view' | 'params' | 'process' | 'objects';
+export type WindowId = 'source' | 'view' | 'params' | 'process' | 'entities' | 'evaluations';
 
 /**
  * 标题栏采用节点的名字.
@@ -56,7 +56,7 @@ export interface AppWindowEntry {
     /** 标题栏文案,同时是 Dock 按钮的 `title` 与无障碍名. */
     readonly title: string;
     readonly dock: { readonly label: string };
-    readonly defaultGeometry: WindowGeometrySpec;
+    readonly defaultGeometry: RelativeGeometry;
     readonly minSize: { readonly w: number; readonly h: number };
 }
 
@@ -68,7 +68,7 @@ export interface AppWindowEntry {
  * - `chrome`:标题栏节点的文案,字面量只在配置里,HTML 与 TS 都不留副本.
  */
 export interface AppWindowConfig {
-    /** 五个窗口,顺序即 z 初始序与 Dock 顺序. */
+    /** 六个窗口,顺序即 z 初始序与 Dock 顺序. */
     readonly windows: readonly AppWindowEntry[];
     /** 标题栏上的窗口按钮:顺序即显示顺序,文案进配置不散在 TS 里. */
     readonly actions: readonly {
@@ -159,12 +159,14 @@ export const UI_CONFIG = {
      *
      * 与 `editor` / `formula` 的区别:**窗口几何不进 CSS** -- 窗口是 JS 建的,
      * 在脚本跑之前窗口层是空的,不存在"CSS 首帧"这回事;几何的唯一真相源是
-     * 这里 + `WindowGeometry` 纯函数,由 `WindowManager` 写成行内样式.所以
-     * `applyUiConfig` 的映射表里没有任何 `--window-*`,唯一的例外是
-     * `headerHeight`(`.window-header` 的高度)与两个夹取常量.
+     * 这里 + 库的 `resolveRelativeGeometries` 纯函数,由 `WindowManager` 写成
+     * 行内样式.所以 `applyUiConfig` 的映射表里没有任何 `--window-*`,唯一的例外
+     * 是 `headerHeight`(`.window-header` 的高度)与两个夹取常量.
      *
-     * 数组顺序即默认几何的依赖顺序(`view` 依赖 `source`,`process` 依赖
-     * `params`),也是 Dock 的按钮顺序,不能随意调.
+     * 数组顺序决定 **Dock 按钮顺序**与初始 z 序,但**不再是几何的依赖顺序**:
+     * `after`(如 `view` 接在 `source` 下方,`process` 接在 `params` 下方)由库的
+     * 纯函数在内部按依赖解,清单怎么排都算得对.这一点由
+     * `src/config/windowLayout.test.ts` 的"顺序不影响几何"那条钉住.
      */
     window: {
         windows: [
@@ -223,17 +225,33 @@ export const UI_CONFIG = {
                 minSize: { w: 280, h: 180 },
             },
             {
-                id: 'objects',
-                title: '对象',
-                dock: { label: '对象' },
+                id: 'entities',
+                title: '实体对象',
+                dock: { label: '实体' },
                 defaultGeometry: {
-                    // 中列宽度是算出来的:dW - 2 * (420 + 16),夹到 [360, 720]
+                    // 底部中线的左半:`split` 一个锚点同时给出等分宽度与居中 x
+                    // (整排占 [436, dW-436],两块之间留 12).
+                    // `x` 是**占位值**:`w` 用了 `split` 时不读它,类型上仍必填,
+                    // 免得"相对"退化成 undefined 分支(见库的 `RelativeGeometry`).
                     x: 'center',
                     y: { from: 'bottom', inset: 16 },
-                    w: { clamp: [360, 720], inset: 2 * 436 + 32 },
+                    w: { split: { count: 2, index: 0, inset: 436, gap: 12 } },
                     h: { at: 260 },
                 },
-                minSize: { w: 360, h: 160 },
+                minSize: { w: 180, h: 160 },
+            },
+            {
+                id: 'evaluations',
+                title: '求值对象',
+                dock: { label: '求值' },
+                defaultGeometry: {
+                    // 右半:落在左半右侧由 `split` 的 index 决定,`x` 同样是占位值.
+                    x: 'center',
+                    y: { from: 'bottom', inset: 16 },
+                    w: { split: { count: 2, index: 1, inset: 436, gap: 12 } },
+                    h: { at: 260 },
+                },
+                minSize: { w: 180, h: 160 },
             },
         ],
         actions: [
@@ -248,7 +266,9 @@ export const UI_CONFIG = {
             { node: 'exampleButton', window: 'source', slot: 'actions' },
             { node: 'runButton', window: 'source', slot: 'actions' },
             { node: 'exampleMenu', window: 'source', slot: 'overlays' },
-            { node: 'formulaCopyHint', window: 'objects', slot: 'title' },
+            // 复制提示跟着**实体**窗口走:它是对象列表那一列的回显,窗口拆开之后
+            // 跟着左半(实体)比跟着右半更贴近它提示的内容.
+            { node: 'formulaCopyHint', window: 'entities', slot: 'title' },
         ],
         chrome: {
             exampleLabel: '示例',

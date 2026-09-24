@@ -84,7 +84,7 @@ describe('windowSlotsProvider', () => {
             actions: [chrome.exampleButton, chrome.runButton],
             overlays: [chrome.exampleMenu],
         });
-        expect(content('objects')).toEqual({
+        expect(content('entities')).toEqual({
             title: [chrome.formulaCopyHint],
             actions: [],
             overlays: [],
@@ -92,6 +92,8 @@ describe('windowSlotsProvider', () => {
         expect(content('view')).toEqual({});
         expect(content('params')).toEqual({});
         expect(content('process')).toEqual({});
+        // 对象窗口拆成两个之后,求值窗口一个节点都不挂.
+        expect(content('evaluations')).toEqual({});
     });
 
     it('同一个节点不会被放进两个窗口', () => {

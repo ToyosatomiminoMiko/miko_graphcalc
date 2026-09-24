@@ -48,7 +48,7 @@ export interface AppViews {
     readonly diagnostics: HTMLElement;
     /** 过程窗口的正文容器. */
     readonly processPanel: HTMLElement;
-    /** 对象窗口里的七个子列表容器. */
+    /** 两个对象窗口里的列表容器:`entity` 在实体窗口,其余六个在求值窗口. */
     readonly objectLists: ObjectListContainers;
 }
 
@@ -94,7 +94,12 @@ function buildParamsWindow(doc: Document): {
     diagnostics: HTMLElement;
 } {
     const paramsPanel = create_element('section', { id: 'params-panel', root: doc });
+    // 容器的排版用应用自己的类名 `.diagnostic-list`:库的 `MessageList` 只管
+    // **条目**的外观(`.diagnostic*`,随库的 `styles/feedback.css` 走),列表摆在哪,
+    // 占多高,能不能滚是消费者的容器.写成应用自有的类,应用规则才符合
+    // "不给库的类定样式"那条契约(见 src/config/styleLayers.test.ts).
     const diagnostics = create_element('section', {
+        class: 'diagnostic-list',
         id: 'diagnostics',
         'aria-live': 'polite',
         root: doc,
@@ -114,16 +119,35 @@ function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: H
     return { body, processPanel };
 }
 
-/** 对象窗口正文:实体 / 求值两栏,求值栏下再挂六个子列表. */
-function buildObjectsWindow(doc: Document): {
+/** 实体窗口正文:实体对象一栏(原来与求值两栏同处"对象"窗口).
+ *
+ * 栏标题(`.object-list-title`)删掉了:窗口标题已经是"实体对象",窗口里再来
+ * 一行同名的小标题只是把同一句话说两遍 -- 拆成两个窗口之后,标题栏就是新的
+ * 分组标识,不需要第二套. */
+function buildEntitiesWindow(doc: Document): {
     body: HTMLElement;
-    objectLists: ObjectListContainers;
+    entity: HTMLElement;
+} {
+    const entity = create_element('div', {
+        class: 'object-list-body',
+        id: 'entity-object-list',
+        root: doc,
+    });
+    const body = create_element('footer', { class: 'panel object-panel-column', root: doc },
+        create_element('section', { id: 'object-panel', root: doc },
+            create_element('div', { class: 'object-list-column', root: doc }, entity)));
+    return { body, entity };
+}
+
+/** 求值窗口正文:六个求值子列表(分析 / 积分 / 求交 / 求解 / 原函数 / 微分方程). */
+function buildEvaluationsWindow(doc: Document): {
+    body: HTMLElement;
+    objectLists: Omit<ObjectListContainers, 'entity'>;
 } {
     const list = (id: string, className: string): HTMLElement =>
         create_element('div', { class: className, id, root: doc });
 
-    const objectLists: ObjectListContainers = {
-        entity: list('entity-object-list', 'object-list-body'),
+    const sublists = {
         analysis: list('analysis-object-list', 'object-sublist'),
         integral: list('integral-object-list', 'object-sublist'),
         intersection: list('intersection-object-list', 'object-sublist'),
@@ -131,28 +155,23 @@ function buildObjectsWindow(doc: Document): {
         antiderivative: list('antiderivative-object-list', 'object-sublist'),
         ode: list('ode-object-list', 'object-sublist'),
     };
-    const evaluation = create_element('div', {
-        class: 'object-list-body',
-        id: 'evaluation-object-list',
-        root: doc,
-    },
-    objectLists.analysis,
-    objectLists.integral,
-    objectLists.intersection,
-    objectLists.solve,
-    objectLists.antiderivative,
-    objectLists.ode);
 
-    const body = create_element('footer', { class: 'panel', root: doc },
+    const body = create_element('footer', { class: 'panel object-panel-column', root: doc },
         create_element('section', { id: 'object-panel', root: doc },
             create_element('div', { class: 'object-list-column', root: doc },
-                create_element('header', { class: 'object-list-title', root: doc },
-                    create_element('span', { root: doc }, '实体对象')),
-                objectLists.entity),
-            create_element('div', { class: 'object-list-column', root: doc },
-                create_element('header', { class: 'object-list-title', root: doc }, '求值对象'),
-                evaluation)));
-    return { body, objectLists };
+                create_element('div', {
+                    class: 'object-list-body',
+                    id: 'evaluation-object-list',
+                    root: doc,
+                },
+                sublists.analysis,
+                sublists.integral,
+                sublists.intersection,
+                sublists.solve,
+                sublists.antiderivative,
+                sublists.ode))));
+
+    return { body, objectLists: sublists };
 }
 
 /** 建好全部应用内容;不碰桌面容器(那是 `mountDesktop()` 的事). */
@@ -166,14 +185,16 @@ export function buildAppViews(root: HTMLElement): AppViews {
     const viewControls = create_element('section', { id: 'view-controls', root: doc });
     const params = buildParamsWindow(doc);
     const process = buildProcessWindow(doc);
-    const objects = buildObjectsWindow(doc);
+    const entities = buildEntitiesWindow(doc);
+    const evaluations = buildEvaluationsWindow(doc);
 
     const bodies: Readonly<Record<WindowId, readonly Child[]>> = {
         source: [source.body],
         view: [viewControls],
         params: [params.body],
         process: [process.body],
-        objects: [objects.body],
+        entities: [entities.body],
+        evaluations: [evaluations.body],
     };
 
     /** 窗口 id 守卫:库传进来的是不透明字符串,未知 id 给空内容而不是 undefined. */
@@ -193,6 +214,6 @@ export function buildAppViews(root: HTMLElement): AppViews {
         paramsPanel: params.paramsPanel,
         diagnostics: params.diagnostics,
         processPanel: process.processPanel,
-        objectLists: objects.objectLists,
+        objectLists: { entity: entities.entity, ...evaluations.objectLists },
     };
 }

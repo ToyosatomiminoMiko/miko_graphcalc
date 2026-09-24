@@ -62,8 +62,7 @@
 #params-panel,
 #view-controls {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-scrollbar) transparent;
-}
+    scrollbar-color: var(--color-scrollbar) transparent;}
 
 #params-panel::-webkit-scrollbar,
 #view-controls::-webkit-scrollbar {
@@ -89,18 +88,52 @@
    参数面板只负责列表容器(上面的 `#params-panel`). */
 
 /* ==========================================================================
- * 底部对象列表面板
+ * 底部对象列表面板(实体 / 求值各占一个窗口)
  * ========================================================================== */
 
-/* 对象列表容器:左右两栏,占满 footer 剩余高度 */
+/* 面板容器:一个窗口里只有一栏,所以不再分列 -- 占满 footer 的剩余高度.
+   `min-height: 0` 是必需的:少了它 flex 子项的最小高度按内容算,列表内部的
+   `overflow-y` 永远不会触发. */
 #object-panel {
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
     padding: 8px;
     overflow: hidden;
+}
+
+/* 面板包裹层:窗口正文里唯一的孩子,吃掉整块高度.
+   `.panel` 给的是"面板底"(底色/描边),这里补的是它在窗口正文里的排布. */
+.object-panel-column {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 诊断区(参数窗口下方):库的 `MessageList` 只管条目的外观,列表容器归应用.
+   高度基准是所在窗口正文 `.window-body` 的 34%:参数窗口默认只有约半个桌面高,
+   所以这个比例是否够用要真机看过再定(见 docs/windowing-plan.md §11.1 B3). */
+.diagnostic-list {
+    flex: 0 1 auto;
+    max-height: 34%;
+    margin: 0 8px 8px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border-panel);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sunken);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 20px;
+}
+
+/* 没有诊断时整块收起,不占位置. */
+.diagnostic-list:empty {
+    display: none;
 }
 
 .object-list-column {
@@ -113,17 +146,8 @@
     overflow: hidden;
 }
 
-.object-list-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 7px 10px;
-    border-bottom: 1px solid var(--color-border-divider);
-    font-size: 12px;
-    color: var(--color-text-muted);
-    background: var(--color-bg-header);
-}
+/* 栏标题(`.object-list-title`)已随拆分删除:窗口标题就是分组标识
+   (见 src/app/appViews.ts 的 buildEntitiesWindow). */
 
 /* 复制提示:唯一一处"公式可点"文案,复制成功/失败复用同一元素回显. */
 .object-list-hint {
@@ -161,31 +185,25 @@
     display: none;
 }
 
-.object-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 7px 8px;
-    border: 1px solid var(--color-border-faint);
-    border-radius: var(--radius-sm);
-    background: var(--color-fill-row);
-}
+/* 行外壳三件套(`.object-row` / `.row-main` / `.row-actions`)的**基线归库了**
+   (库的 `styles/widgets.css`,与产出它们的 `shared/rowDom.ts` 同一个仓库).
+   应用侧只剩自己的增量,规则都必须至少带一个应用自有的类名:
 
-.object-row.is-hidden {
+     本条已删的规则                        为什么删
+     .object-row........... 逐字与库相同(横排/间距/描边/圆角/底色)
+     .row-main............. 逐字与库相同(flex:1 + min-width:0 + 换行横排)
+     .row-actions.......... 逐字与库相同(贴右 + 按钮竖排)
+     .object-row.is-hidden. 只写库的类;改成下面的 `.entity-row.is-hidden`
+
+   判据不是"注释记得",而是 `src/config/styleLayers.test.ts` 会红 -- 库一旦
+   拥有某个类,应用再给它写规则就直接失败. */
+
+/* 实体行的"不渲染"态:实体显隐只改渲染可见性,行仍然占位,所以是"变淡"不是
+   "消失".类名用应用自己的 `.entity-row` + `is-disabled`(不再是库的
+   `.object-row.is-hidden`),选择器里有应用自有的类,与上面那条契约一致;
+   `is-disabled` 也把语义与库的 `.window.is-hidden`(窗口最小化)分开了. */
+.entity-row.is-disabled {
     opacity: 0.6;
-}
-
-/* 行主内容:`.object-row` 里除显隐按钮外的全部内容都收在这一层(见
-   ui/shared/rowDom.ts 的 createObjectRow).flex:1 吃掉除按钮外的全部宽度,按钮
-   因此始终贴右;内部的"可换行横排"沿用原来的行内布局--实体行的公式,
-   求值行无细节时的结果行都用 flex-basis 100% 独占第二行. */
-.row-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 8px;
 }
 
 /* 实体行是两行式(见 entity/EntityItem):第一行"徽章 + 颜色 + 名称行",
@@ -243,18 +261,8 @@
    还被排在后面的 `widgets.css` 盖掉),已删 -- 要改这个按钮就看库,不要在应用里
    覆盖(理由见 src/config/styleLayers.test.ts). */
 
-/* 行末动作容器:把"过程"入口与显隐按钮收成**一个**直接子节点(见
-   ui/shared/rowDom.ts 的 createRowActions).整组贴右靠 .row-main 的 flex:1;
-   按钮竖排:右栏默认 300px 时两个按钮并排会把摘要行挤得读不出来,竖排只占
-   一个按钮的宽度. */
-.row-actions {
-    flex: 0 0 auto;
-    align-self: flex-start;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-}
+/* 行末动作容器(`.row-actions`)的外观归库(见上面那段说明):贴右 + 按钮竖排
+   都由库的 `styles/widgets.css` 给,应用不再写第二份. */
 
 /* "过程"入口(三级披露的 L2):类名只当 DOM 钩子(测试与语义)留着,外观**全部
    来自库的按钮基线** `:where(.ui-button)` -- 库给每个 `createButton` 的按钮都

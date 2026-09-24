@@ -35,7 +35,6 @@ const APP_CSS = [
     'base.css',
     'panels.css',
     'editor.css',
-    'diagnostics.css',
     'process.css',
 ] as const;
 
@@ -49,6 +48,7 @@ const LIB_CSS = [
     '@miko/ui/styles/widgets.css',
     '@miko/ui/styles/desktop.css',
     '@miko/ui/styles/editor.css',
+    '@miko/ui/styles/feedback.css',
 ] as const;
 
 const require = createRequire(import.meta.url);

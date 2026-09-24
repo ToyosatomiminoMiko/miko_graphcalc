@@ -18,12 +18,11 @@ import { describe, expect, it } from 'vitest';
  * `@miko/ui/src/theme/cssPalette.test.ts`.
  */
 
-/** 应用自己的样式表(库的三份不在此列). */
+/** 应用自己的样式表(库的不在此列). */
 const APP_CSS = [
     'base.css',
     'panels.css',
     'editor.css',
-    'diagnostics.css',
     'process.css',
 ] as const;
 
@@ -33,6 +32,7 @@ const LIB_CSS = [
     '@miko/ui/styles/widgets.css',
     '@miko/ui/styles/desktop.css',
     '@miko/ui/styles/editor.css',
+    '@miko/ui/styles/feedback.css',
 ] as const;
 
 const require = createRequire(import.meta.url);

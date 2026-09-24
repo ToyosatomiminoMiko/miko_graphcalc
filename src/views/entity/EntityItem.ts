@@ -106,7 +106,10 @@ export class EntityItem {
         // 第二行;按钮由 createObjectRow 放在行末.
         const { row, main } = createObjectRow('entity-row', createRowActions(toggle));
         main.append(badge, color, head, expression);
-        row.classList.toggle('is-hidden', !object.enabled);
+        // 用应用自己的 `is-disabled` 而不是 `is-hidden`:库的 `.window.is-hidden`
+        // 已经占着"隐藏"这个词(窗口最小化),这里表达的是"这条实体不渲染",
+        // 两者语义不同,共用同一个词会让"库里哪些选择器会命中我"变得要猜.
+        row.classList.toggle('is-disabled', !object.enabled);
         this.row = row;
     }
 

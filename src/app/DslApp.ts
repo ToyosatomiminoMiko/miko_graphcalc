@@ -171,7 +171,7 @@ export class DslApp {
         this.renderController.bindViewState(this.viewState);
         this._wireEditor();
 
-        // 窗口装配已经在 `mountDesktop()` 里做过(构造期):建五个窗口外壳,把
+        // 窗口装配已经在 `mountDesktop()` 里做过(构造期):建六个窗口外壳,把
         // 各窗口内容搬进 `.window-body`,把标题栏节点放进 adopted 表声明的槽位,
         // 建 Dock,起初始焦点.这里只补装配层自己的那条几何回调.
         this._wireEditorResize();

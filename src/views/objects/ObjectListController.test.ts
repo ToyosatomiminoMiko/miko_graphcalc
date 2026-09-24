@@ -319,7 +319,7 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(calls.entity).toEqual([1]);
     });
 
-    it('隐藏的实体:按钮变"显示",行加 is-hidden 并给出状态芯片', () => {
+    it('隐藏的实体:按钮变"显示",行加 is-disabled 并给出状态芯片', () => {
         const { entityList, controller } = createController();
         controller.renderScene({
             ...scene,
@@ -327,7 +327,9 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         } as SceneIR);
 
         const row = entityList.querySelector<StubElement>('.entity-row')!;
-        expect(row.classList.contains('is-hidden')).toBe(true);
+        // 实体行用的是应用自己的 `is-disabled`(与库的 `.window.is-hidden` 区分开,
+        // 见 css/panels.css 与 views/entity/EntityItem.ts).
+        expect(row.classList.contains('is-disabled')).toBe(true);
         expect(row.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
         expect(row.querySelector<StubElement>('.row-visibility-btn')!.textContent).toBe('显示');
         // 状态芯片挂在名称行里,与对象名同一行;公式仍是名称行的兄弟(另起一行).
