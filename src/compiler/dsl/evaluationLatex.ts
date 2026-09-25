@@ -70,7 +70,7 @@ export function analysisLatexSummary(analysis: AnalysisResult): LatexLine {
  * 细节行的**角色**.
  *
  * 与渲染无关的中性标注:它说明"这一行在这段推导里承担什么",供过程视图
- * (`ui/process/processData.ts`)把同一批行分区成步骤并配依据文案.角色留在
+ * (`src/adapters/processSteps.ts`)把同一批行分区成步骤并配依据文案.角色留在
  * 这个数据模块里(公式在这里拼装,只有它知道每行的来历),过程视图只负责把
  * 角色翻译成展示用的 `kind`/`reason` -- 文案不硬编码进渲染逻辑.
  */

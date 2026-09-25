@@ -119,7 +119,7 @@ export const UI_CONFIG = {
      *
      * `#dsl-editor` 与 `#dsl-editor-lines` 必须共用同一组
      * fontFamily/fontSize/lineHeight,否则行号与文本会错行
-     * (见 `src/ui/editor/EditorLineNumbers.ts` 的行号对齐说明).
+     * (见库 `miko_ui` 的 `EditorLineNumbers` 的行号对齐说明).
      */
     editor: {
         /**
@@ -337,7 +337,7 @@ export const UI_CONFIG = {
      * 视图控件(右侧"视图"面板)的行为参数.
      *
      * 与 `panel` 里那部分同理,**CSS 用不到**这些值:它们是控件的 min/step 与
-     * 选项清单,只被 `ui/view/ViewPanel` 与 `ui/view/controls/*` 当数字/数据用,
+     * 选项清单,只被 `ui/view/ViewPanel` 与 `ui/view/viewState` 当数字/数据用,
      * 所以不进 `applyUiConfig` 的变量表,`css/base.css` 里也就没有第二份副本.
      *
      * 与 `renderConfig` 的分工:那里是**渲染默认值**(点半径 0.2,轴线宽 3),

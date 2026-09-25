@@ -16,7 +16,8 @@
    而 `overflow: hidden` 会把有意超出面板的浮层切掉(见 §11.1 B2).
    面板里的标题栏(.panel-header)也整体删除:标题上移成窗口标题(W6/B8);
    右栏的标签栏与页级 hidden 同样删除(两页各自独立成窗口).
-   `flex: 1 1 auto` 不在这里写:`.window-body > *` 已经给了(见 css/window.css),
+   `flex: 1 1 auto` 不在这里写:`.window-body > *` 已经给了(见库的
+   `miko_ui/styles/desktop.css`),
    两处都写就会在下一次改窗口正文骨架时漏掉一处. */
 .panel,
 .right-page {

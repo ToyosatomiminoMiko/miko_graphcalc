@@ -27,7 +27,7 @@ import { createFormulaElement } from 'miko_ui';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildIntegralProcess } from '@/adapters/evaluationToSteps';
-import { needsProcessPage } from '@/views/process/disclosure';
+import { needsProcessPage } from '@/ui/process/disclosure';
 import { create_element } from 'miko_ui';
 import {
     createDetailSections,

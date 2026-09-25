@@ -19,7 +19,7 @@ import {
 } from '@/compiler/dsl/evaluationLatex';
 import { createRowActions, createVisibilityButton } from 'miko_ui';
 import { buildGradientProcess } from '@/adapters/evaluationToSteps';
-import { needsProcessPage } from '@/views/process/disclosure';
+import { needsProcessPage } from '@/ui/process/disclosure';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
 import {
     createDetailSections,

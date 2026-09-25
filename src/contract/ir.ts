@@ -584,7 +584,7 @@ export interface IntersectionOutput {
 /**
  * 过程步骤的依据分区(**全部内核共用**).
  *
- * 与 `ui/process/processSteps.ts` 的 `ProcessStepKind` 同域:内核产物直接带
+ * 与 `src/adapters/processSteps.ts` 的 `ProcessStepKind` 同域:内核产物直接带
  * 分区,UI 只负责配色与文案.
  *
  * 前四种与求解内核的既有取值一致--法则 / 代数 / 定义 / 数值;后三种由
@@ -595,7 +595,7 @@ export interface IntersectionOutput {
  *   避免学生把"验证"当成推导的一环.
  *
  * 常量名保持 `SOLVE_STEP_KINDS` 不改:它是既有导出,改名会同时动
- * `ui/process/processSteps.ts` 的别名与三处导入;语义已经写在这里.
+ * `src/adapters/processSteps.ts` 的别名与三处导入;语义已经写在这里.
  */
 export const SOLVE_STEP_KINDS = [
     'rule',

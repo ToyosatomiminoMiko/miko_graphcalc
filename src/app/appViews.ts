@@ -22,7 +22,7 @@ import {
 } from 'miko_ui';
 import { UI_CONFIG, type WindowId } from '@/config/uiConfig';
 import { highlightDsl } from '@/editor/dslHighlight';
-import type { ObjectListContainers } from '@/views/objects/ObjectListController';
+import type { ObjectListContainers } from '@/ui/objects/ObjectListController';
 import { createWindowChrome, type WindowChrome } from './windowChrome';
 
 /** 应用内容节点与逐窗口内容表:装配层与 `mountDesktop()` 的全部输入. */

@@ -16,7 +16,7 @@
 //! - 三次及以上**明确报错**,而不是给一个看起来像推导的东西.
 //!
 //! 每一步都带 `reason`(依据文案)与 `kind`(依据分区),分区取值与
-//! `ui/process/processSteps.ts` 的 `ProcessStepKind` 同域:
+//! `src/adapters/processSteps.ts` 的 `ProcessStepKind` 同域:
 //! `rule`(求根公式/零积律)/ `algebra`(移项/因式分解)/ `definition`(定义式)/
 //! `numeric`(判别式取值/数值近似).
 

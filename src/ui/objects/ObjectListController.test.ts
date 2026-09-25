@@ -328,7 +328,7 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
 
         const row = entityList.querySelector<StubElement>('.entity-row')!;
         // 实体行用的是应用自己的 `is-disabled`(与库的 `.window.is-hidden` 区分开,
-        // 见 css/panels.css 与 views/entity/EntityItem.ts).
+        // 见 css/panels.css 与 ui/entity/EntityItem.ts).
         expect(row.classList.contains('is-disabled')).toBe(true);
         expect(row.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
         expect(row.querySelector<StubElement>('.row-visibility-btn')!.textContent).toBe('显示');

@@ -144,10 +144,10 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 
 代码区字体,KaTeX 字号与窗口外壳常量**不做运行时设置界面**,也不落 localStorage:
 唯一真相源是 `src/config/uiConfig.ts`,启动时由 `src/app/applyUiConfig.ts`
-写成 `:root` 上的 CSS 变量,再由 `css/editor.css`(源码编辑区),
-`css/panels.css` / `css/diagnostics.css` / `css/process.css`(面板与列表)
-与 `miko_ui` 的 `styles/` 下的库样式表(控件 `widgets.css`,桌面窗口系统
-`desktop.css`,编辑器外壳 `editor.css`)的 `var()` 消费.
+写成 `:root` 上的 CSS 变量,再由应用层的四份样式表(`css/base.css` /
+`panels.css` / `editor.css` / `process.css`)与 `miko_ui` 的 `styles/` 下的库
+样式表(控件 `widgets.css`,桌面窗口系统 `desktop.css`,编辑器外壳
+`editor.css`,反馈条目 `feedback.css`)的 `var()` 消费.
 
 **样式表按两层加载,顺序即层叠顺序**(入口在 `src/main.ts`):
 
@@ -155,14 +155,15 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
    (token -> 控件 -> 桌面 -> 编辑器外壳)由库自己的 `styles.css` 决定,应用不
    插手;库以后加样式表,应用入口不用改;
 2. **应用层**:`css/base.css` -> `panels.css` -> `editor.css` ->
-   `diagnostics.css` -> `process.css`,只写应用自己的类 / id / 页面级规则.
+   `process.css`,只写应用自己的类 / id / 页面级规则.
 
 整层压而不是逐份交错:交错时"谁赢"由"文件排在第几位"决定,而不是"这块样式归谁
 负责".踩过的坑是应用层的 `.row-visibility-btn` 被排在它后面的库 `widgets.css`
 盖掉,在应用里改 `background` 完全无效而且不报错.所以应用层不许出现"只由库的类
 构成"的选择器,也不许整组照抄库的按钮基线 `:where(.ui-button)` -- 要改外观就改库
 (或给节点加一个应用自有的变体类,只写增量).这条界限由
-`src/config/styleLayers.test.ts` 断言,配色纪律由 `cssPalette.test.ts` 断言.
+`src/config/styleLayers.test.ts` 断言,配色纪律由
+`src/config/cssPalette.test.ts` 断言.
 
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
@@ -194,7 +195,7 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 写在内容元素的 `transform` 上(`EditorHighlight.sync`),不让高亮层自己滚动:
 textarea 的滚动条要占位而高亮层不占,两者的最大滚动偏移差一个滚动条厚度,
 抄 `scrollTop` 会在靠近底部/右端时被浏览器夹住,高亮最多滞后约 0.8 行.
-分词与配色见 `src/ui/editor/dslHighlight.ts` 与 `css/editor.css`;关键字表由
+分词与配色见 `src/editor/dslHighlight.ts` 与 `css/editor.css`;关键字表由
 `dslHighlight.test.ts` 直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,
 语法文件新增枚举值不会漏.
 
@@ -424,24 +425,24 @@ src/compiler/       AST -> IR(dsl/ 编译管线,parser/ WASM 解析,errors/text 
 src/render/         只消费 IR;渲染层不再自行解析表达式
   core/             场景/相机/动画/渲染器与轴刻度
   visualization/    网格与积分可视化
-src/ui/
-  widgets/          声明式控件词表:开关/单选/滑块/数字/按钮/浮层/行(只碰 DOM 与可访问性)
-  theme/            UI_CONFIG -> CSS 变量与配色契约
-  shared/           跨控件共用件:行 DOM/行缓存/数值文本/拖动/全应用键盘出口
-  editor/           编辑器输入区:高亮叠层/行号栏/DSL 分词/execCommand 收口
-  formula/          KaTeX 排版与点击复制
-  examples/         示例目录与载入
-  view/             视图窗口的控件装配;view/controls/ 视图控件控制器(状态 + 校验 + 广播)
-  objects/          对象列表装配(左实体栏 + 右求值栏)
-  entity/           实体列表(左栏)
-  evaluation/       求值列表(右栏:分析/积分/求交/不定积分/ODE)
-  process/          过程窗口与步骤数据
-  desktop/          桌面窗口化:几何纯函数/窗口外壳/八向缩放/状态机/Dock/吸附
-  params/           参数面板(滑块取值口径与写回时机)
-  diagnostics/      诊断提示列表
+src/ui/              应用侧界面:只声明"有什么"(DOM 结构)与"干什么"(行为)
+  entity/           实体列表(对象窗口左栏):行结构 + 列表装配
+  evaluation/       求值列表(对象窗口右栏):分析/积分/求交/求解/原函数/微分方程
+  objects/          两个对象列表的装配与事件接线
+  params/           参数面板:滑块取值口径与写回时机
+  process/          过程窗口:递等式步骤列表与三级披露判据
+  view/             视图窗口:相机/坐标轴/网格/曲面的控件装配(viewState + ViewPanel)
+  examples/         示例目录与载入(示例清单数据 + 编辑器写入)
 src/app/            控制与编排
 src/testing/        测试基建(domStub / setupWasm / matrixOps),不被生产代码引用
 ```
+
+`src/ui/` 里**没有样式**:控件词表(token / 开关 / 滑块 / 数字框 / 按钮 /
+浮层 / 行原语)在库 `miko_ui` 的 `widgets/` 与 `shared/`,主题与默认外观在
+库的 `styles/`,桌面窗口系统在库的 `desktop/`,编辑器外壳在库的 `editor/`,
+反馈条目与公式排版在库的 `feedback/` / `formula/`.应用侧只保留
+应用自有的类名(对象行/求值行/过程步骤/面板容器)与其布局,见
+[界面样式配置](#界面样式配置).
 
 数值求值链路(`math_rs::eval_core::CompiledEvaluator`)在构造期把符号解析成
 槽位(`symbolic::eval::SymBinding`),求值期零字符串/零哈希/零分配;旧
@@ -516,26 +517,28 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 视图窗口(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
 
 ```text
-RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初值(唯一读配置的视图代码)
-                        │ handles
+RENDER_CONFIG ──► src/ui/view/viewState.ts   唯一状态源(signal / 派生信号 / 计算值)
+                        │  value: Signal<...>
                         ▼
-                  src/ui/view/controls/*      状态 + 校验 + EventBus 广播(不再碰 document)
+                  src/ui/view/ViewPanel.ts   结构 + 控件实例 + 双向绑定
+                        │  effect
+                        ▼
+                  RenderController           订阅状态,推到 CameraManager / Plotter / SceneManager
 ```
 
-`src/ui/widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /
+库的 `widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /
 `createSlider` / `createNumberField` / `createButton` / `createPopover` /
-行与分组):只负责 DOM 结构与可访问性,不认识 EventBus,也不读配置.参数面板
-(`ParamPanelController`)复用同一批件,只保留取值口径与写回时机这类业务语义;
+行与分组):只负责 DOM 结构与可访问性,不认识 EventBus,也不读配置.应用侧
+`ParamPanelController` 复用同一批件,只保留取值口径与写回时机这类业务语义;
 示例菜单复用 `createPopover`(开合态/`aria-expanded`/点外部关闭/焦点归还),
-自己只留"渲染什么"与"选中后干什么";对象行/求值行也改用同一个建元素原语
-`el`,两栏共用的行外壳与显隐按钮仍在 `ui/shared/rowDom.ts`.
+自己只留"渲染什么"与"选中后干什么";对象行/求值行也改用库的建元素原语
+`create_element`,两栏共用的行外壳与显隐按钮在库的 `shared/rowDom.ts`.
+行外壳(`.object-row` / `.row-main` / `.row-actions`)与显隐按钮只要库给了
+默认样式,应用侧就不再写第二份 -- 这条由 `src/config/styleLayers.test.ts` 守.
 
-`css/controls.css` 里的类名与控件一一对应且不再重复:过去
-`.point-row` / `.axis-row` / `.surface-row` / `.cam-toggle` 是四条逐字相同的规则,
-`.point-mode` / `.axis-up-mode` / `.viewcube` 是三组逐字相同的按钮样式;现在小节
-结构只有 `.control-group` / `.control-title` / `.control-row` /
-`.control-toggle-group`,单选按钮组统一是 `.segmented`,列数由控件写进
-`--segmented-columns`,行内撑满走修饰类 `.segmented--inline`.
+`miko_ui` 的控件类名(`.segmented` / `.control-group` / `.slider-field` 等)
+与样式都在库里;应用侧的 `css/panels.css` 只留应用自有的行/栏/面板类
+(`.object-sublist` / `.kind-*` / `.object-expr` / `.eval-*` ...)与其布局.
 
 控件的可调范围与选项(`min`/`step`/ViewCube 名单)收在 `UI_CONFIG.view`:
 它是**只有 TS 消费**的界面参数(与 `UI_CONFIG.window` 的窗口几何同类),不进
@@ -543,9 +546,10 @@ RENDER_CONFIG ──► src/ui/view/ViewPanel.ts   布局 + 控件实例 + 初�
 仍只在 `RENDER_CONFIG`.控制器判"越界"时读的是同一份 `UI_CONFIG.view`.
 
 装配出来的控件不再需要外部 `dispose`:每个控件恰好交给一个持有者(视图面板交
-控制器,参数行交面板控制器,浮层交示例菜单控制器),由持有者统一解绑.新增一个
-视图控件只改 `ViewPanel.ts` 与对应控制器,`index.html` 里只留一个空的
-`#view-controls` 容器.
+`createViewPanel` 的句柄,参数行交面板控制器,浮层交示例菜单控制器),由持有者
+统一解绑.新增一个视图控件只改 `src/ui/view/ViewPanel.ts` 与
+`src/ui/view/viewState.ts`;`#view-controls` 这个宿主由 `src/app/appViews.ts`
+建,`index.html` 里除 `#app` 外没有任何宿主 id.
 
 另外,曲线/曲面/向量场的 Worker 采样失败现在统一经
 `render/core/samplingErrors.ts` 上报,RenderController 转成诊断区错误;

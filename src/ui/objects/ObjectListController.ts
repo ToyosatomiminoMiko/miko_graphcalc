@@ -19,9 +19,9 @@ import type {
     IntersectionOutput,
     SceneIR,
 } from '@/contract/ir';
-import { EntityList } from '@/views/entity/EntityList';
-import { EvaluationList } from '@/views/evaluation/EvaluationList';
-import type { ProcessRequest } from '@/views/evaluation/EvaluationItem';
+import { EntityList } from '@/ui/entity/EntityList';
+import { EvaluationList } from '@/ui/evaluation/EvaluationList';
+import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
 
 /**
  * footer 的列表容器:左栏实体 1 个 + 右栏求值 4 个子列表.

@@ -23,8 +23,8 @@ import { onSamplingFailure } from '@/render/core/samplingErrors';
 import { SceneStore } from './SceneStore';
 import { MessageList } from 'miko_ui';
 import type { MessageEntry } from 'miko_ui';
-import { ObjectListController } from '@/views/objects/ObjectListController';
-import type { ViewState } from '@/views/view/viewState';
+import { ObjectListController } from '@/ui/objects/ObjectListController';
+import type { ViewState } from '@/ui/view/viewState';
 
 export class RenderController {
     private readonly sceneManager: SceneManager;

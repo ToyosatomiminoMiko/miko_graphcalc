@@ -29,15 +29,15 @@ import type { AppViews } from './appViews';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
 import { RenderController } from './RenderController';
-import { ParamPanelController } from '@/views/params/ParamPanelController';
-import { ObjectListController, type ObjectListHandlers } from '@/views/objects/ObjectListController';
-import { ProcessPanel, formatProcessParamEcho } from '@/views/process/ProcessPanel';
-import type { ProcessRequest } from '@/views/evaluation/EvaluationItem';
-import { ExampleLoaderController } from '@/views/examples/ExampleLoaderController';
-import { defaultExample, exampleSource, type ExampleEntry } from '@/views/examples/exampleCatalog';
-import { replaceTextareaSource, seedTextareaSource } from '@/views/examples/replaceEditorSource';
-import { createViewPanel, type ViewPanelHandle } from '@/views/view/ViewPanel';
-import { createViewState, type ViewState } from '@/views/view/viewState';
+import { ParamPanelController } from '@/ui/params/ParamPanelController';
+import { ObjectListController, type ObjectListHandlers } from '@/ui/objects/ObjectListController';
+import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel';
+import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
+import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
+import { defaultExample, exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
+import { replaceTextareaSource, seedTextareaSource } from '@/ui/examples/replaceEditorSource';
+import { createViewPanel, type ViewPanelHandle } from '@/ui/view/ViewPanel';
+import { createViewState, type ViewState } from '@/ui/view/viewState';
 
 export class DslApp {
     private readonly store = new SceneStore();

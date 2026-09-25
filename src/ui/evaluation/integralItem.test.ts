@@ -19,7 +19,7 @@ vi.mock('katex/dist/katex.min.css', () => ({}));
 // 积分细节只有 3 行,默认阈值(5)下"过程"入口不出现.这里只放宽**披露判据**
 // 本身,让"点按钮 -> 拿文档"这条真实路径可以被驱动:驱动器不是被测逻辑,
 // 而过程文档的新鲜度才是.
-vi.mock('@/views/process/disclosure', async (importOriginal) => ({
+vi.mock('@/ui/process/disclosure', async (importOriginal) => ({
     ...(await importOriginal<typeof import('../process/disclosure')>()),
     needsProcessPage: () => true,
 }));

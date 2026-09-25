@@ -13,8 +13,8 @@
  * 没有当前步游标样式:`.process-nav` / `.process-counter` / `.process-step.is-current`
  * 随"上一个 / 下一个"整套移除(见 src/ui/process/ProcessPanel.ts 头注释).
  *
- * 配色的唯一来源是 css/base.css 的色板,本文件不出现颜色字面量
- * (由 src/ui/theme/cssPalette.test.ts 断言).
+ * 配色的唯一来源是库的 `miko_ui/styles/tokens.css`(由 UI_CONFIG 覆盖),
+ * 本文件不出现颜色字面量(由 src/config/cssPalette.test.ts 断言).
  * ========================================================================== */
 
 .process-panel {
@@ -164,7 +164,7 @@
 }
 
 /* 依据分区配色(见 design 4.2):法则=强调色,代数=中性色,定义=虚线,
-   数值=等宽数字.文案由数据源给(ui/process/processSteps.ts). */
+   数值=等宽数字.文案由数据源给(src/adapters/processSteps.ts). */
 .process-step-reason[data-kind="rule"] {
     color: var(--color-text-strong);
     background: var(--color-accent-tint);

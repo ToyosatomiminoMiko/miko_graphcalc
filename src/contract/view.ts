@@ -2,13 +2,13 @@
  * 视图值域契约.
  *
  * 相机/视图控件的**值域**类型集中在这里,供 `render/core`,
- * `ui/view`(面板与视图控制器)与事件契约(`contract/events`)共同使用:
- * 面板用它们给控件定类型,控制器用它们解释选中值,两边必须是同一个联合类型 --
+ * `ui/view`(面板与状态源)与事件契约(`contract/events`)共同使用:
+ * 面板用它们给控件定类型,状态源用它们解释选中值,两边必须是同一个联合类型 --
  * 否则又会退化成"从 DOM 的 `data-*` 字符串里还原类型"的那套运行时校验
  * (`isCamMode` / `isViewHome` / `isPointMode`),那是组件化要消掉的东西.
  *
  * 本模块是零依赖叶子:只声明类型,不引入任何其他模块.默认值(具体选哪个
- * 相机模式、哪个向上轴)在 `config/renderConfig`,不在这里.
+ * 相机模式,哪个向上轴)在 `config/renderConfig`,不在这里.
  */
 
 export type CamMode = 'perspective' | 'orthographic';

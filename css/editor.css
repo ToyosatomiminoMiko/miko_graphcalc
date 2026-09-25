@@ -25,10 +25,30 @@
  * 继续用来标"选项名";注释刻意用行号同色(--color-syntax-comment),
  * 它在源码里密度最高,必须最不抢眼.色值全部来自库的 tokens.css,这里不再写字面量.
  * -------------------------------------------------------------------------- */
-.code-editor-highlight-code .dsl-comment { color: var(--color-syntax-comment); }
-.code-editor-highlight-code .dsl-string { color: var(--color-syntax-string); }
-.code-editor-highlight-code .dsl-number { color: var(--color-syntax-number); }
-.code-editor-highlight-code .dsl-keyword { color: var(--color-syntax-keyword); }
-.code-editor-highlight-code .dsl-property { color: var(--color-syntax-property); }
-.code-editor-highlight-code .dsl-operator { color: var(--color-syntax-operator); }
-.code-editor-highlight-code .dsl-bracket { color: var(--color-syntax-bracket); }
+.code-editor-highlight-code .dsl-comment {
+    color: var(--color-syntax-comment);
+}
+
+.code-editor-highlight-code .dsl-string {
+    color: var(--color-syntax-string);
+}
+
+.code-editor-highlight-code .dsl-number {
+    color: var(--color-syntax-number);
+}
+
+.code-editor-highlight-code .dsl-keyword {
+    color: var(--color-syntax-keyword);
+}
+
+.code-editor-highlight-code .dsl-property {
+    color: var(--color-syntax-property);
+}
+
+.code-editor-highlight-code .dsl-operator {
+    color: var(--color-syntax-operator);
+}
+
+.code-editor-highlight-code .dsl-bracket {
+    color: var(--color-syntax-bracket);
+}
