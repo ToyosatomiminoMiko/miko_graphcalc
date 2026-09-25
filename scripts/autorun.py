@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
-# ============================================================================
-# 提交前把中文全角标点转成半角
-# ----------------------------------------------------------------------------
-# 由 .githooks/pre-commit 对本次暂存的每个文本文件调用(文件模式,原地改写).
 #
+# 提交前把中文全角标点转成半角
+
+# 由 .githooks/pre-commit 对本次暂存的每个文本文件调用(文件模式,原地改写).
+
 # [为什么 hook 放在版本库里]
 # .git/hooks 不进版本库,换机器或重新 clone 后自动运行会静默失效.改用
 # .githooks/ + core.hooksPath: hook 跟随仓库提交,谁 clone 下来用同一条
 # 命令就能启用.
-#
+
 # [启用(每个 clone 各做一次)]
 #     npm install            # 或 npm ci:prepare 会先 build,再执行下一条
 #     或手动: git config --local core.hooksPath .githooks
 #     确认:   git config --get core.hooksPath        # 应输出 .githooks
 # 之后每次 git commit 都会运行 .githooks/pre-commit.
-#
+
 #   临时跳过某次提交:  git commit --no-verify
 #   卸载:              git config --unset core.hooksPath
 #   单独调试 hook:     git hook run pre-commit
-#
+
 # [工作原理(.githooks/pre-commit)]
 #   git diff --cached --name-only -z --diff-filter=ACM
 #     -> 取出本次暂存的新增/修改/复制文件(不含删除)
 #     -> 对每个文件执行 python3 scripts/autorun.py <file>(文件模式,原地改写)
 #     -> 再 git add 回暂存区,让修正结果直接进入这一次提交
-#
+
 # [为什么可以对自己生效]
 #   - CHAR_MAP 的左值一律写成 \uXXXX 转义(见下方),源文件里不含全角字面量,
 #     所以本文件被自己扫描一遍之后映射表依旧完好.改动映射表时不要退回字面量
@@ -34,14 +34,14 @@
 #   - .githooks/pre-commit 也在修正范围内,但它必须等循环结束,bash 把脚本读完
 #     之后再改写(边执行边重写正在运行的 shell 脚本是危险的);本文件由 python
 #     整体读入并编译后才执行,当场改写是安全的.
-#
+
 # [注意事项]
 #   * 二进制文件读取时抛 UnicodeDecodeError,直接跳过,不影响提交.
 #   * 没装 python3 的环境: hook 打印警告并放行提交(不阻断别人).
 #   * 文件模式会真的改写工作区文件(再 git add 回暂存区),所以 git status 未必
 #     看得到差异,但磁盘内容已经变了.
 #   * 无参数调用时是管道模式: stdin -> stdout,可配合编辑器/其他脚本使用.
-# ============================================================================
+#
 import sys
 import re
 

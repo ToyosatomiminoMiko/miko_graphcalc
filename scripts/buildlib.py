@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""构建脚本共享底层.
+"""
+构建脚本共享底层
 
 build.py(生产入口)与 dev_ui_link.py(本地联调)都从这里取. 抽出来的都是
 "判断 / 字符串 / JSON / 文件系统"这类 shell 不擅长的部分:
@@ -13,8 +14,9 @@ build.py(生产入口)与 dev_ui_link.py(本地联调)都从这里取. 抽出来
 编排(按顺序调用 npm / cargo / wasm-pack)留在 build.py; 构建步骤本身的顺序依旧
 由 package.json 的 build:all 定义, 这里不重复.
 
-需要 Python 3.9+.
+需要 Python 3.10+
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -183,7 +185,9 @@ def git_state(ui_dir):
         return ("unknown", "?")
     if run_capture(["git", "-C", ui_dir, "rev-parse", "--git-dir"]) is None:
         return ("unknown", "?")
-    head = (run_capture(["git", "-C", ui_dir, "rev-parse", "--short", "HEAD"]) or "").strip()
+    head = (
+        run_capture(["git", "-C", ui_dir, "rev-parse", "--short", "HEAD"]) or ""
+    ).strip()
     porcelain = run_capture(["git", "-C", ui_dir, "status", "--porcelain"]) or ""
     dirty = str(sum(1 for line in porcelain.splitlines() if line.strip()))
     return (head or "unknown", dirty)

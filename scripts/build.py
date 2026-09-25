@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""生产构建入口.
+"""
+生产构建入口
 
 负责"安装锁定依赖", "决定这次用哪份 miko_ui"和"调用统一流水线"; 真正的
 构建/检查步骤序列定义在 package.json 的 build:all 脚本(单一事实源, 避免两处
@@ -21,6 +22,7 @@
 kit.run(). 版本同步的策略矩阵单独抽成 buildlib.decide_ui_sync() 这个纯函数,
 不必通读分支就能看清每种组合的结论.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -127,7 +129,9 @@ def require_local_ui(ui_dir):
 
 def npm_latest():
     """npm view miko_ui@latest version 的第一行; 断网或 npm 失败时返回 None."""
-    output = kit.run_capture(["npm", "view", f"{kit.UI_PKG_NAME}@latest", "version"], cwd=ROOT)
+    output = kit.run_capture(
+        ["npm", "view", f"{kit.UI_PKG_NAME}@latest", "version"], cwd=ROOT
+    )
     if not output:
         return None
     for line in output.splitlines():
@@ -164,7 +168,9 @@ def sync_miko_ui(environ):
 
     locked = kit.ui_version(ROOT / "node_modules" / kit.UI_PKG_NAME)
     latest = environ.get("MIKO_UI_LATEST_VERSION") or npm_latest()
-    must_resolve = bool(environ.get("CI")) or environ.get("MIKO_UI_REQUIRE_LATEST") == "1"
+    must_resolve = (
+        bool(environ.get("CI")) or environ.get("MIKO_UI_REQUIRE_LATEST") == "1"
+    )
     action = kit.decide_ui_sync(mode, locked, latest, must_resolve_latest=must_resolve)
     locked_display = locked or "unknown"
 
@@ -217,7 +223,9 @@ def build_and_link_local_ui(ui_dir):
 
     version = kit.ui_version(ui_dir)
     head, dirty = kit.git_state(ui_dir)
-    LOG.log(f"local miko_ui: version {version}, commit {head}, {dirty} uncommitted file(s)")
+    LOG.log(
+        f"local miko_ui: version {version}, commit {head}, {dirty} uncommitted file(s)"
+    )
 
     dev_ui_link.link(ui_dir)
 
@@ -270,7 +278,9 @@ def run_build(argv):
 
     LOG.log("build succeeded")
     if ui_source == "local":
-        LOG.log("node_modules/miko_ui is still linked to the local checkout: 'npx vite' serves it")
+        LOG.log(
+            "node_modules/miko_ui is still linked to the local checkout: 'npx vite' serves it"
+        )
     LOG.log(f"output directory: {ROOT / 'dist'}")
     return kit.EXIT_OK
 
