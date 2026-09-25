@@ -62,10 +62,11 @@ describe('createWindowChrome', () => {
         expect((chrome.exampleButton as unknown as StubElement).getAttribute('aria-controls'))
             .toBe(chrome.exampleMenu.id);
         expect((chrome.exampleButton as unknown as StubElement).getAttribute('aria-expanded')).toBe('false');
-        // 容器只负责 id:类名 / role / aria-label 与内容都由库的 createMenu 写,
-        // 所以这里既没有 `.example-menu` 类,也没有 role / aria-labelledby.
+        // 容器自己只挂**滚动条类**(库里那条独立规定,挂不挂由消费方定,见
+        // windowChrome.ts);菜单的类名 / role / aria-label 与内容仍由库的
+        // createMenu 写,所以这里还没有 `.menu-panel`,也没有 role / aria-labelledby.
         expect(chrome.exampleMenu.id).toBe('example-menu');
-        expect(chrome.exampleMenu.className).toBe('');
+        expect(chrome.exampleMenu.className).toBe('ui-scrollbar');
         expect((chrome.exampleMenu as unknown as StubElement).getAttribute('role')).toBeNull();
     });
 

@@ -73,9 +73,9 @@ export class ProcessPanel {
         this.title = create_element('span', { class: 'process-title' }, '过程');
         this.legend = create_element('span', { class: 'process-legend' });
         // 题目区:过程页先给"在解什么",再给步骤(见 ProcessDocument.problem).
-        this.problem = create_element('div', { class: 'process-problem' });
+        this.problem = create_element('div', { class: 'process-problem ui-scrollbar' });
         setHidden(this.problem, true);
-        this.echo = create_element('div', { class: 'process-param-echo' });
+        this.echo = create_element('div', { class: 'process-param-echo ui-scrollbar' });
         setHidden(this.echo, true);
 
         const header = create_element(
@@ -90,7 +90,8 @@ export class ProcessPanel {
         this.truncated = create_element('p', { class: 'process-truncated' });
         setHidden(this.truncated, true);
 
-        this.stepsContainer = create_element('div', { class: 'process-steps' });
+        // `ui-scrollbar` 是库的滚动条规定(见 css/process.css 的说明).
+        this.stepsContainer = create_element('div', { class: 'process-steps ui-scrollbar' });
         // KeyedRowList 构造时会给容器加 role="list"(与两个对象列表同一约定).
         this.list = new KeyedRowList<IndexedStep, ProcessStepRow>(this.stepsContainer);
 
@@ -148,7 +149,11 @@ export class ProcessPanel {
     }
 
     private _buildStepRow(entry: IndexedStep): ProcessStepRow {
-        const formula = createFormulaElement(entry.step.latex, 'process-step-formula', false);
+        const formula = createFormulaElement(
+            entry.step.latex,
+            'process-step-formula ui-scrollbar',
+            false,
+        );
         const reason = create_element('span', {
             class: 'kind-badge process-step-reason',
         }, entry.step.reason);

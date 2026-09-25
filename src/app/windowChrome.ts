@@ -73,7 +73,11 @@ export function createWindowChrome(): WindowChrome {
     // 示例浮层只给一个**带 id 的空容器**:菜单的类名 / `role` / `aria-label` 与
     // 分组,菜单项全由库的 `createMenu` 建(见 ExampleLoaderController).id 必须在
     // 这里就有 -- `Popover` 构造时按面板 id 写 `aria-controls`.
-    const exampleMenu = create_element('div');
+    //
+    // `ui-scrollbar` 由**消费者**挂:库的 `createMenu` 会把这颗容器补成
+    // `.menu-panel`(它有 max-height + overflow-y),但滚动条规定与菜单件互不
+    // 认识(见库的 `styles/scrollbar.css`),要不要用由这里决定.
+    const exampleMenu = create_element('div', { class: 'ui-scrollbar' });
     exampleMenu.id = 'example-menu';
 
     return {

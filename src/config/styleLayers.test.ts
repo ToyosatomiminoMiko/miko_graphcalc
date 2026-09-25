@@ -45,6 +45,7 @@ const APP_CSS = [
  */
 const LIB_CSS = [
     'miko_ui/styles/tokens.css',
+    'miko_ui/styles/scrollbar.css',
     'miko_ui/styles/widgets.css',
     'miko_ui/styles/desktop.css',
     'miko_ui/styles/editor.css',

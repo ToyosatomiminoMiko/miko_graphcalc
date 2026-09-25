@@ -29,6 +29,7 @@ const APP_CSS = [
 /** 库的样式表:按**包路径**解析,遵循 exports 映射. */
 const LIB_CSS = [
     'miko_ui/styles/tokens.css',
+    'miko_ui/styles/scrollbar.css',
     'miko_ui/styles/widgets.css',
     'miko_ui/styles/desktop.css',
     'miko_ui/styles/editor.css',

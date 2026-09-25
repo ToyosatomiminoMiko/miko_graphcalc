@@ -106,25 +106,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-scrollbar) transparent;
 }
 
-.process-steps::-webkit-scrollbar {
-    width: 8px;
-}
-
-.process-steps::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: var(--radius-pill);
-    background: var(--color-scrollbar);
-    background-clip: content-box;
-}
-
-.process-steps::-webkit-scrollbar-thumb:hover {
-    background: var(--color-scrollbar-hover);
-    background-clip: content-box;
-}
+/* 滚动条外观不在这里:`.process-steps` 与其余滚动容器一样,在应用侧只挂库的
+   `.ui-scrollbar` 类(见 src/ui/process/ProcessPanel.ts),外观由库的
+   `styles/scrollbar.css` 一处给. */
 
 /* 一行 = 序号 + 公式 + 依据徽章.公式列 minmax(0,1fr):公式自己横向滚动,
    不把徽章挤出栏外.行是只读的:没有高亮/悬停态,也没有点击语义. */

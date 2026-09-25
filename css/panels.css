@@ -58,31 +58,11 @@
     overflow-y: auto;
 }
 
-/* 内部滚动条:参数区与视图区被压缩时都会出现滚动条,给一套不抢眼但看得见的
-   样式,免得默认滚动条在深色底上几乎不可见(用户找不到"还有内容"). */
-#params-panel,
-#view-controls {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-scrollbar) transparent;}
-
-#params-panel::-webkit-scrollbar,
-#view-controls::-webkit-scrollbar {
-    width: 8px;
-}
-
-#params-panel::-webkit-scrollbar-thumb,
-#view-controls::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: var(--radius-pill);
-    background: var(--color-scrollbar);
-    background-clip: content-box;
-}
-
-#params-panel::-webkit-scrollbar-thumb:hover,
-#view-controls::-webkit-scrollbar-thumb:hover {
-    background: var(--color-scrollbar-hover);
-    background-clip: content-box;
-}
+/* 滚动条外观**不在这里**:库的 `styles/scrollbar.css` 是唯一来源,滚动容器
+   (`#params-panel` / `#view-controls` / `.object-list-body` / `.diagnostic-list`)
+   只在 `src/app/appViews.ts` 里挂库公开的 `.ui-scrollbar` 类.这里原本有一份
+   写死 `8px` + 两条 `--color-scrollbar*` 的副本,已删 -- 那正是"同一个滚动条
+   有两个来源"的写法. */
 
 /* 单条参数行的样式(名称 / 滑杆 / 数值框 / 重置按钮)参见:
    `miko_ui` 的 `.slider-field`(见库的 `styles/widgets.css`),

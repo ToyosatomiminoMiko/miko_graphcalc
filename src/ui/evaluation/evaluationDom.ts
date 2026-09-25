@@ -96,7 +96,7 @@ export function createDetailSections(
             if (formulas === null) {
                 formulas = create_element('div', { class: 'eval-detail-body' });
             }
-            formulas.append(createFormulaElement(line.latex, 'eval-detail-line'));
+            formulas.append(createFormulaElement(line.latex, 'eval-detail-line ui-scrollbar'));
         } else {
             if (metadata === null) {
                 metadata = create_element('div', { class: 'eval-detail-meta-block' });
@@ -126,7 +126,7 @@ export function createEvaluationSummary(
     name: string,
 ): HTMLElement {
     const formula = spec.latex !== null
-        ? createFormulaElement(spec.latex, 'eval-summary-formula', false)
+        ? createFormulaElement(spec.latex, 'eval-summary-formula ui-scrollbar', false)
         : create_element('code', { class: 'object-expr' }, spec.text ?? '');
 
     const summary = document.createElement('summary');

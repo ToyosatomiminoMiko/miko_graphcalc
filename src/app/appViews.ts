@@ -73,6 +73,9 @@ function buildSourceWindow(doc: Document): {
         gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
         root: doc,
     });
+    // 源码区也会滚动:textarea 挂库的滚动条类,与其余滚动容器同一种外观.
+    // 编辑器外壳本身不认这条规定(结构与滚动条分开),所以由消费者在这里挂.
+    code.textarea.classList.add('ui-scrollbar');
     const panel = create_element('section', { id: 'editor-panel', root: doc }, code.element);
     // 旧 `#left-panel` 只有 `.panel` 这一条样式(id 选择器里没有它,见计划附录 C6).
     const body = create_element('aside', { class: 'panel', root: doc }, panel);
@@ -93,13 +96,17 @@ function buildParamsWindow(doc: Document): {
     paramsPanel: HTMLElement;
     diagnostics: HTMLElement;
 } {
-    const paramsPanel = create_element('section', { id: 'params-panel', root: doc });
+    const paramsPanel = create_element('section', {
+        class: 'ui-scrollbar',
+        id: 'params-panel',
+        root: doc,
+    });
     // 容器的排版用应用自己的类名 `.diagnostic-list`:库的 `MessageList` 只管
     // **条目**的外观(`.diagnostic*`,随库的 `styles/feedback.css` 走),列表摆在哪,
     // 占多高,能不能滚是消费者的容器.写成应用自有的类,应用规则才符合
     // "不给库的类定样式"那条契约(见 src/config/styleLayers.test.ts).
     const diagnostics = create_element('section', {
-        class: 'diagnostic-list',
+        class: 'diagnostic-list ui-scrollbar',
         id: 'diagnostics',
         'aria-live': 'polite',
         root: doc,
@@ -129,7 +136,7 @@ function buildEntitiesWindow(doc: Document): {
     entity: HTMLElement;
 } {
     const entity = create_element('div', {
-        class: 'object-list-body',
+        class: 'object-list-body ui-scrollbar',
         id: 'entity-object-list',
         root: doc,
     });
@@ -160,7 +167,7 @@ function buildEvaluationsWindow(doc: Document): {
         create_element('section', { id: 'object-panel', root: doc },
             create_element('div', { class: 'object-list-column', root: doc },
                 create_element('div', {
-                    class: 'object-list-body',
+                    class: 'object-list-body ui-scrollbar',
                     id: 'evaluation-object-list',
                     root: doc,
                 },
@@ -182,7 +189,12 @@ export function buildAppViews(root: HTMLElement): AppViews {
 
     const viewport = create_element('div', { id: 'viewport', root: doc });
     const source = buildSourceWindow(doc);
-    const viewControls = create_element('section', { id: 'view-controls', root: doc });
+    // 视图窗口正文:`ui-scrollbar` 是库的滚动条类(见 css/panels.css 的说明).
+    const viewControls = create_element('section', {
+        class: 'ui-scrollbar',
+        id: 'view-controls',
+        root: doc,
+    });
     const params = buildParamsWindow(doc);
     const process = buildProcessWindow(doc);
     const entities = buildEntitiesWindow(doc);

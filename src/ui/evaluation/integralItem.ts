@@ -283,7 +283,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         const latex = value === null
             ? this.bodyLatex
             : `${this.bodyLatex}=${latexResultNumber(value)}`;
-        const equation = createFormulaElement(latex, 'eval-detail-line');
+        const equation = createFormulaElement(latex, 'eval-detail-line ui-scrollbar');
         const existing = container.querySelector<HTMLElement>('.eval-detail-line');
         if (existing) {
             existing.replaceWith(equation);
