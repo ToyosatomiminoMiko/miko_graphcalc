@@ -20,9 +20,11 @@ jobs:
   #   (ci.yml 是检查,release.yml 出 GitHub release 与 npm 包)
   # 本仓库只从 npm 取它:package.json 里一条 `"miko_ui": "^0.1.2"`,`npm ci`
   # 直接从 registry 装好.所以这里不需要 checkout submodule,也不需要额外的凭据.
-  # 装完之后 build.sh 还会把 miko_ui 对齐到 npm 的 `latest`(MIKO_UI_SYNC=auto),
-  # 所以**每次 Pages 部署拿到的都是库的最新发布版**;CI=true 让"查不到 latest"
-  # 直接失败,不会静默部署旧版本.
+  # 注意 build.sh 必须显式带 `--ui npm`:本地默认已改成用工作副本构建,而 CI 上
+  # 既没有那份副本,部署出去的也必须是 npm 上能说清哪一版的产物(build.sh 在
+  # CI 里会直接拒绝默认的本地模式).带上 --ui npm 之后,它还会把 miko_ui 对齐到
+  # npm 的 `latest`(MIKO_UI_SYNC=auto),所以**每次 Pages 部署拿到的都是库的最新
+  # 发布版**;CI=true 让"查不到 latest"直接失败,不会静默部署旧版本.
   build-and-deploy:
     runs-on: ubuntu-latest
     environment:
@@ -47,10 +49,11 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      # 生产构建唯一入口:安装锁定依赖 -> Rust lint -> 清理并构建 WASM ->
-      # 前端/Rust 测试 -> TypeScript 检查 -> Vite 构建,分阶段日志由脚本输出.
+      # 生产构建唯一入口:安装锁定依赖 -> 按 npm 上那一版取 miko_ui -> Rust lint ->
+      # 清理并构建 WASM -> 前端/Rust 测试 -> TypeScript 检查 -> Vite 构建,
+      # 分阶段日志由脚本输出. `--ui npm` 不能省(理由见上面的注释).
       - name: Install, lint, test and build
-        run: bash ./build.sh
+        run: bash ./build.sh --ui npm
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

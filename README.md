@@ -152,10 +152,22 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 **样式表按两层加载,顺序即层叠顺序**(入口在 `src/main.ts`):
 
 1. **库层**:`import 'miko_ui/styles.css'` 一行拿到库的全部默认样式,内部顺序
-   (token -> 控件 -> 桌面 -> 编辑器外壳)由库自己的 `styles.css` 决定,应用不
-   插手;库以后加样式表,应用入口不用改;
+   (token -> 滚动条 -> 控件 -> 桌面 -> 编辑器外壳)由库自己的 `styles.css` 决定,
+   应用不插手;库以后加样式表,应用入口不用改;
 2. **应用层**:`css/base.css` -> `panels.css` -> `editor.css` ->
    `process.css`,只写应用自己的类 / id / 页面级规则.
+
+**滚动条是一条单独的规定**:库的 `styles/scrollbar.css` 是唯一来源,会滚动的
+容器挂库公开的 `.ui-scrollbar` 类即得同一种细滚动条(尺寸 `--scrollbar-size`,
+颜色 `--color-scrollbar*`,都在库的 token 层),应用侧一条滚动条规则都不写 --
+挂类的地方是 `src/app/appViews.ts`(`#params-panel` / `#view-controls` /
+`.object-list-body` / `.diagnostic-list`,以及库建好外壳后的源码 `textarea`),
+`src/app/windowChrome.ts`(示例浮层,库的 `createMenu` 会把它补成会滚动的
+`.menu-panel`),`src/ui/process/ProcessPanel.ts`,`src/ui/evaluation/evaluationDom.ts`
+与 `integralItem.ts`.库自己的组件不挂这个类:菜单件与滚动条规定互不认识,要不要
+用由消费者决定.库侧这条规定有独立守卫(`miko_ui` 的
+`test/scrollbarStyles.test.ts`):只认 `.ui-scrollbar`,不认识任何组件,也不被任何
+组件引用.
 
 整层压而不是逐份交错:交错时"谁赢"由"文件排在第几位"决定,而不是"这块样式归谁
 负责".踩过的坑是应用层的 `.row-visibility-btn` 被排在它后面的库 `widgets.css`
@@ -181,7 +193,8 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
   (`--window-header-height` 与 `--dock-reserve`)在挂载时由库从这份配置
   写到 `#app`,库样式表里的同名值只是没有 JS 时的兜底.
 
-改完刷新页面即可.库样式表(`miko_ui` 的 `styles/tokens.css`)的 `:root`
+改完刷新页面即可(库自己的样式改完想立刻看到,见"构建"一节的本地联调
+`miko_ui`).库样式表(`miko_ui` 的 `styles/tokens.css`)的 `:root`
 兜底只负责脚本执行前的首帧,必须与 `UI_CONFIG` 保持一致--这条约定由
 `applyUiConfig.test.ts` 逐字断言,
 只改 `uiConfig.ts` 或只改 CSS 都会先失败在测试上,不会静默闪一帧旧样式.
@@ -314,10 +327,15 @@ npm run build
 三. `npm run test`(vitest),最后 `npm run build:app`:先 `npm run typecheck`
 (`tsc --noEmit`),再 `vite build`
 
-四. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行 `npm ci`,把
-`miko_ui` 对齐到 npm 的 `latest`(见下面的版本同步),再跑上面整条 `build:all`
+四. 生产/CI 统一入口是根目录的 `bash ./build.sh`:依次执行 `npm ci`,决定这次用
+哪份 `miko_ui`(不带参数时本机默认本地副本,CI 默认 npm,见下面的"本地联调"与
+版本同步),再跑上面整条 `build:all`
 (Rust lint,清理旧产物与 WASM 构建,前端/Rust 测试,前端类型检查与打包),
 每个阶段都有日志输出;GitHub Actions 只调用这一个脚本,不再重复编排各步骤.
+脚本本体是 `scripts/build.py`(`build.sh` 只是 exec 它的壳,入口不变),所以构建
+需要 `python3`(GitHub Actions 的 ubuntu-latest 自带);`--ui` / `MIKO_UI_*` 的
+语义与旧版兼容,版本同步的策略矩阵见 `scripts/buildlib.py` 的
+`decide_ui_sync()`.
 
 > **`miko_ui`(网页 UI 库)是 npm 依赖,不在这里.** 它是独立仓库
 > [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
@@ -330,11 +348,12 @@ npm run build
 > `katex`(可选 peer),本应用在 `package.json` 里显式声明了这两个,并由
 > `vite.config.ts` 的 `resolve.dedupe` 保证全程只有一份实例.
 >
-> **每次构建对齐最新版:** `build.sh` 在 `npm ci` 之后,流水线之前跑一步版本
-> 同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就 `npm install miko_ui@latest`
-> 并更新 `package.json` / `package-lock.json`.所以 **GitHub Pages 每次部署用的
-> 都是库的最新发布版**(`deploy.yml` 走的就是 `build.sh`);本地跑完
-> `bash ./build.sh` 记得把这两个文件提交.策略由 `MIKO_UI_SYNC` 控制:
+> **每次构建对齐最新版(`--ui npm`):** `build.sh --ui npm` 在 `npm ci` 之后,流水线
+> 之前跑一步版本同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就
+> `npm install miko_ui@latest` 并更新 `package.json` / `package-lock.json`.所以
+> **GitHub Pages 每次部署用的都是库的最新发布版**(`deploy.yml` 显式调
+> `bash ./build.sh --ui npm`);本地用 npm 那一版跑完记得把这两个文件提交.
+> 策略由 `MIKO_UI_SYNC` 控制:
 >
 > - `auto`(默认):落后就更新;
 > - `check`:落后就失败,不改文件(只校验);
@@ -344,6 +363,53 @@ npm run build
 > `MIKO_UI_REQUIRE_LATEST=1`)明确失败 -- 部署出去的不能是"说不清哪一版"的产物.
 > 注意 `npm run build`(=`build:all`)不经过 `build.sh`,它按 lock 构建,不会自动
 > 更新;要手动升到最新就是 `npm install miko_ui@latest` 后提交 lock.
+
+### 本地联调 `miko_ui`(不发版也能看到改动)
+
+上面说的是**发布形态**:CI 与 GitHub Pages 只能走 npm.但改库的时候不必"改一行 ->
+发一版 -> 回来 `npm install`":`build.sh` 有一个开关,换的只是"这次构建用哪份 UI".
+**不带开关时:本机默认本地工作副本,CI 默认 npm**(`CI` 非空即视为 CI),所以两边
+都可以只写 `bash ./build.sh`;CI 上显式要 local 会被直接拒绝.
+
+```sh
+bash ./build.sh             # 本机: 本地 miko_ui 工作副本; CI: npm 版 + 对齐 latest
+bash ./build.sh --ui npm    # 本机也想用 npm 上发布的那一版(显式覆盖)
+bash ./build.sh --ui local  # CI 上这么写会被拒绝(绝不部署工作副本)
+bash ./build.sh --help      # 说明
+```
+
+默认(本地)模式做三件事,顺序固定:
+
+1. 跳过"把 `miko_ui` 对齐到 npm `latest`"那一步(它的意义就是对齐 npm,与"用本地
+   副本"直接冲突);
+2. 在本地副本里跑它自己的 `npm run build:dist` 重建 `dist/` -- 应用的运行时 import
+   的是库的 `dist/index.js`,`tsc` 读的是 `dist/index.d.ts`,所以**改了库的 `src/`
+   必须重新出 dist**.本地模式下不用再挂 `tsc --watch`,`build.sh` 会把这件事做掉;
+3. 把 `node_modules/miko_ui` 换成指向副本的符号链接,并清掉 `node_modules/.vite`
+   里按 npm 包预打包的旧产物(不清会"改了库但页面没动").
+
+链接会一直留着,所以**构建完自己跑 `npx vite`,看到的就是本地库**(本地服务不由
+`build.sh` 起).库的 `styles/*.css` 是原样发布的,`npx vite` 下改完零构建立即生效;
+库的 `src/` 改完要再跑一次 `bash ./build.sh` 才会进 `dist/`.
+
+全程不碰 `package.json` / `package-lock.json`,对 gh-pages 与 CI 没有影响;反过来
+也**不能**把 `file:../...` 写进 `package.json`:CI 上没有那个路径,Pages 构建会直接
+失败.也正因为这一点,CI 上不带参数时**默认就是 npm**(不会误用工作副本),显式写
+`--ui local` 则被直接拒绝.想在本机回到 npm 版就是
+`bash ./build.sh --ui npm`(它开头是 `npm ci`,会把链接换成 npm 版);
+`deploy.yml` 里的 `--ui npm` 因此只是显式冗余,留着或去掉都一样.
+
+工作副本默认在 `../__projects_web/miko_ui`,换位置设 `MIKO_UI_DIR`:
+
+```sh
+MIKO_UI_DIR=/path/to/miko_ui bash ./build.sh
+```
+
+一个必须知道的差异:**本地 `npm test` 也会跟着用工作副本**
+(`cssPalette.test.ts` / `editorStyles.test.ts` 直接读库的 `styles/`),所以"本地绿"
+不等于"CI 绿":库改了还没发版时,CI 仍按 npm 上那一版跑.底层就是
+`scripts/dev_ui_link.sh`,只想快速链接而不跑整条流水线时可以单独调用它
+(`bash scripts/dev_ui_link.sh link|unlink|status`,本体是 `scripts/dev_ui_link.py`).
 
 只重新生成 WASM(不动其余步骤):
 
