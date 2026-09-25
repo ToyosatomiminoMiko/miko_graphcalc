@@ -270,7 +270,6 @@ export const UI_CONFIG = {
             { id: 'maximize', text: 'max' },
         ],
         // 五个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
-        // (旧写法是 index.html 里一个 hidden 暂存区 + DslApp 里一条 if 链).
         adopted: [
             { node: 'exampleButton', window: 'source', slot: 'actions' },
             { node: 'runButton', window: 'source', slot: 'actions' },

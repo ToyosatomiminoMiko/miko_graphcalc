@@ -31,9 +31,15 @@ Chromium + DevTools Protocol,1280×800 与 1920×1080 两组视口,用真实鼠�
 > 3. 两个"CSS 必须自己读"的外壳尺寸(`--dock-reserve` / `--window-header-height`)
 >    改由库在挂载时从 `DesktopConfig` 写到桌面根,`styles/tokens.css` 里的同名值
 >    只留作"没有 JS / 纯 CSS"的兜底.
+> 4. **窗口数从五变成六**:原来的"对象"一窗(实体 / 求值两栏)按提交 `9333355`
+>    拆成"实体对象"与"求值对象"两个窗口,`#object-panel` 里那两栏因此各自成了
+>    一个窗口的正文.下文 §2.1 / §4 里"五个窗口"的数值是**拆分之前**的原始设计;
+>    当前清单见 `src/config/uiConfig.ts` 的 `UI_CONFIG.window.windows`(六项),
+>    几何契约由 `src/config/windowLayout.test.ts` 守着.
 >
 > 下文 §3–§5 里关于底部 Dock,`fullscreen`,`closed`,`.dock-inner` 的文字与代码
-> 清单是**当时的原始设计**,不再作为实现依据;逐条记录见 §11.2 的 E37.
+> 清单是**当时的原始设计**,不再作为实现依据;逐条记录见 §11.2 的 E37."五个
+> 窗口"同样按历史设计读:现状是六个窗口(见上面第 4 条).
 
 已拍板的口径(用户 2026-09 指定):
 

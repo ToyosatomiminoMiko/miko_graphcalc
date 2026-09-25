@@ -103,15 +103,15 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 桌面窗口化
 
-界面形态是"**3D 视口铺满 + 五个浮动窗口 + 顶部任务栏**":`#viewport`(Three.js
-画布)仍然铺满 `#app`,五个窗口悬在它上面,桌面空白处照常可以转视角.任务栏是
+界面形态是"**3D 视口铺满 + 六个浮动窗口 + 顶部任务栏**":`#viewport`(Three.js
+画布)仍然铺满 `#app`,六个窗口悬在它上面,桌面空白处照常可以转视角.任务栏是
 紧贴 `#app` 上沿的一条通栏带,窗口几何被夹在它下面,所以它不会被任何窗口遮住.
 
 ```text
 任务栏(顶部通栏):窗口按钮 ... 全部还原
 
 source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
-过程(递等式)        对象(实体 / 求值两栏)
+过程(递等式)        实体对象(实体一栏)       求值对象(六个求值子列表)
 ```
 
 - 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)与任务栏**由库声明式装配**
@@ -180,11 +180,11 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 - `UI_CONFIG.editor`:`fontFamily`/`fontSize`/`lineHeight`/`tabSize`,
   作用于左面板源码编辑区(textarea,行号栏与源码高亮层共用同一组值);
   `gutterMinWidth` 是行号槽宽下限;
-- `UI_CONFIG.formula.katexFontSize`:底部对象列表里 KaTeX 公式的字号,
+- `UI_CONFIG.formula.katexFontSize`:对象列表里 KaTeX 公式的字号,
   单位 em,基准是 `.object-expr` 的 16px;
 - `UI_CONFIG.panel`:只剩参数区与视图控件的**内容下限**
   (`paramsMinHeight` / `viewControlsMinHeight`),由 CSS 消费;
-- `UI_CONFIG.window`:桌面窗口化的全部几何与常量--五个窗口的标题/宿主/
+- `UI_CONFIG.window`:桌面窗口化的全部几何与常量--六个窗口的标题/Dock 文案/
   默认几何锚点/最小尺寸,标题栏按钮清单(只有最小化与最大化),
   `edgeKeep`/`edgeGap`/`headerMinVisible`/`dockReserve`/`headerHeight`,
   三层容器的 `z-index` 与吸附阈值.**窗口几何不进 CSS**(窗口是 JS 建的,
@@ -472,9 +472,9 @@ SceneIR(纯数据,不含 three.js/DOM)
 
 ```text
 src/contract/       零依赖叶子:跨层数据契约(ast.ts 解析产物 / ir.ts 编译产物 /
-                    view.ts 视图值域 / events.ts 视图事件映射)
+                    view.ts 视图值域 / evaluation.ts 求值细节展示数据)
 src/config/         零依赖叶子:数值/渲染/UI 默认值(含 SphericalAngleConvention)
-src/core/           零依赖通用原语:EventBus,LatestRequestExecutor(+RequestClient)
+src/core/           零依赖通用原语:LatestRequestExecutor(+RequestClient)
 src/math/           纯数学(同步,无 DOM,无 Worker)
   CoordinateSystem / latexNumber / paramValue
   adapters/         系数/求交的纯数据转换
@@ -492,9 +492,9 @@ src/render/         只消费 IR;渲染层不再自行解析表达式
   core/             场景/相机/动画/渲染器与轴刻度
   visualization/    网格与积分可视化
 src/ui/              应用侧界面:只声明"有什么"(DOM 结构)与"干什么"(行为)
-  entity/           实体列表(对象窗口左栏):行结构 + 列表装配
-  evaluation/       求值列表(对象窗口右栏):分析/积分/求交/求解/原函数/微分方程
-  objects/          两个对象列表的装配与事件接线
+  entity/           实体列表(实体对象窗口):行结构 + 列表装配
+  evaluation/       求值列表(求值对象窗口):分析/积分/求交/求解/原函数/微分方程
+  objects/          两个对象列表的装配与回调接线
   params/           参数面板:滑块取值口径与写回时机
   process/          过程窗口:递等式步骤列表与三级披露判据
   view/             视图窗口:相机/坐标轴/网格/曲面的控件装配(viewState + ViewPanel)
@@ -573,12 +573,13 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 ## 五/UI 通信:两种方式各有明确边界
 
 - **业务数据(参数/对象列表/诊断/积分结果)**:DslApp 与 RenderController
-  直接注入回调,不走 EventBus;调用链在编译/应用代码里就能看清.
-- **视图控件(相机/坐标轴/网格/点样式)**:控件 emit `EventBus` 事件,
-  RenderController 统一订阅并落到 SceneManager/CameraManager/Plotter.
+  直接注入回调,不走事件总线;调用链在编译/应用代码里就能看清.
+- **视图控件(相机/坐标轴/网格/点样式)**:面板把控件绑到 `viewState` 的一组
+  signal 上(三层见下),RenderController 用 `effect` 订阅并落到
+  SceneManager/CameraManager/Plotter.
 
-`contract/events.ts` 只保留有真实 emit 点的视图事件键,不再允许
-"先声明后接线"的 dead event keys.
+原来的 9 个视图控制器与 `EventBus`(连同 `contract/events.ts`)已经整条下线:
+状态只有 `viewState` 一份,没有"先声明后接线"的 dead event key 可留.
 
 视图窗口(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
 
@@ -594,9 +595,9 @@ RENDER_CONFIG ──► src/ui/view/viewState.ts   唯一状态源(signal / 派�
 
 库的 `widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /
 `createSlider` / `createNumberField` / `createButton` / `createPopover` /
-行与分组):只负责 DOM 结构与可访问性,不认识 EventBus,也不读配置.应用侧
+行与分组):只负责 DOM 结构与可访问性,不认识渲染侧,也不读配置.应用侧
 `ParamPanelController` 复用同一批件,只保留取值口径与写回时机这类业务语义;
-示例菜单复用 `createPopover`(开合态/`aria-expanded`/点外部关闭/焦点归还),
+示例菜单复用 `createMenu`(分组/当前项/开合态/`aria-expanded`/点外部关闭),
 自己只留"渲染什么"与"选中后干什么";对象行/求值行也改用库的建元素原语
 `create_element`,两栏共用的行外壳与显隐按钮在库的 `shared/rowDom.ts`.
 行外壳(`.object-row` / `.row-main` / `.row-actions`)与显隐按钮只要库给了

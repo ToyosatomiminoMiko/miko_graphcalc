@@ -288,7 +288,7 @@
 | --- | --- |
 | 问题 | **G1 的展示侧 + G3 合并成的同一个教学需求**:学生要看到"每一步为什么".现状把过程挤在底栏求值条目的一个 `<details>` 里--底栏高上限 640px,扣掉标题与内边距后可用约 548px,简单递等式一行约 37px(带分式 55–70px),**一屏最多约 14 行**,且与实体清单对半分宽(默认 1920 屏每栏约 646px,长式子必然横滚) |
 | 设计 | 见 [方程求解过程的展示设计](equation-solving-process.md):**不改浮层格局**,把右栏改成标签页(页1 参数/视图,页2 过程);过程页通高(1080p 下约 27 行),一行一步递等式,条目走三级披露(L0 摘要 / L1 行内短过程 / L2 过程页) |
-| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器".**落地形态已变**:W6 把标签页/分隔条整条链路拆成五个独立窗口(`PanelController` / `RightPanelTabs` / `RightSplitController` 已删除),过程是独立窗口,详见 [窗口化计划](windowing-plan.md) |
+| 一期(零内核风险) | 右栏标签页 + 过程视图 + 披露判据 + 条目"过程"入口.数据源是现有 `analysisLatexDetailEntries` 与积分/求交的细节行,**不动 Rust,不动 `contract/ir.ts` 既有字段,不新增 DSL 语句**.唯一要动的共享件是 `createObjectRow(rowClass, toggle)`:它只容得下一个行末按钮,需扩成"行末动作容器".**落地形态已变**:W6 把标签页/分隔条整条链路拆成六个独立窗口(`PanelController` / `RightPanelTabs` / `RightSplitController` 已删除),过程是独立窗口,详见 [窗口化计划](windowing-plan.md) |
 | 二期 | 步骤索引驱动几何(割线->切线,黎曼矩形加细,交点高亮):把"第 k 步"当虚拟参数走 `CompileController.refresh` -> `RenderController.applyScene(scene, changedParams)`,复用既有缓存与 latest-only 调度;IR **只新增**字段(如 `stepHighlights`) |
 | 三期 | 保守式求解内核:步骤产物用**独立类型**(不是 `Expr`,见 §7.1),配 WASM 入口.三期只换数据源:过程页骨架(标签页/递等式/披露)零改动;UI 增量只有"求解"子列表条目与过程页**题目区**--这正是展示层先行的价值 |
 | 三期状态(v1 已落地) | 新增 `solve 名称 = 左 = 右 [选项];` 语句;**内核**在 `math_rs::symbolic/solve.rs`(+`poly.rs`),产物是独立的 `SolveOutcome`/`SolveStep`(只有字符串与计数,`Expr` 仍是 `pub(crate)`),WASM 入口 `solve_equation` 返回 JSON;TS 侧只**新增** `SolveTask`/`SceneIR.solves`(既有字段语义不变),渲染进"求解"子列表,过程页新增**题目区**.能力边界 v1:**单变量一次/二次多项式**,数值系数(参数按当前值代入);因式分解+零积律 / 判别式+求根公式两条路径;三次以上,多未知量,超越项明确报错.示例 `example/solve_equations.miko`,默认场景也带两条 `solve` |
@@ -504,7 +504,8 @@
 - **展示层如实标注,不替内核圆场**.隐式解明确写成"隐式解(`Φ(x,y) = C`),不是
   `y = ...`",并说明未下发解曲线;未定出常数,缺省自变量,未显式化等都由细节区
   照实回显.
-- 依据:[三期完整规划与设置](plan3.md) 第 1.2/1.4 节与第 7 节第 5 条.
+- 依据:**三期完整规划与设置**(原文已按"过期文档"删除,可从
+  `git show 6ad16b0^:docs/plan3.md` 取回)第 1.2/1.4 节与第 7 节第 5 条.
 
 ## 7.2 隐性风险
 
