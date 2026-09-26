@@ -42,7 +42,7 @@ describe('createWindowChrome', () => {
     });
 
     it('标题栏按钮带库的按钮基线类(不是裸 <button>)', () => {
-        // 裸 `create_element('button')` 会吃到浏览器 UA 的那套外观(自带圆角与
+        // 裸 `create_element({ tag: 'button' })` 会吃到浏览器 UA 的那套外观(自带圆角与
         // 底色,而 token 里 `--radius-*` 都是 0),与库示例里的按钮不是同一种
         // 东西.库的 `createButton` 给每个按钮叠上 `.ui-button`,外观因此只有库
         // 里那一份 -- 见库 `widgets/Button.ts` 的说明.

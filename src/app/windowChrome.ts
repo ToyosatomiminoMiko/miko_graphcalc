@@ -40,7 +40,7 @@ export type WindowChrome = Record<ChromeNodeId, HTMLElement>;
  * 就有"改了一处忘了另一处"的余地.差别只有 id(节点在 DOM 里仍要分得开).
  */
 function createCopyHint(id: string): HTMLElement {
-    const hint = create_element('span', {
+    const hint = create_element({ tag: 'span' }, {
         class: 'object-list-hint',
     }, UI_CONFIG.window.chrome.copyHint);
     hint.id = id;
@@ -50,7 +50,7 @@ function createCopyHint(id: string): HTMLElement {
 export function createWindowChrome(): WindowChrome {
     // 标题栏按钮走库的 `createButton`:它给每个按钮叠上基线类 `.ui-button`
     // (appearance / 盒模型 / 描边 / 悬停 / 焦点 / 禁用都在库的 `widgets.css` 里).
-    // 自己 `create_element('button')` 会吃到浏览器 UA 的那套外观 -- 自带圆角与
+    // 自己 `create_element({ tag: 'button' })` 会吃到浏览器 UA 的那套外观 -- 自带圆角与
     // 底色,而 token 里四个 `--radius-*` 都是 0,看上去就像"这颗按钮从别处继承了
     // 圆角",和库示例里的按钮明显不是同一种东西(见库 `widgets/Button.ts` 的说明).
     //
@@ -77,7 +77,7 @@ export function createWindowChrome(): WindowChrome {
     // `ui-scrollbar` 由**消费者**挂:库的 `createMenu` 会把这颗容器补成
     // `.menu-panel`(它有 max-height + overflow-y),但滚动条规定与菜单件互不
     // 认识(见库的 `styles/scrollbar.css`),要不要用由这里决定.
-    const exampleMenu = create_element('div', { class: 'ui-scrollbar' });
+    const exampleMenu = create_element({ tag: 'div' }, { class: 'ui-scrollbar' });
     exampleMenu.id = 'example-menu';
 
     return {

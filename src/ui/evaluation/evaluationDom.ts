@@ -94,14 +94,14 @@ export function createDetailSections(
     for (const line of lines) {
         if (line.kind === 'latex') {
             if (formulas === null) {
-                formulas = create_element('div', { class: 'eval-detail-body' });
+                formulas = create_element({ tag: 'div' }, { class: 'eval-detail-body' });
             }
             formulas.append(createFormulaElement(line.latex, 'eval-detail-line ui-scrollbar'));
         } else {
             if (metadata === null) {
-                metadata = create_element('div', { class: 'eval-detail-meta-block' });
+                metadata = create_element({ tag: 'div' }, { class: 'eval-detail-meta-block' });
             }
-            metadata.append(create_element('div', { class: 'eval-detail-meta' }, line.text));
+            metadata.append(create_element({ tag: 'div' }, { class: 'eval-detail-meta' }, line.text));
         }
     }
 
@@ -127,13 +127,13 @@ export function createEvaluationSummary(
 ): HTMLElement {
     const formula = spec.latex !== null
         ? createFormulaElement(spec.latex, 'eval-summary-formula ui-scrollbar', false)
-        : create_element('code', { class: 'object-expr' }, spec.text ?? '');
+        : create_element({ tag: 'code' }, { class: 'object-expr' }, spec.text ?? '');
 
     const summary = document.createElement('summary');
     summary.className = 'eval-summary';
     summary.append(
-        create_element('span', { class: `kind-badge ${spec.badgeClass}` }, spec.badgeLabel),
-        create_element('strong', { class: 'object-name' }, name),
+        create_element({ tag: 'span' }, { class: `kind-badge ${spec.badgeClass}` }, spec.badgeLabel),
+        create_element({ tag: 'strong' }, { class: 'object-name' }, name),
         formula,
     );
     return summary;
@@ -146,7 +146,7 @@ export function createEvaluationSummary(
  * `计算中...`/`已隐藏`/数值文本/错误文本;`className` 决定配色.
  */
 export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
-    return create_element('code', { class: spec.className }, spec.text);
+    return create_element({ tag: 'code' }, { class: spec.className }, spec.text);
 }
 
 /**
@@ -227,7 +227,7 @@ export function createEvaluationRow(
     // 单独建一个块,保证结果行不会掉出折叠区.
     if (result !== null) {
         if (detail.formulas === null) {
-            detail.formulas = create_element('div', { class: 'eval-detail-body' });
+            detail.formulas = create_element({ tag: 'div' }, { class: 'eval-detail-body' });
         }
         detail.formulas.append(result);
     }

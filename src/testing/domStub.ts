@@ -492,7 +492,7 @@ export class StubElement {
     setAttribute(name: string, value: string): void {
         this.attributes.set(name, value);
         // 真 DOM 的**反射属性**:按属性名写也会改到同名成员上.库的 `create_element()` 走
-        // `attrs` 建节点(`create_element('div', { attrs: { id: 'x' } })`),不反射的话
+        // `attrs` 建节点(`create_element({ tag: 'div' }, { attrs: { id: 'x' } })`),不反射的话
         // `querySelector('#x')` 与 `getElementById('x')` 会找不到自己的节点.
         if (name === 'id') this.id = value;
         else if (name === 'class') this.className = value;

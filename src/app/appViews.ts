@@ -76,9 +76,9 @@ function buildSourceWindow(doc: Document): {
     // 源码区也会滚动:textarea 挂库的滚动条类,与其余滚动容器同一种外观.
     // 编辑器外壳本身不认这条规定(结构与滚动条分开),所以由消费者在这里挂.
     code.textarea.classList.add('ui-scrollbar');
-    const panel = create_element('section', { id: 'editor-panel', root: doc }, code.element);
+    const panel = create_element({ tag: 'section', root: doc }, { id: 'editor-panel' }, code.element);
     // 旧 `#left-panel` 只有 `.panel` 这一条样式(id 选择器里没有它,见计划附录 C6).
-    const body = create_element('aside', { class: 'panel', root: doc }, panel);
+    const body = create_element({ tag: 'aside', root: doc }, { class: 'panel' }, panel);
 
     return {
         body,
@@ -96,33 +96,30 @@ function buildParamsWindow(doc: Document): {
     paramsPanel: HTMLElement;
     diagnostics: HTMLElement;
 } {
-    const paramsPanel = create_element('section', {
+    const paramsPanel = create_element({ tag: 'section', root: doc }, {
         class: 'ui-scrollbar',
-        id: 'params-panel',
-        root: doc,
+        id: 'params-panel'
     });
     // 容器的排版用应用自己的类名 `.diagnostic-list`:库的 `MessageList` 只管
     // **条目**的外观(`.diagnostic*`,随库的 `styles/feedback.css` 走),列表摆在哪,
     // 占多高,能不能滚是消费者的容器.写成应用自有的类,应用规则才符合
     // "不给库的类定样式"那条契约(见 src/config/styleLayers.test.ts).
-    const diagnostics = create_element('section', {
+    const diagnostics = create_element({ tag: 'section', root: doc }, {
         class: 'diagnostic-list ui-scrollbar',
         id: 'diagnostics',
-        'aria-live': 'polite',
-        root: doc,
+        'aria-live': 'polite'
     });
-    const body = create_element('div', { class: 'right-page', root: doc }, paramsPanel, diagnostics);
+    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, paramsPanel, diagnostics);
     return { body, paramsPanel, diagnostics };
 }
 
 /** 过程窗口正文:通高的递等式视图. */
 function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: HTMLElement } {
-    const processPanel = create_element('section', {
+    const processPanel = create_element({ tag: 'section', root: doc }, {
         class: 'process-panel',
-        id: 'process-panel',
-        root: doc,
+        id: 'process-panel'
     });
-    const body = create_element('div', { class: 'right-page', root: doc }, processPanel);
+    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, processPanel);
     return { body, processPanel };
 }
 
@@ -135,14 +132,13 @@ function buildEntitiesWindow(doc: Document): {
     body: HTMLElement;
     entity: HTMLElement;
 } {
-    const entity = create_element('div', {
+    const entity = create_element({ tag: 'div', root: doc }, {
         class: 'object-list-body ui-scrollbar',
-        id: 'entity-object-list',
-        root: doc,
+        id: 'entity-object-list'
     });
-    const body = create_element('footer', { class: 'panel object-panel-column', root: doc },
-        create_element('section', { id: 'object-panel', root: doc },
-            create_element('div', { class: 'object-list-column', root: doc }, entity)));
+    const body = create_element({ tag: 'footer', root: doc }, { class: 'panel object-panel-column' },
+        create_element({ tag: 'section', root: doc }, { id: 'object-panel' },
+            create_element({ tag: 'div', root: doc }, { class: 'object-list-column' }, entity)));
     return { body, entity };
 }
 
@@ -152,7 +148,7 @@ function buildEvaluationsWindow(doc: Document): {
     objectLists: Omit<ObjectListContainers, 'entity'>;
 } {
     const list = (id: string, className: string): HTMLElement =>
-        create_element('div', { class: className, id, root: doc });
+        create_element({ tag: 'div', root: doc }, { class: className, id });
 
     const sublists = {
         analysis: list('analysis-object-list', 'object-sublist'),
@@ -163,13 +159,12 @@ function buildEvaluationsWindow(doc: Document): {
         ode: list('ode-object-list', 'object-sublist'),
     };
 
-    const body = create_element('footer', { class: 'panel object-panel-column', root: doc },
-        create_element('section', { id: 'object-panel', root: doc },
-            create_element('div', { class: 'object-list-column', root: doc },
-                create_element('div', {
+    const body = create_element({ tag: 'footer', root: doc }, { class: 'panel object-panel-column' },
+        create_element({ tag: 'section', root: doc }, { id: 'object-panel' },
+            create_element({ tag: 'div', root: doc }, { class: 'object-list-column' },
+                create_element({ tag: 'div', root: doc }, {
                     class: 'object-list-body ui-scrollbar',
-                    id: 'evaluation-object-list',
-                    root: doc,
+                    id: 'evaluation-object-list'
                 },
                 sublists.analysis,
                 sublists.integral,
@@ -187,13 +182,12 @@ export function buildAppViews(root: HTMLElement): AppViews {
     const chrome = createWindowChrome();
     const slots = windowSlotsProvider(UI_CONFIG.window.adopted, chrome);
 
-    const viewport = create_element('div', { id: 'viewport', root: doc });
+    const viewport = create_element({ tag: 'div', root: doc }, { id: 'viewport' });
     const source = buildSourceWindow(doc);
     // 视图窗口正文:`ui-scrollbar` 是库的滚动条类(见 css/panels.css 的说明).
-    const viewControls = create_element('section', {
+    const viewControls = create_element({ tag: 'section', root: doc }, {
         class: 'ui-scrollbar',
-        id: 'view-controls',
-        root: doc,
+        id: 'view-controls'
     });
     const params = buildParamsWindow(doc);
     const process = buildProcessWindow(doc);

@@ -70,28 +70,28 @@ export class ProcessPanel {
         private readonly root: HTMLElement,
         private readonly options: ProcessPanelOptions = {},
     ) {
-        this.title = create_element('span', { class: 'process-title' }, '过程');
-        this.legend = create_element('span', { class: 'process-legend' });
+        this.title = create_element({ tag: 'span' }, { class: 'process-title' }, '过程');
+        this.legend = create_element({ tag: 'span' }, { class: 'process-legend' });
         // 题目区:过程页先给"在解什么",再给步骤(见 ProcessDocument.problem).
-        this.problem = create_element('div', { class: 'process-problem ui-scrollbar' });
+        this.problem = create_element({ tag: 'div' }, { class: 'process-problem ui-scrollbar' });
         setHidden(this.problem, true);
-        this.echo = create_element('div', { class: 'process-param-echo ui-scrollbar' });
+        this.echo = create_element({ tag: 'div' }, { class: 'process-param-echo ui-scrollbar' });
         setHidden(this.echo, true);
 
         const header = create_element(
-            'div',
+            { tag: 'div' },
             { class: 'process-header' },
-            create_element('div', { class: 'process-heading' }, this.title, this.legend),
+            create_element({ tag: 'div' }, { class: 'process-heading' }, this.title, this.legend),
             this.problem,
             this.echo,
         );
 
-        this.empty = create_element('p', { class: 'process-empty' }, EMPTY_TEXT);
-        this.truncated = create_element('p', { class: 'process-truncated' });
+        this.empty = create_element({ tag: 'p' }, { class: 'process-empty' }, EMPTY_TEXT);
+        this.truncated = create_element({ tag: 'p' }, { class: 'process-truncated' });
         setHidden(this.truncated, true);
 
         // `ui-scrollbar` 是库的滚动条规定(见 css/process.css 的说明).
-        this.stepsContainer = create_element('div', { class: 'process-steps ui-scrollbar' });
+        this.stepsContainer = create_element({ tag: 'div' }, { class: 'process-steps ui-scrollbar' });
         // KeyedRowList 构造时会给容器加 role="list"(与两个对象列表同一约定).
         this.list = new KeyedRowList<IndexedStep, ProcessStepRow>(this.stepsContainer);
 
@@ -154,17 +154,17 @@ export class ProcessPanel {
             'process-step-formula ui-scrollbar',
             false,
         );
-        const reason = create_element('span', {
+        const reason = create_element({ tag: 'span' }, {
             class: 'kind-badge process-step-reason',
         }, entry.step.reason);
         // kind 决定徽章配色(样式归 CSS),title 给出分区的中性名字.
         reason.dataset.kind = entry.step.kind;
         reason.title = PROCESS_STEP_KIND_LABELS[entry.step.kind];
 
-        const row = create_element('div', { class: 'process-step' });
+        const row = create_element({ tag: 'div' }, { class: 'process-step' });
         row.setAttribute('role', 'listitem');
         row.append(
-            create_element('span', { class: 'process-step-index' }, String(entry.index + 1)),
+            create_element({ tag: 'span' }, { class: 'process-step-index' }, String(entry.index + 1)),
             formula,
             reason,
         );

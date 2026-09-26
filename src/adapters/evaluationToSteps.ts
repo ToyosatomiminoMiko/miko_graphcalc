@@ -38,6 +38,8 @@ import {
     type ProcessStepKind,
 } from '@/adapters/processSteps';
 
+const process_maxSteps = UI_CONFIG.process.maxSteps;
+
 /** 角色 -> 展示:`kind` 决定徽章分区,`reason` 是徽章文案. */
 interface StepPresentation {
     readonly kind: ProcessStepKind;
@@ -98,7 +100,7 @@ function buildProcessDocument(
 /** 梯度条目的过程:符号展开 -> 该点数值 -> 取点/回显 -> 函数值与切向量. */
 export function buildGradientProcess(
     analysis: AnalysisResult,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     return buildProcessDocument(
         `梯度 ${analysis.name}`,
@@ -119,7 +121,7 @@ export function buildIntegralProcess(
     objects: readonly SceneObject[],
     methodLabel: string,
     value: number | null,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     return buildProcessDocument(
         `积分 ${task.name}`,
@@ -157,7 +159,7 @@ export interface ConstraintProcessInput {
  */
 export function buildConstraintProcess(
     input: ConstraintProcessInput,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     const steps: ProcessStep[] = input.steps.map((step) => ({
         latex: step.latex,
@@ -181,7 +183,7 @@ export function buildConstraintProcess(
  */
 export function buildSolveProcess(
     task: SolveTask,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     return buildConstraintProcess(
         {
@@ -206,7 +208,7 @@ export function buildSolveProcess(
  */
 export function buildOdeProcess(
     task: OdeTask,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     const steps: ProcessStep[] = task.steps.map((step) => ({
         latex: step.latex,
@@ -231,7 +233,7 @@ export function buildOdeProcess(
  */
 export function buildAntiderivativeProcess(
     task: AntiderivativeTask,
-    maxSteps: number = UI_CONFIG.process.maxSteps,
+    maxSteps: number = process_maxSteps,
 ): ProcessDocument {
     const steps: ProcessStep[] = task.steps.map((step) => ({
         latex: step.latex,

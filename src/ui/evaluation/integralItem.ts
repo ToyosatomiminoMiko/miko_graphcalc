@@ -302,7 +302,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
      */
     private ensureStatusRow(): HTMLElement {
         if (this.result !== null) return this.result;
-        const result = create_element('code', { class: 'eval-result is-error' }, '');
+        const result = create_element({ tag: 'code' }, { class: 'eval-result is-error' }, '');
         const container = this.row.querySelector<HTMLElement>('.eval-detail-body')
             ?? this.main;
         container.append(result);
