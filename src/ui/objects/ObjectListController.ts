@@ -20,8 +20,7 @@ import type {
     SceneIR,
 } from '@/contract/ir';
 import { EntityList } from '@/ui/entity/EntityList';
-import { EvaluationList } from '@/ui/evaluation/EvaluationList';
-import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
+import { EvaluationList, type EvaluationListHandlers } from '@/ui/evaluation/EvaluationList';
 
 /**
  * footer 的列表容器:左栏实体 1 个 + 右栏求值 4 个子列表.
@@ -45,24 +44,14 @@ export interface ObjectListContainers {
  *
  * - 实体:直接切换场景对象的可见性,不重新编译;
  * - 分析/积分/求交/求解:切隐藏集合后按当前参数重新编译,让数值计算或求解内核被跳过.
+ *
+ * 求值侧那 7 条**不在这里重写**:它们就是 {@link EvaluationListHandlers},
+ * 本接口只多一条 `toggleEntity`(实体在左栏,求值列表不认识它).于是 `handlers`
+ * 可以原样转交给 `EvaluationList`,不必再把同样的字段名抄第二遍.
  */
-export interface ObjectListHandlers {
+export interface ObjectListHandlers extends EvaluationListHandlers {
+    /** 实体行末按钮:实体显隐不重新编译,直接改渲染可见性. */
     toggleEntity(id: number): void;
-    toggleAnalysis(name: string): void;
-    toggleIntegral(name: string): void;
-    toggleIntersection(name: string): void;
-    toggleSolve(name: string): void;
-    /** 原函数条目:隐藏 = 不调积分内核,也不下发实体对象. */
-    toggleAntiderivative(name: string): void;
-    /** 微分方程条目:隐藏 = 不下发斜率场与解曲线. */
-    toggleOde(name: string): void;
-    /**
-     * 打开某条求值对象的过程页(三级披露的 L2).
-     *
-     * 列表层只管把"用户点了哪一条,过程是什么"报上来;切到右栏过程页,载入
-     * 步骤由应用层做(与显隐回调同一条分工).
-     */
-    openProcess(request: ProcessRequest): void;
 }
 
 export class ObjectListController {
@@ -88,15 +77,8 @@ export class ObjectListController {
                 antiderivative: containers.antiderivative,
                 ode: containers.ode,
             },
-            {
-                toggleAnalysis: (name) => handlers.toggleAnalysis(name),
-                toggleIntegral: (name) => handlers.toggleIntegral(name),
-                toggleIntersection: (name) => handlers.toggleIntersection(name),
-                toggleSolve: (name) => handlers.toggleSolve(name),
-                toggleAntiderivative: (name) => handlers.toggleAntiderivative(name),
-                toggleOde: (name) => handlers.toggleOde(name),
-                openProcess: (request) => handlers.openProcess(request),
-            },
+            // 求值侧 7 条原样转交:接口关系已由 `extends` 说明,这里不再抄字段名.
+            handlers,
         );
     }
 

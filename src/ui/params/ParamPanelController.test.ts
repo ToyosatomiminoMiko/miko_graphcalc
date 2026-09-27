@@ -10,12 +10,12 @@
  *   走同一条 onChange 链路,且"已经在声明值上"时置灰;
  * - `<label for>` 指向滑块,数字框与重置按钮各有独立的可访问名.
  *
- * 用最小 DOM 桩(见 testing/domStub.ts),`input.value` 直接赋值模拟浏览器文本,
+ * 用最小 DOM 桩(库的 `miko_ui/testing`),`input.value` 直接赋值模拟浏览器文本,
  * `dispatch('input'/'change'/'click')` 模拟事件.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ParamDeclaration } from '@/contract/ir';
-import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type DomStub, type StubElement } from 'miko_ui/testing';
 import { ParamPanelController } from './ParamPanelController';
 
 const NUMERIC: ParamDeclaration = {

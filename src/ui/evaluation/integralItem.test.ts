@@ -6,7 +6,7 @@
  * 构造期的 `value` 会永远停在 `null`,过程页就会缺一个右端.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type StubElement } from 'miko_ui/testing';
 
 vi.mock('katex', () => ({
     default: {

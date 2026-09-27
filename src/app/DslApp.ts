@@ -35,7 +35,7 @@ import { ProcessPanel, formatProcessParamEcho } from '@/ui/process/ProcessPanel'
 import type { ProcessRequest } from '@/ui/evaluation/EvaluationItem';
 import { ExampleLoaderController } from '@/ui/examples/ExampleLoaderController';
 import { defaultExample, exampleSource, type ExampleEntry } from '@/ui/examples/exampleCatalog';
-import { replaceTextareaSource, seedTextareaSource } from '@/ui/examples/replaceEditorSource';
+import { replaceTextareaSource, seedTextareaSource } from 'miko_ui';
 import { createViewPanel, type ViewPanelHandle } from '@/ui/view/ViewPanel';
 import { createViewState, type ViewState } from '@/ui/view/viewState';
 

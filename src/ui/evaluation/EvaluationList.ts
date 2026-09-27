@@ -45,6 +45,11 @@ export interface EvaluationListContainers {
 /**
  * 行末显隐按钮的回调:请求方只报"用户点了哪一条",隐藏的语义
  * (不渲染 + 不参与计算)由应用层实现(切隐藏集合后按当前参数重新编译).
+ *
+ * 这里是**求值侧回调的唯一声明处**:`ObjectListController` 的
+ * `ObjectListHandlers` 在它之上只多一条 `toggleEntity`(实体在左栏,求值列表
+ * 不认识它).两份接口曾经各写一遍同样的 7 个字段,于是"新增一类求值对象"要
+ * 同步改两处,而且编译器不会提醒漏改 -- 现在只可能有一处.
  */
 export interface EvaluationListHandlers {
     toggleAnalysis(name: string): void;

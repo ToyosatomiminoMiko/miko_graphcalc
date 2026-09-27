@@ -1,5 +1,5 @@
 /**
- * 视图面板装配的结构契约与绑定行为(最小 DOM 桩,见 `test/domStub.ts`).
+ * 视图面板装配的结构契约与绑定行为(最小 DOM 桩:库的 `miko_ui/testing`).
  *
  * 两半:
  * 1. **样式契约**:`ViewPanel` 把原来 `index.html` 里的手写标记搬进了 TS,
@@ -13,7 +13,7 @@
  * `createViewState()`;配置错了会在这一层先暴露.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installDomStub, StubElement } from '@/testing/domStub';
+import { installDomStub, StubElement } from 'miko_ui/testing';
 import { RENDER_CONFIG } from '@/config/renderConfig';
 import { UI_CONFIG } from '@/config/uiConfig';
 import { createViewPanel, type ViewPanelHandle } from './ViewPanel';

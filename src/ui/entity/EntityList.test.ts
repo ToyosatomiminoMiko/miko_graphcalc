@@ -1,5 +1,5 @@
 /**
- * 实体列表(item/列表边界)单测(最小 DOM 桩,见 testing/domStub.ts).
+ * 实体列表(item/列表边界)单测(最小 DOM 桩:库的 `miko_ui/testing`).
  *
  * `ObjectListController.test.ts` 覆盖的是整个 footer 的输出;这里锁左栏自己的
  * 不变量,因为实体行结构已经从控制器搬进了 `EntityItem`/`EntityList`:
@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneObject } from '@/contract/ir';
-import { installDomStub, StubElement } from '@/testing/domStub';
+import { installDomStub, StubElement } from 'miko_ui/testing';
 
 vi.mock('katex', () => ({
     default: {

@@ -190,7 +190,16 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
 
 ### 拆不拆独立 repo(§8 P4 的最后一项:评估)
 
-**结论:P0–P4 之后"能不能拆"已经不是问题,"该不该现在拆"才是 -- 现在不拆.**
+> **⚠ 本节结论已被推翻(2026-09 后补注)**:当时的结论是"现在不拆",后来按下面的
+> 触发条件真的拆了 -- 库现在在独立 repo
+> [miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),本仓库通过 npm 的
+> `"miko_ui": "^0.1.2"` 消费它,`packages/miko_ui` 目录在本仓库**已不存在**.
+> 本节保留的是**当时的推理过程**(为什么"能拆"的证据成立),不是当前状态;
+> 本节里出现的 `packages/miko_ui` 与 `npm --workspace @miko/ui` 命令都已作废.
+> 当前的双仓形态见 README 的「本地联调 `miko_ui`」与 `.github/workflows/deploy.yml`
+> 的注释.
+
+**当时的结论:P0–P4 之后"能不能拆"已经不是问题,"该不该现在拆"才是 -- 现在不拆.**
 
 能拆的证据(全部可复核):
 
@@ -322,6 +331,13 @@ P2/P3 之后的总实测口径(复核命令即附录 A,另有 `npm run lint:ui-b
    (从 `src/testing/domStub.ts` 复制)与 `test/desktopFixture.ts`(窗口配置夹具,
    替掉 4 个 desktop 测试里的 `@/config/uiConfig`).分家期间两份桩同步维护,
    库独立成 repo 后各自演进.
+
+   > **⚠ 后补注**:这里预言的"各自演进"真的发生了,而且演进了两个方向 --
+   > 应用那份加了 `document.execCommand` 模拟,库那份加了 `navigator.clipboard`
+   > 模拟,两边都不知道对方缺什么.所以这条偏差最后**没有保留**,而是反向收口:
+   > 桩现在只有一份,在库仓库的 `src/testing/domStub.ts`,由
+   > `exports["./testing"]` 作为测试入口发布(`miko_ui/testing`),应用侧那份
+   > 955 行的复制品已删除.两份复制品一共漂移过一次,这就是不再复制它的理由.
 6. `editor/` 的注入点做成 `highlight(source) => html` 而不是计划里写的
    `tokenize(line, state) => Token[]`:库连"token 是什么"都不需要知道,应用侧
    `src/editor/dslHighlight.ts` 仍然是分词 + 转义 + span 一把做完.换语言只换
@@ -1113,7 +1129,14 @@ find src/ui/entity src/ui/evaluation src/ui/objects src/ui/params \
 
 ### B.2 "导入库就能声明式编排"落地时立刻会撞到的缺口
 
-今天库的控件词汇只有 **6 件**(`Button` / `Switch` / `Segmented` / `Slider` /
+> **⚠ 当前状态(2026-09 后补注)**:下表是写作当时(P4)的快照.之后库已落地
+> **`Menu`**(`createMenu`,含分组/当前项/`aria-expanded`/点外部关闭),
+> **`RangeInput`**,**`MenuItem`** 与 **`CodeEditor`** 组件;`keyedRowList` 也已
+> 进入公开面(`KeyedRowList` / `KeyedRowHandles` / `KeyedRowHooks`),不再是"内部引擎".
+> `TextField` / `Splitter` / `ScrollArea` / `Dialog`·`Toast` / `Tooltip` **仍未落地**.
+> 逐项现状以库仓库的 `src/index.ts` 为准.
+
+当时库的控件词汇只有 **6 件**(`Button` / `Switch` / `Segmented` / `Slider` /
 `NumberField` / `Popover`)加 5 个行级布局助手(`createControlGroup` /
 `createRow` / `createFieldLabel` / `createSwitchRow` / `createNumberRow` /
 `createInlineToggle`),**不足以覆盖今天页面上已有的东西**:

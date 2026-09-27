@@ -15,7 +15,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UI_CONFIG } from '@/config/uiConfig';
-import { installDomStub, type DomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type DomStub, type StubElement } from 'miko_ui/testing';
 import { ExampleLoaderController } from './ExampleLoaderController';
 import { allExamples } from './exampleCatalog';
 

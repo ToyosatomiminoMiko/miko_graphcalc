@@ -14,8 +14,8 @@ import { describe, expect, it } from 'vitest';
  * 3. 色板里没有**没人引用**的 token(库的 CSS + 应用的 CSS 一起算) -- 死 token
  *    会让下一个人以为改了它就能改样式.
  *
- * 库自己那半(字面量只有一处,别名指向真实 token)在
- * `miko_ui/src/theme/cssPalette.test.ts`.
+ * 库自己那半(字面量只有一处,别名指向真实 token)在**库仓库**的
+ * `src/theme/cssPalette.test.ts`(那是库自己的源码路径,不是包路径,不能 import).
  */
 
 /** 应用自己的样式表(库的不在此列). */

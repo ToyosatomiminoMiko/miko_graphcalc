@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { buildAppViews } from '@/app/appViews';
-import { installDomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type StubElement } from 'miko_ui/testing';
 
 /**
  * 编辑区样式的**文件归属**契约.

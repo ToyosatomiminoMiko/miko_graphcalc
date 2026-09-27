@@ -34,9 +34,9 @@
  * 生成函数决定(`dsl/evaluationLatex.ts`).
  *
  * 本文件是求值 item 子类共用的组装件:谁长什么样由各子类的构造函数决定
- * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素走
- * `miko_ui/src/widgets/dom.ts` 的 `create_element`,显隐按钮与行外壳这类两栏
- * 通用件在 `miko_ui/src/shared/rowDom.ts`.
+ * (`analysisItem.ts` / `integralItem.ts` / `intersectionItem.ts`);建元素走库
+ * 公开面的 `create_element`,显隐按钮与行外壳这类两栏通用件走库公开面的
+ * `createObjectRow` / `createRowActions` / `createVisibilityButton`.
  */
 import { createObjectRow } from 'miko_ui';
 import { createButton } from 'miko_ui';

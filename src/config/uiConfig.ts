@@ -2,16 +2,18 @@
  * 界面样式默认值.
  *
  * 与 `numericConfig` / `renderConfig` 同一约定:这里只放纯数据,不含 DOM
- * 或渲染逻辑.真正落到页面的是 `miko_ui/src/theme/applyUiConfig.ts`,它把这些值写成
- * `:root` 上的 CSS 变量,再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
+ * 或渲染逻辑.真正落到页面的是**应用侧** `src/app/applyUiConfig.ts`:它把这份
+ * 配置翻成 token 表,交给库公开面的 `applyTheme()` 写成 `:root` 上的 CSS 变量,
+ * 再由 `css/editor.css` 与 `css/panels.css` 里的 `var()` 消费.
  *
  * 例外:`panel` 里的拖拽夹取范围与整个 `view` 段落**只有 TS 消费**,CSS 没有
  * 同名变量,所以不进 `applyUiConfig` 的映射表(见各自的注释);它们放在这里的
  * 理由是"界面默认值"这一条,而不是"要变成 CSS 变量".
  *
  * 生效方式:改这里 -> 刷新页面(vite 开发态自动重建).
- * `css/base.css` 的 `:root` 里有同名变量的兜底值,必须与本文件保持一致:
- * 兜底只负责脚本执行前的首帧,正常路径一定会被 applyUiConfig 覆盖.
+ * 默认值只有**一处**真相:库的 `styles/tokens.css` 的 `:root`(C2).`css/base.css`
+ * 里没有同名变量的第二份副本,本文件只在**需要覆盖**时才被 `applyUiConfig()`
+ * 写到 `:root` 上.
  */
 import type {
     AxisSpec,
@@ -31,7 +33,7 @@ export type WindowId = 'source' | 'view' | 'params' | 'process' | 'entities' | '
 /**
  * 标题栏采用节点的名字.
  *
- * 与 `WindowChrome` 的字段名一一对应(见 miko_ui/src/desktop/windowChrome.ts):
+ * 与 `WindowChrome` 的字段名一一对应(见应用侧 `src/app/windowChrome.ts`):
  * 那边把它当 `Record<ChromeNodeId, HTMLElement>` 的键,所以这里少写一个名字
  * 或多写一个都会编译不过,不存在"配置里有,代码里没有"的漂移.
  *

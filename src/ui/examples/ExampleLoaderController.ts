@@ -54,7 +54,7 @@ export class ExampleLoaderController {
         private readonly onSelect: (entry: ExampleEntry) => void,
     ) {
         if (!elements.button || !elements.menu) {
-            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 miko_ui/src/desktop/windowChrome.ts)');
+            throw new Error('ExampleLoaderController 缺少示例按钮或浮层节点(见 src/app/windowChrome.ts 的 createWindowChrome)');
         }
 
         this.menu = createMenu({

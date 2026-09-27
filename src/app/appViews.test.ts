@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { mountDesktop } from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
-import { installDomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type StubElement } from 'miko_ui/testing';
 import { buildAppViews, type AppViews } from './appViews';
 
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');

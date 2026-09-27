@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPopover, windowSlotsProvider } from 'miko_ui';
 import { UI_CONFIG } from '@/config/uiConfig';
-import { installDomStub, type StubElement } from '@/testing/domStub';
+import { installDomStub, type StubElement } from 'miko_ui/testing';
 import { createWindowChrome } from './windowChrome';
 
 beforeEach(() => {
