@@ -113,6 +113,18 @@ describe('buildAppViews', () => {
         expect(views.windowContent('nope')).toEqual({ slots: {}, body: [] });
     });
 
+    it('六个窗口的正文都是 div(窗口平等,不分 header/footer/aside/section)', () => {
+        const { views } = build();
+
+        for (const spec of UI_CONFIG.window.windows) {
+            const [body] = views.windowContent(spec.id).body ?? [];
+            // 正文根一律 `div`:有一个窗口是 `footer`/`aside`/`section`,DOM 就先
+            // 替窗口排了座次 -- 语义由库的 `.window`(`role="region"`)给一次.
+            // 桩的 `tagName` 是小写(与 ViewPanel.test.ts 同一口径).
+            expect((body as unknown as StubElement | undefined)?.tagName, spec.id).toBe('div');
+        }
+    });
+
     it('标题栏五个节点按 adopted 表落进各自的窗口', () => {
         const { views } = build();
 

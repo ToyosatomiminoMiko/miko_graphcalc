@@ -1,8 +1,8 @@
 /**
  * 实体列表(item/列表边界)单测(最小 DOM 桩:库的 `miko_ui/testing`).
  *
- * `ObjectListController.test.ts` 覆盖的是整个 footer 的输出;这里锁左栏自己的
- * 不变量,因为实体行结构已经从控制器搬进了 `EntityItem`/`EntityList`:
+ * `ObjectListController.test.ts` 覆盖的是整个对象列表装配的输出;这里锁实体列表
+ * 自己的不变量,因为实体行结构已经从控制器搬进了 `EntityItem`/`EntityList`:
  * 1. 内容键不变 -> **整行复用**(同一个 DOM 节点:KaTeX 不重排,文本选择不丢);
  * 2. 内容键变了 -> 重建行,同名旧行不残留;
  * 3. 行末显隐按钮把 `toggleEntity(id)` 回调出去;

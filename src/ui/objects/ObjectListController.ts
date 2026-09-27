@@ -1,10 +1,10 @@
 /**
- * footer 对象列表的装配入口:左栏实体列表 + 右栏求值列表.
+ * 对象列表的装配入口:实体对象窗口一栏 + 求值对象窗口一栏.
  *
  * 本体只有装配与转发,两栏各自的类负责其余的事:
- * - {@link EntityList}(`ui/entity/EntityList.ts`):左栏,行结构在
+ * - {@link EntityList}(`ui/entity/EntityList.ts`):实体窗口,行结构在
  *   `ui/entity/EntityItem.ts`;
- * - {@link EvaluationList}(`ui/evaluation/EvaluationList.ts`):右栏,分析/积分/求交/求解/
+ * - {@link EvaluationList}(`ui/evaluation/EvaluationList.ts`):求值窗口,分析/积分/求交/求解/
  *   原函数/微分方程子列表,行结构在 `ui/evaluation/*Item.ts`.
  *
  * 控制器对外的面孔保持不变(渲染层只认 `renderScene` 与四个异步回填入口),
@@ -23,9 +23,9 @@ import { EntityList } from '@/ui/entity/EntityList';
 import { EvaluationList, type EvaluationListHandlers } from '@/ui/evaluation/EvaluationList';
 
 /**
- * footer 的列表容器:左栏实体 1 个 + 右栏求值 4 个子列表.
+ * 对象列表容器:实体 1 个 + 求值 6 个子列表.
  *
- * 用具名对象而不是四个同类型的 `HTMLElement` 位置参数:位置参数交换任意两个
+ * 用具名对象而不是一长串同类型的 `HTMLElement` 位置参数:位置参数交换任意两个
  * 都能通过类型检查,只会把求值条目渲染进错误的容器(见 UI-P3.9).
  */
 export interface ObjectListContainers {

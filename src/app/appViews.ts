@@ -10,6 +10,13 @@
  * 节点一律用库的 `create_element()` 建,类名与 id 与旧 HTML **逐字一致**:CSS 还是那一份
  * (`css/*.css`),这一步不动样式(去 id 化是 P4/D8).
  *
+ * **窗口正文一律 `div`**:六个窗口是彼此的**平等**存在,谁也不是谁的
+ * `header` / `footer` / `aside` / `section`.正文容器若按语义标签分档,DOM 就先替
+ * 窗口排了座次("底栏""次要栏"),结构查询与读屏也会把这层不存在的关系读进去.
+ * 窗口的语义只由库的 `.window` 给一次(`role="region"` + `aria-labelledby`),
+ * 正文只是几何宿主,所以 `aside` / `section` / `footer` 全部收成 `div`;
+ * `id` / `class` 逐字不动,CSS 与测试的选择器都不受影响.
+ *
  * 建好的节点不只是"塞进去":`DslApp` 还要拿它们的句柄(编辑器,参数面板...)去
  * 装配各控制器,所以这里返回一张**具名引用表**,而不是只返回根节点.
  */
@@ -76,9 +83,9 @@ function buildSourceWindow(doc: Document): {
     // 源码区也会滚动:textarea 挂库的滚动条类,与其余滚动容器同一种外观.
     // 编辑器外壳本身不认这条规定(结构与滚动条分开),所以由消费者在这里挂.
     code.textarea.classList.add('ui-scrollbar');
-    const panel = create_element({ tag: 'section', root: doc }, { id: 'editor-panel' }, code.element);
+    const panel = create_element({ tag: 'div', root: doc }, { id: 'editor-panel' }, code.element);
     // 旧 `#left-panel` 只有 `.panel` 这一条样式(id 选择器里没有它,见计划附录 C6).
-    const body = create_element({ tag: 'aside', root: doc }, { class: 'panel' }, panel);
+    const body = create_element({ tag: 'div', root: doc }, { class: 'panel' }, panel);
 
     return {
         body,
@@ -96,7 +103,7 @@ function buildParamsWindow(doc: Document): {
     paramsPanel: HTMLElement;
     diagnostics: HTMLElement;
 } {
-    const paramsPanel = create_element({ tag: 'section', root: doc }, {
+    const paramsPanel = create_element({ tag: 'div', root: doc }, {
         class: 'ui-scrollbar',
         id: 'params-panel'
     });
@@ -104,7 +111,7 @@ function buildParamsWindow(doc: Document): {
     // **条目**的外观(`.diagnostic*`,随库的 `styles/feedback.css` 走),列表摆在哪,
     // 占多高,能不能滚是消费者的容器.写成应用自有的类,应用规则才符合
     // "不给库的类定样式"那条契约(见 src/config/styleLayers.test.ts).
-    const diagnostics = create_element({ tag: 'section', root: doc }, {
+    const diagnostics = create_element({ tag: 'div', root: doc }, {
         class: 'diagnostic-list ui-scrollbar',
         id: 'diagnostics',
         'aria-live': 'polite'
@@ -115,7 +122,7 @@ function buildParamsWindow(doc: Document): {
 
 /** 过程窗口正文:通高的递等式视图. */
 function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: HTMLElement } {
-    const processPanel = create_element({ tag: 'section', root: doc }, {
+    const processPanel = create_element({ tag: 'div', root: doc }, {
         class: 'process-panel',
         id: 'process-panel'
     });
@@ -136,8 +143,8 @@ function buildEntitiesWindow(doc: Document): {
         class: 'object-list-body ui-scrollbar',
         id: 'entity-object-list'
     });
-    const body = create_element({ tag: 'footer', root: doc }, { class: 'panel object-panel-column' },
-        create_element({ tag: 'section', root: doc }, { id: 'object-panel' },
+    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel-column' },
+        create_element({ tag: 'div', root: doc }, { id: 'object-panel' },
             create_element({ tag: 'div', root: doc }, { class: 'object-list-column' }, entity)));
     return { body, entity };
 }
@@ -159,8 +166,8 @@ function buildEvaluationsWindow(doc: Document): {
         ode: list('ode-object-list', 'object-sublist'),
     };
 
-    const body = create_element({ tag: 'footer', root: doc }, { class: 'panel object-panel-column' },
-        create_element({ tag: 'section', root: doc }, { id: 'object-panel' },
+    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel-column' },
+        create_element({ tag: 'div', root: doc }, { id: 'object-panel' },
             create_element({ tag: 'div', root: doc }, { class: 'object-list-column' },
                 create_element({ tag: 'div', root: doc }, {
                     class: 'object-list-body ui-scrollbar',
@@ -185,7 +192,7 @@ export function buildAppViews(root: HTMLElement): AppViews {
     const viewport = create_element({ tag: 'div', root: doc }, { id: 'viewport' });
     const source = buildSourceWindow(doc);
     // 视图窗口正文:`ui-scrollbar` 是库的滚动条类(见 css/panels.css 的说明).
-    const viewControls = create_element({ tag: 'section', root: doc }, {
+    const viewControls = create_element({ tag: 'div', root: doc }, {
         class: 'ui-scrollbar',
         id: 'view-controls'
     });
