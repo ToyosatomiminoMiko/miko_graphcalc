@@ -6,7 +6,7 @@
  * ```text
  * <article class="object-row entity-row" role="listitem">
  *   <div class="row-main">                                  ← ┐ 主内容
- *     <span class="kind-badge kind-curve">曲线</span>        │ 第一行:
+ *     <span class="ui-badge kind-curve">曲线</span>        │ 第一行:
  *     <span class="object-color">                           │ 身份 + 名字
  *       <span class="object-color-swatch"></span>            │
  *       <code class="object-color-code">#6dd5ff</code>      │
@@ -38,7 +38,7 @@
  * 还是重建--颜色已经画在行上,所以它必须进键,否则改颜色不会刷新.
  */
 import type { SceneObject } from '@/contract/ir';
-import { createFormulaElement } from 'miko_ui';
+import { createBadge, createFormulaElement } from 'miko_ui';
 import { createObjectRow, createRowActions, createVisibilityButton } from 'miko_ui';
 import { create_element } from 'miko_ui';
 import { sceneObjectExpression, sceneObjectKindLabel } from '@/adapters/entityText';
@@ -52,9 +52,10 @@ export class EntityItem {
         formula: string | null,
         onToggle: () => void,
     ) {
-        const badge = create_element({ tag: 'span' }, {
-            class: `kind-badge kind-${object.kind}`,
-        }, sceneObjectKindLabel(object));
+        // 徽章基线(`.ui-badge`)归库,这里只给"哪一类"这个领域变体类.
+        const badge = createBadge(sceneObjectKindLabel(object), {
+            class: `kind-${object.kind}`,
+        });
 
         // 颜色定义:紧跟在类型徽章后面,同一行给"色块 + 明文值".只画色块等于
         // 只靠颜色传达信息(色觉/低对比度用户读不到),所以定义值也写出来;

@@ -39,6 +39,7 @@
  * `createObjectRow` / `createRowActions` / `createVisibilityButton`.
  */
 import { createObjectRow } from 'miko_ui';
+import { createBadge } from 'miko_ui';
 import { createButton } from 'miko_ui';
 import { create_element } from 'miko_ui';
 import { createFormulaElement } from 'miko_ui';
@@ -112,7 +113,7 @@ export function createDetailSections(
  * 摘要行(折叠态可见):彩色类型标签 + 变量名 + 一行公式.
  *
  * 三项各司其职,不再放宽:
- * - `kind-badge`:彩色标签给出"这是哪一类求值对象"(梯度/散度/旋度/积分/求交),
+ * - `ui-badge`:彩色标签给出"这是哪一类求值对象"(梯度/散度/旋度/积分/求交),
  *   配色沿用左栏实体徽章的同一套视觉语言;
  * - `object-name`:DSL 里声明的变量名(如 `g`,`I`,`X`),同名多条时靠它区分;
  * - 公式:该条目的算子形式,`copyable = false`--摘要行是 `<details>` 的原生
@@ -132,7 +133,7 @@ export function createEvaluationSummary(
     const summary = document.createElement('summary');
     summary.className = 'eval-summary';
     summary.append(
-        create_element({ tag: 'span' }, { class: `kind-badge ${spec.badgeClass}` }, spec.badgeLabel),
+        createBadge(spec.badgeLabel, { class: spec.badgeClass }),
         create_element({ tag: 'strong' }, { class: 'object-name' }, name),
         formula,
     );

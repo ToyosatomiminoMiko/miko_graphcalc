@@ -246,18 +246,15 @@
    这里原本把基线的 9 条声明 + 3 条状态逐字抄了一遍,已删:抄一遍不会改变外观,
    只会让"改样式该改哪里"变成两个地方(理由见 src/config/styleLayers.test.ts). */
 
-.kind-badge {
-    flex: 0 0 auto;
-    min-width: 40px;
-    padding: 2px 6px;
-    border-radius: var(--radius-pill);
-    font-size: 10px;
-    text-align: center;
-    color: var(--color-badge-ink);
-    background: var(--color-neutral);
-}
+/* 徽章(`.ui-badge`):基线归库(见 `miko_ui/styles/widgets.css` 的"徽章"一节).
+   这里原本把基线的 8 条声明抄了一遍,已删:那 8 条的值全部出自库的 token
+   (`--radius-pill` / `--color-badge-ink` / `--color-neutral`),应用抄一遍只会让
+   "改样式该改哪里"变成两个地方.
+   应用只保留**领域配色**:下面的 `.kind-*` 变体类(哪一类对象是什么颜色),
+   它们叠在库的基线后面,且因为基线是零优先级的 `:where(...)`,这里只写
+   `background` 就足够盖住它,不必比优先级. */
 
-/* 实体颜色定义:紧跟在 .kind-badge 后面,同一行的"色块 + 明文值"
+/* 实体颜色定义:紧跟在徽章后面,同一行的"色块 + 明文值"
    (见 entity/EntityItem).上下各留 2px,与徽章的盒高对齐;明文值让颜色不只是
    颜色(色觉/低对比度用户也能读到定义). */
 .object-color {

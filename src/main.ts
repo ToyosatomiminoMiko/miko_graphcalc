@@ -28,10 +28,15 @@ import '../css/process.css';
 import { DslApp } from './app/DslApp';
 import { buildAppViews } from './app/appViews';
 import { applyUiConfig } from './app/applyUiConfig';
+import { applyKindPalette } from './app/applyKindPalette';
 
-// 先把 UI_CONFIG 落成 :root 上的 CSS 变量,再构造 DslApp:
-// EditorLineNumbers 构造时会按最终字体度量行号槽宽,晚一步就会量到兜底字体.
+// 先把两套应用色板落成 :root 上的 CSS 变量,再构造 DslApp:
+// - `UI_CONFIG` -> 字号/几何:EditorLineNumbers 构造时会按最终字体度量行号槽宽,
+//   晚一步就会量到兜底字体;
+// - 领域图例注册表(`src/config/kindPalette.ts`)-> `--kind-*`:晚一步徽章就没有
+//   底色.应用的内容节点全部由 JS 建,所以这两步只要在这里做完,首帧就是对的.
 applyUiConfig();
+applyKindPalette();
 
 /**
  * 模块级唯一实例.

@@ -6,10 +6,14 @@
  *   2. 建立页面背景/文字颜色与字体;
  *   3. 应用根节点与 3D 视口的铺满方式.
  *
- * 设计 token(色板 / 圆角 / 代码字体 / 面板下限 / 窗口外壳常量)不在这里:
- * 它们已经随 UI 库走(`miko_ui/styles/tokens.css`),由 `src/main.ts` 在样式
- * 入口处最先加载.颜色/圆角的"唯一真相源"因此在那份文件里,由库自己的
- * `cssPalette.test.ts` 断言.
+ * 两套色板都不在这里:
+ * - **通用设计 token**(背景/文字/描边/状态色/圆角/代码字体/面板下限/窗口外壳
+ *   常量)随 UI 库走(`miko_ui/styles/tokens.css`),由 `src/main.ts` 在样式入口
+ *   处最先加载,由库自己的 `cssPalette.test.ts` 断言;
+ * - **领域类型图例**(`--kind-*`:曲线/球体/区域...各是什么色)是应用的**领域数据**,
+ *   注册在 TS 里(`src/config/kindPalette.ts`),由 `src/app/applyKindPalette.ts`
+ *   写成 `:root` 变量 -- 与 `UI_CONFIG` -> `applyUiConfig()` 同一条机制.
+ *   本文件因此**一个颜色字面量都没有**,由 `src/config/cssPalette.test.ts` 守.
  *
  * 应用里那两个"脚本执行前"的兜底副本也随之消失:token 层就是默认值,
  * `applyUiConfig()` 只在需要覆盖时把 UI_CONFIG 的值写到 :root 上(C2).

@@ -149,6 +149,16 @@ source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
 样式表(控件 `widgets.css`,桌面窗口系统 `desktop.css`,编辑器外壳
 `editor.css`,反馈条目 `feedback.css`)的 `var()` 消费.
 
+**领域类型图例(`--kind-*`:曲线/球体/区域...各是什么色)走同一条机制,但真相源
+是一张 TS 注册表**:`src/config/kindPalette.ts` 的键取自领域
+(`SceneObject['kind']` 与分析的 op),由 `src/app/applyKindPalette.ts` 写成
+`:root` 变量,与 `applyUiConfig()` 一起在 `new DslApp()` 之前调用.放 TS 而不写成
+CSS 变量的理由是**缺一项要能被机器拦住**:`css/*.css` 里每个 `var(--kind-*)` 与
+注册表的键必须**互相覆盖**(两个方向都查,见 `src/config/cssPalette.test.ts`),
+所以"新增一类对象却忘了配色"的表现是测试红,而不是徽章悄悄没有底色.应用的样式表
+里因此**一个颜色字面量都没有**.这套图例归应用而不是库:库是通用的,不认识"旋转体"
+这类概念(`--kind-*` 曾经借住在库的 `styles/tokens.css` 里,已收回).
+
 **样式表按两层加载,顺序即层叠顺序**(入口在 `src/main.ts`):
 
 1. **库层**:`import 'miko_ui/styles.css'` 一行拿到库的全部默认样式,内部顺序

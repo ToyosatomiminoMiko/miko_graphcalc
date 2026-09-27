@@ -204,8 +204,8 @@ describe('求值条目的折叠结构', () => {
         expect(summary.querySelectorAll<StubElement>('.row-visibility-btn')).toHaveLength(0);
 
         // 彩色类型标签 + 变量名回来了.
-        const badge = summary.querySelector<StubElement>('.kind-badge')!;
-        expect(badge.className).toBe('kind-badge kind-analysis kind-analysis-gradient');
+        const badge = summary.querySelector<StubElement>('.ui-badge')!;
+        expect(badge.className).toBe('ui-badge kind-analysis kind-analysis-gradient');
         expect(badge.textContent).toBe('梯度');
         expect(summary.querySelector<StubElement>('.object-name')!.textContent).toBe('g');
 
@@ -221,8 +221,8 @@ describe('求值条目的折叠结构', () => {
             analyses: [{ ...analysis, op: 'laplacian', symbolic: '\\nabla^2 f=2+2' }],
         });
 
-        const badge = analysisList.querySelector<StubElement>('.kind-badge')!;
-        expect(badge.className).toBe('kind-badge kind-analysis kind-analysis-laplacian');
+        const badge = analysisList.querySelector<StubElement>('.ui-badge')!;
+        expect(badge.className).toBe('ui-badge kind-analysis kind-analysis-laplacian');
         expect(badge.textContent).toBe('拉普拉斯');
     });
 
@@ -730,8 +730,8 @@ describe('方程求解条目', () => {
         controller.renderScene({ ...scene, solves: [solve] } as SceneIR);
 
         const row = solveList.querySelector<StubElement>('.evaluation-row')!;
-        const badge = row.querySelector<StubElement>('.kind-badge')!;
-        expect(badge.className).toBe('kind-badge kind-solve');
+        const badge = row.querySelector<StubElement>('.ui-badge')!;
+        expect(badge.className).toBe('ui-badge kind-solve');
         expect(badge.textContent).toBe('求解');
         expect(row.querySelector<StubElement>('.object-name')!.textContent).toBe('S');
         expect(row.querySelector<StubElement>('.eval-summary-formula')!.textContent)
@@ -843,8 +843,8 @@ describe('微分方程条目', () => {
         controller.renderScene({ ...scene, odes: [ode] } as SceneIR);
 
         const row = odeList.querySelector<StubElement>('.evaluation-row')!;
-        const badge = row.querySelector<StubElement>('.kind-badge')!;
-        expect(badge.className).toBe('kind-badge kind-ode');
+        const badge = row.querySelector<StubElement>('.ui-badge')!;
+        expect(badge.className).toBe('ui-badge kind-ode');
         expect(badge.textContent).toBe('微分方程');
         expect(row.querySelector<StubElement>('.object-name')!.textContent).toBe('O1');
         expect(row.querySelector<StubElement>('.eval-summary-formula')!.textContent)

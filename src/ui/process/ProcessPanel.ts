@@ -17,6 +17,7 @@ import { UI_CONFIG } from '@/config/uiConfig';
 import { createFormulaElement } from 'miko_ui';
 import { KeyedRowList, type KeyedRowHandles } from 'miko_ui';
 import { create_element } from 'miko_ui';
+import { createBadge } from 'miko_ui';
 import {
     PROCESS_STEP_KIND_LABELS,
     partitionStepsByKind,
@@ -154,9 +155,7 @@ export class ProcessPanel {
             'process-step-formula ui-scrollbar',
             false,
         );
-        const reason = create_element({ tag: 'span' }, {
-            class: 'kind-badge process-step-reason',
-        }, entry.step.reason);
+        const reason = createBadge(entry.step.reason, { class: 'process-step-reason' });
         // kind 决定徽章配色(样式归 CSS),title 给出分区的中性名字.
         reason.dataset.kind = entry.step.kind;
         reason.title = PROCESS_STEP_KIND_LABELS[entry.step.kind];

@@ -131,7 +131,7 @@ describe('实体列表:行缓存 / 顺序 / 显隐回调', () => {
 
         const row = container.querySelector<StubElement>('.entity-row')!;
         const main = row.querySelector<StubElement>('.row-main')!;
-        const badge = row.querySelector<StubElement>('.kind-badge')!;
+        const badge = row.querySelector<StubElement>('.ui-badge')!;
         const color = row.querySelector<StubElement>('.object-color')!;
 
         // 与徽章同为主内容的直接子节点(不在名称行里),且紧跟徽章之后.
