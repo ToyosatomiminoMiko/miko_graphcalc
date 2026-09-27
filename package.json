@@ -7,7 +7,7 @@
   "dependencies": {
     "@preact/signals-core": "^1.14.4",
     "katex": "^0.18.5",
-    "miko_ui": "^0.1.2",
+    "miko_ui": "^0.1.5",
     "three": "^0.185.1"
   },
   "devDependencies": {
