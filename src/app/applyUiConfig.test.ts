@@ -140,7 +140,7 @@ describe('applyUiConfig', () => {
 });
 
 describe('token 层的默认值(P4/D8 之后在库里)', () => {
-    it('每个默认值都与 UI_CONFIG 映射出的值逐字一致', () => {
+    it('库读的变量由库的 token 层给默认值,应用域名令牌库不给', () => {
         // 默认值层随库走(miko_ui/styles/tokens.css):它就是"脚本执行前的首帧".
         // 值不一致就会闪一下旧字号/旧面板宽度,所以两边必须逐字相同.
         // 这条断言也覆盖"新加变量忘了写默认值":漏掉时 toMatchObject 直接失败.
@@ -150,7 +150,26 @@ describe('token 层的默认值(P4/D8 之后在库里)', () => {
         );
         const fallbacks = readRootCssVariables(css);
 
-        expect(fallbacks).toMatchObject(uiConfigCssVariables());
+        // 例外只有两个,判据写死在库的 `tokens.css` 文件头里:**库的样式表里没有
+        // `var()` 读它,就不该由库给一份带应用名的默认值**.这两个下限只被应用的
+        // `css/panels.css` 消费,首帧也不需要兜底(窗口是 JS 建的,脚本跑之前窗口
+        // 层是空的),运行期由 applyUiConfig() 按 UI_CONFIG 写进 `:root`.
+        const APP_OWNED_FALLBACKS = [
+            '--params-panel-min-height',
+            '--view-controls-min-height',
+        ] as const;
+        const libraryOwned = Object.fromEntries(
+            Object.entries(uiConfigCssVariables()).filter(
+                ([name]) => !APP_OWNED_FALLBACKS.includes(
+                    name as (typeof APP_OWNED_FALLBACKS)[number],
+                ),
+            ),
+        );
+
+        expect(fallbacks).toMatchObject(libraryOwned);
+        for (const name of APP_OWNED_FALLBACKS) {
+            expect(fallbacks[name], `${name} 不该出现在库的 token 层`).toBeUndefined();
+        }
     });
 
     it('#app 上不再有面板几何的派生变量(几何归窗口系统)', () => {

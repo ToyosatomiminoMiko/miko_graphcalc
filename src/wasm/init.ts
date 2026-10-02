@@ -17,6 +17,7 @@ let wasmReady: Promise<void> | null = null;
 /**
  * @cache_access
  * 主线程共享的 WASM 初始化入口,保证 parser 和 compiler 不会重复初始化.
+ * ensure wasm ready 确保 WASM 就绪
  */
 export function ensureWasmReady(): Promise<void> {
     if (!wasmReady) {

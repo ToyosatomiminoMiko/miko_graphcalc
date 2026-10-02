@@ -103,15 +103,16 @@ GraphCalc 的当前入口是 `index.html`,它加载 `src/main.ts`,再由
 
 ## 桌面窗口化
 
-界面形态是"**3D 视口铺满 + 六个浮动窗口 + 顶部任务栏**":`#viewport`(Three.js
-画布)仍然铺满 `#app`,六个窗口悬在它上面,桌面空白处照常可以转视角.任务栏是
+界面形态是"**3D 视口铺满 + 七个浮动窗口 + 顶部任务栏**":`#viewport`(Three.js
+画布)仍然铺满 `#app`,七个窗口悬在它上面,桌面空白处照常可以转视角.任务栏是
 紧贴 `#app` 上沿的一条通栏带,窗口几何被夹在它下面,所以它不会被任何窗口遮住.
 
 ```text
 任务栏(顶部通栏):窗口按钮 ... 全部还原
 
-source code(源码)  参数(参数滑块 + 诊断)  视图(视图控件)
-过程(递等式)        实体对象(实体一栏)       求值对象(六个求值子列表)
+source code(源码)  参数(参数滑块)   视图(视图控件)
+过程(递等式)        诊断(报错 / 警告) 实体对象(实体一栏)
+求值对象(六个求值子列表)
 ```
 
 - 窗口外壳(`.window` / 标题栏 / 正文 / 八根缩放手柄)与任务栏**由库声明式装配**
@@ -194,7 +195,7 @@ CSS 变量的理由是**缺一项要能被机器拦住**:`css/*.css` 里每个 `
   单位 em,基准是 `.object-expr` 的 16px;
 - `UI_CONFIG.panel`:只剩参数区与视图控件的**内容下限**
   (`paramsMinHeight` / `viewControlsMinHeight`),由 CSS 消费;
-- `UI_CONFIG.window`:桌面窗口化的全部几何与常量--六个窗口的标题/Dock 文案/
+- `UI_CONFIG.window`:桌面窗口化的全部几何与常量--七个窗口的标题/Dock 文案/
   默认几何锚点/最小尺寸,标题栏按钮清单(只有最小化与最大化),
   `edgeKeep`/`edgeGap`/`headerMinVisible`/`dockReserve`/`headerHeight`,
   三层容器的 `z-index` 与吸附阈值.**窗口几何不进 CSS**(窗口是 JS 建的,
@@ -516,7 +517,7 @@ src/testing/        测试基建(domStub / setupWasm / matrixOps),不被生产�
 `src/ui/` 里**没有样式**:控件词表(token / 开关 / 滑块 / 数字框 / 按钮 /
 浮层 / 行原语)在库 `miko_ui` 的 `widgets/` 与 `shared/`,主题与默认外观在
 库的 `styles/`,桌面窗口系统在库的 `desktop/`,编辑器外壳在库的 `editor/`,
-反馈条目与公式排版在库的 `feedback/` / `formula/`.应用侧只保留
+反馈件(消息区容器与诊断条目)与公式排版在库的 `feedback/` / `formula/`.应用侧只保留
 应用自有的类名(对象行/求值行/过程步骤/面板容器)与其布局,见
 [界面样式配置](#界面样式配置).
 

@@ -10,7 +10,7 @@
  * 节点一律用库的 `create_element()` 建,类名与 id 与旧 HTML **逐字一致**:CSS 还是那一份
  * (`css/*.css`),这一步不动样式(去 id 化是 P4/D8).
  *
- * **窗口正文一律 `div`**:六个窗口是彼此的**平等**存在,谁也不是谁的
+ * **窗口正文一律 `div`**:七个窗口是彼此的**平等**存在,谁也不是谁的
  * `header` / `footer` / `aside` / `section`.正文容器若按语义标签分档,DOM 就先替
  * 窗口排了座次("底栏""次要栏"),结构查询与读屏也会把这层不存在的关系读进去.
  * 窗口的语义只由库的 `.window` 给一次(`role="region"` + `aria-labelledby`),
@@ -22,9 +22,11 @@
  */
 import {
     createCodeEditor,
+    createMessageArea,
     create_element,
     windowSlotsProvider,
     type Child,
+    type MessageAreaHandle,
     type WindowContentSpec,
 } from 'miko_ui';
 import { UI_CONFIG, type WindowId } from '@/config/uiConfig';
@@ -50,9 +52,10 @@ export interface AppViews {
     readonly editorHighlightCode: HTMLElement;
     /** 视图窗口的正文(视图控件容器). */
     readonly viewControls: HTMLElement;
-    /** 参数窗口里的两块内容. */
+    /** 参数窗口的正文(参数列表容器). */
     readonly paramsPanel: HTMLElement;
-    readonly diagnostics: HTMLElement;
+    /** 诊断窗口的正文:库建的消息区容器 + 它的条目接口(`MessageList`). */
+    readonly diagnostics: MessageAreaHandle;
     /** 过程窗口的正文容器. */
     readonly processPanel: HTMLElement;
     /** 两个对象窗口里的列表容器:`entity` 在实体窗口,其余六个在求值窗口. */
@@ -97,27 +100,44 @@ function buildSourceWindow(doc: Document): {
     };
 }
 
-/** 参数窗口正文:参数列表 + 诊断区(诊断不是视图控件,留在同一个窗口). */
+/** 参数窗口正文:只有参数列表(诊断已经独立成窗,见 `buildDiagnosticsWindow`). */
 function buildParamsWindow(doc: Document): {
     body: HTMLElement;
     paramsPanel: HTMLElement;
-    diagnostics: HTMLElement;
 } {
     const paramsPanel = create_element({ tag: 'div', root: doc }, {
         class: 'ui-scrollbar',
         id: 'params-panel'
     });
-    // 容器的排版用应用自己的类名 `.diagnostic-list`:库的 `MessageList` 只管
-    // **条目**的外观(`.diagnostic*`,随库的 `styles/feedback.css` 走),列表摆在哪,
-    // 占多高,能不能滚是消费者的容器.写成应用自有的类,应用规则才符合
-    // "不给库的类定样式"那条契约(见 src/config/styleLayers.test.ts).
-    const diagnostics = create_element({ tag: 'div', root: doc }, {
-        class: 'diagnostic-list ui-scrollbar',
-        id: 'diagnostics',
-        'aria-live': 'polite'
-    });
-    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, paramsPanel, diagnostics);
-    return { body, paramsPanel, diagnostics };
+    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, paramsPanel);
+    return { body, paramsPanel };
+}
+
+/**
+ * 诊断窗口正文:库的消息区(容器 + 条目) + 应用的一层宿主体.
+ *
+ * 容器(框体 / 列表节奏 / 滚动 / `aria-live`)现在由库的 `createMessageArea()`
+ * 建:过去容器归应用,条目归库,同一个提示区有两处维护,而容器上那条
+ * `aria-live` 漏了就直接废掉库的"内容一致时零 DOM 操作"(读屏每帧重放).
+ *
+ * 这里只剩两件**应用**的事:
+ * - `#diagnostics-panel` 是宿主,给消息区留一圈内边距(窗口正文本身没有 padding);
+ * - `ui-scrollbar` 由消费者挂:滚动条是库的一条**独立规定**,组件与它互不认识
+ *   (见库的 `styles/scrollbar.css`),要不要用由这里决定.
+ *
+ * 字体与字号不给库的类写规则:`#diagnostics-panel` 上的排版由 `.message-area`
+ * 里的文本继承(--code-font-family 与字号都写在 `css/panels.css` 的应用规则里).
+ */
+function buildDiagnosticsWindow(doc: Document): {
+    body: HTMLElement;
+    diagnostics: MessageAreaHandle;
+} {
+    const messageArea = createMessageArea({ root: doc, class: 'ui-scrollbar' });
+    const body = create_element({ tag: 'div', root: doc }, {
+        class: 'panel',
+        id: 'diagnostics-panel'
+    }, messageArea.element);
+    return { body, diagnostics: messageArea };
 }
 
 /** 过程窗口正文:通高的递等式视图. */
@@ -197,6 +217,7 @@ export function buildAppViews(root: HTMLElement): AppViews {
         id: 'view-controls'
     });
     const params = buildParamsWindow(doc);
+    const diagnosticsWindow = buildDiagnosticsWindow(doc);
     const process = buildProcessWindow(doc);
     const entities = buildEntitiesWindow(doc);
     const evaluations = buildEvaluationsWindow(doc);
@@ -208,6 +229,7 @@ export function buildAppViews(root: HTMLElement): AppViews {
         process: [process.body],
         entities: [entities.body],
         evaluations: [evaluations.body],
+        diagnostics: [diagnosticsWindow.body],
     };
 
     /** 窗口 id 守卫:库传进来的是不透明字符串,未知 id 给空内容而不是 undefined. */
@@ -225,7 +247,7 @@ export function buildAppViews(root: HTMLElement): AppViews {
         editorHighlightCode: source.highlightCode,
         viewControls,
         paramsPanel: params.paramsPanel,
-        diagnostics: params.diagnostics,
+        diagnostics: diagnosticsWindow.diagnostics,
         processPanel: process.processPanel,
         objectLists: { entity: entities.entity, ...evaluations.objectLists },
     };

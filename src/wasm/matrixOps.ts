@@ -43,7 +43,7 @@ function flattenMat4ToWasm(matrix: Mat4): Float64Array {
 }
 
 /**
- * 创建基于 WASM 的矩阵运算后端,调用方需先 `ensureWasmReady`.
+ * 创建基于 WASM 的矩阵运算后端,调用方需先 {@link ensureWasmReady}.
  *
  * 直接返回 `MatrixOps`:后端实现与接口同名同形,不再经过一层零逻辑包装.
  */

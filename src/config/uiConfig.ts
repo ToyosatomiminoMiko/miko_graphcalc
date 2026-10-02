@@ -27,8 +27,15 @@ import type {
 // 不重复写第二份,否则"库说 slot 有 3 个,应用说有 4 个"这种事没有编译错误.
 export type { AxisSpec, WindowActionId, RelativeGeometry, WindowSlot };
 
-/** 窗口 id;数组顺序即 Dock 顺序与默认几何的依赖顺序(应用自己的清单). */
-export type WindowId = 'source' | 'view' | 'params' | 'process' | 'entities' | 'evaluations';
+/** 窗口 id;数组顺序即 Dock 顺序(应用自己的清单;几何依赖由库内部解). */
+export type WindowId =
+    | 'source'
+    | 'view'
+    | 'params'
+    | 'process'
+    | 'entities'
+    | 'evaluations'
+    | 'diagnostics';
 
 /**
  * 标题栏采用节点的名字.
@@ -79,7 +86,7 @@ export interface AppWindowEntry {
  * - `chrome`:标题栏节点的文案,字面量只在配置里,HTML 与 TS 都不留副本.
  */
 export interface AppWindowConfig {
-    /** 六个窗口,顺序即 z 初始序与 Dock 顺序. */
+    /** 七个窗口,顺序即 z 初始序与 Dock 顺序. */
     readonly windows: readonly AppWindowEntry[];
     /** 标题栏上的窗口按钮:顺序即显示顺序,文案进配置不散在 TS 里. */
     readonly actions: readonly {
@@ -263,6 +270,31 @@ export const UI_CONFIG = {
                     h: { at: 260 },
                 },
                 minSize: { w: 180, h: 160 },
+            },
+            {
+                // 诊断(编译错误 / 采样失败 / 积分与求交警告).它从"参数窗口下半块"
+                // 独立成窗:消息多长都只影响自己这一个窗口,参数滑块也不再被错误
+                // 文本挤矮(旧口径见 docs/windowing-plan.md §11.1 B3/B10,现由文首
+                // 的修订块记录这次改动).
+                //
+                // 空态就是空窗口:库的 `MessageArea` 只给框体与滚动,占位与可见性
+                // 都归消费者,所以这里不做"没有诊断就收起" -- 收起一整扇窗口不是
+                // 一条 CSS 能表达的事(要收就按任务栏按钮最小化).
+                id: 'diagnostics',
+                title: '诊断',
+                dock: { label: '诊断' },
+                defaultGeometry: {
+                    // 中列上半块:左右两列之间那道空当,`436` 就是两侧列各占的宽度
+                    // (edgeGap + 420,与下面并排两块的 `split.inset` 同一个数).
+                    x: { at: 436 },
+                    y: { at: 16 },
+                    // `clamp` 的语义是"桌面宽减去 `inset` 再夹取":留出左右两列之后
+                    // 中列剩下的宽度,宽屏下不至于拉成一整条.
+                    w: { clamp: [280, 560], inset: 872 },
+                    // 与参数窗口同高(同一条 `fraction`):两扇窗在视觉上是同一条基准线.
+                    h: { fraction: 0.55, of: 'usableHeight' },
+                },
+                minSize: { w: 200, h: 140 },
             },
         ],
         actions: [

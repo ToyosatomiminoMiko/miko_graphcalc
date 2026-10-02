@@ -5,7 +5,7 @@
  * `buildAppViews()`.这条接缝过去由 `appHosts.test.ts` 守着(HTML 里的 id 够不够
  * 取齐宿主),现在改成两条更直接的断言:
  * 1. `index.html` 里**只剩** `#app`(D1 的验收线,防止宿主 id 又长回来);
- * 2. 建出来的桩树里,CSS 依赖的结构 id 一个不少,六个窗口都拿得到内容.
+ * 2. 建出来的桩树里,CSS 依赖的结构 id 一个不少,七个窗口都拿得到内容.
  *
  * 用桩而不是真浏览器:这里只验结构,桩不做布局(见 docs/windowing-plan.md §8.1).
  */
@@ -46,7 +46,7 @@ const REQUIRED_IDS = [
     'editor-panel',
     'view-controls',
     'params-panel',
-    'diagnostics',
+    'diagnostics-panel',
     'process-panel',
     'object-panel',
     'entity-object-list',
@@ -104,7 +104,7 @@ describe('buildAppViews', () => {
         expect(input.children[1]).toBe(views.editorHighlight as unknown as StubElement);
     });
 
-    it('六个窗口都拿到正文,未知窗口给空内容', () => {
+    it('七个窗口都拿到正文,未知窗口给空内容', () => {
         const { views } = build();
 
         for (const spec of UI_CONFIG.window.windows) {
@@ -113,7 +113,7 @@ describe('buildAppViews', () => {
         expect(views.windowContent('nope')).toEqual({ slots: {}, body: [] });
     });
 
-    it('六个窗口的正文都是 div(窗口平等,不分 header/footer/aside/section)', () => {
+    it('七个窗口的正文都是 div(窗口平等,不分 header/footer/aside/section)', () => {
         const { views } = build();
 
         for (const spec of UI_CONFIG.window.windows) {
@@ -123,6 +123,20 @@ describe('buildAppViews', () => {
             // 桩的 `tagName` 是小写(与 ViewPanel.test.ts 同一口径).
             expect((body as unknown as StubElement | undefined)?.tagName, spec.id).toBe('div');
         }
+    });
+
+    it('诊断窗口的容器由库的 MessageArea 建(aria-live 在库侧,应用不再有容器类)', () => {
+        const { root, views } = build();
+        const area = views.diagnostics.element as unknown as StubElement;
+
+        expect(area.className).toBe('message-area ui-scrollbar');
+        // `aria-live` 是"容器里一有变动就被播报"的那条行为,必须由库件给出:
+        // 它漏了,库的"内容一致时零 DOM 操作"就白做(读屏每帧重放).
+        expect(area.getAttribute('aria-live')).toBe('polite');
+        // 句柄里的节点就是树上那一颗,不是建完没插进去的孤儿.
+        expect(root.querySelector('.message-area')).toBe(area);
+        // 应用自建的诊断列表容器类随库走了,别在这里长回来.
+        expect(root.querySelector('.diagnostic-list')).toBeNull();
     });
 
     it('标题栏五个节点按 adopted 表落进各自的窗口', () => {

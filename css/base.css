@@ -7,9 +7,13 @@
  *   3. 应用根节点与 3D 视口的铺满方式.
  *
  * 两套色板都不在这里:
- * - **通用设计 token**(背景/文字/描边/状态色/圆角/代码字体/面板下限/窗口外壳
- *   常量)随 UI 库走(`miko_ui/styles/tokens.css`),由 `src/main.ts` 在样式入口
- *   处最先加载,由库自己的 `cssPalette.test.ts` 断言;
+ * - **通用设计 token**(背景/文字/描边/状态色/圆角/代码字体/窗口外壳常量)随
+ *   UI 库走(`miko_ui/styles/tokens.css`),由 `src/main.ts` 在样式入口处最先加载,
+ *   由库自己的 `cssPalette.test.ts` 断言;
+ *   **面板内容下限不在这份清单里**:`--params-panel-min-height` /
+ *   `--view-controls-min-height` 是应用域名令牌,库里没有一条 `var()` 读它们
+ *   (判据见库 `tokens.css` 的文件头),所以默认值也不由库给 -- 它们只在运行期
+ *   由 `applyUiConfig()` 写到 `:root` 上,首帧不需要兜底(窗口是 JS 建的);
  * - **领域类型图例**(`--kind-*`:曲线/球体/区域...各是什么色)是应用的**领域数据**,
  *   注册在 TS 里(`src/config/kindPalette.ts`),由 `src/app/applyKindPalette.ts`
  *   写成 `:root` 变量 -- 与 `UI_CONFIG` -> `applyUiConfig()` 同一条机制.

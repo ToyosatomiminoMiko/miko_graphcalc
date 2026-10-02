@@ -18,8 +18,9 @@
 import 'miko_ui/styles.css';
 //
 // 2) 应用层:只写应用自己的类 / id / 页面级规则,按用途拆成四份.
-//    (诊断条目的外观已随库走 `miko_ui/styles/feedback.css`,原来的
-//    `diagnostics.css` 整份删除;列表容器改由 `.diagnostic-list` 在 panels.css 里排布.)
+//    (诊断这块整件已随库走 `miko_ui/styles/feedback.css`:条目 `.diagnostic*`
+//    与容器 `.message-area` 都在那边,原来的 `diagnostics.css` 整份删除,
+//    列表容器也不再由 `.diagnostic-list` 在 panels.css 里排布.)
 import '../css/base.css';
 import '../css/panels.css';
 import '../css/editor.css';

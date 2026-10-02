@@ -152,10 +152,26 @@ pub fn sample_vector_field(payload: &str) -> Result<Vec<f32>, JsValue> {
 // 表达式级积分
 // ================================================================
 
-#[wasm_bindgen(getter_with_clone)]
+/// 积分采样结果:积分值 + 采样网格 + 域包围盒.
+///
+/// 为什么 `samples` / `sample_shape` 要手写 getter/setter, 而不是用
+/// `#[wasm_bindgen(getter_with_clone)]`:
+/// - 该属性会给**每个**公开字段生成 `<T as Clone>::clone(&self.field)` 形式的 getter,
+///   对 `value`/`n`/`m`/`xa..zb` 这些 `Copy` 字段等于白克隆一次, clippy 的
+///   `clone_on_copy` 会直接命中(rustc 1.99 起开始检查 wasm-bindgen 展开出的胶水),
+///   在 `-D warnings` 下把构建打断;
+/// - 这些胶水是 wasm-bindgen 在结构体**之外**生成的同级条目, 挂在结构体上的
+///   `#[allow(clippy::clone_on_copy)]` 覆盖不到, 只能靠 crate 级 allow 或换写法;
+/// - `Vec`/`String` 不是 `Copy`, 本来就走不了自动字段 getter(会被 `assert_copy` 拦下),
+///   所以下面 impl 里显式补 getter/setter, JS 侧 API 与旧版逐字一致.
+#[wasm_bindgen]
 pub struct IntegralSampleResult {
     pub value: f64,
+    /// 采样点,扁平展开;形状由 `sample_shape` 决定.
+    #[wasm_bindgen(skip)]
     pub samples: Vec<f64>,
+    /// 采样网格形状标签.
+    #[wasm_bindgen(skip)]
     pub sample_shape: String,
     pub n: usize,
     pub m: usize,
@@ -166,6 +182,31 @@ pub struct IntegralSampleResult {
     pub yb: f64,
     pub za: f64,
     pub zb: f64,
+}
+
+#[wasm_bindgen]
+impl IntegralSampleResult {
+    /// JS 侧 `Float64Array`;读取时整块 `.slice()`, 与旧 `getter_with_clone` 行为一致.
+    #[wasm_bindgen(getter)]
+    pub fn samples(&self) -> Vec<f64> {
+        self.samples.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_samples(&mut self, samples: Vec<f64>) {
+        self.samples = samples;
+    }
+
+    /// JS 侧 `string`.
+    #[wasm_bindgen(getter)]
+    pub fn sample_shape(&self) -> String {
+        self.sample_shape.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_sample_shape(&mut self, sample_shape: String) {
+        self.sample_shape = sample_shape;
+    }
 }
 
 /// 一维(曲线域)积分统一入口;参数走 JSON 请求(见 `wasm_payloads`).

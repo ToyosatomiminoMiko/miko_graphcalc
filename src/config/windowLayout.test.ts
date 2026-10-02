@@ -3,7 +3,7 @@
  *
  * 为什么单独立一条:窗口的默认位置是**声明**(`UI_CONFIG.window.windows` 里的锚点),
  * 真正落成 px 的是库的纯函数 `resolveRelativeGeometries`.锚点写错不会报错,只会让两个
- * 窗口在真机上叠在一起 -- 而单测里不去解一遍就完全看不出来.这一条把"六个窗口
+ * 窗口在真机上叠在一起 -- 而单测里不去解一遍就完全看不出来.这一条把"七个窗口
  * 在目标视口下的实际几何"钉死.
  *
  * 走的是库的**批量**入口(与 `WindowManager.bind()` 同一个函数):依赖由库内部解,
@@ -88,10 +88,34 @@ describe('窗口默认几何', () => {
         }
     });
 
+    it('诊断窗占中列上半块:不比左右两列宽,也不压住下面并排的两块', () => {
+        // 诊断窗是"自己拖出来的"那扇:它的 x 取 436(edgeGap + 左列宽),
+        // 宽度走 `clamp`(桌面宽减去两列再夹取),高度与参数窗同一条 fraction.
+        // 中列是唯一的空当,压住谁都是回归 -- 所以这里逐视口量它和四邻的关系.
+        for (const desktop of VIEWPORTS) {
+            const resolved = resolveAll(desktop);
+            const diagnostics = resolved.get('diagnostics')!;
+            const source = resolved.get('source')!;
+            const params = resolved.get('params')!;
+            const entities = resolved.get('entities')!;
+
+            expect(diagnostics.x, `${desktop.w}`).toBe(source.x + source.w);
+            expect(diagnostics.x + diagnostics.w).toBeLessThanOrEqual(params.x);
+            // 中列上半块:底边落在并排两块的上沿之上(不与它们争同一段高度).
+            expect(diagnostics.y + diagnostics.h).toBeLessThanOrEqual(entities.y);
+            expect(diagnostics.y).toBeGreaterThanOrEqual(CONFIG.dockReserve);
+            expect(diagnostics.w).toBeGreaterThanOrEqual(
+                CONFIG.windows.find((spec) => spec.id === 'diagnostics')!.minSize.w,
+            );
+        }
+    });
+
     it('每个窗口都拿得到正文内容(库按 id 反问应用)', () => {
         // 这条守的是"配置里声明了窗口 但 appViews 没给内容"这种静默空窗.
         const ids = UI_CONFIG.window.windows.map((spec) => spec.id);
-        expect(ids).toEqual(['source', 'view', 'params', 'process', 'entities', 'evaluations']);
+        expect(ids).toEqual([
+            'source', 'view', 'params', 'process', 'entities', 'evaluations', 'diagnostics',
+        ]);
     });
 
     it('窗口清单的顺序不影响几何(依赖由库内部解)', () => {

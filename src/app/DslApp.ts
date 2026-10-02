@@ -18,10 +18,11 @@ import {
     EditorLineNumbers,
     FormulaCopyController,
     KeyboardController,
-    MessageList,
     WindowManager,
     mountDesktop,
     type DesktopHandle,
+    // 只当类型用:实例由 `createMessageArea()` 建,应用不再 `new` 它.
+    type MessageList,
 } from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
 import { highlightDsl } from '@/editor/dslHighlight';
@@ -109,7 +110,9 @@ export class DslApp {
         this.editorHighlight = decorations.highlight;
 
         this.compileController = new CompileController(this.store);
-        this.diagnosticsController = new MessageList(views.diagnostics);
+        // 诊断列表的**容器**由库的 `createMessageArea()` 建(见 appViews 的
+        // `buildDiagnosticsWindow`),这里只取它的条目接口,不再自己 `new`.
+        this.diagnosticsController = views.diagnostics.list;
         // 显隐/过程入口这一组回调单独建:它们各自绑一个业务动作,堆在构造
         // 函数里只会把"装配顺序"淹掉(见 `_objectListHandlers`).
         this.objectListController = new ObjectListController(
@@ -176,7 +179,7 @@ export class DslApp {
         this.renderController.bindViewState(this.viewState);
         this._wireEditor();
 
-        // 窗口装配已经在 `mountDesktop()` 里做过(构造期):建六个窗口外壳,把
+        // 窗口装配已经在 `mountDesktop()` 里做过(构造期):建七个窗口外壳,把
         // 各窗口内容搬进 `.window-body`,把标题栏节点放进 adopted 表声明的槽位,
         // 建 Dock,起初始焦点.这里只补装配层自己的那条几何回调.
         this._wireEditorResize();
