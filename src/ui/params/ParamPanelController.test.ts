@@ -27,7 +27,7 @@ const NUMERIC: ParamDeclaration = {
     cyclic: false,
 };
 
-const CYCLIC: ParamDeclaration = {
+const ANGULAR: ParamDeclaration = {
     name: '方位角',
     value: 0,
     min: -Math.PI,
@@ -41,8 +41,8 @@ const CYCLIC: ParamDeclaration = {
  * `7 - 2π`,面板拿到的就是回绕后的值(面板不再二次归一化,但重置目标必须
  * 与编译期同源).
  */
-const WRAPPED_CYCLIC: ParamDeclaration = {
-    ...CYCLIC,
+const WRAPPED_ANGULAR: ParamDeclaration = {
+    ...ANGULAR,
     value: 7 - 2 * Math.PI,
 };
 
@@ -126,7 +126,7 @@ describe('数字输入框的写回时机(UI-P2.1)', () => {
     });
 
     it('循环参数按区间长度回绕,而不是夹到端点', () => {
-        const { numberInput, slider } = setup(CYCLIC);
+        const { numberInput, slider } = setup(ANGULAR);
 
         numberInput.value = '4';
         numberInput.dispatch('change');
@@ -168,13 +168,16 @@ describe('参数行的可访问名(UI-P3.1)', () => {
         expect(numberInput.getAttribute('aria-label')).toBe('a 数值');
     });
 
-    it('循环参数的可见与可访问文案都带循环提示', () => {
-        const { label, numberInput } = setup(CYCLIC);
+    it('循环参数的循环提示写进名称', () => {
+        const { label, numberInput } = setup(ANGULAR);
 
-        expect(label.textContent).toBe('方位角 cyclic');
-        // 循环提示是一枚独立的徽章(与"类型"标签同一套外观),名字本身不变色.
-        expect(label.querySelector('.slider-field-tag')).not.toBeNull();
-        expect(numberInput.getAttribute('aria-label')).toBe('方位角 数值(循环)');
+        // 库的滑块只有一种姿态:名称行里不再有徽章,根节点也没有变体类,
+        // 提示只能在名称里(见 _createParamRow 里 createSlider 的 label).
+        expect(label.textContent).toBe('方位角(循环)');
+        // 名称行里除了那段文本没有别的节点:徽章那种"第二个子元素"不存在了
+        // (桩的 children 数组把文本节点也算在内,所以按元素类型过滤).
+        expect(label.children.filter((child): child is StubElement => 'tagName' in child)).toEqual([]);
+        expect(numberInput.getAttribute('aria-label')).toBe('方位角(循环) 数值');
     });
 });
 
@@ -244,19 +247,19 @@ describe('重置按钮(回到 in 前的声明值)', () => {
     });
 
     it('循环参数退回声明的主值(声明值已在域外时就是回绕后的值)', () => {
-        const { slider, resetButton } = setup(WRAPPED_CYCLIC);
+        const { slider, resetButton } = setup(WRAPPED_ANGULAR);
 
         slider.value = '2';
         slider.dispatch('input');
         resetButton.dispatch('click');
 
-        expect(Number(slider.value)).toBe(WRAPPED_CYCLIC.value);
+        expect(Number(slider.value)).toBe(WRAPPED_ANGULAR.value);
         expect(Number(slider.value)).toBeCloseTo(7 - 2 * Math.PI, 12);
         expect(resetButton.disabled).toBe(true);
     });
 
     it('重置后 getValues 反映声明值', () => {
-        const { slider, resetButton, controller } = setup(CYCLIC);
+        const { slider, resetButton, controller } = setup(ANGULAR);
 
         slider.value = '1.5';
         slider.dispatch('input');

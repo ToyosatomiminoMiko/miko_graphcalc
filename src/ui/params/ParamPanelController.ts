@@ -8,7 +8,7 @@
  * 取值口径,归一化函数,以及"值变了通知场景".行的结构由库定义:
  *
  * ```text
- * <div class="slider-field [is-cyclic]">
+ * <div class="slider-field">
  *   <input class="slider-field-range" type="range">       ← 粗调入口
  *   <div class="slider-field-meta">
  *     <label class="slider-field-label" for=滑杆>a</label> ← 命名滑杆(一行里的大热区)
@@ -37,7 +37,8 @@
  * 回绕到 `[min, max)`,而不是像普通参数那样夹到端点;回绕口径与编译期共用
  * `math/paramValue.ts` 的 normalizeParamValue.归一化收在**数字框**的
  * `normalize` 选项里(滑块自己不会越界,不需要再过一遍),于是信号里永远不会
- * 出现未归一化的值.标签上的 cyclic 只是**显式声明**的可视提示,不改变取值语义.
+ * 出现未归一化的值.这类声明是**取值口径**,不是控件类型:它在界面上只体现为
+ * 名称后的 `(循环)` 缀词,库的滑块不为此换姿态.
  *
  * 数字输入框的写回时机就是数字框"保守策略"的那一种接线:
  * - `input` 阶段只把**已能解析**的值同步给信号(进而同步滑块与场景),
@@ -150,10 +151,11 @@ export class ParamPanelController {
             min: param.min,
             max: param.max,
             step: param.step,
-            // 名称,循环标记,重置目标,以及归一化一起交给库的系数滑块:
+            // 名称,重置目标,以及归一化一起交给库的系数滑块:
             // 一行里的名称/滑杆/数值框/重置按钮由它组合并互相同步.
-            label: param.name,
-            cyclic: param.cyclic,
+            // 循环类系数在名称后缀 `(循环)`:库的滑块只有一种姿态,不为循环换外观,
+            // "这个量要绕回来"只能由声明它的这一侧在名称里说出来.
+            label: param.cyclic ? `${param.name}(循环)` : param.name,
             resetValue: declaredValue,
             // 归一化只挂在数值框上:滑杆本身不会越界(range 由浏览器夹住),
             // 再走一遍回绕反而会把"拖到 max"变成 min.
