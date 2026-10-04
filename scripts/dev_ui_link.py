@@ -38,8 +38,12 @@ MIKO_UI_DIR 覆盖:
         bash ./build.sh                   # 默认: 重建副本 dist/ + 跑完整流水线
         或 在库里常驻 npx tsc -p tsconfig.build.json --watch
     (两种别同时用: build:dist 开头会 clean, 和常驻的 watch 会打架);
-  * Vite 会把 root 外已加载的模块加进自己的 watcher, 所以保存后会自动刷新,
-    不需要配 server.fs.allow(见本仓库 vite.config.ts 的 dedupe 说明).
+  * Vite 会把 root 外已加载的**模块**加进自己的 watcher, 所以保存后会自动刷新;
+    但模块之外的**资源**(CSS 里的 url():库的公式件带出的 katex 字体)不走模块图,
+    浏览器按 /@fs/<真身>/... 直接请求, 落在 server.fs.allow 之外会被 403
+    ("outside of Vite serving allow list"), 表现是公式掉字形.
+    vite.config.ts 的 server.fs.allow 现在自动把库(以及它解析到的 katex)的真身
+    目录补进去, 所以链接状态不用额外配置;换成 npm 形状(字体本就在仓库内)也不冲突.
 
 [三个已知坑]
   1. node_modules/.vite 里可能有上一轮按 npm 包预打包的产物

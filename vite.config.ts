@@ -1,5 +1,8 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -14,6 +17,45 @@ import { fileURLToPath } from 'node:url';
  * `src/generated/` 刻意不做别名,构建产物不该伪装成源码层.
  */
 const SRC_ALIAS = fileURLToPath(new URL('./src', import.meta.url));
+
+/** 本仓库根目录(配置文件所在目录),给 `searchForWorkspaceRoot` 与真身解析用. */
+const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
+
+const require = createRequire(import.meta.url);
+
+/**
+ * 库(`miko_ui`)在磁盘上的**真身**目录,以及它实际用的 katex 包目录.
+ *
+ * 为什么需要:本地联调时 `node_modules/miko_ui` 是指向仓库外工作副本的符号链接
+ * (见 `scripts/dev_ui_link.py`),而 Vite 默认解析真身路径 -- 库的公式件从
+ * `katex/dist/katex.min.css` 里带出一堆 `url(...)` 字体,浏览器直接按
+ * `/@fs/<真身>/.../fonts/*.woff2` 请求,落在 `server.fs.allow`(默认只有工作区根)
+ * 之外,于是 dev 控制台刷 "outside of Vite serving allow list",公式字体的请求
+ * 全部 403(公式照样排,只是掉字形).
+ *
+ * 为什么 katex 的位置要问**库**而不是本仓库:`node_modules/katex` 是库的依赖,
+ * 可能被提升到任何一层;本仓库也已经不声明 katex 了,从这边 `require.resolve`
+ * 根本找不到它.所以用 `createRequire(库的 package.json)` 从库的解析上下文去问.
+ *
+ * 只在 dev server / preview 生效;`vite build` 把字体当资源拷进产物,不需要白名单.
+ * 解析不到就跳过:CI 与 npm 形状(库就在本仓库的 `node_modules/` 里,本来就在
+ * 工作区根之内)不会因此多出任何路径.
+ */
+function libraryServeDirs(): string[] {
+    const dirs: string[] = [];
+    try {
+        const manifest = require.resolve('miko_ui/package.json');
+        dirs.push(dirname(realpathSync(manifest)));
+        try {
+            dirs.push(dirname(realpathSync(createRequire(manifest).resolve('katex/package.json'))));
+        } catch {
+            // 库这一版没带 katex(旧的可选 peer 版):没有字体要放行
+        }
+    } catch {
+        // 库没装出来(例如只跑库自己的测试):没有要额外放行的东西
+    }
+    return dirs;
+}
 
 /**
  * 独立仓库配置: 本仓库是 GitHub Pages 的"项目页",站点根是
@@ -67,6 +109,16 @@ export default defineConfig({
          * (`setFormulaRenderer` / `installDomStub()`)一起删除,理由随之消失.
          */
         dedupe: ['@preact/signals-core'],
+    },
+    server: {
+        fs: {
+            /**
+             * 默认白名单只有"工作区根".本地联调时库的真身在仓库外,它的公式字体
+             * 走 `/@fs` 请求会被拒(见 `libraryServeDirs`).这里把根与库的真身
+             * 一起放行 -- 写 `allow` 会**覆盖**默认值,所以根必须留在数组里.
+             */
+            allow: [searchForWorkspaceRoot(PROJECT_ROOT), ...libraryServeDirs()],
+        },
     },
     optimizeDeps: {
         include: ['three'],
