@@ -3,11 +3,11 @@
  *
  * 与求值窗口的 `EvaluationList` 对称:列表层只做"按内容键增删/复用/排序",行内结构
  * 全在 item 类({@link EntityItem})里.行缓存/顺序由
- * {@link KeyedRowList} 承担--与求值的三个子列表共用同一份实现(见 UI-P3.8),
+ * {@link RowList} 承担--与求值的三个子列表共用同一份实现(见 UI-P3.8),
  * 因此"顺序/缓存"策略只有一处.
  */
 import type { SceneObject } from '@/contract/ir';
-import { KeyedRowList } from 'miko_ui';
+import { RowList } from 'miko_ui';
 import { EntityItem } from './EntityItem';
 
 /**
@@ -20,13 +20,13 @@ export interface EntityListHandlers {
 
 export class EntityList {
     /** 行缓存与顺序由共用引擎负责(与求值子列表同一份,见 UI-P3.8). */
-    private readonly rows: KeyedRowList<SceneObject, EntityItem>;
+    private readonly rows: RowList<SceneObject, EntityItem>;
 
     constructor(
         container: HTMLElement,
         private readonly handlers: EntityListHandlers,
     ) {
-        this.rows = new KeyedRowList(container);
+        this.rows = new RowList(container);
     }
 
     /**

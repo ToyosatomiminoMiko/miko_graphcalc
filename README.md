@@ -172,7 +172,8 @@ CSS 变量的理由是**缺一项要能被机器拦住**:`css/*.css` 里每个 `
 容器挂库公开的 `.ui-scrollbar` 类即得同一种细滚动条(尺寸 `--scrollbar-size`,
 颜色 `--color-scrollbar*`,都在库的 token 层),应用侧一条滚动条规则都不写 --
 挂类的地方是 `src/app/appViews.ts`(`#params-panel` / `#view-controls` /
-`.object-list-body` / `.diagnostic-list`,以及库建好外壳后的源码 `textarea`),
+三个列表窗口的 `.message-area`(实体 / 求值 / 诊断共用库的同一个框体,三张表同形,
+以及库建好外壳后的源码 `textarea`),
 `src/app/windowChrome.ts`(示例浮层,库的 `createMenu` 会把它补成会滚动的
 `.menu-panel`),`src/ui/process/ProcessPanel.ts`,`src/ui/evaluation/evaluationDom.ts`
 与 `integralItem.ts`.库自己的组件不挂这个类:菜单件与滚动条规定互不认识,要不要

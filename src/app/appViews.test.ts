@@ -48,7 +48,6 @@ const REQUIRED_IDS = [
     'params-panel',
     'diagnostics-panel',
     'process-panel',
-    'object-panel',
     'entity-object-list',
     'evaluation-object-list',
     'analysis-object-list',
@@ -75,6 +74,29 @@ describe('buildAppViews', () => {
         for (const id of REQUIRED_IDS) {
             expect(root.querySelector(`#${id}`), `缺少 #${id}`).not.toBeNull();
         }
+    });
+
+    it('三个列表窗口的框体是库的同一份,正文里不再有应用自建的盒子', () => {
+        const { root, views } = build();
+
+        // 句柄拿到的就是框体本身:它直接挂在宿主 `.object-panel` 下,中间没有包裹层.
+        expect(views.objectLists.entity.classList.contains('message-area')).toBe(true);
+        expect((views.objectLists.entity.parentElement as unknown as StubElement).className)
+            .toBe('panel object-panel');
+        // 诊断窗口的框体是同一份类:三张表同形,差别只在里面装什么.
+        expect(views.diagnostics.element.classList.contains('message-area')).toBe(true);
+        // 两个框体都还挂着应用决定的滚动条规定(滚动条外观在库的 scrollbar.css).
+        for (const id of ['entity-object-list', 'evaluation-object-list']) {
+            const box = root.querySelector(`#${id}`) as unknown as StubElement;
+            expect(box.classList.contains('message-area'), id).toBe(true);
+            expect(box.classList.contains('ui-scrollbar'), id).toBe(true);
+        }
+        // 应用自建的框体与那两层包裹 div 不许长回来:框体只有库那一份,
+        // 宿主只有一层(见 css/panels.css).
+        for (const dead of ['.object-list-body', '.object-list-column', '.object-panel-column']) {
+            expect(root.querySelector(dead), dead).toBeNull();
+        }
+        expect(root.querySelector('#object-panel')).toBeNull();
     });
 
     it('编辑器外壳由库的 CodeEditor 建(类名结构,应用只包一层面板)', () => {
@@ -133,8 +155,9 @@ describe('buildAppViews', () => {
         // `aria-live` 是"容器里一有变动就被播报"的那条行为,必须由库件给出:
         // 它漏了,库的"内容一致时零 DOM 操作"就白做(读屏每帧重放).
         expect(area.getAttribute('aria-live')).toBe('polite');
-        // 句柄里的节点就是树上那一颗,不是建完没插进去的孤儿.
-        expect(root.querySelector('.message-area')).toBe(area);
+        // 句柄里的节点就是树上那一颗,不是建完没插进去的孤儿.三个列表窗口现在都挂
+        // `.message-area`,`querySelector` 只会命中第一个,所以按宿主认这一颗.
+        expect(area.closest('#diagnostics-panel')).not.toBeNull();
         // 应用自建的诊断列表容器类随库走了,别在这里长回来.
         expect(root.querySelector('.diagnostic-list')).toBeNull();
     });

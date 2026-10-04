@@ -4,7 +4,7 @@
  * 一行一步的递等式:序号 + 一行 KaTeX + 依据徽章,整条过程一次铺开(只读).
  *
  * 几条刻意的不变量:
- * - **渲染是纯写入**:行按指纹复用(`keyedRowList` 的复用约定与 `stepRows`),
+ * - **渲染是纯写入**:行按指纹复用(`rowList` 的复用约定与 `stepRows`),
  *   同一条过程重载不会重建同内容行;
  * - **键盘不在本类**:本类没有键盘语义,左右方向键留给标签栏与编辑器;
  * - 空过程给一句明文,超长过程截断并注明,隐藏对象不生成过程(入口置灰的理由
@@ -15,7 +15,7 @@
  */
 import { UI_CONFIG } from '@/config/uiConfig';
 import { createFormulaElement } from 'miko_ui';
-import { KeyedRowList, type KeyedRowHandles } from 'miko_ui';
+import { RowList, type RowHandle } from 'miko_ui';
 import { create_element } from 'miko_ui';
 import { createBadge } from 'miko_ui';
 import {
@@ -31,7 +31,7 @@ export interface ProcessPanelOptions {
 }
 
 /** 列表引擎要的句柄:一行步骤只有根元素. */
-interface ProcessStepRow extends KeyedRowHandles {
+interface ProcessStepRow extends RowHandle {
     readonly row: HTMLElement;
 }
 
@@ -56,7 +56,7 @@ function setHidden(element: HTMLElement, hidden: boolean): void {
 }
 
 export class ProcessPanel {
-    private readonly list: KeyedRowList<IndexedStep, ProcessStepRow>;
+    private readonly list: RowList<IndexedStep, ProcessStepRow>;
     private readonly title: HTMLElement;
     private readonly legend: HTMLElement;
     private readonly problem: HTMLElement;
@@ -93,8 +93,8 @@ export class ProcessPanel {
 
         // `ui-scrollbar` 是库的滚动条规定(见 css/process.css 的说明).
         this.stepsContainer = create_element({ tag: 'div' }, { class: 'process-steps ui-scrollbar' });
-        // KeyedRowList 构造时会给容器加 role="list"(与两个对象列表同一约定).
-        this.list = new KeyedRowList<IndexedStep, ProcessStepRow>(this.stepsContainer);
+        // RowList 构造时会给容器加 role="list"(与两个对象列表同一约定).
+        this.list = new RowList<IndexedStep, ProcessStepRow>(this.stepsContainer);
 
         this.root.replaceChildren(header, this.empty, this.stepsContainer, this.truncated);
         this._renderEmptyState();

@@ -4,7 +4,7 @@
  *
  * 与类型无关:一类条目长什么样,异步数值怎么落到行上,全在传入的
  * {@link EvaluationItemClass}(即 item 类本身)里;行缓存/顺序那套增删复用循环由
- * {@link KeyedRowList} 承担(与实体列表共用同一份,见 UI-P3.8).`EvaluationList`
+ * {@link RowList} 承担(与实体列表共用同一份,见 UI-P3.8).`EvaluationList`
  * 的三个子列表(分析/积分/求交)各是一个 `EvaluationSection`,于是"增删行,保持
  * 顺序,替换行时保留展开态,数值回填命中缓存"这套逻辑只有一份.
  *
@@ -12,7 +12,7 @@
  * 的数据袋,`resolve`/`reject` 直接调实例方法.
  *
  * 两层缓存:
- * - `KeyedRowList` 的 `rows`:条目名 -> { item, 内容键, 任务 };内容键一致就整行
+ * - `RowList` 的 `rows`:条目名 -> { item, 内容键, 任务 };内容键一致就整行
  *   复用(KaTeX 不重排,用户展开态不丢);
  * - 本类的 `results`:条目名 -> { 内容键, 数值 };异步结果回来时按当时的键存,
  *   行被改写(键变了)后旧数值自然作废--列表回到"计算中",不会先显示上一次的答案.
@@ -22,7 +22,7 @@
  * latest-only 语义(`LatestRequestExecutor`)在上游丢弃.这里没有"请求发出时的键"
  * 可比较,因此注释不再承诺本层能识别改写.
  */
-import { KeyedRowList } from 'miko_ui';
+import { RowList } from 'miko_ui';
 import {
     EvaluationItem,
     type EvaluationContext,
@@ -38,13 +38,13 @@ export class EvaluationSection<
     private readonly results = new Map<string, { key: string; value: TResult }>();
 
     /** 行缓存与顺序由共用引擎负责(与实体列表同一份,见 UI-P3.8). */
-    private readonly list: KeyedRowList<TTask, TItem>;
+    private readonly list: RowList<TTask, TItem>;
 
     constructor(
         container: HTMLElement,
         private readonly itemClass: EvaluationItemClass<TTask, TResult, TItem>,
     ) {
-        this.list = new KeyedRowList(container);
+        this.list = new RowList(container);
     }
 
     /** 按 item 类增量刷新:删消失的,复用键相同的,重建键变了的. */
@@ -57,7 +57,7 @@ export class EvaluationSection<
             // 条目从 DSL 里消失(删除或改名)时必须连数值缓存一起删:只删 DOM 行
             // 会让 `results` 变成只增不减的 Map -- 每个用过的名字都永久留下一份
             // `IntersectionOutput`/积分值,来回改名就一直涨.这条钩子正是
-            // KeyedRowList 提供给"调用方清自己的缓存"的唯一时机.
+            // RowList 提供给"调用方清自己的缓存"的唯一时机.
             onRemove: (name) => {
                 this.results.delete(name);
             },

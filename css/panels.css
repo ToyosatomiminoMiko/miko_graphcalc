@@ -59,8 +59,8 @@
 }
 
 /* 滚动条外观**不在这里**:库的 `styles/scrollbar.css` 是唯一来源,滚动容器
-   (`#params-panel` / `#view-controls` / `.object-list-body` / 诊断窗口里的
-   `.message-area`)只在 `src/app/appViews.ts` 里挂库公开的 `.ui-scrollbar` 类.
+   (`#params-panel` / `#view-controls` / 三个列表窗口的 `.message-area`)
+   只在 `src/app/appViews.ts` 里挂库公开的 `.ui-scrollbar` 类.
    这里原本有一份写死 `8px` + 两条 `--color-scrollbar*` 的副本,已删 -- 那正是
    "同一个滚动条有两个来源"的写法. */
 
@@ -69,28 +69,17 @@
    参数面板只负责列表容器(上面的 `#params-panel`). */
 
 /* ==========================================================================
- * 底部对象列表面板(实体 / 求值各占一个窗口)
+ * 列表窗口的宿主(实体 / 求值 / 诊断三个窗口同形)
  * ========================================================================== */
 
-/* 面板容器:一个窗口里只有一栏,所以不再分列 -- 占满窗口正文的剩余高度.
-   `min-height: 0` 是必需的:少了它 flex 子项的最小高度按内容算,列表内部的
-   `overflow-y` 永远不会触发. */
-#object-panel {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+/* 宿主:窗口正文里唯一的孩子,只给一圈内边距.
+   "吃掉窗口正文的剩余高度"归库的 `.window-body > *`,列排布与 `min-height: 0`
+   归 `.panel`(少了它壳里的 `overflow-y` 不会触发,但那条已经在 `.panel` 里),
+   这里不再重复.
+   `overflow: hidden` 留着:壳里那层框体自己滚,宿主不该再冒出第二条滚动条. */
+.object-panel {
     padding: 8px;
     overflow: hidden;
-}
-
-/* 面板包裹层:窗口正文里唯一的孩子,吃掉整块高度.
-   `.panel` 给的是"面板底"(底色/描边),这里补的是它在窗口正文里的排布. */
-.object-panel-column {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
 }
 
 /* ==========================================================================
@@ -109,16 +98,6 @@
     font-size: 20px;
 }
 
-.object-list-column {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--color-border-panel);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-sunken);
-    overflow: hidden;
-}
-
 /* 栏标题(`.object-list-title`)已随拆分删除:窗口标题就是分组标识
    (见 src/app/appViews.ts 的 buildEntitiesWindow). */
 
@@ -133,15 +112,19 @@
     transition: color 0.2s ease;
 }
 
-.object-list-body {
-    flex: 1;
-    min-height: 0;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    overflow-y: auto;
-}
+/* 对象列表的框体**不在这里**:它就是库的 `.message-area`
+ * (`miko_ui/styles/feedback.css`) -- 框体 + 列表节奏 + 滚动,只此一份.
+ *
+ * 为什么并进库那一份:应用侧过去有一份逐字重复的 `.object-list-body`,13 条
+ * 声明里 9 条与 `.message-area` 完全相同(只差 `gap` 4px/6px 与一条
+ * `min-width`).同一个盒子两个来源,改一处漏一处不会报错,只会让两个窗口的
+ * 观感慢慢分叉.诊断窗口本来就是库那一份,于是三个列表窗口现在同形:
+ *
+ *   window-body > .panel.object-panel(宿主,给内边距) > .message-area(框体,滚)
+ *
+ * 行引擎同样只有一份:`RowList`(库的 `shared/rowList.ts`),实体 / 求值六个
+ * 子列表 / 诊断消息 / 过程步骤都走它 -- 三张表的差别只有 `name` / `key` / `build`.
+ * 应用侧剩下的只有这两个窗口自己的分组(`.object-sublist`)与行结构. */
 
 .object-sublist {
     display: flex;

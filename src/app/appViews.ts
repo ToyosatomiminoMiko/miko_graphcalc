@@ -154,22 +154,29 @@ function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: H
  *
  * 栏标题(`.object-list-title`)删掉了:窗口标题已经是"实体对象",窗口里再来
  * 一行同名的小标题只是把同一句话说两遍 -- 拆成两个窗口之后,标题栏就是新的
- * 分组标识,不需要第二套. */
+ * 分组标识,不需要第二套.
+ *
+ * 正文只有两层,与诊断窗口同形:宿主 `.object-panel` 给内边距,框体是**库的**
+ * `.message-area`(框体 + 列表节奏 + 滚动只此一份,见 `css/panels.css`).
+ * 行引擎同理只一份:`RowList`,构造时给容器挂 `role="list"`. */
 function buildEntitiesWindow(doc: Document): {
     body: HTMLElement;
     entity: HTMLElement;
 } {
     const entity = create_element({ tag: 'div', root: doc }, {
-        class: 'object-list-body ui-scrollbar',
+        class: 'message-area ui-scrollbar',
         id: 'entity-object-list'
     });
-    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel-column' },
-        create_element({ tag: 'div', root: doc }, { id: 'object-panel' },
-            create_element({ tag: 'div', root: doc }, { class: 'object-list-column' }, entity)));
+    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel' },
+        entity);
     return { body, entity };
 }
 
-/** 求值窗口正文:六个求值子列表(分析 / 积分 / 求交 / 求解 / 原函数 / 微分方程). */
+/** 求值窗口正文:六个求值子列表(分析 / 积分 / 求交 / 求解 / 原函数 / 微分方程).
+ *
+ * 与实体窗口同一个框体,同一个宿主:六个 kind 各占一个 `.object-sublist`
+ * (应用类,空的时候由 CSS 收起),它们是各自的 `RowList` 容器;外面那只盒子
+ * 只负责内边距,框体与滚动归库的 `.message-area`. */
 function buildEvaluationsWindow(doc: Document): {
     body: HTMLElement;
     objectLists: Omit<ObjectListContainers, 'entity'>;
@@ -186,19 +193,17 @@ function buildEvaluationsWindow(doc: Document): {
         ode: list('ode-object-list', 'object-sublist'),
     };
 
-    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel-column' },
-        create_element({ tag: 'div', root: doc }, { id: 'object-panel' },
-            create_element({ tag: 'div', root: doc }, { class: 'object-list-column' },
-                create_element({ tag: 'div', root: doc }, {
-                    class: 'object-list-body ui-scrollbar',
-                    id: 'evaluation-object-list'
-                },
-                sublists.analysis,
-                sublists.integral,
-                sublists.intersection,
-                sublists.solve,
-                sublists.antiderivative,
-                sublists.ode))));
+    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel' },
+        create_element({ tag: 'div', root: doc }, {
+            class: 'message-area ui-scrollbar',
+            id: 'evaluation-object-list'
+        },
+        sublists.analysis,
+        sublists.integral,
+        sublists.intersection,
+        sublists.solve,
+        sublists.antiderivative,
+        sublists.ode));
 
     return { body, objectLists: sublists };
 }

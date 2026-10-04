@@ -265,7 +265,7 @@ vendored**(依赖 `@preact/signals-core`,库对外只导出自己的 `signal` / 
   方法).
 - **`ObjectListController` 没有改**:计划把它和另外两个面板并列,但它的输入是
   编译产物(`SceneIR`),没有"两个状态源"要消掉 -- 列表每次由场景重建,行复用
-  已经交给 `KeyedRowList`.把它改成 signal 只会多一层中间物,属于计划自己的
+  已经交给 `RowList`.把它改成 signal 只会多一层中间物,属于计划自己的
   R1("库一层 props,app 又一层 adapter").这一条留在这里,不是漏掉.
 
 P2/P3 之后的总实测口径(复核命令即附录 A,另有 `npm run lint:ui-boundary`):
@@ -1131,8 +1131,8 @@ find src/ui/entity src/ui/evaluation src/ui/objects src/ui/params \
 
 > **⚠ 当前状态(2026-09 后补注)**:下表是写作当时(P4)的快照.之后库已落地
 > **`Menu`**(`createMenu`,含分组/当前项/`aria-expanded`/点外部关闭),
-> **`RangeInput`**,**`MenuItem`** 与 **`CodeEditor`** 组件;`keyedRowList` 也已
-> 进入公开面(`KeyedRowList` / `KeyedRowHandles` / `KeyedRowHooks`),不再是"内部引擎".
+> **`RangeInput`**,**`MenuItem`** 与 **`CodeEditor`** 组件;`rowList` 也已
+> 进入公开面(`RowList` / `RowHandle` / `RowListHooks`),不再是"内部引擎".
 > `TextField` / `Splitter` / `ScrollArea` / `Dialog`·`Toast` / `Tooltip` **仍未落地**.
 > 逐项现状以库仓库的 `src/index.ts` 为准.
 
