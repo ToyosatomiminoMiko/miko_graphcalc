@@ -1,22 +1,16 @@
 /**
- * 过程页视图单测(最小 DOM 桩 + KaTeX 假实现,不引 jsdom).
+ * 过程页视图单测(最小 DOM 桩,不引 jsdom).
  *
  * 锁的是视图自己的不变量:
  * - 空过程给明文,不给空盒子;超长过程截断并注明;
  * - 一行一步(序号 + 公式 + 依据徽章),行按指纹复用(重建时同内容行不被替换);
  * - 页头元信息与参数只读回显各走各的刷新入口.
+ *
+ * 公式不在这里排版:`installDomStub()` 装上库的文本替身渲染器,断言读回写的
+ * LaTeX 原文.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { installDomStub, type StubElement } from 'miko_ui/testing';
-
-vi.mock('katex', () => ({
-    default: {
-        render: (tex: string, element: { textContent: string }) => {
-            element.textContent = tex;
-        },
-    },
-}));
-vi.mock('katex/dist/katex.min.css', () => ({}));
 
 import { ProcessPanel, formatProcessParamEcho } from './ProcessPanel';
 import type { ProcessDocument, ProcessStep } from '@/adapters/processSteps';

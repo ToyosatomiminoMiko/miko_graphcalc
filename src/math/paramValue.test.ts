@@ -3,9 +3,14 @@
  *
  * 循环参数在编译期与参数面板共用这一份实现,这里锁定三件事:
  * 普通参数仍夹取,循环参数回绕到半开区间 [min, max),非法值报错.
+ *
+ * 后半段是**结果数值 LaTeX 口径的漂移哨兵**:口径本体在库的
+ * `numberText({ syntax: 'latex' })` 里(应用侧只留实例,见 `latexResultText.ts`),
+ * 这里逐条钉住历史上 `src/math/latexNumber.ts` 的期望文本 -- 库改了档位,
+ * 应用换错了语法,公式就会在这里红,而不是等到屏幕上等号右端变形.
  */
 import { describe, expect, it } from 'vitest';
-import { latexResultNumber } from './latexNumber';
+import { LATEX_RESULT_TEXT } from './latexResultText';
 import { normalizeParamValue } from './paramValue';
 
 const ordinary = { name: 'a', min: -2, max: 2 };
@@ -53,25 +58,25 @@ describe('normalizeParamValue', () => {
     });
 });
 
-describe('latexResultNumber', () => {
+describe('结果数值的 LaTeX 口径(库的 numberText latex 档)', () => {
     it('常规数值去掉多余小数 0', () => {
-        expect(latexResultNumber(2)).toBe('2');
-        expect(latexResultNumber(1.5)).toBe('1.5');
-        expect(latexResultNumber(-0.25)).toBe('-0.25');
+        expect(LATEX_RESULT_TEXT.toText(2)).toBe('2');
+        expect(LATEX_RESULT_TEXT.toText(1.5)).toBe('1.5');
+        expect(LATEX_RESULT_TEXT.toText(-0.25)).toBe('-0.25');
     });
 
-    it('科学计数法转成 KaTeX 可排版的 \\times10^{n}', () => {
-        // 直接写 2.775558e-17 会被 KaTeX 排成斜体 e,必须显式转写.
-        expect(latexResultNumber(2.775558e-17))
+    it('科学计数法转成公式件可排版的 \\times10^{n}', () => {
+        // 直接写 2.775558e-17 会被排成斜体 e,必须显式转写.
+        expect(LATEX_RESULT_TEXT.toText(2.775558e-17))
             .toBe('2.775558\\times10^{-17}');
-        expect(latexResultNumber(-2.775558e-17))
+        expect(LATEX_RESULT_TEXT.toText(-2.775558e-17))
             .toBe('-2.775558\\times10^{-17}');
-        expect(latexResultNumber(1.25e20)).toBe('1.25\\times10^{20}');
+        expect(LATEX_RESULT_TEXT.toText(1.25e20)).toBe('1.25\\times10^{20}');
     });
 
     it('0 与非常规量级各自有可读写法', () => {
-        expect(latexResultNumber(0)).toBe('0');
+        expect(LATEX_RESULT_TEXT.toText(0)).toBe('0');
         // 常规量级用定点(1e-4 不写成科学计数法).
-        expect(latexResultNumber(0.0001)).toBe('0.0001');
+        expect(LATEX_RESULT_TEXT.toText(0.0001)).toBe('0.0001');
     });
 });

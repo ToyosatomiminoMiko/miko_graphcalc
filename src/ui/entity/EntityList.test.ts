@@ -3,24 +3,17 @@
  *
  * `ObjectListController.test.ts` 覆盖的是整个对象列表装配的输出;这里锁实体列表
  * 自己的不变量,因为实体行结构已经从控制器搬进了 `EntityItem`/`EntityList`:
- * 1. 内容键不变 -> **整行复用**(同一个 DOM 节点:KaTeX 不重排,文本选择不丢);
+ * 1. 内容键不变 -> **整行复用**(同一个 DOM 节点:不重排公式,文本选择不丢);
  * 2. 内容键变了 -> 重建行,同名旧行不残留;
  * 3. 行末显隐按钮把 `toggleEntity(id)` 回调出去;
  * 4. 消失的对象连行一起删除.
+ *
+ * 公式怎么排不归这里管:`installDomStub()` 会装上库的文本替身渲染器
+ * (`miko_ui` 的 `TEXT_FORMULA_RENDERER`),断言只读回写的 LaTeX 原文.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { SceneObject } from '@/contract/ir';
 import { installDomStub, StubElement } from 'miko_ui/testing';
-
-vi.mock('katex', () => ({
-    default: {
-        // 真 KaTeX 会把排版结果写进传入的元素;桩里直接回写 TeX 文本.
-        render: (tex: string, element: { textContent: string }) => {
-            element.textContent = tex;
-        },
-    },
-}));
-vi.mock('katex/dist/katex.min.css', () => ({}));
 
 import { EntityList } from './EntityList';
 

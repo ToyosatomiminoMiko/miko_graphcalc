@@ -8,14 +8,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStub, type StubElement } from 'miko_ui/testing';
 
-vi.mock('katex', () => ({
-    default: {
-        render: (tex: string, element: { textContent: string }) => {
-            element.textContent = tex;
-        },
-    },
-}));
-vi.mock('katex/dist/katex.min.css', () => ({}));
 // 积分细节只有 3 行,默认阈值(5)下"过程"入口不出现.这里只放宽**披露判据**
 // 本身,让"点按钮 -> 拿文档"这条真实路径可以被驱动:驱动器不是被测逻辑,
 // 而过程文档的新鲜度才是.

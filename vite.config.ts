@@ -55,21 +55,18 @@ export default defineConfig({
     resolve: {
         alias: [{ find: /^@\//, replacement: `${SRC_ALIAS}/` }],
         /**
-         * 库从 npm 装进来(`miko_ui`),它自己的运行时依赖只有
-         * `@preact/signals-core` 一个,`katex` 是可选 peer.本应用的
-         * package.json 也**显式**声明了这两个:应用自己要直接用它们,而且
-         * 声明在这里才能保证解析到应用根目录的那一份实例.dedupe 是第二道
-         * 保险:把它们钉死到应用根目录的那一份实例上.
+         * 库从 npm 装进来(`miko_ui`),它是唯一需要"钉死到应用根目录一份实例"
+         * 的东西:`@preact/signals-core` 是库的响应式真相源,两份实例意味着
+         * signal 与 effect 跨在两条注册表上,表现是"值变了界面不动".
          *
-         * 为什么必须只有一份:
-         *
-         * 1. **测试里的 `vi.mock('katex')` 要能拦住库**:mock 按"从测试文件解析
-         *    出的模块"注册,库的 `dist/formula/FormulaView.js` 必须解析到同一个
-         *    实例,否则公式相关的用例会真的去跑 katex;
-         * 2. **`@preact/signals-core` 是库的响应式真相源**:两份实例意味着 signal
-         *    与 effect 跨在两条注册表上,表现是"值变了界面不动".
+         * **为什么这里不再有 `katex`**:本应用不直接依赖 katex -- LaTeX 的排版,
+         * 样式(`katex/dist/katex.min.css`)与测试替身都由库自带,应用侧不声明,
+         * 不 import,不 mock(见 `src/config/dependencyBoundary.test.ts` 的三条
+         * 守卫).这条 dedupe 以前存在的理由是"让测试里的 `vi.mock('katex')`
+         * 拦得住库";那个 mock 已经随库的渲染器出口
+         * (`setFormulaRenderer` / `installDomStub()`)一起删除,理由随之消失.
          */
-        dedupe: ['katex', '@preact/signals-core'],
+        dedupe: ['@preact/signals-core'],
     },
     optimizeDeps: {
         include: ['three'],

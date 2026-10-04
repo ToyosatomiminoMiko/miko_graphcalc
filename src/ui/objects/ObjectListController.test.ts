@@ -11,11 +11,11 @@
  * 4. 展开细节逐行分块(.eval-details 下每行一个 .eval-detail-line),不是
  *    一堆 inline 公式挤成一行;结果行在 <details> 内,跟着一起开合.
  *
- * DOM 桩与其它 ui 控制器测试共用一份(库的 `miko_ui/testing`);KaTeX 用
- * render(tex, element) 写回 textContent 的假实现,断言只看结构与 LaTeX
+ * DOM 桩与其它 ui 控制器测试共用一份(库的 `miko_ui/testing`);公式由
+ * `installDomStub()` 默认装上的文本替身渲染器原样回写 LaTeX,断言只看结构与
  * 文本,不看排版.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type {
     AnalysisResult,
     OdeTask,
@@ -24,17 +24,6 @@ import type {
     SolveTask,
 } from '@/contract/ir';
 import { installDomStub, StubElement } from 'miko_ui/testing';
-
-vi.mock('katex', () => ({
-    default: {
-        // 真 KaTeX 会把排版结果写进传入的元素;桩里直接回写 TeX 文本,
-        // FormulaView 的模板 clone 才能带上内容.
-        render: (tex: string, element: { textContent: string }) => {
-            element.textContent = tex;
-        },
-    },
-}));
-vi.mock('katex/dist/katex.min.css', () => ({}));
 
 import { ObjectListController } from './ObjectListController';
 

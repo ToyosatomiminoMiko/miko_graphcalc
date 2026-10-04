@@ -1230,3 +1230,31 @@ find src/ui/entity src/ui/evaluation src/ui/objects src/ui/params \
 一项(外加 `peerDependencies` 里的 `katex`).多出一项就是需要评审的事件 --
 这比"靠人记得不要乱加依赖"可靠,也和 §9 的三条断言同一个性质:把口径写成机器
 能查的东西.
+
+### E.4 2026-10 更正:katex 归库,应用侧零声明
+
+E.1–E.3 的数字与结论**保留原样**(它们是当时的口径与决策过程),但其中"应用的直接
+依赖含 `katex`""katex 是库的可选 peer,应用仍要显式装它"两条**已作废**:
+
+| 项 | 2026-09-22(上文) | 现在 |
+| --- | --- | --- |
+| 应用的直接运行时依赖 | `katex`,`three` | 只有 `three`(`@preact/signals-core` 与 `miko_ui` 是另两条) |
+| katex 的位置 | 应用声明 + 库的**可选 peer** | 进库的 `dependencies`(库自带,应用不声明) |
+| 传递进产物的 npm 包 | `three` 与 `katex` | 不变(`katex` 仍进产物,但由库带进来) |
+| `katex` 的测试替身 | 消费者 `vi.mock('katex')` | 库的 `installDomStub()` 默认装文本替身渲染器 |
+| 库的 deps 守卫 | 允许 `katex` 作 peer | **要求** `katex` 在 `dependencies`,`peerDependencies` 必须为空 |
+
+理由(库侧 `docs/value-text-window-layout-plan.md` 第五轮的同一件事):下游规定
+不许直接依赖 katex,而可选 peer 等于把"知道 katex 并安装它"的责任留给应用,那条
+规定会静默失效.落地动作与验收清单见该文第五轮,应用侧已按它执行:删
+`katex` / `@types/katex`,删 4 处 `vi.mock('katex')`,`dedupe` 去掉 `katex`,
+`src/math/latexNumber.ts` 由库的 `numberText({ syntax: 'latex' })` 顶替;应用侧
+三条机器守卫在 `src/config/dependencyBoundary.test.ts`.
+
+**仍未闭环的一处**(不属 E 节口径,是样式接缝):应用 CSS 里还有 4 条
+`.katex { font-size: var(--katex-font-size) }`(`css/panels.css` 2 条,
+`css/process.css` 2 条)与 `UI_CONFIG.formula.katexFontSize`.令牌本身是库
+`styles/tokens.css` 的公开主题面(库内不读,注释里写明"由消费侧读它定渲染字号"),
+所以这不是依赖,而是**库尚未消费自己的令牌**:库里加一条带库自有类名的
+`.katex` 字号规则(≥2 类选择器,否则会被后到的 `katex.min.css` 的
+`.katex{font:normal 1.21em}` 盖掉),应用侧那 4 条就能删干净.

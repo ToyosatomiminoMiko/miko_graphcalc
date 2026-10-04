@@ -350,14 +350,19 @@ npm run build
 
 > **`miko_ui`(网页 UI 库)是 npm 依赖,不在这里.** 它是独立仓库
 > [ToyosatomiminoMiko/miko_ui](https://github.com/ToyosatomiminoMiko/miko_ui),
-> 发布在 npm registry 上.根 `package.json` 里一条 `"miko_ui": "^0.1.2"`,
-> `npm ci` / `npm install` 直接从 registry 装好,和 `three` / `katex` 没有区别:
+> 发布在 npm registry 上.根 `package.json` 里一条 `"miko_ui": "^0.1.6"`,
+> `npm ci` / `npm install` 直接从 registry 装好,和 `three` 没有区别:
 > **本仓库里没有取库的脚本,没有 `preinstall`,也没有 `.cache/` 缓存**.库的检查
 > (边界守卫 / typecheck / vitest)与发布都在库自己的仓库里跑,本仓库不构建库;
 > 源码里的 `import ... from 'miko_ui'` 解析到的是 npm 包里的 `dist/` 构建产物
-> (纯 ESM,自带类型声明).库的运行时依赖只有 `@preact/signals-core`(必装)与
-> `katex`(可选 peer),本应用在 `package.json` 里显式声明了这两个,并由
-> `vite.config.ts` 的 `resolve.dedupe` 保证全程只有一份实例.
+> (纯 ESM,自带类型声明).库的运行时依赖是 `@preact/signals-core` 与 `katex` 两项
+> -- **`katex` 由库自带**(落在库的 `dependencies` 里,不是可选 peer),本应用的
+> `package.json` 里没有它,源码与测试里也不出现它:LaTeX 的排版,样式
+> (`katex/dist/katex.min.css`)与测试替身渲染器全归库的公式件
+> (`createFormulaElement` / `installDomStub()`).因此 `vite.config.ts` 的
+> `resolve.dedupe` 只剩 `@preact/signals-core`(它必须全程只有一份实例).这条边界
+> 由 `src/config/dependencyBoundary.test.ts` 的三条断言守着:声明里没有,代码里
+> 没有,dedupe 里没有.
 >
 > **每次构建对齐最新版(`--ui npm`):** `build.sh --ui npm` 在 `npm ci` 之后,流水线
 > 之前跑一步版本同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就

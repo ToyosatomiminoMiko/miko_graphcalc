@@ -27,7 +27,7 @@ import type {
 } from '@/contract/ir';
 // 展示数据形状在契约层(D3):渲染层不必为了一个类型 import 编译模块.
 import type { EvaluationDetailLine, LatexLine } from '@/contract/evaluation';
-import { latexResultNumber } from '@/math/latexNumber';
+import { LATEX_RESULT_TEXT } from '@/math/latexResultText';
 import { integralBodyLatex, latexNumberText } from './latex';
 
 /**
@@ -221,7 +221,7 @@ export function integralLatexDetailEntries(
             role: 'equation',
             line: {
                 kind: 'latex',
-                latex: result === null ? body : `${body}=${latexResultNumber(result)}`,
+                latex: result === null ? body : `${body}=${LATEX_RESULT_TEXT.toText(result)}`,
             },
         });
     }

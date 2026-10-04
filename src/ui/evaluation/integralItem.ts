@@ -21,7 +21,7 @@ import {
     integralLatexDetailEntries,
     integralLatexSummary,
 } from '@/compiler/dsl/evaluationLatex';
-import { latexResultNumber } from '@/math/latexNumber';
+import { LATEX_RESULT_TEXT } from '@/math/latexResultText';
 import { formatNumber } from 'miko_ui';
 import { createFormulaElement } from 'miko_ui';
 import { EvaluationItem, type EvaluationContext } from './EvaluationItem';
@@ -282,7 +282,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
 
         const latex = value === null
             ? this.bodyLatex
-            : `${this.bodyLatex}=${latexResultNumber(value)}`;
+            : `${this.bodyLatex}=${LATEX_RESULT_TEXT.toText(value)}`;
         const equation = createFormulaElement(latex, 'eval-detail-line ui-scrollbar');
         const existing = container.querySelector<HTMLElement>('.eval-detail-line');
         if (existing) {

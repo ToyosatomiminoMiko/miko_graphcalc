@@ -46,8 +46,10 @@ import {
     createSwitch,
     createSwitchRow,
     create_element,
+    parseNumber,
     watchValue,
     type NumberFieldHandle,
+    type ValueText,
 } from 'miko_ui';
 import {
     CAM_MODE_WHEN_CHECKED,
@@ -63,10 +65,24 @@ export interface ViewPanelHandle {
     dispose(): void;
 }
 
-/** 点的数值显示口径:保留 4 位小数再去零(与老 `PointStyleController` 一致). */
-function formatPointValue(value: number): string {
-    return String(Number(value.toFixed(4)));
-}
+/**
+ * 点的数值**编辑**口径:保留 4 位小数再去零(与老 `PointStyleController` 一致).
+ *
+ * 为什么不直接用库的工厂:`<input type="number">` 的口径要过库的
+ * `assertEditSafe`(输出必须是合法 number 文本,见 `createNumberField`).
+ * - `numberText({ syntax: 'edit', digits: 4 })` 去尾零时会把 `0.0000` 去成**空串**
+ *   (半径 0 是合法值,输入框会莫名其妙变空);
+ * - 不去尾零(`trimZeros: false`,库示例里的写法)则把 `0.2` 显示成 `0.2000`,
+ *   与本控件既有显示不一致.
+ *
+ * 所以这里自定义口径,但只用库给的零件:数值走定点 4 位去零,非有限值给空串
+ * (number 输入框本来就会把它消毒成空串),解析交回库的 `parseNumber`.
+ * 这套口径同样喂得进库的读数件,所以"显示文本"与"编辑文本"仍然是同一份.
+ */
+const POINT_DISPLAY_TEXT: ValueText<number> = {
+    toText: (value) => (Number.isFinite(value) ? String(Number(value.toFixed(4))) : ''),
+    fromText: parseNumber,
+};
 
 /** 会被 `dispose()` 一起解绑的东西:控件句柄与内部订阅. */
 interface Disposable {
@@ -157,7 +173,8 @@ export function createViewPanel(host: HTMLElement, state: ViewState): ViewPanelH
         min: view.point.min,
         // 步长跟着模式走:绝对值与比例各一档(见 viewState.pointStep).
         step: state.pointStep,
-        format: formatPointValue,
+        // 显示/回读口径走库的 `text` 出口:应用侧不再自己写格式化函数(见上).
+        text: POINT_DISPLAY_TEXT,
     });
     disposables.push(pointVisible, pointMode, pointValue);
     guardLowerBound(pointValue, view.point.min, () => state.pointDisplay.peek());
