@@ -13,10 +13,11 @@
  * `createViewState()`;配置错了会在这一层先暴露.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { assertEditSafe } from 'miko_ui';
 import { installDomStub, StubElement } from 'miko_ui/testing';
 import { RENDER_CONFIG } from '@/config/renderConfig';
 import { UI_CONFIG } from '@/config/uiConfig';
-import { createViewPanel, type ViewPanelHandle } from './ViewPanel';
+import { POINT_DISPLAY_TEXT, createViewPanel, type ViewPanelHandle } from './ViewPanel';
 import { createViewState, type ViewState } from './viewState';
 
 let state: ViewState;
@@ -360,5 +361,46 @@ describe('控件与视图状态双向绑定(P3)', () => {
 
         // 面板已经拆了,但节点还在:它不该再被订阅更新
         expect(firstInput(toggle).checked).toBe(true);
+    });
+});
+
+/**
+ * 点数值口径的等价契约.
+ *
+ * 面板把"点的大小"这份口径整个交给了库的 `numberText` 工厂(见 `POINT_DISPLAY_TEXT`
+ * 的文件注释).工厂的**默认**档与老口径不等价(默认会回退科学计数法),所以这里把
+ * "逐字符等于 `String(Number(v.toFixed(4)))`"钉死:谁删掉那个 `exponentialAt`,
+ * 或者换到没有"-0 修正"的库版本,这一条会先红,而不是等到界面上出现 `1.0000e-5`.
+ */
+describe('点数值口径:库工厂与老口径逐字符等价', () => {
+    /** 迁移前的实现(老 `PointStyleController` 的 `formatPointValue`). */
+    const legacy = (value: number): string =>
+        (Number.isFinite(value) ? String(Number(value.toFixed(4))) : '');
+
+    /** 探针:零点,负零,四舍五入边界,指数门槛两侧,超大值与浮点噪声. */
+    const PROBES = [
+        0, -0, 0.5, 0.2, -0.2, 1 / 3, 0.1 + 0.2, 0.0001, 0.00005, 1e-7,
+        -0.00004, 0.000049999, 999999.99999, 1000000, 1000001, 1e21, 123456.789,
+    ] as const;
+
+    it('每个有限值都逐字符相同', () => {
+        for (const value of PROBES) {
+            expect(POINT_DISPLAY_TEXT.toText(value), `v=${String(value)}`).toBe(legacy(value));
+        }
+    });
+
+    it('0 与 -0 排成 "0" 而不是空串(半径 0 是合法值)', () => {
+        expect(POINT_DISPLAY_TEXT.toText(0)).toBe('0');
+        expect(POINT_DISPLAY_TEXT.toText(-0)).toBe('0');
+    });
+
+    it('非有限值排成空串(number 输入框对 NaN 的既有行为)', () => {
+        for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+            expect(POINT_DISPLAY_TEXT.toText(value)).toBe('');
+        }
+    });
+
+    it('过得了库的编辑档自检(输出都是合法 number 输入文本)', () => {
+        expect(assertEditSafe(POINT_DISPLAY_TEXT)).toBe(true);
     });
 });

@@ -46,10 +46,9 @@ import {
     createSwitch,
     createSwitchRow,
     create_element,
-    parseNumber,
+    numberText,
     watchValue,
     type NumberFieldHandle,
-    type ValueText,
 } from 'miko_ui';
 import {
     CAM_MODE_WHEN_CHECKED,
@@ -66,23 +65,27 @@ export interface ViewPanelHandle {
 }
 
 /**
- * 点的数值**编辑**口径:保留 4 位小数再去零(与老 `PointStyleController` 一致).
+ * 点的数值口径:**显示文本与编辑文本共用同一个 `ValueText`**,输出与老
+ * `PointStyleController` 的 `String(Number(v.toFixed(4)))` 逐字符相同.
  *
- * 为什么不直接用库的工厂:`<input type="number">` 的口径要过库的
- * `assertEditSafe`(输出必须是合法 number 文本,见 `createNumberField`).
- * - `numberText({ syntax: 'edit', digits: 4 })` 去尾零时会把 `0.0000` 去成**空串**
- *   (半径 0 是合法值,输入框会莫名其妙变空);
- * - 不去尾零(`trimZeros: false`,库示例里的写法)则把 `0.2` 显示成 `0.2000`,
- *   与本控件既有显示不一致.
+ * 为什么必须显式给 `exponentialAt`:库的编辑档默认在 `|v| < 1e-4` 或 `|v| >= 1e6`
+ * 时切成 `e+n`(`1e-5` 排成 `1.0000e-5`),而"点的大小"这个读数一路是定点.
+ * 把区间开成 `[0, Infinity)`(判据 `low <= |v| < high`,`Infinity` 恒成立)就是让
+ * 定点分支吃下全部有限值.**这条等价关系由 `ViewPanel.test.ts` 的"口径等价"逐值
+ * 钉住**,不靠注释:改库版本或改选项时它会先红.
  *
- * 所以这里自定义口径,但只用库给的零件:数值走定点 4 位去零,非有限值给空串
- * (number 输入框本来就会把它消毒成空串),解析交回库的 `parseNumber`.
- * 这套口径同样喂得进库的读数件,所以"显示文本"与"编辑文本"仍然是同一份.
+ * 非有限值给空串(库编辑档的固定写法):`<input type="number">` 本来就会把
+ * `NaN` / `Infinity` 消毒成空串,显式写出来免得"值是 NaN"伪装成"用户清空了框";
+ * 回读走库的 `parseNumber`,所以显示与编辑是同一份口径.
+ *
+ * 版本前提:编辑档"舍入到零去符号"那条修正(`-0.00004` 给 `0` 而不是 `-0`)与
+ * "katex 收进库 `dependencies`"同属一批未发布改动,`^0.1.10` 之前的发布版没有它.
  */
-const POINT_DISPLAY_TEXT: ValueText<number> = {
-    toText: (value) => (Number.isFinite(value) ? String(Number(value.toFixed(4))) : ''),
-    fromText: parseNumber,
-};
+export const POINT_DISPLAY_TEXT = numberText({
+    syntax: 'edit',
+    digits: 4,
+    exponentialAt: { low: 0, high: Infinity },
+});
 
 /** 会被 `dispose()` 一起解绑的东西:控件句柄与内部订阅. */
 interface Disposable {

@@ -20,13 +20,22 @@
  *    且写入**恰好一处**.这条不是洁癖:应用写成单类 `.katex` 会与
  *    `katex.min.css` 同特异度,又排在前面的关系**静默失效**(库的样式排在前),
  *    而删掉唯一那处写入会把公式从 24px 静默缩到库默认的 19.36px.
+ * 5. **载体**:装到的 `miko_ui` 自己得真的带 katex.前四条只说明"本应用不装
+ *    katex",公式排不排得出来却取决于库那一版把 katex 放在 `dependencies` 还是
+ *    **可选 peer**;可选 peer 等于把"知道 katex 并安装它"推回消费者,而消费者
+ *    已经不装了.这条失败时的表现最难查:Vite 8 对解析不到的 import **不报错**,
+ *    产物入口会变成 `throw Error('Could not resolve "katex" imported by
+ *    "miko_ui". Is it installed?')` -- 构建绿,页面白屏.所以这一条查的是**装到
+ *    的那一份库**(`require.resolve('miko_ui/package.json')`),不是应用自己的声明.
  *
  * 注释与文档里的"KaTeX"不受这条守卫管:公式仍然由 KaTeX 排版,只是那件事
  * 在库里面,应用不需要知道它.
  */
 import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
+const require = createRequire(import.meta.url);
 const ROOT = new URL('../../', import.meta.url);
 
 function readRoot(name: string): string {
@@ -134,5 +143,22 @@ describe('依赖边界:katex 只经 miko_ui 间接依赖', () => {
         }
         expect(writes).toHaveLength(1);
         expect(writes[0]).toContain('app/applyUiConfig.ts');
+    });
+
+    it('装到的 miko_ui 把 katex 放在 dependencies(不是可选 peer)', () => {
+        const installed = JSON.parse(
+            readFileSync(require.resolve('miko_ui/package.json'), 'utf8'),
+        ) as {
+            dependencies?: Record<string, string>;
+            peerDependencies?: Record<string, string>;
+        };
+
+        expect(
+            Object.keys(installed.dependencies ?? {}),
+            '这一版库没把 katex 收进 dependencies:应用已经不声明它了,装出来就没有 katex,'
+            + '公式件会解析失败(构建仍是绿的,产物入口是一个 throw).要么升到带 katex 的'
+            + '那一版库,要么先把 katex 加回应用依赖 -- 别让页面白屏替构建报错',
+        ).toContain('katex');
+        expect(Object.keys(installed.peerDependencies ?? {})).not.toContain('katex');
     });
 });

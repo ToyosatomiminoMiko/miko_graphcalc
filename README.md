@@ -362,9 +362,24 @@ npm run build
 > (`createFormulaElement` / `installDomStub()`).因此 `vite.config.ts` 的
 > `resolve.dedupe` 只剩 `@preact/signals-core`(它必须全程只有一份实例),应用
 > CSS 里也没有 `.katex` 选择器.这条边界
-> 由 `src/config/dependencyBoundary.test.ts` 的四条断言守着:声明里没有,代码里
+> 由 `src/config/dependencyBoundary.test.ts` 的**五条**断言守着:声明里没有,代码里
 > 没有,dedupe 里没有,样式里没有(字号只经库的令牌 `--katex-font-size`,且
-> 恰好一处写入 -- 库默认是 1.21em,本应用显式要 1.5em/24px).
+> 恰好一处写入 -- 库默认是 1.21em,本应用显式要 1.5em/24px),以及**装到的那一份库
+> 自己把 katex 放在 `dependencies`**.
+>
+> **版本前提(2026-10 核对,未闭环):** 最后一条依赖库"**把 katex 收进
+> `dependencies`**"的那一版.本地工作副本已就位,但 npm 上的 `latest`(0.1.10)仍是
+> 旧的**可选 peer** 版本(`npm install miko_ui@0.1.10` 实测只装
+> `@preact/signals-core`,**没有** katex),而且它的 `dist/formula/FormulaView.js`
+> 是静态 `import katex from 'katex'` + `import 'katex/dist/katex.min.css'`;它连本
+> 应用已经在用的 `numberText` / `ValueText` 出口都还没有(同一批未发布改动).应用侧
+> 既然已经不声明 katex,这条路的表现是**构建绿,页面白屏**:Vite 8 对解析不到的
+> import 不报错,产物入口会变成
+> `throw Error('Could not resolve "katex" imported by "miko_ui". Is it installed?')`.
+> 所以**在库发布那一版之前,`--ui npm` 那条路(含 GitHub Pages)拿不到可用产物**;
+> 本地 `bash ./build.sh`(默认用工作副本)不受影响.发布后把根 `package.json` 的
+> `miko_ui` 升到那一版即可(`npm install miko_ui@<版本>` 会一并刷新 lock -- 现在
+> lock 钉的 0.1.6 里连 katex 条目都没有).
 >
 > **每次构建对齐最新版(`--ui npm`):** `build.sh --ui npm` 在 `npm ci` 之后,流水线
 > 之前跑一步版本同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就

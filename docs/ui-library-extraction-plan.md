@@ -1271,3 +1271,29 @@ E.1–E.3 的数字与结论**保留原样**(它们是当时的口径与决策�
 所以库侧"删掉令牌写入 = 零视觉变化"的推论在**单类选择器**的前提下才成立;本项目要
 保住 24px 就必须留着那一处写入,`applyUiConfig.test.ts` 里把这条列为"应用显式覆盖
 值的令牌"(只校验库声明过它,不校验值相同).
+
+### E.5 2026-10 核对:这条边界在 npm 路径上还没闭环
+
+E.4 是按"katex 已归库"写的,但那次落地**只在库的工作副本里,npm 上还没有**,
+而本应用取库的唯一正路是 npm(`build.sh --ui npm` / GitHub Pages).逐条实测
+(2026-10-05):
+
+| 事实 | 证据 |
+| --- | --- |
+| npm 的 `latest` 仍是 `0.1.10`,katex 在**可选 peer** | `npm view miko_ui@0.1.10 dependencies peerDependencies` |
+| `npm install miko_ui@0.1.10` **不装** katex | 空目录实测:`added 3 packages`,没有 `node_modules/katex` |
+| 发布的 `dist/` 静态引它 | `dist/formula/FormulaView.js`:`import katex from 'katex'` + `import 'katex/dist/katex.min.css'` |
+| 发布版连 `numberText` / `ValueText` 都还没有 | `dist/shared/numberText.d.ts` 只剩 `formatNumber` / `formatVector` |
+| 干净安装形状下 Vite 构建"绿"而产物不可用 | 产物入口 = `throw Error('Could not resolve "katex" imported by "miko_ui". Is it installed?')` |
+
+本地之所以全绿,是因为 `node_modules/miko_ui` 是指向工作副本的符号链接
+(`scripts/dev_ui_link.py`),Vite 默认解析真身路径,`katex` 于是从工作副本自己的
+`node_modules/` 里被解析到 -- 这条链在 npm 形状下不存在.**构建不报错**是这里最
+危险的一点:Vite 8 对解析不到的 import 只在产物里放一个 throw.
+
+落地动作两步:(1)**库发一版** -- 把 katex 移进 `dependencies` 的那批改动
+(含 `valueText` / `numberText` 出口与编辑档的 `-0` 修正);npm 上 `0.1.10` 这个
+版本号已被占用,必须 bump.(2)本仓库 `npm install miko_ui@<新版本>`,它会一并刷新
+`package.json` 与 `package-lock.json`(lock 现在钉的是 0.1.6,条目里连 katex 的
+依赖边都没有).在那之前 `--ui npm` 的产物不可用;`dependencyBoundary.test.ts`
+第 5 条(2026-10 新增)会红在"装到的那一份库"上,而不是等页面白屏.

@@ -18,8 +18,11 @@ jobs:
   # UI 库的检查(边界守卫 / typecheck / vitest)与**发布**都在库自己的仓库里跑:
   #   https://github.com/ToyosatomiminoMiko/miko_ui
   #   (ci.yml 是检查,release.yml 出 GitHub release 与 npm 包)
-  # 本仓库只从 npm 取它:package.json 里一条 `"miko_ui": "^0.1.2"`,`npm ci`
+  # 本仓库只从 npm 取它:package.json 里一条 `miko_ui` 依赖,`npm ci`
   # 直接从 registry 装好.所以这里不需要 checkout submodule,也不需要额外的凭据.
+  # 版本号随每次 `--ui npm` 的同步走,这里刻意不写死(旧的 `^0.1.2` / `^0.1.6`
+  # 都留过,写死只会过期);当前能否部署取决于 npm 上那一版是否已经把 katex 收进
+  # `dependencies`(见 README 的"版本前提"与 dependencyBoundary 第 5 条).
   # 注意 build.sh 必须显式带 `--ui npm`:本地默认已改成用工作副本构建,而 CI 上
   # 既没有那份副本,部署出去的也必须是 npm 上能说清哪一版的产物(build.sh 在
   # CI 里会直接拒绝默认的本地模式).带上 --ui npm 之后,它还会把 miko_ui 对齐到
