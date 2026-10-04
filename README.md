@@ -358,11 +358,13 @@ npm run build
 > (纯 ESM,自带类型声明).库的运行时依赖是 `@preact/signals-core` 与 `katex` 两项
 > -- **`katex` 由库自带**(落在库的 `dependencies` 里,不是可选 peer),本应用的
 > `package.json` 里没有它,源码与测试里也不出现它:LaTeX 的排版,样式
-> (`katex/dist/katex.min.css`)与测试替身渲染器全归库的公式件
+> (`katex/dist/katex.min.css`),公式字号与测试替身渲染器全归库的公式件
 > (`createFormulaElement` / `installDomStub()`).因此 `vite.config.ts` 的
-> `resolve.dedupe` 只剩 `@preact/signals-core`(它必须全程只有一份实例).这条边界
-> 由 `src/config/dependencyBoundary.test.ts` 的三条断言守着:声明里没有,代码里
-> 没有,dedupe 里没有.
+> `resolve.dedupe` 只剩 `@preact/signals-core`(它必须全程只有一份实例),应用
+> CSS 里也没有 `.katex` 选择器.这条边界
+> 由 `src/config/dependencyBoundary.test.ts` 的四条断言守着:声明里没有,代码里
+> 没有,dedupe 里没有,样式里没有(字号只经库的令牌 `--katex-font-size`,且
+> 恰好一处写入 -- 库默认是 1.21em,本应用显式要 1.5em/24px).
 >
 > **每次构建对齐最新版(`--ui npm`):** `build.sh --ui npm` 在 `npm ci` 之后,流水线
 > 之前跑一步版本同步 -- 拿 npm 的 `latest` 与已装版本比,不一致就

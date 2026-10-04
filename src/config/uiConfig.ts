@@ -150,11 +150,21 @@ export const UI_CONFIG = {
          */
         gutterMinWidth: 32,
     },
-    /** 公式:底部对象列表里的 KaTeX */
+    /** 公式:底部对象列表与求值/过程条目里的公式件(`createFormulaElement`) */
     formula: {
         /**
-         * KaTeX 字号,单位 em,基准是 `panels.css`/`.object-expr` 的 16px.
-         * 1 -> 16px;只影响样式,不影响 FormulaView 的模板缓存.
+         * 公式字号,单位 em,基准是 `panels.css` 里 `.object-expr` / `.eval-result`
+         * 那条 16px;1.5 -> 24px.
+         *
+         * 这个值是库的公开主题令牌 `--katex-font-size` 的唯一输入:库的
+         * `styles/widgets.css` 里 `.ui-formula > .katex` 读它(2026-10 起**库自己
+         * 消费**),应用侧不再写 `.katex` 选择器.
+         *
+         * 库的默认档是 1.21em(KaTeX 自带的值),1.5em 是本应用**显式**要的:删掉
+         * `applyUiConfig` 里那行写入,公式会静默缩到 19.36px.所以
+         * `dependencyBoundary.test.ts` 钉住"令牌恰好一处写入".
+         *
+         * 只影响样式,不影响 FormulaView 的模板缓存.
          */
         katexFontSize: 1.5,
     },

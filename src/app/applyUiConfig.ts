@@ -25,11 +25,14 @@ import { UI_CONFIG } from '@/config/uiConfig';
  */
 export function uiConfigCssVariables(): ThemeTokens {
     return {
-        // 编辑器 / 公式:消费者是 css/editor.css 与 css/panels.css.
+        // 编辑器:消费者是 css/editor.css.
         '--code-font-family': UI_CONFIG.editor.fontFamily,
         '--code-font-size': `${UI_CONFIG.editor.fontSize}px`,
         '--code-line-height': String(UI_CONFIG.editor.lineHeight),
         '--code-tab-size': String(UI_CONFIG.editor.tabSize),
+        // 公式字号:库的 `.ui-formula > .katex` 读它(见 uiConfig.formula).
+        // 应用侧没有 `.katex` 选择器了,这里是**唯一**的写入点 -- 删掉它公式会
+        // 静默落到库默认的 1.21em,所以守卫钉住这一处.
         '--katex-font-size': `${UI_CONFIG.formula.katexFontSize}em`,
         '--code-gutter-width': `${UI_CONFIG.editor.gutterMinWidth}px`,
 

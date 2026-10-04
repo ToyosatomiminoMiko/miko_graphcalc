@@ -70,14 +70,11 @@
     border-bottom: 1px solid var(--color-border-divider);
 }
 
+/* 公式继承这一格的配色;`.katex` 的字号与配色由库的 `.ui-formula > .katex` 负责
+   (见 miko_ui/styles/widgets.css),应用不写公式内部选择器. */
 .process-problem-formula {
     min-width: 0;
     color: var(--color-text-strong);
-}
-
-.process-problem-formula .katex {
-    color: inherit;
-    font-size: var(--katex-font-size, 1em);
 }
 
 .process-problem-formula[data-tex] {
@@ -138,11 +135,6 @@
     overflow-x: auto;
     overflow-y: hidden;
     color: var(--color-text-formula);
-}
-
-.process-step-formula .katex {
-    color: inherit;
-    font-size: var(--katex-font-size, 1em);
 }
 
 .process-step-reason {

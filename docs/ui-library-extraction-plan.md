@@ -1249,12 +1249,25 @@ E.1–E.3 的数字与结论**保留原样**(它们是当时的口径与决策�
 规定会静默失效.落地动作与验收清单见该文第五轮,应用侧已按它执行:删
 `katex` / `@types/katex`,删 4 处 `vi.mock('katex')`,`dedupe` 去掉 `katex`,
 `src/math/latexNumber.ts` 由库的 `numberText({ syntax: 'latex' })` 顶替;应用侧
-三条机器守卫在 `src/config/dependencyBoundary.test.ts`.
+四条机器守卫在 `src/config/dependencyBoundary.test.ts`.
 
-**仍未闭环的一处**(不属 E 节口径,是样式接缝):应用 CSS 里还有 4 条
-`.katex { font-size: var(--katex-font-size) }`(`css/panels.css` 2 条,
-`css/process.css` 2 条)与 `UI_CONFIG.formula.katexFontSize`.令牌本身是库
-`styles/tokens.css` 的公开主题面(库内不读,注释里写明"由消费侧读它定渲染字号"),
-所以这不是依赖,而是**库尚未消费自己的令牌**:库里加一条带库自有类名的
-`.katex` 字号规则(≥2 类选择器,否则会被后到的 `katex.min.css` 的
-`.katex{font:normal 1.21em}` 盖掉),应用侧那 4 条就能删干净.
+**样式接缝也已闭环(同日)**:库补了 `.ui-formula > .katex` 规则自己消费
+`--katex-font-size`,应用侧那 4 条 `.katex` 规则(`css/panels.css` 2 条,
+`css/process.css` 2 条)随之删除;`--katex-font-size` 的写入保留**恰好一处**
+(`applyUiConfig`),由守卫第 4 条钉住.
+
+一处要记下来的**判断分歧**(库侧第五轮的说明里"下游那条单类规则一直输给
+`katex.min.css`"不成立):应用那 4 条从来是**双类**后代选择器
+(`.object-expr .katex` 等,0,2,0),KaTeX 自带的是单类 `.katex`(0,1,0),
+所以它们一直生效,公式一直是 **24px**(1.5em).无头 Chromium 实测(六个位置:
+`object-expr` / `eval-summary-formula` / `eval-detail-line` / `eval-result` /
+`process-problem-formula` / `process-step-formula`):
+
+| 场景 | 改前 | 删 4 条规则后 |
+| --- | --- | --- |
+| 应用写令牌 1.5em | 24px | **24px**(靠库的 `.ui-formula > .katex`) |
+| 不写令牌(库默认 1.21em) | 19.36px | 19.36px |
+
+所以库侧"删掉令牌写入 = 零视觉变化"的推论在**单类选择器**的前提下才成立;本项目要
+保住 24px 就必须留着那一处写入,`applyUiConfig.test.ts` 里把这条列为"应用显式覆盖
+值的令牌"(只校验库声明过它,不校验值相同).

@@ -158,17 +158,31 @@ describe('token 层的默认值(P4/D8 之后在库里)', () => {
             '--params-panel-min-height',
             '--view-controls-min-height',
         ] as const;
-        const libraryOwned = Object.fromEntries(
-            Object.entries(uiConfigCssVariables()).filter(
-                ([name]) => !APP_OWNED_FALLBACKS.includes(
-                    name as (typeof APP_OWNED_FALLBACKS)[number],
-                ),
-            ),
+
+        // 第三个例外只在**值**上:`--katex-font-size` 库声明了它(1.21em,KaTeX 自带的
+        // 档位)并且自己读它(`widgets.css` 的 `.ui-formula > .katex`),而本应用显式
+        // 要 1.5em / 24px(见 `uiConfig.formula`).所以只要求"库声明过这一项",
+        // 不要求值相同 -- 库调自己的默认档时,不该逼着应用跟着缩水.
+        const APP_OVERRIDDEN_VALUES = ['--katex-font-size'] as const;
+        const exempt = new Set<string>([...APP_OWNED_FALLBACKS, ...APP_OVERRIDDEN_VALUES]);
+
+        const mustMatch = Object.fromEntries(
+            Object.entries(uiConfigCssVariables()).filter(([name]) => !exempt.has(name)),
         );
 
-        expect(fallbacks).toMatchObject(libraryOwned);
+        expect(fallbacks).toMatchObject(mustMatch);
         for (const name of APP_OWNED_FALLBACKS) {
             expect(fallbacks[name], `${name} 不该出现在库的 token 层`).toBeUndefined();
+        }
+        for (const name of APP_OVERRIDDEN_VALUES) {
+            expect(
+                fallbacks[name],
+                `${name} 该由库的 token 层声明(应用只覆盖它的值)`,
+            ).toBeDefined();
+            expect(
+                uiConfigCssVariables()[name],
+                `${name} 被应用覆盖的原因要成立:两边值不同才是"覆盖"`,
+            ).not.toBe(fallbacks[name]);
         }
     });
 

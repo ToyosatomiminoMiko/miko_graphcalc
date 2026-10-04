@@ -391,12 +391,6 @@
     overflow-wrap: anywhere;
 }
 
-/* KaTeX 生成的公式继承对象列表配色,不套用代码字体;字号由 UI_CONFIG 控制. */
-.object-expr .katex {
-    color: inherit;
-    font-size: var(--katex-font-size, 1em);
-}
-
 /* 可复制公式:光标与悬停色表达"可点",提示文案不放在这里. */
 .object-expr[data-tex] {
     cursor: pointer;
@@ -462,7 +456,8 @@
     white-space: nowrap;
 }
 
-/* KaTeX 生成的公式继承列表配色;字号与实体对象公式一致(见 uiConfig). */
+/* 公式继承列表配色(`.katex` 的字号与配色由库的 `.ui-formula > .katex` 负责,
+   见 miko_ui/styles/widgets.css;应用不再写公式内部选择器). */
 .eval-summary-formula,
 .eval-detail-line {
     min-width: 0;
@@ -470,13 +465,6 @@
     overflow-x: auto;
     overflow-y: hidden;
     max-width: 100%;
-}
-
-.eval-summary-formula .katex,
-.eval-detail-line .katex,
-.eval-result .katex {
-    color: inherit;
-    font-size: var(--katex-font-size, 1em);
 }
 
 /* 可复制公式:与实体对象公式同一套交互(FormulaCopyController 事件委托). */
