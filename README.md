@@ -381,6 +381,18 @@ npm run build
 > 恰好一处写入 -- 库默认是 1.21em,本应用显式要 1.5em/24px),以及**装到的那一份库
 > 自己把 katex 放在 `dependencies`**.
 >
+> **公式边界(三段,2026-10 定):** ① LaTeX 的**排版实现**只能在库(上一条:
+> 应用不声明/不 import katex);② 数值与向量的**文本口径**也只能在库 -- 应用侧
+> 只做"选档位"(构造库的 ValueText 实例),不实现格式化(自己算科学计数法,自己
+> 拼 `\times10^{n}` 都算另起一套);公式用的两档实例集中在 `src/math/latexText.ts`
+> (`LATEX_NUMBER_TEXT` / `LATEX_VECTOR_TEXT`);③ 公式的**领域语义**
+> (∇/∫/∂/区域不等式/ODE 解族)留在编译器(`compiler/dsl/latex.ts` /
+> `evaluationLatex.ts` / `analyses.ts`)-- 那是数学,不是 UI:搬进库会让库认识
+> `@/contract` 的 IR,直接撞上库自己的 `domain-imports` 守卫.①由
+> `src/config/dependencyBoundary.test.ts` 守,②③由
+> `src/config/latexBoundary.test.ts` 守(Rust 符号引擎自产的 LaTeX 不在射程内,
+> 见该文件头).
+>
 > **版本前提(2026-10 核对,未闭环):** 最后一条依赖库"**把 katex 收进
 > `dependencies`**"的那一版.本地工作副本已就位,但 npm 上的 `latest`(0.1.10)仍是
 > 旧的**可选 peer** 版本(`npm install miko_ui@0.1.10` 实测只装

@@ -6,6 +6,11 @@
  * 这里只负责补上对象语义(curve 是 y=...,surface 是 z=...,求导对象是
  * d/dx(源函数)=导函数 或 ∂/∂y(源函数)=导函数,region 是不等式带,
  * 积分是 ∫/∬/∭...).
+ *
+ * 数值本身**不在这里格式化**:区间端点/隐式场 level/积分上下限都经库的
+ * `numberText({ syntax: 'latex' })` 实例(`@/math/latexText` 的
+ * LATEX_NUMBER_TEXT),否则同一份值会在结果行与上下限里出现两种写法.
+ * 这里的字符串拼装只承担"数学语义"(哪个位置放什么),不承担数值口径.
  */
 import type {
     AntiderivativeOrigin,
@@ -14,17 +19,8 @@ import type {
     OdeOrigin,
     SceneObject,
 } from '@/contract/ir';
+import { LATEX_NUMBER_TEXT } from '@/math/latexText';
 import { cachedLatexExpression } from './expression';
-
-function latexNumber(value: number): string {
-    if (!Number.isFinite(value)) return String(value);
-    return String(value);
-}
-
-/** 数值 -> LaTeX 数字(供求值结果公式复用;与 latexNumber 同口径). */
-export function latexNumberText(value: number): string {
-    return latexNumber(value);
-}
 
 /**
  * 求导算子:curve 用常导 d/dx,surface 用偏导 ∂/∂x 或 ∂/∂y.
@@ -79,7 +75,7 @@ function antiderivativeLatex(
     if (constant === 0) {
         return `${target}=${integral}`;
     }
-    return `${target}=${integral}+\\left(${latexNumberText(constant)}\\right)`;
+    return `${target}=${integral}+\\left(${LATEX_NUMBER_TEXT.toText(constant)}\\right)`;
 }
 
 /**
@@ -99,8 +95,11 @@ function odeLatex(target: 'y' | 'z', origin: OdeOrigin, resultExpr: string): str
         ? '特解'
         : origin.constant === null
             ? '解族'
-            : `解族 C=${latexNumberText(origin.constant)}`;
-    return `${target}=${cachedLatexExpression(resultExpr)}\quad\left(\text{${label}}\right)`;
+            : `解族 C=${LATEX_NUMBER_TEXT.toText(origin.constant)}`;
+    // 反斜杠必须成对:模板字符串里 `\t` 是制表符,`\r` 是回车,`\quad` 这类
+    // 未知转义会把反斜杠吞掉.这一行历史上漏过一层,ODE 解族公式因此在屏幕上
+    // 排成 `quadleft(` + TAB + `ext{...}` + 回车 + `ight)`(2026-10 修).
+    return `${target}=${cachedLatexExpression(resultExpr)}\\quad\\left(\\text{${label}}\\right)`;
 }
 
 /**
@@ -178,13 +177,13 @@ export function sceneObjectLatex(
                     fA,
                     `\\le y\\le`,
                     fB,
-                    `,\\quad ${latexNumber(a)}\\le x\\le ${latexNumber(b)}`,
+                    `,\\quad ${LATEX_NUMBER_TEXT.toText(a)}\\le x\\le ${LATEX_NUMBER_TEXT.toText(b)}`,
                 ].join(' ');
             }
             case 'implicit':
                 // 隐式场本身就是方程:`f(x,y,z) = level`,左端没有因变量,
                 // 不能套 curve/surface 的 `y=` / `z=`.
-                return `${cachedLatexExpression(object.expr)}=${latexNumber(object.level)}`;
+                return `${cachedLatexExpression(object.expr)}=${LATEX_NUMBER_TEXT.toText(object.level)}`;
             case 'sphere':
             case 'box':
             case 'conic':
@@ -229,7 +228,7 @@ export function integralBodyLatex(
         if (task.domainKind === 'interval' && task.range) {
             const [a, b] = task.range as [number, number];
             return [
-                `\\int_{${latexNumber(a)}}^{${latexNumber(b)}}`,
+                `\\int_{${LATEX_NUMBER_TEXT.toText(a)}}^{${LATEX_NUMBER_TEXT.toText(b)}}`,
                 integrand,
                 '\\mathrm{d}x',
             ].join(' ');
@@ -243,8 +242,8 @@ export function integralBodyLatex(
                 number,
             ];
             return [
-                `\\int_{${latexNumber(xa)}}^{${latexNumber(xb)}}`,
-                `\\int_{${latexNumber(ya)}}^{${latexNumber(yb)}}`,
+                `\\int_{${LATEX_NUMBER_TEXT.toText(xa)}}^{${LATEX_NUMBER_TEXT.toText(xb)}}`,
+                `\\int_{${LATEX_NUMBER_TEXT.toText(ya)}}^{${LATEX_NUMBER_TEXT.toText(yb)}}`,
                 integrand,
                 '\\mathrm{d}y\\,\\mathrm{d}x',
             ].join(' ');

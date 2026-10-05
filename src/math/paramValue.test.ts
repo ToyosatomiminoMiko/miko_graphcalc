@@ -4,13 +4,13 @@
  * 循环参数在编译期与参数面板共用这一份实现,这里锁定三件事:
  * 普通参数仍夹取,循环参数回绕到半开区间 [min, max),非法值报错.
  *
- * 后半段是**结果数值 LaTeX 口径的漂移哨兵**:口径本体在库的
- * `numberText({ syntax: 'latex' })` 里(应用侧只留实例,见 `latexResultText.ts`),
+ * 后半段是**公式数值/向量 LaTeX 口径的漂移哨兵**:口径本体在库的
+ * `numberText` / `numberVectorText` 里(应用侧只留实例,见 `latexText.ts`),
  * 这里逐条钉住历史上 `src/math/latexNumber.ts` 的期望文本 -- 库改了档位,
  * 应用换错了语法,公式就会在这里红,而不是等到屏幕上等号右端变形.
  */
 import { describe, expect, it } from 'vitest';
-import { LATEX_RESULT_TEXT } from './latexResultText';
+import { LATEX_NUMBER_TEXT, LATEX_VECTOR_TEXT } from './latexText';
 import { normalizeParamValue } from './paramValue';
 
 const ordinary = { name: 'a', min: -2, max: 2 };
@@ -58,25 +58,42 @@ describe('normalizeParamValue', () => {
     });
 });
 
-describe('结果数值的 LaTeX 口径(库的 numberText latex 档)', () => {
+describe('公式数值的 LaTeX 口径(库的 numberText latex 档)', () => {
     it('常规数值去掉多余小数 0', () => {
-        expect(LATEX_RESULT_TEXT.toText(2)).toBe('2');
-        expect(LATEX_RESULT_TEXT.toText(1.5)).toBe('1.5');
-        expect(LATEX_RESULT_TEXT.toText(-0.25)).toBe('-0.25');
+        expect(LATEX_NUMBER_TEXT.toText(2)).toBe('2');
+        expect(LATEX_NUMBER_TEXT.toText(1.5)).toBe('1.5');
+        expect(LATEX_NUMBER_TEXT.toText(-0.25)).toBe('-0.25');
     });
 
     it('科学计数法转成公式件可排版的 \\times10^{n}', () => {
         // 直接写 2.775558e-17 会被排成斜体 e,必须显式转写.
-        expect(LATEX_RESULT_TEXT.toText(2.775558e-17))
+        expect(LATEX_NUMBER_TEXT.toText(2.775558e-17))
             .toBe('2.775558\\times10^{-17}');
-        expect(LATEX_RESULT_TEXT.toText(-2.775558e-17))
+        expect(LATEX_NUMBER_TEXT.toText(-2.775558e-17))
             .toBe('-2.775558\\times10^{-17}');
-        expect(LATEX_RESULT_TEXT.toText(1.25e20)).toBe('1.25\\times10^{20}');
+        expect(LATEX_NUMBER_TEXT.toText(1.25e20)).toBe('1.25\\times10^{20}');
     });
 
     it('0 与非常规量级各自有可读写法', () => {
-        expect(LATEX_RESULT_TEXT.toText(0)).toBe('0');
+        expect(LATEX_NUMBER_TEXT.toText(0)).toBe('0');
         // 常规量级用定点(1e-4 不写成科学计数法).
-        expect(LATEX_RESULT_TEXT.toText(0.0001)).toBe('0.0001');
+        expect(LATEX_NUMBER_TEXT.toText(0.0001)).toBe('0.0001');
+    });
+
+    it('非有限值原样成文:公式件把 NaN 排成斜体字母,但至少不静默消失', () => {
+        expect(LATEX_NUMBER_TEXT.toText(NaN)).toBe('NaN');
+        expect(LATEX_NUMBER_TEXT.toText(Infinity)).toBe('Infinity');
+    });
+});
+
+describe('公式向量的 LaTeX 口径(库的 numberVectorText latex 档)', () => {
+    it('行向量用可定高的圆括号,分量间隔是显式空白 `,\\ `', () => {
+        expect(LATEX_VECTOR_TEXT.toText([1, 2, 3])).toBe('\\left(1,\\ 2,\\ 3\\right)');
+        expect(LATEX_VECTOR_TEXT.toText([-0.25, 0.0001])).toBe('\\left(-0.25,\\ 0.0001\\right)');
+    });
+
+    it('分量走与标量同一档位:科学计数法同样转写', () => {
+        // 分量若原样给 String(2.775558e-17),公式里会出现斜体 e.
+        expect(LATEX_VECTOR_TEXT.toText([2.775558e-17])).toBe('\\left(2.775558\\times10^{-17}\\right)');
     });
 });

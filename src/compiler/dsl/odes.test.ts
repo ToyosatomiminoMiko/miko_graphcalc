@@ -63,7 +63,9 @@ describe("ode:声明级编译与对象下发", () => {
         // 公式层读 odeOrigin:斜率场排成 `y' = ...`,解曲线带常数标注.
         expect(scene.objectFormulas[field!.id]).toContain("y'=");
         const first = scene.objects.find((object) => object.name === 'O1_c1')!;
-        expect(scene.objectFormulas[first.id]).toContain('解族');
+        // 连反斜杠一起钉住:只断言"含解族"会漏掉"反斜杠被 JS 模板字符串的转义
+        // 吞掉"这一类坏公式(`\quad` -> `quad`,`\text` -> TAB+`ext`,2026-10 事故).
+        expect(scene.objectFormulas[first.id]).toContain('\\quad\\left(\\text{解族');
     });
 
     it('下游语句可以引用解曲线(与 derivative 同一条 resolvable 链)', async () => {

@@ -12,6 +12,10 @@
  * 返回,列表里一行排不下时由 CSS 横向滚动承接(KaTeX 不换行,这是屏上
  * 唯一不破坏公式语义的溢出处理).
  *
+ * 本文件只决定"哪个位置放数值",不决定"数值长什么样":数值与向量的文本
+ * 口径来自库(`@/math/latexText` 的两个实例,LATEX_NUMBER_TEXT /
+ * LATEX_VECTOR_TEXT),它们逐字符等于结果行与对象公式里的同一份写法.
+ *
  * 折叠态是否给数值是**有意按算子区分**的(见 UI-P3.13):需要展开才能读到
  * 推导过程的(梯度,积分)只给算子/积分式的书写形式,数值留在细节行;
  * 没有中间步骤可看的(散度,旋度)直接把结果排进摘要.同一列表里两类条目
@@ -27,19 +31,14 @@ import type {
 } from '@/contract/ir';
 // 展示数据形状在契约层(D3):渲染层不必为了一个类型 import 编译模块.
 import type { EvaluationDetailLine, LatexLine } from '@/contract/evaluation';
-import { LATEX_RESULT_TEXT } from '@/math/latexResultText';
-import { integralBodyLatex, latexNumberText } from './latex';
+import { LATEX_NUMBER_TEXT, LATEX_VECTOR_TEXT } from '@/math/latexText';
+import { integralBodyLatex } from './latex';
 
 /**
  * 积分式本体(``∫_a^b f dx``),再导出给 UI:积分条目的摘要排版它,数值回填后
  * 把 `=数值` 接在同一个字符串上,保证摘要与细节两处公式同源.
  */
 export { integralBodyLatex };
-
-/** 数值数组 -> LaTeX 行向量 `\left(1, 2, 3\right)`. */
-function vectorLatex(values: readonly number[]): string {
-    return `\\left(${values.map((value) => latexNumberText(value)).join(',\\ ')}\\right)`;
-}
 
 /**
  * 分析结果摘要:默认可见的一行.
@@ -53,16 +52,16 @@ function vectorLatex(values: readonly number[]): string {
  * 直接把向量排进摘要.梯度则只给书写形式,数值留在细节.
  */
 export function analysisLatexSummary(analysis: AnalysisResult): LatexLine {
-    const point = vectorLatex(analysis.point);
+    const point = LATEX_VECTOR_TEXT.toText(analysis.point);
     switch (analysis.op) {
         case 'gradient':
             return `\\nabla f\\left(${point}\\right)`;
         case 'divergence':
-            return `\\nabla\\cdot\\mathbf{F}\\left(${point}\\right)=${latexNumberText(analysis.scalar ?? NaN)}`;
+            return `\\nabla\\cdot\\mathbf{F}\\left(${point}\\right)=${LATEX_NUMBER_TEXT.toText(analysis.scalar ?? NaN)}`;
         case 'curl':
-            return `\\nabla\\times\\mathbf{F}\\left(${point}\\right)=${vectorLatex(analysis.vector)}`;
+            return `\\nabla\\times\\mathbf{F}\\left(${point}\\right)=${LATEX_VECTOR_TEXT.toText(analysis.vector)}`;
         case 'laplacian':
-            return `\\nabla^{2}f\\left(${point}\\right)=${latexNumberText(analysis.scalar ?? NaN)}`;
+            return `\\nabla^{2}f\\left(${point}\\right)=${LATEX_NUMBER_TEXT.toText(analysis.scalar ?? NaN)}`;
     }
 }
 
@@ -135,37 +134,37 @@ export function analysisLatexDetailEntries(
     }
 
     if (analysis.op === 'gradient') {
-        push('value', `\\nabla f\\left(P\\right)=${vectorLatex(analysis.vector)}`);
+        push('value', `\\nabla f\\left(P\\right)=${LATEX_VECTOR_TEXT.toText(analysis.vector)}`);
     } else if (analysis.op === 'divergence') {
         push(
             'value',
-            `\\left(\\nabla\\cdot\\mathbf{F}\\right)\\left(P\\right)=${latexNumberText(analysis.scalar ?? NaN)}`,
+            `\\left(\\nabla\\cdot\\mathbf{F}\\right)\\left(P\\right)=${LATEX_NUMBER_TEXT.toText(analysis.scalar ?? NaN)}`,
         );
     } else if (analysis.op === 'laplacian') {
         push(
             'value',
-            `\\left(\\nabla^{2}f\\right)\\left(P\\right)=${latexNumberText(analysis.scalar ?? NaN)}`,
+            `\\left(\\nabla^{2}f\\right)\\left(P\\right)=${LATEX_NUMBER_TEXT.toText(analysis.scalar ?? NaN)}`,
         );
     } else {
         push(
             'value',
-            `\\left(\\nabla\\times\\mathbf{F}\\right)\\left(P\\right)=${vectorLatex(analysis.vector)}`,
+            `\\left(\\nabla\\times\\mathbf{F}\\right)\\left(P\\right)=${LATEX_VECTOR_TEXT.toText(analysis.vector)}`,
         );
     }
 
-    push('point', `P=${vectorLatex(analysis.point)}`);
+    push('point', `P=${LATEX_VECTOR_TEXT.toText(analysis.point)}`);
 
     // 球坐标回显:与 at spherical 共用同一份约定(见 math/CoordinateSystem.ts).
     if (analysis.pointSpherical) {
-        push('spherical', `\\left(r,\\theta,\\varphi\\right)=${vectorLatex(analysis.pointSpherical)}`);
+        push('spherical', `\\left(r,\\theta,\\varphi\\right)=${LATEX_VECTOR_TEXT.toText(analysis.pointSpherical)}`);
     }
 
     if (analysis.op === 'gradient') {
         if (analysis.scalar !== null) {
-            push('scalar', `f\\left(P\\right)=${latexNumberText(analysis.scalar)}`);
+            push('scalar', `f\\left(P\\right)=${LATEX_NUMBER_TEXT.toText(analysis.scalar)}`);
         }
         if (analysis.tangent) {
-            push('tangent', `\\mathbf{T}=${vectorLatex(analysis.tangent)}`);
+            push('tangent', `\\mathbf{T}=${LATEX_VECTOR_TEXT.toText(analysis.tangent)}`);
         }
     }
 
@@ -221,7 +220,7 @@ export function integralLatexDetailEntries(
             role: 'equation',
             line: {
                 kind: 'latex',
-                latex: result === null ? body : `${body}=${LATEX_RESULT_TEXT.toText(result)}`,
+                latex: result === null ? body : `${body}=${LATEX_NUMBER_TEXT.toText(result)}`,
             },
         });
     }
@@ -379,7 +378,7 @@ export function antiderivativeLatexDetailEntries(
             role: 'value',
             line: {
                 kind: 'latex',
-                latex: `=${task.antiderivativeLatex}+${latexNumberText(task.constant)}`,
+                latex: `=${task.antiderivativeLatex}+${LATEX_NUMBER_TEXT.toText(task.constant)}`,
             },
         });
     }
