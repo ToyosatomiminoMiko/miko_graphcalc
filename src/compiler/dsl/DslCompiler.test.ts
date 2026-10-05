@@ -304,7 +304,6 @@ describe('compileScene', () => {
         expect(scene.objectFormulas[1]).toBe('y=sin(x * a)');
         expect(scene.objectFormulas[2]).toBe('z=sin(x) * cos(y)');
         expect(scene.objectFormulas[3]).toContain('\\mathbf{F}');
-        expect(scene.integralFormulas.I).toContain('\\int');
     });
 
     it('defaults univariate curve gradients to also show the tangent line', () => {
@@ -589,8 +588,6 @@ describe('compileScene', () => {
         });
         expect(scene.integrals[0].integrandCoefficients).toEqual([]);
         expect(scene.integrals[1].integrand).toBe('x * x + y * y');
-        expect(scene.integralFormulas.Area).toContain('\\iint');
-        expect(scene.integralFormulas.Moment).toContain('x * x + y * y');
     });
 
     it('compiles triple integrals over solids with world-coordinate integrands', () => {
@@ -638,8 +635,6 @@ describe('compileScene', () => {
         });
         expect(scene.integrals[0].range).toBeUndefined();
         expect(scene.integrals[1].integrand).toBe('x * y + z * z');
-        expect(scene.integralFormulas.Vol).toContain('\\iiint');
-        expect(scene.integralFormulas.M).toContain('\\iiint');
     });
 
     it('rejects unknown integral sources and solid range options', () => {

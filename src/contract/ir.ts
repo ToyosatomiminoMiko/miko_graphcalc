@@ -794,17 +794,13 @@ export interface SceneIR {
      *
      * 体积对象等无法从数值化几何参数给出可靠方程时值为 null,UI 回退到
      * 纯文本摘要.该字段由编译阶段统一生成,避免每次渲染重复调用 LaTeX 引擎.
+     *
+     * 积分式**刻意不在这里并列**:它由 `dsl/evaluationLatex.ts` 的
+     * `integralLatexSummary` 从 `integrals` 现场派生,是唯一来源.IR 里再存一份
+     * `integralFormulas` 就是第二个真相--2026-10 删掉的那个字段正是如此:只被
+     * 测试读,屏幕上一个消费者都没有,却每次编译都真跑一遍 LaTeX 拼装.
      */
     objectFormulas: Record<number, string | null>;
-    /**
-     * 积分任务展示公式:任务名 -> LaTeX 字符串(积分式本体,不含方法名).
-     *
-     * 找不到被积对象时值为 null.它是 IR 的展示元数据,供任意消费者读取;
-     * 求值对象列表(ui/objects/ObjectListController)现在直接调用
-     * `dsl/evaluationLatex.ts` 的 `integralLatexSummary` 生成同样的公式
-     * (两处同源于 `latex.ts` 的 `integralBodyLatex`),不再依赖本字段.
-     */
-    integralFormulas: Record<string, string | null>;
     /**
      * 对象 id -> 行主序 4x4 矩阵,布局见 `math/matrix/rowMajorMatrix.ts`.
      *

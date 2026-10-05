@@ -16,7 +16,7 @@ import { compileIntersections } from './intersections';
 import { compileSolves } from './solves';
 import { collectAntiderivativeTasks } from './antiderivativeTasks';
 import { collectOdeTasks } from './odeTasks';
-import { integralLatex, sceneObjectLatex } from './latex';
+import { sceneObjectLatex } from './latex';
 import {
     cloneAnimations,
     cloneObjectAnimations,
@@ -49,8 +49,9 @@ import {
  *    integral 语句即使被隐藏也必须通过全部声明级校验,错误照常带语句 span
  *    抛出;隐藏只产出 enabled:false 的占位(列表保留,不调度数值计算).
  * 2. 语句名唯一:param/object/animation/analysis/integral/intersection 各自
- *    查重("重复声明").求值语句(analysis/integral/intersection)此前漏了
- *    查重,integralFormulas 这类 Record<名字,...> 会被同名语句静默覆盖.
+ *    查重("重复声明").求值语句此前漏了查重:同名语句会在列表里留下两条同名
+ *    条目,而按名字回填/显隐的入口(`setIntegralResult` 这类)只认第一条,
+ *    第二条的数值会静默落到第一条行上.
  * 3. 表达式归一化收口:curve/surface 单表达式与 vector_field 三分量在
  *    blueprint 阶段统一归一化;region 边界系数也按"归一化后的边界表达式"
  *    提取,保证符号求导/LaTeX/系数集合与对象自身同源(objects/build.ts 文件头).
@@ -165,10 +166,6 @@ export function compileScene(
     for (const object of objects) {
         objectFormulas[object.id] = sceneObjectLatex(object, objectByName);
     }
-    const integralFormulas: Record<string, string | null> = {};
-    for (const task of integrals) {
-        integralFormulas[task.name] = integralLatex(task, objects);
-    }
 
     return {
         params: [...params.values()],
@@ -185,7 +182,6 @@ export function compileScene(
             hiddenAnalysisNames,
         ),
         integrals,
-        integralFormulas,
         intersections: compileIntersections(
             ast,
             objectByName,

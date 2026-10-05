@@ -61,6 +61,48 @@ const curve: SceneObject = {
     enabled: true,
 };
 
+/** 二维矩形域的源:`range` 是 `[xa, xb, ya, yb]`. */
+const surface: SceneObject = {
+    kind: 'surface',
+    id: 2,
+    name: 's',
+    expr: 'x^2',
+    coefficients: [],
+    color: '#ffffff',
+    enabled: true,
+    range: [0, 1, 0, 2],
+};
+
+/** 区域对象:`\iint` 的域下标取**对象名**,所以这条 fixture 的名字是断言的一部分. */
+const region: SceneObject = {
+    kind: 'region',
+    id: 3,
+    name: 'R',
+    curveAName: 'c',
+    curveBName: 'd',
+    range: [-1, 1],
+    coefficients: [],
+    color: '#ffffff',
+    opacity: 0.5,
+    segments: 64,
+    enabled: true,
+};
+
+/** 体积对象:`\iiint` 的域下标同样取对象名. */
+const sphere: SceneObject = {
+    kind: 'sphere',
+    id: 4,
+    name: 'S',
+    expr: '[0, 0, 0]',
+    position: { x: 0, y: 0, z: 0 },
+    radius: 1,
+    coefficients: [],
+    color: '#ffffff',
+    opacity: 0.5,
+    segments: 32,
+    enabled: true,
+};
+
 function integral(overrides: Partial<IntegralTask> = {}): IntegralTask {
     return {
         name: 'I',
@@ -176,6 +218,56 @@ describe('integralLatex', () => {
     it('摘要只给积分式本身,不接等号(数值在结果行/细节里排成完整等式)', () => {
         expect(integralLatexSummary(integral(), [curve]))
             .toBe('\\int_{-4}^{4} x^2 \\mathrm{d}x');
+    });
+
+    /**
+     * 四种积分域各出一种排版符号:`\int` / `\int\int` / `\iint` / `\iiint`.
+     *
+     * 覆盖的是 `integralBodyLatex` 的四个分支,而不是"编译器把公式搬进了 IR".
+     * 这四条断言原先钉在 `DslCompiler.test.ts` 的 `scene.integralFormulas` 上,
+     * 而那个字段只被测试读,屏幕上没有任何消费者(见 contract/ir.ts 的字段说明),
+     * 已在 2026-10 删除;断言随之搬到这里 -- 域符号的覆盖一条不丢.
+     */
+    it('四种积分域各出一种排版符号(interval/rectangle/region/solid)', () => {
+        // 一维区间:`∫_a^b f dx`
+        expect(integralLatexSummary(integral(), [curve]))
+            .toBe('\\int_{-4}^{4} x^2 \\mathrm{d}x');
+
+        // 二维矩形:两个积分号 + `dy dx`,上下限按 (xa, xb, ya, yb) 次序取
+        expect(integralLatexSummary(
+            integral({
+                objectId: 2,
+                sourceKind: 'surface',
+                dim: 2,
+                domainKind: 'rectangle',
+                range: [0, 1, 0, 2],
+            }),
+            [surface],
+        )).toBe('\\int_{0}^{1} \\int_{0}^{2} x^2 \\mathrm{d}y\\,\\mathrm{d}x');
+
+        // 区域对象:域下标是**对象名**(不是 `D` 兜底),因为它就是积分域本身
+        expect(integralLatexSummary(
+            integral({
+                objectId: 3,
+                sourceKind: 'region',
+                dim: 2,
+                domainKind: 'region',
+                range: undefined,
+            }),
+            [region],
+        )).toBe('\\iint_{R} x^2 \\,\\mathrm{d}A');
+
+        // 体积对象:同上,域下标取对象名 `S`
+        expect(integralLatexSummary(
+            integral({
+                objectId: 4,
+                sourceKind: 'sphere',
+                dim: 3,
+                domainKind: 'solid',
+                range: undefined,
+            }),
+            [sphere],
+        )).toBe('\\iiint_{S} x^2 \\,\\mathrm{d}V');
     });
 
     it('找不到被积对象时返回 null', () => {

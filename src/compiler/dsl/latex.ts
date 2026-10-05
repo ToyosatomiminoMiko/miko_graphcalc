@@ -196,25 +196,17 @@ export function sceneObjectLatex(
 }
 
 /**
- * 积分任务的积分式(不含方法名,方法名由 UI 拼在公式后面).
+ * 积分式本体(``∫_a^b f dx`` 这类).
  *
- * 只返回 LaTeX 正文;找不到被积对象/域种类异常时返回 null,由 UI 回退到
- * 文字摘要.域维度与形状由 task 的显式 `dim`/`domainKind` 决定,不再靠
- * range 长度猜测.
- */
-export function integralLatex(
-    task: IntegralTask,
-    objects: readonly SceneObject[],
-): string | null {
-    return integralBodyLatex(task, objects);
-}
-
-/**
- * 积分式本体(``∫_a^b f dx`` 这类),供两处复用:
- * - 实体列表的积分条目公式(本文件 `integralLatex`);
- * - 求值对象的列表条目(ui/objects/ObjectListController 展开细节里的完整公式).
+ * **唯一来源**:求值条目列表的摘要与细节(`evaluationLatex.ts` 的
+ * `integralLatexSummary` / `integralLatexDetailEntries`)都调它,所以折叠态
+ * 与展开态不可能给出两个版本的积分式.编译器不再另算一份存进 IR--
+ * 2026-10 删掉的 `SceneIR.integralFormulas` 就是那个第二来源:只被测试读,
+ * 却每次编译都真跑一遍 LaTeX 拼装.
  *
- * 两处必须同源,否则展开前后会给出两个不同版本的积分式.
+ * 只返回 LaTeX 正文(不含方法名,方法名由 UI 拼在公式后面);找不到被积对象
+ * 或域种类异常时返回 null,由 UI 回退到文字摘要.域维度与形状由 task 的显式
+ * `dim`/`domainKind` 决定,不再靠 range 长度猜测.
  */
 export function integralBodyLatex(
     task: IntegralTask,

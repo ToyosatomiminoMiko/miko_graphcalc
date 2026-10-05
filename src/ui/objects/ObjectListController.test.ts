@@ -57,7 +57,6 @@ const scene = {
     params: [],
     objects: [curve],
     objectFormulas: { 1: 'y=1' },
-    integralFormulas: {},
     objectTransforms: {},
     animations: [],
     objectAnimations: {},

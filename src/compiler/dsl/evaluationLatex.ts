@@ -35,12 +35,6 @@ import { LATEX_NUMBER_TEXT, LATEX_VECTOR_TEXT } from '@/math/latexText';
 import { integralBodyLatex } from './latex';
 
 /**
- * 积分式本体(``∫_a^b f dx``),再导出给 UI:积分条目的摘要排版它,数值回填后
- * 把 `=数值` 接在同一个字符串上,保证摘要与细节两处公式同源.
- */
-export { integralBodyLatex };
-
-/**
  * 分析结果摘要:默认可见的一行.
  *
  * 只给"哪个算子在哪个点":数值放到展开细节里,同一行不重复出现算子与结果.
