@@ -7,9 +7,10 @@
  * - 细节:
  *   1. 第一条公式行是**完整等式** `∫f dx = 数值`(数值未回填时省略右端);
  *   2. 后面是域/方法/分段/分层等纯文本元信息(走 `.eval-detail-meta`,不经 KaTeX);
- * - 状态行:只在需要时存在--`计算中...`/`已隐藏,不参与计算`/错误文本,以及
- *   积分式排不出来时的纯文本数值;**数值就绪且有等式时被摘掉**,否则同一条
- *   等式会在公式块里出现两遍.
+ * - 状态行:只在需要时存在--`计算中...`/错误文本,以及积分式排不出来时的纯文本
+ *   数值;**数值就绪且有等式时被摘掉**,否则同一条等式会在公式块里出现两遍.
+ *   隐藏项**没有**状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达(与实体
+ *   行同一套).
  *
  * 因为"等式挂在哪,状态行留不留"随数值就绪而变,本类实例自己记住积分式本体
  * `bodyLatex` 与当前状态行 `result`:异步回填是 `renderValue`/`renderError`
@@ -134,6 +135,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
                 badgeLabel: '积分',
                 latex: bodyLatex,
                 text: integralSourceLabel(task, context.objects),
+                hidden: !task.enabled,
             },
             task.name,
         );
@@ -155,15 +157,14 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
         ));
         const details = task.enabled ? createDetailSections(detailLines) : null;
 
-        // 状态行只在"没有等式可挂"或"还没算出/已禁用"时需要:
+        // 状态行只在"没有等式可挂"或"还没算出"时需要:
         // - 就绪 + 有积分式:等式已由细节行承载,再挂状态行就是重复行;
-        // - 其余状态:"计算中/已隐藏/错误文本"必须有落点.
+        // - 其余状态:"计算中/错误文本"必须有落点;
+        // - 隐藏项:没有状态行(隐藏态由摘要行的"已隐藏"芯片表达,数值本来也
+        //   不参与计算,不会出现"计算中"这种与隐藏相冲突的措辞).
         let status: HTMLElement | null;
         if (!task.enabled) {
-            status = createResultRow({
-                className: 'eval-result is-disabled',
-                text: '已隐藏,不参与计算',
-            });
+            status = null;
         } else if (value === null) {
             status = createResultRow({
                 className: 'eval-result is-pending',
@@ -175,7 +176,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             status = null;
         }
 
-        // 显隐按钮:隐藏后不再调度数值计算(状态行给"已隐藏,不参与计算"),
+        // 显隐按钮:隐藏后不再调度数值计算(隐藏态由摘要行的"已隐藏"芯片表达),
         // 按钮不在 summary 内,点它不会开合细节.
         const toggle = createVisibilityButton(
             task.enabled,
@@ -211,7 +212,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
             status,
             createRowActions(processEntry, toggle),
         );
-        row.classList.toggle('is-hidden', !task.enabled);
+        row.classList.toggle('is-disabled', !task.enabled);
 
         super(task, row);
         this.bodyLatex = bodyLatex;
@@ -293,7 +294,7 @@ export class IntegralItem extends EvaluationItem<IntegralTask, number> {
     }
 
     /**
-     * 状态行(计算中 / 已隐藏 / 错误文本)的唯一落点.
+     * 状态行(计算中 / 错误文本 / 纯文本数值)的唯一落点.
      *
      * 就绪后状态行会被摘掉(等式在细节行上),出错时再按需挂回公式块末尾;
      * 公式块不存在(积分式排不出来)时退回**主内容包装** `.row-main`,由它

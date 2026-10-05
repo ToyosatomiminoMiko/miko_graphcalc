@@ -8,7 +8,10 @@
  * <article class="object-row evaluation-row" role="listitem">
  *   <div class="row-main">                              ← 除按钮外的全部内容
  *     <details class="eval-details" open=false>          ← 无展开细节时 summary 直接在行上
- *       <summary class="eval-summary">...badge + 变量名 + 一行公式...</summary>
+ *       <summary class="eval-summary">                ← 两行:身份行 + 公式行
+ *         ...badge + 变量名 + (隐藏时)「已隐藏」芯片...
+ *         ...一行公式(第二行,由 CSS 的 flex-basis 100% 挤下去)...
+ *       </summary>
  *       <div class="eval-detail-body">        ← 公式块:数学内容 + 结果行
  *         <span class="eval-detail-line">...</span>
  *       </div>
@@ -46,7 +49,9 @@ import { createFormulaElement } from 'miko_ui';
 import type { EvaluationDetailLine } from '@/contract/evaluation';
 
 /**
- * 折叠态摘要:彩色类型标签 + 变量名 + 一行公式.
+ * 折叠态摘要:第一行"彩色类型标签 + 变量名 + (隐藏时)「已隐藏」芯片",第二行
+ * 整行公式--与实体行同一个两行式(公式由 CSS 的 flex-basis 100% 挤到第二行,
+ * 见 `css/panels.css`).
  *
  * 公式排不出来时 `latex` 为 null,由 `text` 回退成纯文本(积分源对象被
  * 删除时就是这条路径),避免给半个公式.
@@ -59,9 +64,16 @@ export interface EvaluationSummarySpec {
     latex: string | null;
     /** `latex === null` 时的纯文本回退. */
     text?: string;
+    /**
+     * 条目已隐藏(`enabled === false`):名字后补一颗"已隐藏"状态芯片.
+     *
+     * 与实体行同一个 `.row-state`(见 `ui/entity/EntityItem.ts`):隐藏态在两栏
+     * 里用同一套表达(芯片 + 整行变淡),不再给求值行单独挂一条状态结果行.
+     */
+    hidden?: boolean;
 }
 
-/** 结果/状态行初态:`className` 决定 `计算中...`/`已隐藏`/`错误` 的配色. */
+/** 结果/状态行初态:`className` 决定 `计算中...`/错误文本/纯文本数值的配色. */
 export interface EvaluationResultSpec {
     className: string;
     text: string;
@@ -110,12 +122,15 @@ export function createDetailSections(
 }
 
 /**
- * 摘要行(折叠态可见):彩色类型标签 + 变量名 + 一行公式.
+ * 摘要行(折叠态可见):第一行"彩色类型标签 + 变量名 + (隐藏时)「已隐藏」芯片",
+ * 第二行整行公式/纯文本回退(与实体行同形,换行交给 CSS 的 flex-wrap).
  *
- * 三项各司其职,不再放宽:
+ * 各段各司其职,不再放宽:
  * - `ui-badge`:彩色标签给出"这是哪一类求值对象"(梯度/散度/旋度/积分/求交),
  *   配色沿用左栏实体徽章的同一套视觉语言;
  * - `object-name`:DSL 里声明的变量名(如 `g`,`I`,`X`),同名多条时靠它区分;
+ * - `.row-state`:隐藏项的"已隐藏"芯片,紧跟在名字后(与实体行的
+ *   `.object-head` 同一个位置语义),色觉/低对比度用户不靠透明度也能读到状态;
  * - 公式:该条目的算子形式,`copyable = false`--摘要行是 `<details>` 的原生
  *   开合热区,点它只开合,不复制 TeX(复制只在展开细节行上生效).
  *
@@ -135,8 +150,13 @@ export function createEvaluationSummary(
     summary.append(
         createBadge(spec.badgeLabel, { class: spec.badgeClass }),
         create_element({ tag: 'strong' }, { class: 'object-name' }, name),
-        formula,
     );
+    // 芯片排在名字后,公式前:"谁 + 什么状态"读在一起,公式仍是这一行的最后
+    // 一段.它与实体行那颗是同一个类(同一条 CSS),所以两栏的隐藏态同形.
+    if (spec.hidden === true) {
+        summary.append(create_element({ tag: 'span' }, { class: 'row-state' }, '已隐藏'));
+    }
+    summary.append(formula);
     return summary;
 }
 
@@ -144,7 +164,8 @@ export function createEvaluationSummary(
  * 结果/状态行:纯文本的 `<code class="eval-result ...">`.
  *
  * 数值是数学量时由各类型走细节里的公式行,这里只承担
- * `计算中...`/`已隐藏`/数值文本/错误文本;`className` 决定配色.
+ * `计算中...`/数值文本/错误文本;`className` 决定配色.隐藏态**不**走这条
+ * 路径:它与实体行同一套表达(摘要行"已隐藏"芯片 + 整行变淡).
  */
 export function createResultRow(spec: EvaluationResultSpec): HTMLElement {
     return create_element({ tag: 'code' }, { class: spec.className }, spec.text);
@@ -168,8 +189,8 @@ export interface ProcessEntrySpec {
  * - 可用:点击后由应用层切到右栏过程页并载入该条目的过程;
  * - 不可用(`disabledReason !== null`,目前是"已隐藏,不参与计算"与"内核拒绝
  *   所以没有步骤"两种):**仍然渲染**但置灰,并把理由写进 `title`/`aria-label`.
- *   "为什么点不了"必须有明文,与列表里"已隐藏,不参与计算"的文案口径一致
- *   (见设计文档 4.5).
+ *   "为什么点不了"必须有明文:行内的"已隐藏"芯片只说了状态,按钮的理由把
+ *   "因为不参与计算"补全,与设计文档 4.5 同一口径.
  *
  * 入口的**有无**由各 item 按披露判据决定,且与条目是否隐藏无关:隐藏只把本来
  * 存在的入口置灰,绝不凭空多出一颗点不动的按钮(见 `EvaluationItem` 的

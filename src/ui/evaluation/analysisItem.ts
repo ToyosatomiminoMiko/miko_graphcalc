@@ -8,8 +8,8 @@
  * 数值在编译期就算好了(`AnalysisResult` 自带 `scalar`/`vector`),所以这一类
  * 不 override `renderValue`/`renderError`:渲染即最终态.
  *
- * 隐藏项例外:细节根本不生成,此时挂一条"已隐藏,不参与计算"的状态行,
- * 让"不渲染 + 不参与计算"在列表里有明文,而不是只靠透明度.
+ * 隐藏项例外:细节根本不生成,摘要行名字后补一颗"已隐藏"芯片(与实体行同一个
+ * `.row-state`),行整体变淡--隐藏态在两个对象窗口里同一套表达.
  */
 import type { AnalysisResult } from '@/contract/ir';
 import {
@@ -26,7 +26,6 @@ import {
     createEvaluationRow,
     createEvaluationSummary,
     createProcessEntryButton,
-    createResultRow,
 } from './evaluationDom';
 
 /** 分析条目的彩色类型标签文案(算子维度). */
@@ -65,12 +64,14 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
 
     /** `cached` 用不上:分析的数值编译期就在 IR 里,没有异步回填路径. */
     constructor(analysis: AnalysisResult, context: EvaluationContext) {
-        // 折叠态:彩色算子标签 + 变量名 + 一行 KaTeX 公式(摘要公式不可复制).
+        // 折叠态:彩色算子标签 + 变量名 (+ 隐藏时的"已隐藏"芯片) + 一行 KaTeX
+        // 公式(摘要公式不可复制).
         const summary = createEvaluationSummary(
             {
                 badgeClass: `kind-analysis kind-analysis-${analysis.op}`,
                 badgeLabel: ANALYSIS_KIND_LABELS[analysis.op],
                 latex: analysisLatexSummary(analysis),
+                hidden: !analysis.enabled,
             },
             analysis.name,
         );
@@ -91,23 +92,17 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
             () => context.toggleHidden(analysis.name),
         );
 
-        // 隐藏项没有细节可展开(detail=null),状态行会直接落在 main 里,
-        // 屏幕上有"已隐藏,不参与计算"这句明文--不能只靠 is-hidden 的透明度.
-        const status = analysis.enabled
-            ? null
-            : createResultRow({
-                className: 'eval-result is-disabled',
-                text: '已隐藏,不参与计算',
-            });
-
+        // 隐藏项没有独立状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达
+        // (与实体行同一套,见 createEvaluationSummary 的 hidden),状态行恒为 null.
+        //
         // "过程"入口(三级披露的 L2):一期只接梯度(其余算子没有可看的中间
         // 步骤).入口的有无**只**由披露判据决定,与是否隐藏无关;但隐藏项不生成
         // 细节行(数值在编译期被跳过),判据无从重算,所以隐藏时留给
         // preserveExpandedStateFrom 从同名旧行继承--否则点一下"隐藏"就会凭空
         // 多出一颗按钮.容器先建好,入口由 addProcessEntry 挂(显隐按钮仍在末位).
         const actions = createRowActions(toggle);
-        const { row } = createEvaluationRow(summary, detail, status, actions);
-        row.classList.toggle('is-hidden', !analysis.enabled);
+        const { row } = createEvaluationRow(summary, detail, null, actions);
+        row.classList.toggle('is-disabled', !analysis.enabled);
         super(analysis, row);
         this.context = context;
         this.actions = actions;
@@ -127,8 +122,8 @@ export class AnalysisItem extends EvaluationItem<AnalysisResult, void> {
      * 这条).因此这里继承旧行的决定,并把它置灰.
      *
      * 首次渲染就隐藏的条目没有旧行可继承:按"无入口"处理--判据本身来自渲染
-     * 内容,算不出来就不摆一颗点不动的按钮;状态行的"已隐藏,不参与计算"已经
-     * 把那句话说清了.
+     * 内容,算不出来就不摆一颗点不动的按钮;摘要行的"已隐藏"芯片已经把那句话
+     * 说清了.
      */
     override preserveExpandedStateFrom(previous: AnalysisItem): void {
         super.preserveExpandedStateFrom(previous);

@@ -158,29 +158,40 @@
      .object-row........... 逐字与库相同(横排/间距/描边/圆角/底色)
      .row-main............. 逐字与库相同(flex:1 + min-width:0 + 换行横排)
      .row-actions.......... 逐字与库相同(贴右 + 按钮竖排)
-     .object-row.is-hidden. 只写库的类;改成下面的 `.entity-row.is-hidden`
+     .object-row.is-hidden. 只写库的类;改成下面的
+                            `.entity-row.is-disabled` / `.evaluation-row.is-disabled`
 
    判据不是"注释记得",而是 `src/config/styleLayers.test.ts` 会红 -- 库一旦
    拥有某个类,应用再给它写规则就直接失败. */
 
-/* 实体行的"不渲染"态:实体显隐只改渲染可见性,行仍然占位,所以是"变淡"不是
-   "消失".类名用应用自己的 `.entity-row` + `is-disabled`(不再是库的
-   `.object-row.is-hidden`),选择器里有应用自有的类,与上面那条契约一致;
-   `is-disabled` 也把语义与库的 `.window.is-hidden`(窗口最小化)分开了. */
-.entity-row.is-disabled {
+/* 两个对象列表的"不渲染 / 不参与计算"态是**同一套表达**:行仍然占位,所以是
+   "变淡"不是"消失"(透明度之外还有行内的"已隐藏"芯片,见下面的 .row-state).
+   类名用应用自己的 `.entity-row` / `.evaluation-row` + `is-disabled`(库的
+   `.object-row.is-hidden` 没有这条规则),选择器里有应用自有的类,与上面那条
+   契约一致;`is-disabled` 也把语义与库的 `.window.is-hidden`(窗口最小化)分开了.
+   求值行原先写的是 `is-hidden`,而应用侧从没有它的规则--隐藏的求值行其实
+   一点没变淡,同一件事在两个窗口里长得不一样;现在两栏共用这一条. */
+.entity-row.is-disabled,
+.evaluation-row.is-disabled {
     opacity: 0.6;
 }
 
 /* 实体行是两行式(见 entity/EntityItem):第一行"徽章 + 颜色 + 名称行",
-   第二行公式整行独占. */
+   第二行公式整行独占.求值摘要行同形(见下面那条 flex-basis 规则). */
 .entity-row > .row-main {
     row-gap: 5px;
 }
 
 /* 公式自己占一整行:flex-basis 100% 把它挤到第二行,并横向铺满.
-   这条只作用于实体行;`.object-expr` 也用在求值摘要的纯文本回退里(在
-   `.eval-summary` 内部),那里不能被拉成整行. */
-.entity-row > .row-main > .object-expr {
+   两栏同形:实体行第一行是"徽章 + 颜色 + 名称行",公式另起一行;求值摘要行
+   (`.eval-summary`)第一行是"徽章 + 名字 (+ 隐藏芯片)",公式也另起一行.
+   纯文本回退(`latex === null`:源对象已删除,或隐藏的求解/ODE 没有题目 LaTeX)
+   走同一条规则--否则同一栏里"公式行"与"文本行"会落在不同的行上.
+   这纯粹是视觉:`.eval-summary` 仍是 `<details>` 里那颗 `<summary>`,换行由
+   flex-wrap 完成,开合行为不变. */
+.entity-row > .row-main > .object-expr,
+.eval-summary > .eval-summary-formula,
+.eval-summary > .object-expr {
     flex: 1 0 100%;
 }
 
@@ -204,7 +215,8 @@
 }
 
 /* 显隐状态文字:透明度之外的第二条线索(色觉/低对比度用户).
-   芯片与对象名同处 `.object-head` 这一行,按行居中而不是顶对齐. */
+   两个对象窗口共用这一颗:实体行挂在名称行 `.object-head` 里,求值行挂在摘要行
+   `.eval-summary` 的名字后;两处都按行居中而不是顶对齐. */
 .row-state {
     align-self: center;
     padding: 1px 6px;
@@ -411,16 +423,16 @@
     color: var(--color-error);
 }
 
-.eval-result.is-disabled {
-    color: var(--color-neutral);
-    opacity: 0.75;
-}
+/* 这里原本有一条 `.eval-result.is-disabled`:求值行用一条状态行表达"已隐藏,
+   不参与计算".隐藏态改成与实体行同一套(摘要行"已隐藏"芯片 + 整行变淡)之后
+   就没有节点再用这个类,规则随之删除. */
 
 /* ==========================================================================
  * 求值条目的折叠细节(分析/积分/求交)
  *
  * 条目 = 主内容(.row-main:摘要行 + 折叠细节)+ 行末显隐按钮.
- * 摘要行是 (<summary>:彩色类型标签 + 变量名 + 一行 KaTeX);折叠细节是
+ * 摘要行是 <summary> 里的两行:第一行"彩色类型标签 + 变量名 (+ 隐藏芯片)",
+ * 第二行整行的 KaTeX 公式(与实体行同形,见上面那条 flex-basis 规则);折叠细节是
  * <details>(默认收起:展开后每行一段 KaTeX,结果行在最后).
  * 开合完全是 <details>/<summary> 的原生行为(点摘要行即开合),没有自建开合
  * 按钮,因此这里也不隐藏 ::marker,让浏览器自带的三角作为唯一标识.
@@ -431,7 +443,8 @@
  * ========================================================================== */
 
 .eval-summary {
-    /* 原生 summary 自带热区与三角;这里只负责把标签/名字/公式排成一行. */
+    /* 原生 summary 自带热区与三角;这里只负责换行:第一行"标签 + 名字
+       (+ 隐藏芯片)",公式整行独占第二行(见上面那条 flex-basis 规则). */
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -439,15 +452,12 @@
     cursor: pointer;
 }
 
-/* 公式与前面的"标签 + 名字"多留一点距离,一行里读出三段结构. */
-.eval-summary .eval-summary-formula {
-    margin-left: 2px;
-}
-
-/* 公式行在右侧:名字列宽固定,便于多行条目纵向对齐. */
+/* 名字列:与徽章/状态芯片同处第一行.公式已经另起一行,那条"给公式留出右侧
+   位置"的 30% 上限随之删除;长名字仍用省略号收尾--允许 flex-shrink 先缩名字,
+   芯片就不会被挤到第二行. */
 .eval-summary .object-name {
-    flex: 0 0 auto;
-    max-width: 30%;
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -21,7 +21,6 @@ import {
     createEvaluationRow,
     createEvaluationSummary,
     createProcessEntryButton,
-    createResultRow,
 } from './evaluationDom';
 
 export class OdeItem extends EvaluationItem<OdeTask, void> {
@@ -61,6 +60,7 @@ export class OdeItem extends EvaluationItem<OdeTask, void> {
                 badgeLabel: '微分方程',
                 latex: odeLatexSummary(task),
                 text: task.equation,
+                hidden: !task.enabled,
             },
             task.name,
         );
@@ -90,20 +90,15 @@ export class OdeItem extends EvaluationItem<OdeTask, void> {
             }),
         });
 
-        const status = task.enabled
-            ? null
-            : createResultRow({
-                className: 'eval-result is-disabled',
-                text: '已隐藏,不参与计算',
-            });
-
+        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达
+        // (与实体行同一套).
         const { row } = createEvaluationRow(
             summary,
             detail,
-            status,
+            null,
             createRowActions(processEntry, toggle),
         );
-        row.classList.toggle('is-hidden', !task.enabled);
+        row.classList.toggle('is-disabled', !task.enabled);
         super(task, row);
         // 微分方程的推导天然在 L2,入口常驻:有无与是否隐藏无关,隐藏只置灰
         // (见基类 processEntryOffered).

@@ -361,7 +361,7 @@ export class RenderController {
         }
 
         // 列表行按新的 enabled 重建(键里含 enabled):显隐按钮文案,
-        // `is-hidden` 与"已隐藏"状态芯片都从 IR 推导,不在这里手改 DOM.
+        // `is-disabled` 与"已隐藏"状态芯片都从 IR 推导,不在这里手改 DOM.
         if (this.currentScene !== null) {
             this.objectListController.renderScene(this.currentScene);
         }

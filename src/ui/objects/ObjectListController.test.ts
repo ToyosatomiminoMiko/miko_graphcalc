@@ -374,7 +374,7 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         expect(summary.listeners.get('click')).toBeUndefined();
     });
 
-    it('隐藏的求值条目:按钮变"显示",行加 is-hidden,并给出明文状态', () => {
+    it('隐藏的求值条目:与实体行同一套隐藏态(变淡 + "已隐藏"芯片)', () => {
         const { analysisList, controller } = createController();
         controller.renderScene({
             ...scene,
@@ -382,11 +382,15 @@ describe('行末显隐按钮:隐藏 = 不渲染 + 不参与计算', () => {
         } as SceneIR);
 
         const row = analysisList.querySelector<StubElement>('.evaluation-row')!;
-        expect(row.classList.contains('is-hidden')).toBe(true);
+        // 与实体行同一个类:隐藏 = 变淡(css/panels.css 里两栏共用一条规则).
+        expect(row.classList.contains('is-disabled')).toBe(true);
         expect(row.querySelector<StubElement>('.row-visibility-btn')!.textContent).toBe('显示');
-        // 隐藏项没有可展开细节,状态行直接可见:不靠透明度传达"不参与计算".
-        expect(row.querySelector<StubElement>('.eval-result')!.textContent)
-            .toBe('已隐藏,不参与计算');
+        // 隐藏态由摘要行名字后的"已隐藏"芯片承担(与实体行的 `.row-state` 同一个
+        // 类),不再另挂一条"已隐藏,不参与计算"状态行.
+        const summary = row.querySelector<StubElement>('.eval-summary')!;
+        expect(summary.querySelector<StubElement>('.object-name')).not.toBeNull();
+        expect(summary.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
+        expect(row.querySelector<StubElement>('.eval-result')).toBeNull();
     });
 });
 
@@ -465,7 +469,7 @@ describe('列表缓存:内容不变就复用,顺序/展开态/数值都不串', 
             .toBe('计算中...');
     });
 
-    it('禁用的积分显示"已隐藏"而不是旧数值', () => {
+    it('禁用的积分不显示旧数值,也没有状态行', () => {
         const { integralList, controller } = createController();
         controller.renderScene(scene);
         controller.setIntegralResult('I', 1.5);
@@ -475,8 +479,10 @@ describe('列表缓存:内容不变就复用,顺序/展开态/数值都不串', 
             integrals: [{ ...scene.integrals[0], enabled: false }],
         } as SceneIR);
 
-        expect(integralList.querySelector<StubElement>('.eval-result')!.textContent)
-            .toBe('已隐藏,不参与计算');
+        const row = integralList.querySelector<StubElement>('.evaluation-row')!;
+        // 旧数值不显示:隐藏项整行不建结果行,改由摘要行的"已隐藏"芯片表达状态.
+        expect(row.querySelector<StubElement>('.eval-result')).toBeNull();
+        expect(row.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
     });
 
     it('就绪的积分不再产生重复的 .eval-result is-ready', () => {
@@ -655,9 +661,9 @@ describe('三级披露:长过程的 L2 入口', () => {
             analyses: [{ ...analysis, enabled: false }],
         } as SceneIR);
         expect(analysisList.querySelectorAll<StubElement>('.row-process-btn')).toHaveLength(0);
-        // 隐藏的明文理由仍由状态行承担.
-        expect(analysisList.querySelector<StubElement>('.eval-result')!.textContent)
-            .toBe('已隐藏,不参与计算');
+        // 隐藏的明文理由仍由摘要行的"已隐藏"芯片承担.
+        expect(analysisList.querySelector<StubElement>('.row-state')!.textContent)
+            .toBe('已隐藏');
     });
 
     it('积分条目隐藏后也不会凭空多出"过程"入口', () => {
@@ -766,12 +772,13 @@ describe('方程求解条目', () => {
         } as SceneIR);
 
         const row = solveList.querySelector<StubElement>('.evaluation-row')!;
-        expect(row.classList.contains('is-hidden')).toBe(true);
+        expect(row.classList.contains('is-disabled')).toBe(true);
         // 没有题目 LaTeX 时回退成方程原文(纯文本),不留半条公式.
         expect(row.querySelector<StubElement>('.object-expr')!.textContent)
             .toBe('x^2 - 5*x + 6 = 0');
-        expect(row.querySelector<StubElement>('.eval-result')!.textContent)
-            .toBe('已隐藏,不参与计算');
+        // 隐藏态与实体行同一套:芯片在摘要行,整行变淡;没有状态结果行.
+        expect(row.querySelector<StubElement>('.row-state')!.textContent).toBe('已隐藏');
+        expect(row.querySelector<StubElement>('.eval-result')).toBeNull();
         const entry = row.querySelector<StubElement>('.row-process-btn')!;
         expect(entry.disabled).toBe(true);
         expect(entry.getAttribute('aria-label')).toContain('已隐藏,不参与计算');

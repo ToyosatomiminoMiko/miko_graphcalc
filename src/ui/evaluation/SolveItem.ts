@@ -27,7 +27,6 @@ import {
     createEvaluationRow,
     createEvaluationSummary,
     createProcessEntryButton,
-    createResultRow,
 } from './evaluationDom';
 
 export class SolveItem extends EvaluationItem<SolveTask, void> {
@@ -62,13 +61,14 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
                 badgeLabel: '求解',
                 latex: solveLatexSummary(task),
                 text: solvePlainText(task),
+                hidden: !task.enabled,
             },
             task.name,
         );
 
         const detail = task.enabled ? createDetailSections(solveLatexDetails(task)) : null;
 
-        // 显隐按钮:隐藏后不再调用求解内核(状态行给同一句明文).
+        // 显隐按钮:隐藏后不再调用求解内核(隐藏态由摘要行的"已隐藏"芯片表达).
         const toggle = createVisibilityButton(
             task.enabled,
             task.name,
@@ -90,20 +90,15 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
             }),
         });
 
-        const status = task.enabled
-            ? null
-            : createResultRow({
-                className: 'eval-result is-disabled',
-                text: '已隐藏,不参与计算',
-            });
-
+        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达
+        // (与实体行同一套).
         const { row } = createEvaluationRow(
             summary,
             detail,
-            status,
+            null,
             createRowActions(processEntry, toggle),
         );
-        row.classList.toggle('is-hidden', !task.enabled);
+        row.classList.toggle('is-disabled', !task.enabled);
         super(task, row);
         // 求解过程天然在 L2,入口常驻:有无与是否隐藏无关,隐藏只置灰(见基类
         // processEntryOffered).
