@@ -17,8 +17,9 @@ import { assertEditSafe } from 'miko_ui';
 import { installDomStub, StubElement } from 'miko_ui/testing';
 import { RENDER_CONFIG } from '@/config/renderConfig';
 import { UI_CONFIG } from '@/config/uiConfig';
-import { POINT_DISPLAY_TEXT, createViewPanel, type ViewPanelHandle } from './ViewPanel';
+import { createViewPanel, type ViewPanelHandle } from './ViewPanel';
 import { createViewState, type ViewState } from './viewState';
+import { POINT_DISPLAY_TEXT } from './viewSpec';
 
 let state: ViewState;
 let panel: ViewPanelHandle;
@@ -104,11 +105,13 @@ describe('createViewPanel 分组结构', () => {
     it('相机行:两个可点模式文字夹一个开关,再加锁定旋转', () => {
         const camera = groupAt(0);
         expect(camera.className).toBe('control-row');
-        // 顺序:透视 / 开关 / 正交(默认高亮) / "锁定旋转"标签(无类名) / 开关
+        // 顺序:透视 / 开关 / 正交 / "锁定旋转"标签(无类名) / 开关.
+        // `cam-label` 不带 `active`:那套高亮没有任何样式表规则(死代码已删,
+        // 见 ViewPanel.ts 的相机一节).
         expect(childClasses(camera)).toEqual([
             'cam-label',
             'switch',
-            'cam-label active',
+            'cam-label',
             '',
             'switch',
         ]);
@@ -116,10 +119,8 @@ describe('createViewPanel 分组结构', () => {
         const [perspective, toggle, orthographic] = childrenOf(camera);
         expect(perspective.textContent).toBe('透视');
         expect(orthographic.textContent).toBe('正交');
-        // 默认模式是正交 -> 开关勾选,"正交"高亮
+        // 默认模式是正交 -> 开关勾选
         expect(firstInput(toggle).checked).toBe(true);
-        expect(orthographic.classList.contains('active')).toBe(true);
-        expect(perspective.classList.contains('active')).toBe(false);
         // 旋转锁定的可见文字是一个关联到开关的 label
         const rotationLabel = childrenOf(camera)[3];
         expect(rotationLabel.tagName).toBe('label');
@@ -230,20 +231,21 @@ describe('createViewPanel 分组结构', () => {
 });
 
 describe('控件与视图状态双向绑定(P3)', () => {
-    it('相机:开关与文字标签都写同一个状态源,高亮跟着状态走', () => {
+    it('相机:开关与两段文字都写同一个状态源', () => {
         const camera = groupAt(0);
         const [perspective, toggle, orthographic] = childrenOf(camera);
 
         perspective.dispatch('click');
         expect(state.camMode.peek()).toBe('perspective');
-        expect(orthographic.classList.contains('active')).toBe(false);
-        expect(perspective.classList.contains('active')).toBe(true);
         expect(firstInput(toggle).checked).toBe(false);
 
-        // 反向:状态变了,开关与标签自己跟上(不需要任何 set 调用)
-        state.camMode.value = 'orthographic';
+        orthographic.dispatch('click');
+        expect(state.camMode.peek()).toBe('orthographic');
         expect(firstInput(toggle).checked).toBe(true);
-        expect(orthographic.classList.contains('active')).toBe(true);
+
+        // 反向:状态变了,开关自己跟上(不需要任何 set 调用)
+        state.camMode.value = 'perspective';
+        expect(firstInput(toggle).checked).toBe(false);
     });
 
     it('开关切换直接写派生视图,再落到真相上', () => {

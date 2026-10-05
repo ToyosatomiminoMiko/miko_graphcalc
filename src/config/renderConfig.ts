@@ -65,7 +65,9 @@ export const RENDER_CONFIG = {
         colorMapEnabled: true,
     },
     // 相机与视图默认值:投影模式,初始机位与视锥参数,由 CameraManager 读取.
-    // defaultMode 同时是投影切换 UI(CameraToggle)的初态,避免两处默认值漂移.
+    // defaultMode 是相机投影的**唯一初值**:`createViewState()` 读它建 `camMode`,
+    // 面板那个开关只是 `camMode` 的派生视图,两处不会各存一份默认值.
+    // (原文写的是"CameraToggle 的初态",那个控制器已随 P3 的 signal 化删除.)
     camera: {
         defaultMode: 'orthographic' as const,
         frustumSize: 14,

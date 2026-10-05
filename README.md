@@ -544,7 +544,7 @@ src/ui/              应用侧界面:只声明"有什么"(DOM 结构)与"干什�
   objects/          两个对象列表的装配与回调接线
   params/           参数面板:滑块取值口径与写回时机
   process/          过程窗口:递等式步骤列表与三级披露判据
-  view/             视图窗口:相机/坐标轴/网格/曲面的控件装配(viewState + ViewPanel)
+  view/             视图窗口:元素清单(viewSpec)+ 状态源(viewState)+ 解释器(ViewPanel)
   examples/         示例目录与载入(示例清单数据 + 编辑器写入)
 src/app/            控制与编排
 src/testing/        测试基建(domStub / setupWasm / matrixOps),不被生产代码引用
@@ -628,17 +628,32 @@ geometry.求交结果按独立求值对象处理:隐藏某个参与面并不会�
 原来的 9 个视图控制器与 `EventBus`(连同 `contract/events.ts`)已经整条下线:
 状态只有 `viewState` 一份,没有"先声明后接线"的 dead event key 可留.
 
-视图窗口(相机/预置视角/点/坐标轴/曲面)的装配固定成三层:
+视图窗口(相机/预置视角/点/坐标轴/曲面)的装配固定成四层:
 
 ```text
 RENDER_CONFIG ──► src/ui/view/viewState.ts   唯一状态源(signal / 派生信号 / 计算值)
                         │  value: Signal<...>
                         ▼
-                  src/ui/view/ViewPanel.ts   结构 + 控件实例 + 双向绑定
+UI_CONFIG.view ──► src/ui/view/viewSpec.ts   元素清单:分组 / 顺序 / 行标签 / 控件种类 / 绑定的状态键
+                        │  VIEW_BLOCKS
+                        ▼
+                  src/ui/view/ViewPanel.ts   解释器:按 kind 建控件 + 统一持有与拆卸
                         │  effect
                         ▼
                   RenderController           订阅状态,推到 CameraManager / Plotter / SceneManager
 ```
+
+**"视图窗口里有什么"只有一处**:`viewSpec.ts` 的表(顺序即显示顺序).它只声明
+结构,数值仍引用 `UI_CONFIG.view`(可调范围/步长/ViewCube 名单),渲染默认值仍
+只在 `RENDER_CONFIG`,`viewState.ts` 仍是状态与派生(半径↔倍数换算,下限保护),
+状态到渲染器的接线仍是 `RenderController` 的 effect.这几样各有硬理由分居:
+`render/core` 的文件直接读 `RENDER_CONFIG`(并进 UI 配置等于让渲染层依赖界面),
+而换算与下限保护是函数不是数据.表里那两行"内容随状态变"的(相机行 / 点的大小
+行)是 `custom` 行,构建函数就放在表里,不会又散回装配代码.
+
+清单是数据,所以另有一条守卫 `src/ui/view/viewSpec.test.ts`:表里的键必须是真实
+存在的状态字段;`ViewState` 的每个字段必须被清单引用或被 `RenderController`
+订阅(否则是"只加信号不接线"的孤儿);同一个字段不许被两行主绑定.
 
 库的 `widgets/` 是这套东西的词汇表(`createSwitch` / `createSegmented` /
 `createSlider` / `createNumberField` / `createButton` / `createPopover` /
@@ -661,9 +676,11 @@ RENDER_CONFIG ──► src/ui/view/viewState.ts   唯一状态源(signal / 派�
 
 装配出来的控件不再需要外部 `dispose`:每个控件恰好交给一个持有者(视图面板交
 `createViewPanel` 的句柄,参数行交面板控制器,浮层交示例菜单控制器),由持有者
-统一解绑.新增一个视图控件只改 `src/ui/view/ViewPanel.ts` 与
-`src/ui/view/viewState.ts`;`#view-controls` 这个宿主由 `src/app/appViews.ts`
-建,`index.html` 里除 `#app` 外没有任何宿主 id.
+统一解绑.新增一个视图控件因此是:**`src/ui/view/viewSpec.ts` 加一行**(结构+文案+
+绑定的键)+ `src/ui/view/viewState.ts` 加信号(或复用)+ 需要出图时在
+`RenderController` 接一条 effect;只有新增一种**控件种类**才动 `ViewPanel.ts`
+的解释器.`#view-controls` 这个宿主由 `src/app/appViews.ts` 建,`index.html` 里
+除 `#app` 外没有任何宿主 id.
 
 另外,曲线/曲面/向量场的 Worker 采样失败现在统一经
 `render/core/samplingErrors.ts` 上报,RenderController 转成诊断区错误;

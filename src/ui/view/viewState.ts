@@ -46,9 +46,17 @@ import {
     type Signal,
 } from 'miko_ui';
 
-/** 相机模式的两个字面量:勾选 = 正交.面板与状态源共用这一份映射. */
-export const CAM_MODE_WHEN_CHECKED: CamMode = 'orthographic';
-export const CAM_MODE_WHEN_UNCHECKED: CamMode = 'perspective';
+/**
+ * 相机模式的两个字面量:勾选 = 正交.
+ *
+ * 只在本文件的 `camIsOrtho` 派生里用一次,不导出:面板侧原先那份
+ * "文字高亮按 `camMode` 切换"的映射已删(它 toggle 的 `.active` 没有任何样式表
+ * 规则,零可见效果,见 `ViewPanel.ts` 的相机一节),于是这两个名字在模块外没有
+ * 任何消费者.相机控件改用库的 `createSegmented` 绑 `camMode` 之后,连
+ * `camIsOrtho` 一起退休.
+ */
+const CAM_MODE_WHEN_CHECKED: CamMode = 'orthographic';
+const CAM_MODE_WHEN_UNCHECKED: CamMode = 'perspective';
 
 /** 点的比例模式以"配置里的半径"为基准(1 = 100%). */
 function baseRadius(): number {

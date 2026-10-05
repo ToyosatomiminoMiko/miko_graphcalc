@@ -1,43 +1,38 @@
 /**
- * 右侧"视图"面板的声明式装配.
+ * 右侧"视图"窗口正文的装配:**解释 `viewSpec.ts` 的元素清单**,不自己声明元素.
+ *
+ * ```text
+ * viewSpec.ts     分组 / 顺序 / 行标签 / 控件种类 / 绑定的状态键   ← 元素清单(唯一处)
+ *      │  VIEW_BLOCKS
+ *      ▼
+ * ViewPanel(本文件)  按 kind 建控件 + 收集句柄 + 统一拆卸          ← 解释器
+ *      │  effect(在 RenderController 里,不是这里)
+ *      ▼
+ * RenderController   订阅 viewState,推到 CameraManager / Plotter / SceneManager
+ * ```
  *
  * 这一块以前散在 `index.html`(约 150 行手写 `div/label/input/span`)与 10 个
  * 控制器各自的 `getElementById` 之间:加一个控件要同时改 HTML,改某个控制器的
- * id 字符串,再祈祷页面上没有同名 id.
+ * id 字符串,再祈祷页面上没有同名 id.`createViewPanel` 把"结构"收进 TS 之后,
+ * 结构又长在这 120 行装配里;现在它归 `viewSpec.ts`,本文件只剩两件事:
  *
- * P3 之后的形状更短:
- *
- * ```text
- * createViewState()   唯一的视图状态源(signal / 派生信号 / 计算值)
- *      │  value: Signal<...>
- *      ▼
- * ViewPanel(本文件)   结构 + 控件 + 双向绑定(值变了控件自己更新)
- *      │  effect
- *      ▼
- * RenderController    订阅状态,推到 CameraManager / Plotter / SceneManager
- * ```
- *
- * 原来夹在中间的 9 个控制器(每个都存一份自己的状态再用 EventBus 广播)没有了:
- * 状态只有一份,**读值再转发**这件事由 `effect` 直接做.
+ * 1. **按清单渲染**:`kind` 决定控件种类,`key` 决定绑哪个状态字段.数值
+ *    (`min` / `step` / `items`)在清单里,清单引用 `UI_CONFIG.view`,所以界面
+ *    默认值仍然只有一处;
+ * 2. **统一持有与拆卸**:控件句柄(`own`)与内部订阅(`stop`)都进面板的袋子,
+ *    `dispose()` 一处解绑.清单本身不认识 DOM 生命周期.
  *
  * 三条约定:
  * 1. **本文件不认识渲染器**:它只把控件绑到状态上;谁订阅状态,推到哪由
  *    `RenderController` 决定.所以这里是纯视图,可以在测试里单独装配断言.
- * 2. **配置只在这里读结构性的部分**:控件能拖多细/有哪些选项来自
- *    `UI_CONFIG.view`;初值(渲染默认值)归 `createViewState()`.
- * 3. **面板拥有自己的控件与订阅**:`dispose()` 解绑全部控件,标签点击监听与
- *    内部订阅.重复装配前必须先 dispose 上一个句柄,否则旧控件会继续监听.
- *
- * 产出的 DOM 与原来的手写 HTML 同构,类名沿用库的 `styles/widgets.css` /
- * `css/panels.css`,所以样式一个字符都没改.唯一有意的差别是"行内可见文字"
- * 由 `<span>` 变成 `<label for>`(见 `widgets/Row.ts`),以及去掉了那些只给
- * `getElementById` 用的 id.
+ * 2. **配置只在这里被"用"**:范围/选项来自 `UI_CONFIG.view`(经清单),
+ *    初值(渲染默认值)归 `createViewState()`.
+ * 3. **重复装配前必须先 dispose 上一个句柄**:`host` 原有内容会被清空,但旧
+ *    句柄的控件与订阅还挂在状态上,不清就泄漏(见 `ViewPanel.test.ts`).
  */
-import { UI_CONFIG } from '@/config/uiConfig';
 import type { PointMode, UpAxis, ViewHome } from '@/contract/view';
 import {
     createControlGroup,
-    createFieldLabel,
     createInlineToggle,
     createNumberField,
     createNumberRow,
@@ -46,48 +41,27 @@ import {
     createSwitch,
     createSwitchRow,
     create_element,
-    numberText,
-    watchValue,
-    type NumberFieldHandle,
 } from 'miko_ui';
+import type { ViewState } from './viewState';
 import {
-    CAM_MODE_WHEN_CHECKED,
-    CAM_MODE_WHEN_UNCHECKED,
-    type ViewState,
-} from './viewState';
+    VIEW_BLOCKS,
+    type SegmentedRowSpec,
+    type ViewBlockSpec,
+    type ViewRowSpec,
+    type ViewSpecContext,
+} from './viewSpec';
 
-export { CAM_MODE_WHEN_CHECKED, CAM_MODE_WHEN_UNCHECKED };
-
-/** 面板句柄:建完只留一个拆卸入口(控件与订阅都归面板所有). */
+/**
+ * 面板句柄:建完只留一个拆卸入口(控件与订阅都归面板所有).
+ *
+ * 没有 `element`:正文宿主由 `src/app/appViews.ts` 建并持有(`#view-controls`),
+ * 装配层拿它只是为了 `dispose()`.
+ */
 export interface ViewPanelHandle {
-    readonly element: HTMLElement;
     dispose(): void;
 }
 
-/**
- * 点的数值口径:**显示文本与编辑文本共用同一个 `ValueText`**,输出与老
- * `PointStyleController` 的 `String(Number(v.toFixed(4)))` 逐字符相同.
- *
- * 为什么必须显式给 `exponentialAt`:库的编辑档默认在 `|v| < 1e-4` 或 `|v| >= 1e6`
- * 时切成 `e+n`(`1e-5` 排成 `1.0000e-5`),而"点的大小"这个读数一路是定点.
- * 把区间开成 `[0, Infinity)`(判据 `low <= |v| < high`,`Infinity` 恒成立)就是让
- * 定点分支吃下全部有限值.**这条等价关系由 `ViewPanel.test.ts` 的"口径等价"逐值
- * 钉住**,不靠注释:改库版本或改选项时它会先红.
- *
- * 非有限值给空串(库编辑档的固定写法):`<input type="number">` 本来就会把
- * `NaN` / `Infinity` 消毒成空串,显式写出来免得"值是 NaN"伪装成"用户清空了框";
- * 回读走库的 `parseNumber`,所以显示与编辑是同一份口径.
- *
- * 版本前提:编辑档"舍入到零去符号"那条修正(`-0.00004` 给 `0` 而不是 `-0`)与
- * "katex 收进库 `dependencies`"同属一批未发布改动,`^0.1.10` 之前的发布版没有它.
- */
-export const POINT_DISPLAY_TEXT = numberText({
-    syntax: 'edit',
-    digits: 4,
-    exponentialAt: { low: 0, high: Infinity },
-});
-
-/** 会被 `dispose()` 一起解绑的东西:控件句柄与内部订阅. */
+/** 会被 `dispose()` 一起解绑的东西:控件句柄. */
 interface Disposable {
     dispose(): void;
 }
@@ -100,195 +74,20 @@ interface Disposable {
  * `dispose()` 之后再建(否则旧订阅会留在状态上).
  */
 export function createViewPanel(host: HTMLElement, state: ViewState): ViewPanelHandle {
-    const view = UI_CONFIG.view;
     const abort = new AbortController();
     const disposables: Disposable[] = [];
     const stops: Array<() => void> = [];
-
-    /**
-     * 数字框的"即时回退":下限只是 HTML 约束,浏览器拦不住手工输入的负数;
-     * 低于下限时把文本回填成当前值(值本身到不了状态源,见 `boundedInput`).
-     */
-    const guardLowerBound = (field: NumberFieldHandle, min: number, current: () => number): void => {
-        field.onInput((raw) => {
-            if (raw === null || raw < min) field.write(current());
-        });
+    const context: ViewSpecContext = {
+        own: (disposable) => disposables.push(disposable),
+        stop: (stop) => stops.push(stop),
+        signal: abort.signal,
     };
 
-    // ── 相机 ────────────────────────────────────────────────────────────
-    // 透视/正交两段文字是"点一下也能切"的旁路入口;开关才是可访问的主入口,
-    // 所以文字保持 <span>(不用 <label for>,否则会与开关的可访问名打架).
-    const perspective = create_element({ tag: 'span' }, { class: 'cam-label' }, '透视');
-    const orthographic = create_element({ tag: 'span' }, { class: 'cam-label' }, '正交');
-    const modeLabels = [
-        { mode: CAM_MODE_WHEN_UNCHECKED, element: perspective },
-        { mode: CAM_MODE_WHEN_CHECKED, element: orthographic },
-    ] as const;
-    const cameraToggle = createSwitch({ value: state.camIsOrtho, ariaLabel: '正交投影' });
-    // 旋转锁定没有配置默认值(老代码读 DOM 的勾选态,软重载会被浏览器恢复);
-    // 面板由脚本生成,浏览器不会恢复动态节点的表单态,所以固定从 false 起.
-    const rotationLock = createSwitch({ value: state.rotationLock });
-    disposables.push(cameraToggle, rotationLock);
-
-    // 两套 UI 都由 camMode 推导:开关是派生视图(双向),标签只读.
-    stops.push(watchValue(state.camMode, (mode) => {
-        for (const label of modeLabels) {
-            label.element.classList.toggle('active', label.mode === mode);
-        }
-    }));
-    for (const label of modeLabels) {
-        label.element.addEventListener('click', () => {
-            state.camIsOrtho.value = label.mode === CAM_MODE_WHEN_CHECKED;
-        }, { signal: abort.signal });
-    }
-
-    const camera = createRow(
-        perspective,
-        cameraToggle.element,
-        orthographic,
-        createFieldLabel('锁定旋转', rotationLock.input.id),
-        rotationLock.element,
+    host.replaceChildren(
+        ...VIEW_BLOCKS.map((block) => renderBlock(block, state, context)),
     );
-
-    // ── 预置视角 ────────────────────────────────────────────────────────
-    // 选项与列数都来自 UI_CONFIG:加一个视角只改配置,这里不用动.
-    const viewCube = createSegmented<ViewHome>({
-        columns: view.viewCube.length,
-        ariaLabel: '预置视角',
-        value: state.viewHome,
-        items: view.viewCube,
-    });
-    disposables.push(viewCube);
-
-    // ── 点 ──────────────────────────────────────────────────────────────
-    const pointVisible = createSwitch({ value: state.pointVisible });
-    const pointMode = createSegmented<PointMode>({
-        columns: 2,
-        ariaLabel: '点的显示方式',
-        value: state.pointMode,
-        items: [
-            { value: 'size', label: '设定大小' },
-            { value: 'scale', label: '按比例缩放' },
-        ],
-    });
-    const pointValue = createNumberField({
-        value: state.pointDisplay,
-        min: view.point.min,
-        // 步长跟着模式走:绝对值与比例各一档(见 viewState.pointStep).
-        step: state.pointStep,
-        // 显示/回读口径走库的 `text` 出口:应用侧不再自己写格式化函数(见上).
-        text: POINT_DISPLAY_TEXT,
-    });
-    disposables.push(pointVisible, pointMode, pointValue);
-    guardLowerBound(pointValue, view.point.min, () => state.pointDisplay.peek());
-
-    const pointValueRow = createNumberRow('大小', pointValue);
-    // 标签文案随模式变:大小模式是绝对值,比例模式是倍数.
-    stops.push(watchValue(state.pointMode, (mode) => {
-        pointValueRow.label.textContent = mode === 'size' ? '大小' : '缩放';
-    }));
-
-    const point = createControlGroup(
-        '点',
-        createSwitchRow('全局可见', pointVisible),
-        pointMode.element,
-        pointValueRow.row,
-    );
-
-    // ── 坐标轴(含网格刻度)────────────────────────────────────────────
-    const upAxis = createSegmented<UpAxis>({
-        columns: 3,
-        // 三选一按钮组在行内吃掉剩余宽度,又不无限拉长
-        modifier: 'segmented--inline',
-        ariaLabel: '向上轴',
-        value: state.upAxis,
-        items: [
-            { value: 'x', label: 'X' },
-            { value: 'y', label: 'Y' },
-            { value: 'z', label: 'Z' },
-        ],
-    });
-    const axisLineWidth = createNumberField({
-        value: state.axisLineWidthInput,
-        min: view.axis.lineWidthMin,
-        step: view.axis.lineWidthStep,
-    });
-    const axisTicks = createSwitch({ value: state.axisTicks });
-    const axisPiUnit = createSwitch({ value: state.axisPiUnit });
-    const axisLabels = {
-        x: createSwitch({ value: state.axisLabelX }),
-        y: createSwitch({ value: state.axisLabelY }),
-        z: createSwitch({ value: state.axisLabelZ }),
-    };
-    const gridPlanes = {
-        xz: createSwitch({ value: state.gridPlaneXZ }),
-        xy: createSwitch({ value: state.gridPlaneXY }),
-        yz: createSwitch({ value: state.gridPlaneYZ }),
-    };
-    const gridMajorWidth = createNumberField({
-        value: state.gridMajorWidthInput,
-        min: view.axis.gridMajorMin,
-        step: view.axis.gridMajorStep,
-    });
-    const gridMinorWidth = createNumberField({
-        value: state.gridMinorWidthInput,
-        min: view.axis.gridMinorMin,
-        step: view.axis.gridMinorStep,
-    });
-    disposables.push(
-        upAxis,
-        axisLineWidth,
-        axisTicks,
-        axisPiUnit,
-        axisLabels.x,
-        axisLabels.y,
-        axisLabels.z,
-        gridPlanes.xz,
-        gridPlanes.xy,
-        gridPlanes.yz,
-        gridMajorWidth,
-        gridMinorWidth,
-    );
-    guardLowerBound(axisLineWidth, view.axis.lineWidthMin, () => state.axisLineWidth.peek());
-    guardLowerBound(gridMajorWidth, view.axis.gridMajorMin, () => state.gridMajorWidth.peek());
-    guardLowerBound(gridMinorWidth, view.axis.gridMinorMin, () => state.gridMinorWidth.peek());
-
-    const axis = createControlGroup(
-        '坐标轴',
-        createRow(create_element({ tag: 'span' }, {}, '向上'), upAxis.element),
-        createNumberRow('线宽', axisLineWidth).row,
-        createSwitchRow('刻度', axisTicks),
-        createSwitchRow('π 单位', axisPiUnit),
-        createRow(
-            create_element({ tag: 'span' }, {}, '标签'),
-            createInlineToggle('X', axisLabels.x),
-            createInlineToggle('Y', axisLabels.y),
-            createInlineToggle('Z', axisLabels.z),
-        ),
-        createRow(
-            create_element({ tag: 'span' }, {}, '网格'),
-            createInlineToggle('XZ', gridPlanes.xz),
-            createInlineToggle('XY', gridPlanes.xy),
-            createInlineToggle('YZ', gridPlanes.yz),
-        ),
-        createNumberRow('大刻度线宽', gridMajorWidth).row,
-        createNumberRow('小刻度线宽', gridMinorWidth).row,
-    );
-
-    // ── 曲面 ────────────────────────────────────────────────────────────
-    const surfaceWireframe = createSwitch({ value: state.surfaceWireframe });
-    const surfaceColorMap = createSwitch({ value: state.surfaceColorMap });
-    disposables.push(surfaceWireframe, surfaceColorMap);
-    const surface = createControlGroup(
-        '曲面',
-        createSwitchRow('网格', surfaceWireframe),
-        createSwitchRow('颜色映射', surfaceColorMap),
-    );
-
-    host.replaceChildren(camera, viewCube.element, point, axis, surface);
 
     return {
-        element: host,
         dispose(): void {
             abort.abort();
             for (const stop of stops) stop();
@@ -296,4 +95,130 @@ export function createViewPanel(host: HTMLElement, state: ViewState): ViewPanelH
             disposables.length = 0;
         },
     };
+}
+
+/** 一块:分组包一层小节,其余(相机行 / 预置视角)原样落地. */
+function renderBlock(
+    block: ViewBlockSpec,
+    state: ViewState,
+    context: ViewSpecContext,
+): HTMLElement {
+    if (block.kind !== 'group') return renderRow(block, state, context);
+    return createControlGroup(
+        block.title,
+        ...block.rows.map((row) => renderRow(row, state, context)),
+    );
+}
+
+/**
+ * 一行:按 `kind` 建控件.
+ *
+ * `switch` / `number` / `toggle-row` 三档的 `key` 落在"字段类型全是
+ * `Signal<boolean>` / `Signal<number>`"的键集合里(见 `viewSpec.ts` 的
+ * `BoolKey` / `NumberKey`),所以这里 `state[row.key]` 直接就是控件要的可写信号,
+ * 不需要强转也不需要运行时校验.
+ */
+function renderRow(
+    row: ViewRowSpec,
+    state: ViewState,
+    context: ViewSpecContext,
+): HTMLElement {
+    switch (row.kind) {
+        case 'switch': {
+            const control = createSwitch({ value: state[row.key] });
+            context.own(control);
+            return createSwitchRow(row.label, control);
+        }
+        case 'number': {
+            const control = createNumberField({
+                value: state[row.key],
+                min: row.min,
+                step: row.step,
+            });
+            context.own(control);
+            if (row.guardLowerBound === true) {
+                // 低于下限的输入到不了状态源(见 viewState 的 boundedInput),
+                // 这里把框里的文本回填成当前值,免得非法输入留在眼前.
+                control.onInput((raw) => {
+                    if (raw === null || raw < row.min) control.write(state[row.key].peek());
+                });
+            }
+            return createNumberRow(row.label, control).row;
+        }
+        case 'toggle-row': {
+            const toggles = row.toggles.map((toggle) => {
+                const control = createSwitch({ value: state[toggle.key] });
+                context.own(control);
+                return createInlineToggle(toggle.text, control);
+            });
+            return createRow(create_element({ tag: 'span' }, {}, row.label), ...toggles);
+        }
+        case 'segmented':
+            return renderSegmented(row, state, context);
+        case 'custom':
+            return row.build(state, context);
+    }
+}
+
+/**
+ * 分段行.
+ *
+ * `switch (row.key)` 是**按键收窄**而不是按泛型硬转:三个分段行的值域
+ * (`PointMode` / `UpAxis` / `ViewHome`)互不相同,逐键写出来才能让
+ * `createSegmented<T>` 的 `items` 与 `value` 落到同一个 `T` 上.键只有三个,
+ * 多写三行换来的是"清单里写错值域就编译不过".
+ *
+ * 有 `label` = 包一层 `.control-row`(行内组);没有 = 裸 `.segmented`
+ * (点模式 / 预置视角:它们的名字走 `aria-label`,不需要第二行文字).
+ */
+function renderSegmented(
+    row: SegmentedRowSpec,
+    state: ViewState,
+    context: ViewSpecContext,
+): HTMLElement {
+    const element = segmentedElement(row, state, context);
+    if (row.label === undefined) return element;
+    return createRow(create_element({ tag: 'span' }, {}, row.label), element);
+}
+
+function segmentedElement(
+    row: SegmentedRowSpec,
+    state: ViewState,
+    context: ViewSpecContext,
+): HTMLElement {
+    switch (row.key) {
+        case 'pointMode': {
+            const control = createSegmented<PointMode>({
+                columns: row.columns,
+                modifier: row.modifier,
+                ariaLabel: row.ariaLabel,
+                value: state.pointMode,
+                items: row.items,
+            });
+            context.own(control);
+            return control.element;
+        }
+        case 'upAxis': {
+            const control = createSegmented<UpAxis>({
+                columns: row.columns,
+                modifier: row.modifier,
+                ariaLabel: row.ariaLabel,
+                value: state.upAxis,
+                items: row.items,
+            });
+            context.own(control);
+            return control.element;
+        }
+        case 'viewHome': {
+            const control = createSegmented<ViewHome>({
+                columns: row.columns,
+                modifier: row.modifier,
+                ariaLabel: row.ariaLabel,
+                value: state.viewHome,
+                items: row.items,
+            });
+            context.own(control);
+            return control.element;
+        }
+    }
 }
