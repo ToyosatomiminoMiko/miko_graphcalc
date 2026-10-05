@@ -106,15 +106,31 @@ describe('编辑区样式归属', () => {
         );
     });
 
-    it('高亮层是 inset:0 的裁剪框而不是滚动容器', () => {
-        // 滚动偏移写在高亮内容的 transform 上(见 EditorHighlight.sync);
-        // 一旦这里变成 auto/scroll,高亮层就会与 textarea 各有一个最大滚动偏移
-        // (两者 client 尺寸差一个滚动条厚度),靠近底部时高亮会被夹住而错位.
-        const rule = ruleOf(libEditorCss, '.code-editor-highlight');
+    it('高亮层与 textarea 同处网格的一格,高亮层是裁剪框而不是滚动容器', () => {
+        // `.code-editor-input` 是 grid,两个盒子都是 `grid-area: 1 / 1`:
+        // "严格同尺寸重叠"由布局保证,不再是靠 `inset: 0` 算出来的.
+        const highlight = ruleOf(libEditorCss, '.code-editor-highlight');
+        const textarea = ruleOf(libEditorCss, '.code-editor-textarea');
 
-        expect(rule).toContain('inset: 0');
-        expect(rule).toContain('overflow: hidden');
-        expect(rule).not.toMatch(/overflow:\s*(auto|scroll)/);
+        expect(ruleOf(libEditorCss, '.code-editor-input')).toContain('display: grid');
+        expect(highlight).toContain('grid-area: 1 / 1');
+        expect(textarea).toContain('grid-area: 1 / 1');
+        // 高亮层自己不滚,也不出现滚动条(滚动归窗口正文根,见下一条).
+        expect(highlight).toContain('overflow: hidden');
+        expect(highlight).not.toMatch(/overflow:\s*(auto|scroll)/);
+    });
+
+    it('滚动归源码窗口正文根:编辑器随内容长,不再自己滚', () => {
+        // `#editor-panel` 是正文根,也是唯一的滚动容器.
+        expect(ruleOf(editorCss, '#editor-panel')).toMatch(/overflow:\s*auto/);
+        // 库的外框随内容长高长宽(内容比窗口小时由 min-* 填满):写死尺寸就又会
+        // 变回"textarea 内部滚",窗口上那条滑条就没了.
+        const frame = ruleOf(libEditorCss, '.code-editor');
+        expect(frame).toContain('min-height: 100%');
+        expect(frame).toContain('min-width: 100%');
+        expect(frame).not.toMatch(/(?:^|;)\s*height:\s*100%/);
+        // 行号槽钉在左边:横向滚动时行号不跟着跑.
+        expect(ruleOf(libEditorCss, '.code-editor-gutter')).toContain('position: sticky');
     });
 
     it('高亮层紧跟 textarea(相邻兄弟选择器依赖这个顺序)', () => {

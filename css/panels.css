@@ -18,8 +18,12 @@
    右栏的标签栏与页级 hidden 同样删除(两页各自独立成窗口).
    `flex: 1 1 auto` 不在这里写:`.window-body > *` 已经给了(见库的
    `miko_ui/styles/desktop.css`),
-   两处都写就会在下一次改窗口正文骨架时漏掉一处. */
-.panel,
+   两处都写就会在下一次改窗口正文骨架时漏掉一处.
+
+   应用那个通用 `.panel` 类已随"正文根自己滚"的改动退休:七个窗口的正文根现在
+   各自给出自己需要的列排布(参数 / 过程用 `.right-page`,列表用 `.object-panel`,
+   诊断用库的 `.message-area`,源码那条规则在 css/editor.css),没有谁再需要一层
+   空骨架. */
 .right-page {
     display: flex;
     flex-direction: column;
@@ -59,8 +63,9 @@
 }
 
 /* 滚动条外观**不在这里**:库的 `styles/scrollbar.css` 是唯一来源,滚动容器
-   (`#params-panel` / `#view-controls` / 三个列表窗口的 `.message-area`)
-   只在 `src/app/appViews.ts` 里挂库公开的 `.ui-scrollbar` 类.
+   (参数 / 视图 / 源码三个窗口的正文根,实体与求值窗口正文里的 `.object-panel`,
+   诊断窗口里那颗**就是正文根**的 `.message-area`)只在 `src/app/appViews.ts` 里挂
+   库公开的 `.ui-scrollbar` 类 -- 源码窗口那条规则属于 css/editor.css,不在本文件.
    这里原本有一份写死 `8px` + 两条 `--color-scrollbar*` 的副本,已删 -- 那正是
    "同一个滚动条有两个来源"的写法. */
 
@@ -69,29 +74,41 @@
    参数面板只负责列表容器(上面的 `#params-panel`). */
 
 /* ==========================================================================
- * 列表窗口的宿主(实体 / 求值 / 诊断三个窗口同形)
+ * 实体 / 求值两个列表窗口的正文
  * ========================================================================== */
 
-/* 宿主:窗口正文里唯一的孩子,只给一圈内边距.
-   "吃掉窗口正文的剩余高度"归库的 `.window-body > *`,列排布与 `min-height: 0`
-   归 `.panel`(少了它壳里的 `overflow-y` 不会触发,但那条已经在 `.panel` 里),
-   这里不再重复.
-   `overflow: hidden` 留着:壳里那层框体自己滚,宿主不该再冒出第二条滚动条. */
+/* 正文根**就是**滚动容器:与 `#params-panel` / `#view-controls` 同一个形状 --
+ * 一个按顺序往下摞,超出就自己滚的列容器,滑条贴窗口边.
+ *
+ * 为什么不是"宿主 + 里面一个会滚的卡片":那样滑条属于窗口内的**元素**,窗口
+ * 正文根反而不滚,于是要靠 `overflow: hidden` + 逐层的 `min-height: 0` 传递
+ * 把滚动顶到内层去(改一层忘了另一层不报错,只是滑条位置慢慢分叉).正文根自己
+ * 滚之后这些约束全都不需要了:`.window-body > *` 已经给了 `flex: 1 1 auto` 与
+ * `min-height: 0`(见库的 `styles/desktop.css`),这里只声明"怎么摞"与"滚".
+ *
+ * 列排布与 `#params-panel` 同值(gap 6 / padding 8);诊断窗口不动 -- 它是消息区,
+ * 框体与 `aria-live` 都是库的 `.message-area` 的一部分. */
 .object-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     padding: 8px;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 /* ==========================================================================
  * 诊断窗口
  * ========================================================================== */
 
-/* 宿主:给库的消息区留一圈内边距(窗口正文自己没有 padding,`.panel` 只给
-   "填满正文"的骨架).消息区自己那圈框体 / 底色 / 滚动 / `aria-live` 现在全在
-   库的 `.message-area` 里(见 `miko_ui` 的 `styles/feedback.css`),应用侧不再有
-   `.diagnostic-list` 那一份容器样式.
-   等宽大字号是**应用的排版口径**:库的 `.message-area` 让文本继承宿主,所以这两
-   条写在应用自己的宿主 id 上,而不是给库的类写规则(见 styleLayers.test.ts). */
+/* 正文根**就是**库的消息区容器(`createMessageArea({ modifier: 'message-area--unframed' })`
+   建的那颗,应用只给它 id):与实体 / 求值 / 源码窗口同形,滑条落在窗口边上.
+   这里只剩两件**应用**的事:一圈内边距,以及排版.框体不要了:那个变体类让库不给
+   框体 -- 窗口外壳那圈描边就是它的框,再套一层就是两层边框 + 一圈白给的内边距,
+   和实体 / 求值窗口当初删掉的是同一个东西.
+   列表节奏 / 滚动 / `aria-live` 仍全在库的 `.message-area`(见 `miko_ui` 的
+   `styles/feedback.css` 里那个 `-unframed` 变体),应用侧没有 `.diagnostic-list`
+   那一份容器样式.等宽大字号是**应用的排版口径**:库的容器让文本继承宿主,所以这两
+   条写在应用自己的 id 上,而不是给库的类写规则(见 styleLayers.test.ts). */
 #diagnostics-panel {
     padding: 8px;
     font-family: var(--code-font-family);
@@ -112,18 +129,15 @@
     transition: color 0.2s ease;
 }
 
-/* 对象列表的框体**不在这里**:它就是库的 `.message-area`
- * (`miko_ui/styles/feedback.css`) -- 框体 + 列表节奏 + 滚动,只此一份.
+/* 对象列表的框体**只诊断窗口还有**:那里是库的 `.message-area`
+ * (`miko_ui/styles/feedback.css`) -- 框体 + 列表节奏 + 滚动 + `aria-live`,一件东西.
  *
- * 为什么并进库那一份:应用侧过去有一份逐字重复的 `.object-list-body`,13 条
- * 声明里 9 条与 `.message-area` 完全相同(只差 `gap` 4px/6px 与一条
- * `min-width`).同一个盒子两个来源,改一处漏一处不会报错,只会让两个窗口的
- * 观感慢慢分叉.诊断窗口本来就是库那一份,于是三个列表窗口现在同形:
+ * 实体 / 求值两个窗口不再套这一层:它们的正文根自己滚(见上面的 `.object-panel`),
+ * 再套一个"有描边和底色的卡片"就等于把滑条又塞回窗口内的元素里.三个窗口因此不再
+ * 同形,这是刻意的:诊断是消息,列表是正文.
  *
- *   window-body > .panel.object-panel(宿主,给内边距) > .message-area(框体,滚)
- *
- * 行引擎同样只有一份:`RowList`(库的 `shared/rowList.ts`),实体 / 求值六个
- * 子列表 / 诊断消息 / 过程步骤都走它 -- 三张表的差别只有 `name` / `key` / `build`.
+ * 行引擎仍然只有一份:`RowList`(库的 `shared/rowList.ts`),实体 / 求值六个
+ * 子列表 / 诊断消息 / 过程步骤都走它 -- 差别只有 `name` / `key` / `build`.
  * 应用侧剩下的只有这两个窗口自己的分组(`.object-sublist`)与行结构. */
 
 .object-sublist {

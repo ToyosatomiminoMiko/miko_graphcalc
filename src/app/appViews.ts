@@ -44,6 +44,8 @@ export interface AppViews {
     readonly chrome: WindowChrome;
     /** 窗口内容提供者:标题栏槽位 + 正文节点;未知窗口返回空内容. */
     readonly windowContent: (id: string) => WindowContentSpec;
+    /** 源码窗口的正文根:编辑器所在的那一层,**滚动归它**(`#editor-panel`). */
+    readonly sourcePanel: HTMLElement;
     /** 源码编辑器:`textarea` 本体 + 行号槽 + 高亮层. */
     readonly editor: HTMLTextAreaElement;
     readonly editorGutter: HTMLElement;
@@ -63,12 +65,15 @@ export interface AppViews {
 }
 
 /**
- * 源码窗口正文:面板包裹层(应用) + 编辑器外壳(库的 `CodeEditor`).
+ * 源码窗口正文:正文根就是滚动容器(应用) + 编辑器外壳(库的 `CodeEditor`).
  *
- * 编辑器那套结构(`.code-editor*`)已经随库走(P4):库知道"高亮层必须紧跟
- * textarea"这类结构约束,应用只给两样东西 -- 初值无关的分词器与本应用的
- * 槽宽下限(D6).这里保留的 `#editor-panel` 是**应用的**包裹层(给编辑器留
- * padding 并让它吃掉窗口正文的剩余高度).
+ * 编辑器那套结构(`.code-editor*`)已经随库走(P4):库知道"高亮层必须与 textarea
+ * 同格"这类结构约束,应用只给两样东西 -- 初值无关的分词器与本应用的槽宽下限(D6).
+ *
+ * **滚动归窗口正文根**:`#editor-panel` 自己 `overflow: auto` 并挂库的
+ * `.ui-scrollbar`,库的 `.code-editor` 随内容长高长宽(见库 `styles/editor.css`
+ * 的"滚动归属"),所以滑条只有窗口这一条 -- 与参数 / 视图 / 实体 / 求值窗口同形.
+ * 应用侧因此不再有"给编辑器留 padding 并让它吃掉剩余高度"的包裹层:只剩这一层.
  */
 function buildSourceWindow(doc: Document): {
     body: HTMLElement;
@@ -83,12 +88,12 @@ function buildSourceWindow(doc: Document): {
         gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
         root: doc,
     });
-    // 源码区也会滚动:textarea 挂库的滚动条类,与其余滚动容器同一种外观.
+    // 源码区由窗口正文根滚:滚动条类挂在它上面,与其余滚动容器同一种外观.
     // 编辑器外壳本身不认这条规定(结构与滚动条分开),所以由消费者在这里挂.
-    code.textarea.classList.add('ui-scrollbar');
-    const panel = create_element({ tag: 'div', root: doc }, { id: 'editor-panel' }, code.element);
-    // 旧 `#left-panel` 只有 `.panel` 这一条样式(id 选择器里没有它,见计划附录 C6).
-    const body = create_element({ tag: 'div', root: doc }, { class: 'panel' }, panel);
+    const body = create_element({ tag: 'div', root: doc }, {
+        class: 'ui-scrollbar',
+        id: 'editor-panel'
+    }, code.element);
 
     return {
         body,
@@ -114,30 +119,39 @@ function buildParamsWindow(doc: Document): {
 }
 
 /**
- * 诊断窗口正文:库的消息区(容器 + 条目) + 应用的一层宿主体.
+ * 诊断窗口正文:库的消息区容器**就是**窗口正文根(没有第二层宿主).
  *
- * 容器(框体 / 列表节奏 / 滚动 / `aria-live`)现在由库的 `createMessageArea()`
- * 建:过去容器归应用,条目归库,同一个提示区有两处维护,而容器上那条
- * `aria-live` 漏了就直接废掉库的"内容一致时零 DOM 操作"(读屏每帧重放).
+ * 容器(列表节奏 / 滚动 / `aria-live`)由库的 `createMessageArea()` 建:过去容器
+ * 归应用,条目归库,同一个提示区有两处维护,而容器上那条 `aria-live` 漏了就直接
+ * 废掉库的"内容一致时零 DOM 操作"(读屏每帧重放).
  *
- * 这里只剩两件**应用**的事:
- * - `#diagnostics-panel` 是宿主,给消息区留一圈内边距(窗口正文本身没有 padding);
+ * 这里只剩三件**应用**的事:
+ * - `#diagnostics-panel` 就是那颗容器(应用给它 id,不另建宿主):与实体 / 求值 /
+ *   源码窗口同形 -- **滑条属于窗口正文根**,窗口外壳那圈描边就是它的框;
+ * - `modifier: 'message-area--unframed'` 让库不给框体(理由见上面那条):再套一层
+ *   "有描边的卡片"就是两层边框 + 一圈白给的内边距,和实体 / 求值窗口当初删掉的
+ *   是同一个东西.写的是**变体类名**,与 `ViewPanel` 的
+ *   `modifier: 'segmented--inline'` 同一条约定(见库 `widgets/Segmented.ts`);
  * - `ui-scrollbar` 由消费者挂:滚动条是库的一条**独立规定**,组件与它互不认识
  *   (见库的 `styles/scrollbar.css`),要不要用由这里决定.
  *
- * 字体与字号不给库的类写规则:`#diagnostics-panel` 上的排版由 `.message-area`
- * 里的文本继承(--code-font-family 与字号都写在 `css/panels.css` 的应用规则里).
+ * 滚动仍由库的 `.message-area` 给(`overflow-y` 那一条):容器是正文根,所以那条
+ * 滑条落在窗口边上,正是"窗口自己的滑条".
+ *
+ * 字体与字号不给库的类写规则:`#diagnostics-panel` 上的排版由容器里的文本继承
+ * (--code-font-family 与字号都写在 `css/panels.css` 的应用规则里).
  */
 function buildDiagnosticsWindow(doc: Document): {
     body: HTMLElement;
     diagnostics: MessageAreaHandle;
 } {
-    const messageArea = createMessageArea({ root: doc, class: 'ui-scrollbar' });
-    const body = create_element({ tag: 'div', root: doc }, {
-        class: 'panel',
-        id: 'diagnostics-panel'
-    }, messageArea.element);
-    return { body, diagnostics: messageArea };
+    const messageArea = createMessageArea({
+        root: doc,
+        modifier: 'message-area--unframed',
+        class: 'ui-scrollbar',
+    });
+    messageArea.element.id = 'diagnostics-panel';
+    return { body: messageArea.element, diagnostics: messageArea };
 }
 
 /** 过程窗口正文:通高的递等式视图. */
@@ -150,33 +164,31 @@ function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: H
     return { body, processPanel };
 }
 
-/** 实体窗口正文:实体对象一栏(原来与求值两栏同处"对象"窗口).
+/** 实体窗口正文:实体对象一栏.窗口正文根**就是**那个滚动容器(原来与求值两栏同处
+ * "对象"窗口).
  *
  * 栏标题(`.object-list-title`)删掉了:窗口标题已经是"实体对象",窗口里再来
  * 一行同名的小标题只是把同一句话说两遍 -- 拆成两个窗口之后,标题栏就是新的
  * 分组标识,不需要第二套.
  *
- * 正文只有两层,与诊断窗口同形:宿主 `.object-panel` 给内边距,框体是**库的**
- * `.message-area`(框体 + 列表节奏 + 滚动只此一份,见 `css/panels.css`).
- * 行引擎同理只一份:`RowList`,构造时给容器挂 `role="list"`. */
+ * 正文只有一层:`.object-panel` 既是宿主也是滚动区(`display:flex` + `overflow-y`,
+ * 见 `css/panels.css`),与 `#params-panel` / `#view-controls` 同形 -- 滑条贴窗口边,
+ * 不再缩在一个卡片里.行引擎归库的 `RowList`(构造时给容器挂 `role="list"`). */
 function buildEntitiesWindow(doc: Document): {
     body: HTMLElement;
     entity: HTMLElement;
 } {
     const entity = create_element({ tag: 'div', root: doc }, {
-        class: 'message-area ui-scrollbar',
+        class: 'object-panel ui-scrollbar',
         id: 'entity-object-list'
     });
-    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel' },
-        entity);
-    return { body, entity };
+    return { body: entity, entity };
 }
 
 /** 求值窗口正文:六个求值子列表(分析 / 积分 / 求交 / 求解 / 原函数 / 微分方程).
  *
- * 与实体窗口同一个框体,同一个宿主:六个 kind 各占一个 `.object-sublist`
- * (应用类,空的时候由 CSS 收起),它们是各自的 `RowList` 容器;外面那只盒子
- * 只负责内边距,框体与滚动归库的 `.message-area`. */
+ * 与实体窗口同形:正文根就是滚动容器,六个 kind 各占一个 `.object-sublist`
+ * (应用类,空的时候由 CSS 收起),它们是各自的 `RowList` 容器. */
 function buildEvaluationsWindow(doc: Document): {
     body: HTMLElement;
     objectLists: Omit<ObjectListContainers, 'entity'>;
@@ -193,17 +205,16 @@ function buildEvaluationsWindow(doc: Document): {
         ode: list('ode-object-list', 'object-sublist'),
     };
 
-    const body = create_element({ tag: 'div', root: doc }, { class: 'panel object-panel' },
-        create_element({ tag: 'div', root: doc }, {
-            class: 'message-area ui-scrollbar',
-            id: 'evaluation-object-list'
-        },
+    const body = create_element({ tag: 'div', root: doc }, {
+        class: 'object-panel ui-scrollbar',
+        id: 'evaluation-object-list'
+    },
         sublists.analysis,
         sublists.integral,
         sublists.intersection,
         sublists.solve,
         sublists.antiderivative,
-        sublists.ode));
+        sublists.ode);
 
     return { body, objectLists: sublists };
 }
@@ -245,6 +256,7 @@ export function buildAppViews(root: HTMLElement): AppViews {
         viewport,
         chrome,
         windowContent: (id) => ({ slots: slots(id), body: isWindowId(id) ? bodies[id] : [] }),
+        sourcePanel: source.body,
         editor: source.editor,
         editorGutter: source.gutter,
         editorLines: source.lines,

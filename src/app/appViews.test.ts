@@ -76,27 +76,46 @@ describe('buildAppViews', () => {
         }
     });
 
-    it('三个列表窗口的框体是库的同一份,正文里不再有应用自建的盒子', () => {
+    it('实体 / 求值窗口的正文根自己就是滚动容器(滑条不属于窗口内的卡片)', () => {
         const { root, views } = build();
 
-        // 句柄拿到的就是框体本身:它直接挂在宿主 `.object-panel` 下,中间没有包裹层.
-        expect(views.objectLists.entity.classList.contains('message-area')).toBe(true);
-        expect((views.objectLists.entity.parentElement as unknown as StubElement).className)
-            .toBe('panel object-panel');
-        // 诊断窗口的框体是同一份类:三张表同形,差别只在里面装什么.
-        expect(views.diagnostics.element.classList.contains('message-area')).toBe(true);
-        // 两个框体都还挂着应用决定的滚动条规定(滚动条外观在库的 scrollbar.css).
+        // 句柄拿到的就是**正文根**:它直接挂在库的 `.window-body` 下,中间没有宿主层.
+        const entity = views.objectLists.entity as unknown as StubElement;
+        expect(entity.id).toBe('entity-object-list');
+        expect(entity.classList.contains('object-panel')).toBe(true);
+        expect(entity.classList.contains('ui-scrollbar')).toBe(true);
+        expect((entity.parentElement as unknown as StubElement).classList.contains('window-body'))
+            .toBe(true);
+
+        // 求值窗口同一形状:正文根 = 六个子列表的容器 + 滚动区.
+        const evaluation = root.querySelector('#evaluation-object-list') as unknown as StubElement;
+        expect(evaluation.classList.contains('object-panel')).toBe(true);
+        expect(evaluation.classList.contains('ui-scrollbar')).toBe(true);
+        expect((evaluation.parentElement as unknown as StubElement).classList.contains('window-body'))
+            .toBe(true);
+
+        // 窗口内的卡片(库的 `.message-area`)与旧的包裹层都只属于诊断窗口 /
+        // 已删除:两个列表窗口再套一层"有描边和底色的框体",滑条就又回到
+        // 窗口内的元素里了(见 css/panels.css).
         for (const id of ['entity-object-list', 'evaluation-object-list']) {
-            const box = root.querySelector(`#${id}`) as unknown as StubElement;
-            expect(box.classList.contains('message-area'), id).toBe(true);
-            expect(box.classList.contains('ui-scrollbar'), id).toBe(true);
+            const body = root.querySelector(`#${id}`) as unknown as StubElement;
+            expect(body.classList.contains('message-area'), id).toBe(false);
         }
-        // 应用自建的框体与那两层包裹 div 不许长回来:框体只有库那一份,
-        // 宿主只有一层(见 css/panels.css).
         for (const dead of ['.object-list-body', '.object-list-column', '.object-panel-column']) {
             expect(root.querySelector(dead), dead).toBeNull();
         }
         expect(root.querySelector('#object-panel')).toBeNull();
+    });
+
+    it('源码窗口的正文根是 #editor-panel 自己(滚动归它,编辑器外壳不套第二层)', () => {
+        const { root, views } = build();
+        const body = views.windowContent('source').body?.[0] as unknown as StubElement;
+
+        expect(body.id).toBe('editor-panel');
+        expect(body.classList.contains('ui-scrollbar')).toBe(true);
+        expect(body.classList.contains('panel')).toBe(false);
+        // 编辑器外壳仍是正文根里唯一的孩子,它的结构一行不动.
+        expect(body.children[0]).toBe(root.querySelector('.code-editor'));
     });
 
     it('编辑器外壳由库的 CodeEditor 建(类名结构,应用只包一层面板)', () => {
@@ -147,18 +166,21 @@ describe('buildAppViews', () => {
         }
     });
 
-    it('诊断窗口的容器由库的 MessageArea 建(aria-live 在库侧,应用不再有容器类)', () => {
+    it('诊断窗口的消息区容器**就是**正文根(无框变体,aria-live 在库侧)', () => {
         const { root, views } = build();
         const area = views.diagnostics.element as unknown as StubElement;
 
-        expect(area.className).toBe('message-area ui-scrollbar');
+        // 与实体 / 求值 / 源码窗口同形:正文根自己滚,窗口里不再套第二层盒子.
+        expect(area.id).toBe('diagnostics-panel');
+        expect(area.className).toBe('message-area message-area--unframed ui-scrollbar');
+        expect((area.parentElement as unknown as StubElement).classList.contains('window-body'))
+            .toBe(true);
         // `aria-live` 是"容器里一有变动就被播报"的那条行为,必须由库件给出:
         // 它漏了,库的"内容一致时零 DOM 操作"就白做(读屏每帧重放).
         expect(area.getAttribute('aria-live')).toBe('polite');
-        // 句柄里的节点就是树上那一颗,不是建完没插进去的孤儿.三个列表窗口现在都挂
-        // `.message-area`,`querySelector` 只会命中第一个,所以按宿主认这一颗.
-        expect(area.closest('#diagnostics-panel')).not.toBeNull();
-        // 应用自建的诊断列表容器类随库走了,别在这里长回来.
+        // 句柄里的节点就是树上那一颗,不是建完没插进去的孤儿.
+        expect(root.querySelector('#diagnostics-panel')).toBe(area);
+        // 应用自建的诊断容器类与那层宿主 div 都别在这里长回来.
         expect(root.querySelector('.diagnostic-list')).toBeNull();
     });
 

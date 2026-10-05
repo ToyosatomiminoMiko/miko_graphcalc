@@ -172,14 +172,24 @@ CSS 变量的理由是**缺一项要能被机器拦住**:`css/*.css` 里每个 `
 容器挂库公开的 `.ui-scrollbar` 类即得同一种细滚动条(尺寸 `--scrollbar-size`,
 颜色 `--color-scrollbar*`,都在库的 token 层),应用侧一条滚动条规则都不写 --
 挂类的地方是 `src/app/appViews.ts`(`#params-panel` / `#view-controls` /
-三个列表窗口的 `.message-area`(实体 / 求值 / 诊断共用库的同一个框体,三张表同形,
-以及库建好外壳后的源码 `textarea`),
+源码窗口正文根 `#editor-panel` / 实体与求值窗口正文根 `.object-panel` /
+诊断窗口的正文根,即库那颗 `.message-area`),
 `src/app/windowChrome.ts`(示例浮层,库的 `createMenu` 会把它补成会滚动的
 `.menu-panel`),`src/ui/process/ProcessPanel.ts`,`src/ui/evaluation/evaluationDom.ts`
 与 `integralItem.ts`.库自己的组件不挂这个类:菜单件与滚动条规定互不认识,要不要
 用由消费者决定.库侧这条规定有独立守卫(`miko_ui` 的
 `test/scrollbarStyles.test.ts`):只认 `.ui-scrollbar`,不认识任何组件,也不被任何
 组件引用.
+
+**滑条属于窗口正文根,不属于窗口里的某个元素**:七个窗口里有六个的正文根就是"一个
+按顺序往下摞,超出就自己滚的列容器",`overflow` 与 `min-height: 0` 都只在这一层
+(`#params-panel` / `#view-controls` / `#editor-panel` / `.object-panel` /
+诊断的 `.message-area`;过程窗口是它自己的几个滚动块 -- 页头不该跟着滚).这一条过去
+在实体 / 求值 / 诊断三个窗口上是反的 -- 正文根是个 `overflow: hidden` 的宿主,真正
+滚的是里面那张"库的 `.message-area`"卡片,滑条于是缩在窗口内的元素里,还要靠逐层的
+`min-height: 0` 把滚动顶下去.源码窗口同样:滑条原来在 `.code-editor` 里的 `textarea`
+上,现在编辑器随内容长高长宽,由 `#editor-panel` 滚(库侧口径见 `miko_ui` README 的
+"窗口正文的排布"与 `styles/editor.css` 的"滚动归属").
 
 整层压而不是逐份交错:交错时"谁赢"由"文件排在第几位"决定,而不是"这块样式归谁
 负责".踩过的坑是应用层的 `.row-visibility-btn` 被排在它后面的库 `widgets.css`
@@ -216,10 +226,13 @@ CSS 变量的理由是**缺一项要能被机器拦住**:`css/*.css` 里每个 `
 源码高亮不引入编辑器组件:着色后的源码渲染在 textarea 背后的
 `#dsl-editor-highlight` 层里,textarea 只把文字设为透明(光标/选区/撤销/IME
 仍由原生 textarea 负责).透明与显示由 `EditorHighlight` 在首次渲染成功后加上的
-`is-highlighted` 类同时开关,脚本没跑时它就是一个普通输入框.高亮层的滚动偏移
-写在内容元素的 `transform` 上(`EditorHighlight.sync`),不让高亮层自己滚动:
-textarea 的滚动条要占位而高亮层不占,两者的最大滚动偏移差一个滚动条厚度,
-抄 `scrollTop` 会在靠近底部/右端时被浏览器夹住,高亮最多滞后约 0.8 行.
+`is-highlighted` 类同时开关,脚本没跑时它就是一个普通输入框.
+**两者同处库的 `.code-editor-input` 网格的一格**(`grid-area: 1 / 1`),尺寸
+由布局保证一致;编辑器自己不滚,滑条归源码窗口的正文根 `#editor-panel`(库侧
+见 `styles/editor.css` 的"滚动归属"),所以历史上那条"textarea 的滚动条要占位,
+高亮层不占,两边最大滚动偏移差一个滚动条厚度,抄 `scrollTop` 会被夹住"的坑
+不存在了(`EditorHighlight.sync` / `EditorLineNumbers.sync` 保留,写成恒 0,
+消费者把 textarea 改回固定尺寸时仍然对齐).
 分词与配色见 `src/editor/dslHighlight.ts` 与 `css/editor.css`;关键字表由
 `dslHighlight.test.ts` 直接读 `src/compiler/compiler_rs/src/miko.pest` 校验,
 语法文件新增枚举值不会漏.

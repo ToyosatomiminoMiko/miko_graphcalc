@@ -58,6 +58,8 @@ export class DslApp {
     private readonly viewPanel: ViewPanelHandle;
 
     private readonly editor: HTMLTextAreaElement;
+    /** 源码窗口正文根:编辑器所在的那一层,**滚动归它**(`#editor-panel`). */
+    private readonly sourcePanel: HTMLElement;
     /** 运行按钮:由 `createWindowChrome()` 建,监听在本类(它拥有"运行"这条动作). */
     private readonly runButton: HTMLElement;
     private readonly lineNumbers: EditorLineNumbers;
@@ -102,6 +104,7 @@ export class DslApp {
      */
     constructor(views: AppViews) {
         this.editor = views.editor;
+        this.sourcePanel = views.sourcePanel;
         this.runButton = views.chrome.runButton;
         this.processHost = views.processPanel;
         this.appRoot = views.root;
@@ -305,7 +308,9 @@ export class DslApp {
                 gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
             }),
             // 高亮层与行号栏一样监听 input/scroll,但一个只画行号(translate),
-            // 一个当滚动容器用(见各自类的说明).
+            // 一个只做裁剪框.两条同步现在都写成 0(textarea 自己不滚,滚动归
+            // `#editor-panel`);留着是因为消费者把 textarea 改回固定尺寸时它们
+            // 仍然管用(见库 EditorHighlight 的文件头).
             highlight: new EditorHighlight(this.editor, {
                 scroller: views.editorHighlight,
                 code: views.editorHighlightCode,
@@ -390,9 +395,12 @@ export class DslApp {
      * 行为就一致了(EditorLineNumbers.refresh 本就是为"程序化改写编辑器"准备的).
      */
     private _syncExampleChrome(entry: ExampleEntry): void {
-        // 全选覆盖后光标停在文末,编辑器会跟着滚到底部;载入后应当看到开头.
+        // 全选覆盖后光标停在文末,窗口正文根会跟着滚到底部;载入后应当看到开头.
+        // 滚的是**正文根**而不是 textarea:编辑器自己不滚(见 AppViews.sourcePanel
+        // 与库 `styles/editor.css` 的"滚动归属"),`editor.scrollTop` 恒为 0.
         this.editor.setSelectionRange(0, 0);
-        this.editor.scrollTop = 0;
+        this.sourcePanel.scrollTop = 0;
+        this.sourcePanel.scrollLeft = 0;
         this.lineNumbers.refresh();
         this.editorHighlight.refresh();
         this.exampleLoader.setActive(entry.file);
