@@ -132,10 +132,16 @@ export const UI_CONFIG = {
      */
     editor: {
         /**
-         * 字体栈:首选族与根站点(`public/css/index.css`)的拼写保持一致,都写成
-         * 带空格的族名并加引号.本仓库不随产物提供该字体(没有 @font-face/字体
-         * 文件),系统没装时按后面的 `ui-monospace` 等回退--这是刻意的兜底,
-         * 不要再写成 `JetBrains-Mono-Slashed` 那种连字符族名(见 UI-P3.15).
+         * 字体栈:运行期由 `applyUiConfig` 写进根元素的 `--code-font-family`,
+         * 编辑区 / 行号槽 / 对象列表都读那一份(`css/editor.css`,`css/panels.css`).
+         *
+         * 字体文件**由库提供**:`miko_ui` 的 `styles/fonts.css` 带三份 woff2 与
+         * `@font-face`(`--font-family-base` / `--code-font-family` 的默认值就是它),
+         * 所以"系统里装没装这款字体"不再影响观感,本仓库也不用自带字体.
+         * 这里仍然写完整栈,是因为应用要覆盖库的 token(`uiConfigCssVariables`);
+         * 首位族名必须与库的 `@font-face` 逐字一致(带空格,加引号),
+         * 不要再写成 `JetBrains-Mono-Slashed` 那种连字符族名(见 UI-P3.15);
+         * 后面的 `ui-monospace` 等是"库还是发版前那一版(没有这个字体)"时的兜底.
          */
         fontFamily: "'JetBrains Mono Slashed', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         /** 字号,单位 px */

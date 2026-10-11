@@ -116,24 +116,64 @@ export class SceneManager {
         }
         this.tickGroup.visible = RENDER_CONFIG.scene.axisTicks.visible;
 
-        // XYZ 轴标签(使用 Sprite)
+        // XYZ 轴标签(使用 Sprite):建一次,字体到位后再重建一次(见本方法末尾)
+        this.buildAxisLabels();
+
+        /*
+          文字 Sprite 的画布宽度是按 measureText 实测宽度定的(见 createTextSprite),
+          而 @font-face 的字体是异步到的:字体没到就量到回退字体,之后不会自己更新.
+          DOM 文字有 `font-display: swap` 兜着,画布文字没有这一层,所以这里等这个
+          画布字体自己加载完再重建一次文字(轴标签 + 刻度数字,规模很小,只跑一次).
+          用 fonts.load(而不是 fonts.ready):要等的就是 labelFont 那一份,
+          fonts.ready 在没有待加载字体时会立刻兑现,那时量到的还是回退字体.
+        */
+        void document.fonts
+            ?.load?.(RENDER_CONFIG.scene.labelFont)
+            .then(() => this.refreshTextLabels())
+            .catch(() => {
+                // 字体不可用(离线 / 被拦)就用回退字体画,不把启动拖崩
+            });
+    }
+
+    /**
+     * 建/重建 XYZ 轴标签 Sprite.
+     *
+     * 位置与配色来自配置,可见性沿用**当前**开关状态(不从配置重读),
+     * 所以重建不会把用户关掉的轴又打开.单独抽出来是为了 refreshTextLabels.
+     */
+    private buildAxisLabels(): void {
         const axisLen = RENDER_CONFIG.scene.axisLabelLength;
-        const axisLabel = (
-            axis: AxisName,
-            text: string,
-            position: THREE.Vector3,
-            color: string,
-        ): void => {
+        // X 红色 | Y 绿色 | Z 蓝色 与 AxesHelper 配色一致
+        const defs: readonly (readonly [AxisName, string, THREE.Vector3, string])[] = [
+            ['x', 'X', new THREE.Vector3(axisLen, 0, 0), RENDER_CONFIG.scene.axisColors.x],
+            ['y', 'Y', new THREE.Vector3(0, axisLen, 0), RENDER_CONFIG.scene.axisColors.y],
+            ['z', 'Z', new THREE.Vector3(0, 0, axisLen), RENDER_CONFIG.scene.axisColors.z],
+        ];
+        for (const [axis, text, position, color] of defs) {
+            const previous = this.axisLabels[axis];
+            if (previous) {
+                this.scene.remove(previous);
+                previous.geometry?.dispose();
+                previous.material.map?.dispose();
+                previous.material.dispose();
+            }
             const sprite = this.createTextSprite(text, color);
             sprite.position.copy(position);
-            sprite.visible = RENDER_CONFIG.scene.axisLabels[axis];
+            sprite.visible = this.axisLabelVisible[axis];
             this.axisLabels[axis] = sprite;
             this.scene.add(sprite);
-        };
-        // X 红色 | Y 绿色 | Z 蓝色 与 AxesHelper 配色一致
-        axisLabel('x', 'X', new THREE.Vector3(axisLen, 0, 0), RENDER_CONFIG.scene.axisColors.x);
-        axisLabel('y', 'Y', new THREE.Vector3(0, axisLen, 0), RENDER_CONFIG.scene.axisColors.y);
-        axisLabel('z', 'Z', new THREE.Vector3(0, 0, axisLen), RENDER_CONFIG.scene.axisColors.z);
+        }
+    }
+
+    /**
+     * 字体到位后重建全部文字 Sprite.
+     *
+     * 刻度数字住在 tickGroup 里,由 buildGridAndTicks 一并清掉重建(它是幂等的);
+     * 轴标签不在那一组,所以单独重建一遍.
+     */
+    private refreshTextLabels(): void {
+        this.buildAxisLabels();
+        this.buildGridAndTicks();
     }
 
     getScene(): THREE.Scene {

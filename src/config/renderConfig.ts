@@ -138,7 +138,12 @@ export const RENDER_CONFIG = {
             visible: true,
         },
         labelCanvasSize: 64,
-        labelFont: 'Bold 36px Arial',
+        // 刻度数字与 XYZ 轴标签的 canvas 字体:站点默认字体(JetBrains Mono Slashed,
+        // 由 miko_ui 随包发布).canvas 的 ctx.font 读不到 CSS 变量,只能写族名;
+        // 字体是异步到的,而 Sprite 的画布宽度按 measureText 实测宽度定,所以
+        // SceneManager 会在这一份字体加载完后重建一次文字 Sprite(见那里的
+        // refreshTextLabels):不重建就会一直用回退字体的度量.
+        labelFont: 'Bold 36px "JetBrains Mono Slashed", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
         labelScale: 0.8,
         // 坐标轴颜色 (行业惯例)
         axisColors: {

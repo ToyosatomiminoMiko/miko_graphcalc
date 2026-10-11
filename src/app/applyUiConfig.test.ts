@@ -170,7 +170,20 @@ describe('token 层的默认值(P4/D8 之后在库里)', () => {
             Object.entries(uiConfigCssVariables()).filter(([name]) => !exempt.has(name)),
         );
 
-        expect(fallbacks).toMatchObject(mustMatch);
+        /*
+          库里"值与语境分开"的 token 写成**别名**(`tokens.css` 文件头第 3 条:
+          值相同的换语境项写成 `--x: var(--y)`,字面量只留一处),`--code-font-family`
+          现在正是 `var(--font-family-base)`.这条断言要守的是"脚本执行前的首帧"
+          与应用的取值一致 -- 那是**生效值**一致,不是文本一致,所以先把一层别名展
+          开再比:不展开的话,拿 `var(...)` 去比应用写进去的字体栈必然失败.
+        */
+        const resolved: Record<string, string> = { ...fallbacks };
+        for (const [name, value] of Object.entries(resolved)) {
+            const alias = /^var\(\s*(--[\w-]+)\s*\)$/.exec(value);
+            if (alias?.[1] && resolved[alias[1]] !== undefined) resolved[name] = resolved[alias[1]];
+        }
+
+        expect(resolved).toMatchObject(mustMatch);
         for (const name of APP_OWNED_FALLBACKS) {
             expect(fallbacks[name], `${name} 不该出现在库的 token 层`).toBeUndefined();
         }

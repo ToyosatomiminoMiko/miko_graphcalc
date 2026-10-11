@@ -279,7 +279,8 @@
 }
 
 .object-color-code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* 色值按等宽读:同一份 --code-font-family(库的代码面 token) */
+    font-family: var(--code-font-family);
     font-size: 10px;
     color: inherit;
 }
@@ -393,7 +394,8 @@
 .object-expr,
 .eval-result {
     display: block;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* 表达式 / 求值结果与编辑区同一份字体令牌(见 uiConfig.ts 的 editor.fontFamily) */
+    font-family: var(--code-font-family);
     font-size: 16px;
     line-height: 1.4;
     color: var(--color-text-muted);

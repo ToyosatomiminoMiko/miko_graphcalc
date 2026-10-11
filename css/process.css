@@ -162,7 +162,9 @@
 .process-step-reason[data-kind="numeric"] {
     color: var(--color-text-meta);
     background: var(--color-fill-control-strong);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* 数字口径与编辑区同一份字体:库的 --code-font-family(默认 = --font-family-base,
+       字体文件随 miko_ui 发布),不在这里另抄一份族名. */
+    font-family: var(--code-font-family);
 }
 
 /* 空状态:一句明文,不给空盒子. */

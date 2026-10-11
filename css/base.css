@@ -36,14 +36,20 @@
     color-scheme: dark;
 }
 
-/* 页面根容器:铺满视口,并统一基础视觉风格 */
+/* 页面根容器:铺满视口,并统一基础视觉风格.
+   正文字体取自**库的默认字体** `--font-family-base`(`miko_ui` 的
+   `styles/tokens.css`,字体文件与 `@font-face` 随库发布在 `styles/fonts.css`):
+   它现在是 JetBrains Mono Slashed,本仓库不再自带那份字体,也不依赖机器上装没装.
+   兜底那串无衬线是"库还是发版前那一版"时的旧观感(库里没有这个 token 时
+   `var()` 会整条失效,页面会掉回 UA 的衬线字体),发版后自然用不到;
+   要单独给正文换字体,覆盖这一条即可,库的 `--font-family-base` 不动. */
 html,
 body {
     margin: 0;
     height: 100%;
     background: var(--color-bg-app);
     color: var(--color-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-family-base, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
 
 /* 应用根节点:3D 视口 + 窗口层 + Dock 的桌面 */
