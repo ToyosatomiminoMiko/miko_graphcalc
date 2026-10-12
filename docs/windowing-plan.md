@@ -1321,7 +1321,7 @@ this.windowManager.onGeometryChange(() => {
    (它们读 `#dsl-editor` 的字体)不受影响.
 2. `windowManager.bind()` 必须在 `processPanel` 构造**之前或之后都行**
    (`_openProcess` 只在运行时用它,那时 `bind()` 早已完成);但 `processPanel`
-   必须在 `start()` 里建完,`KeyboardController` 与 `_openProcess` 都依赖它.
+   必须在 `start()` 里建完,`_openProcess` 依赖它.
    推荐顺序:`windowManager.bind()` -> `processPanel = new ProcessPanel(...)`,
    `rightSplitController` 那一行整条删除.
 
@@ -1738,13 +1738,16 @@ section.window[data-window="<id>"][tabindex="-1"][role="region"]
 
 设计先记下,一期不实现:
 
-- 进现有 `KeyboardController` 的**唯一键盘出口**,不另绑 `keydown`.
+- 挂进**应用自己的**键盘入口:`DslApp.onKeyDown`(库不再提供键盘路由,
+  miko_ui 里那套 `KeyboardController` 已随"库不定义任何键盘行为"一起删除),
+  不另起第二个 `document` 监听.
 - 建议绑定:`Alt+方向键` 把焦点窗口按磁吸步长移动;`Alt+M` 最小化,
   `Alt+Enter` 最大化,`Alt+F` 单窗口全屏,`Alt+Tab` 在可见窗口间轮换焦点,
   `Alt+1..5` 直取五个窗口(source code / 视图 / 参数 / 过程 / 对象);`Esc` 退出全屏
   (这条一期就要做,它属于全屏的出口而不是窗口管理).
-- 前提是先定义"窗口快捷键是否在编辑器获得焦点时生效"--`KeyboardController`
-  现在对 textarea 有明确的键位策略,窗口快捷键必须与它对齐,否则 `Alt+方向键`
+- 前提是先定义"窗口快捷键是否在编辑器获得焦点时生效"--应用现在靠
+  `isTypingTarget()`(`src/app/keyboardTarget.ts`)判"焦点在不在输入控件里"
+  来决定 `Home` 让不让位;窗口快捷键必须与它对齐,否则 `Alt+方向键`
   会和文本导航打架.
 
 ---

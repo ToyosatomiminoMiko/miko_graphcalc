@@ -487,16 +487,6 @@
     color: var(--color-text-strong);
 }
 
-/* 可复制公式可聚焦(键盘入口,见 UI-P3.6):焦点环是"当前焦点在公式上"的
-   唯一线索,不能只靠 :hover 表达可操作. */
-.object-expr[data-tex]:focus-visible,
-.eval-detail-line[data-tex]:focus-visible {
-    outline: 1px solid var(--color-accent-focus-soft);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-strong);
-}
-
 /* 展开细节的公式块:DOM 是 <details class="eval-details"> 下的
    <div class="eval-detail-body">(控制器 createDetailSections 创建).
    注意:带左边框/底色的**只包公式行**;域/方法/分段/分层这些纯文本元信息

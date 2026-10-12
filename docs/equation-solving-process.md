@@ -291,7 +291,7 @@ tabindex".语义不同强行复用会把读屏与键盘行为做成四不像.新
 现在:**整条过程一次铺开,行是只读的**(见 `src/ui/process/ProcessPanel.ts`
 头注释).同期删除的还有 `processState.ts` 及其单测,`css/process.css` 的
 `.process-nav` / `.process-counter` / `.process-step.is-current`,以及 `DslApp`
-注册进 `KeyboardController` 的左右方向键绑定.
+当时注册进库 `KeyboardController`(已删除,键盘现归应用自己)的左右方向键绑定.
 
 **若要重做**:二期的"步骤索引驱动几何"应当和那时真正的交互一起设计(要披露就
 真的披露,要联动就真的联动),不复用已删除的 `onStepChange` 残接口.

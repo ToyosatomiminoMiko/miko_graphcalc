@@ -1102,13 +1102,19 @@ find src/ui/entity src/ui/evaluation src/ui/objects src/ui/params \
    (`Popover` 因为有三处监听用了三个).库的规范照这个写,**不要**混入
    `addEventListener` / `removeEventListener` 手工配对,那正是"漏一处就泄漏
    一个监听"的来源.
-2. **键盘只有一个出口.** `src/ui/shared/KeyboardController.ts` 的
+2. **键盘只有一个出口(已废弃,见下).** `src/ui/shared/KeyboardController.ts` 的
    `register({ keys, resolve })`,`resolve()` 返回闭包表示"这一层处理了",
    返回 `null` 表示"放行给下一层";优先级靠**注册顺序**表达
    (见 `DslApp.start()`:示例菜单的 Esc 就是一条 `resolve()` 返回闭包的绑定,
    没有浮层打开时返回 `null` 放行).
    **这条必须在库里保住** -- 否则每个组件各自绑 `keydown`,冲突只能靠
    `stopPropagation` 猜.
+
+   > **落地后的修正(2026-10)**:这一条最终被推翻 -- miko_ui 不再定义任何
+   > 键盘行为,`KeyboardController` 与 `keyboardBinding()` 已整体删除,公式复制
+   > 只剩鼠标点击.现在应用侧唯一的一处 `document` keydown 是
+   > `DslApp.onKeyDown`(`Home` + `Ctrl/Cmd+Enter`),各组件要键盘行为就自己接.
+   > 上面这段保留为"当时为什么这么设计"的记录.
 3. **浮层的"点外部关闭"挂在根节点上,不挂在浮层自己.**
    `DslApp.start()` 里 `formulaCopyController.bind(appRoot)` /
    `exampleLoader.bind(appRoot)`.这条与 D7 的 root 注入是同一件事,做 D7 时

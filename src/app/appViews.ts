@@ -34,7 +34,7 @@ import { createWindowChrome, type WindowChrome } from './windowChrome';
 
 /** 应用内容节点与逐窗口内容表:装配层与 `mountDesktop()` 的全部输入. */
 export interface AppViews {
-    /** 应用根节点(`#app`);浮层"点外部关闭"与键盘代理挂在它上面. */
+    /** 应用根节点(`#app`);浮层"点外部关闭"与公式复制的点击委托挂在它上面. */
     readonly root: HTMLElement;
     /** 3D 视口(桌面背景,位于所有窗口之下). */
     readonly viewport: HTMLElement;

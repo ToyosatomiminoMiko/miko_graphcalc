@@ -17,7 +17,6 @@ import {
     EditorHighlight,
     EditorLineNumbers,
     FormulaCopyController,
-    KeyboardController,
     WindowManager,
     mountDesktop,
     type DesktopHandle,
@@ -26,6 +25,7 @@ import {
 } from 'miko_ui';
 import { UI_CONFIG, desktopConfig } from '@/config/uiConfig';
 import { highlightDsl } from '@/editor/dslHighlight';
+import { isTypingTarget } from '@/app/keyboardTarget';
 import type { AppViews } from './appViews';
 import { SceneStore } from './SceneStore';
 import { CompileController } from './CompileController';
@@ -74,7 +74,7 @@ export class DslApp {
     private readonly desktop: DesktopHandle;
     /** 过程窗口正文宿主(`start()` 才装配过程视图). */
     private readonly processHost: HTMLElement;
-    /** `#app`:浮层"点外部关闭"与公式复制的键盘代理都挂在这个根上. */
+    /** `#app`:浮层的"点外部关闭"与公式复制的**点击**委托都挂在这个根上. */
     private readonly appRoot: HTMLElement;
     /** 几何变化的退订函数(`dispose()` 里调用,与 `_wireEditorResize` 配对). */
     private unsubscribeGeometry: (() => void) | null = null;
@@ -95,7 +95,28 @@ export class DslApp {
     /** `start()` 只允许生效一次(见该方法的说明). */
     private started = false;
 
-    private keyboardController: KeyboardController | null = null;
+    /**
+     * 应用自己的键盘入口:库(miko_ui)不提供键盘路由,所以两条全局快捷键在这里
+     * 直接挂 `document` 的 keydown.
+     *
+     * - `Home`:焦点不在输入控件里时把视角看向原点(0,0,0).判据用
+     *   {@link isTypingTarget}:Home 在 textarea / input / contenteditable 里是
+     *   "光标回行首",必须原样留给控件;
+     * - `Ctrl`/`Cmd`+`Enter`:目标就是编辑器时运行 DSL(编辑器里单独回车是换行).
+     *
+     * 公式的 Enter/Space 复制已随库一起移除,这里不再有那条规则.
+     */
+    private readonly onKeyDown = (e: KeyboardEvent): void => {
+        if (e.key === 'Home' && !isTypingTarget(e.target)) {
+            e.preventDefault();
+            this.renderController.resetHome();
+            return;
+        }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target === this.editor) {
+            e.preventDefault();
+            void this.run();
+        }
+    };
 
     /**
      * @param views `buildAppViews()` 建好的应用内容节点与逐窗口内容表;
@@ -168,7 +189,7 @@ export class DslApp {
      * 装配并启动:绑定全局监听,起 rAF 循环,编译一次当前源码.
      *
      * 幂等:重复调用直接返回.这里的每一步都会**覆盖**字段引用
-     * (`windowManager` / `keyboardController` / `animationFrameId`),
+     * (`windowManager` / `animationFrameId`),
      * 再跑一次会让第一套对象失去引用却又继续监听 window/document,
      * 并多出一个永不取消的动画帧循环 -- 静默的双份键鼠通道.
      * 有 dispose() 就该有配对的一次性启动.
@@ -199,15 +220,9 @@ export class DslApp {
         // 点浮层外部关闭需要鼠标事件,所以根节点上也要绑一份监听.
         this.exampleLoader.bind(this.appRoot);
 
-        this.keyboardController = new KeyboardController(this.editor, {
-            onHome: () => this.renderController.resetHome(),
-            onRun: () => void this.run(),
-        });
-        // 公式复制的 Enter/Space 也注册进唯一的键盘出口,控制器本身不再绑 keydown.
-        this.keyboardController.register(this.formulaCopyController.keyboardBinding());
-        // 示例浮层一条键盘规则都不注册:库与控制器都不负责菜单键盘
-        // (见 ExampleLoaderController 的文件头),浮层靠点按钮开合.
-        this.keyboardController.bind();
+        // 键盘:库不再提供键盘路由(见 onKeyDown 的说明),两条全局快捷键的应用
+        // 监听在这里挂,dispose 里成对摘掉.公式复制只剩鼠标点击,没有键盘规则.
+        document.addEventListener('keydown', this.onKeyDown);
 
         this.animationFrameId = requestAnimationFrame(this.animate);
 
@@ -227,8 +242,7 @@ export class DslApp {
         }
         this._cancelPendingRefresh();
 
-        this.keyboardController?.dispose();
-        this.keyboardController = null;
+        document.removeEventListener('keydown', this.onKeyDown);
 
         // 桌面:摘监听,把正文节点还回 #app,删掉窗口外壳与三层容器(与 mountDesktop 配对).
         this.unsubscribeGeometry?.();
