@@ -10,12 +10,10 @@
  * 节点一律用库的 `create_element()` 建,类名与 id 与旧 HTML **逐字一致**:CSS 还是那一份
  * (`css/*.css`),这一步不动样式(去 id 化是 P4/D8).
  *
- * **窗口正文一律 `div`**:七个窗口是彼此的**平等**存在,谁也不是谁的
- * `header` / `footer` / `aside` / `section`.正文容器若按语义标签分档,DOM 就先替
- * 窗口排了座次("底栏""次要栏"),结构查询与读屏也会把这层不存在的关系读进去.
- * 窗口的语义只由库的 `.window` 给一次(`role="region"` + `aria-labelledby`),
- * 正文只是几何宿主,所以 `aside` / `section` / `footer` 全部收成 `div`;
- * `id` / `class` 逐字不动,CSS 与测试的选择器都不受影响.
+ * 这些节点**都是脱离式建的**:先建好,再由 `mountDesktop()` 的 `content()` 搬进各自
+ * 窗口的正文,建的时候没有宿主可给.所以不传锚点(`into`),也不向库要 `Document` --
+ * 节点插进目标文档时被目标文档收编是 DOM 自己的规则,而这里的目标文档就是页面
+ * 那一个(`#app` 所在的那棵树,测试里是桩树).
  *
  * 建好的节点不只是"塞进去":`DslApp` 还要拿它们的句柄(编辑器,参数面板...)去
  * 装配各控制器,所以这里返回一张**具名引用表**,而不是只返回根节点.
@@ -75,7 +73,7 @@ export interface AppViews {
  * 的"滚动归属"),所以滑条只有窗口这一条 -- 与参数 / 视图 / 实体 / 求值窗口同形.
  * 应用侧因此不再有"给编辑器留 padding 并让它吃掉剩余高度"的包裹层:只剩这一层.
  */
-function buildSourceWindow(doc: Document): {
+function buildSourceWindow(): {
     body: HTMLElement;
     editor: HTMLTextAreaElement;
     gutter: HTMLElement;
@@ -86,11 +84,10 @@ function buildSourceWindow(doc: Document): {
     const code = createCodeEditor({
         highlight: highlightDsl,
         gutterMinWidth: UI_CONFIG.editor.gutterMinWidth,
-        root: doc,
     });
     // 源码区由窗口正文根滚:滚动条类挂在它上面,与其余滚动容器同一种外观.
     // 编辑器外壳本身不认这条规定(结构与滚动条分开),所以由消费者在这里挂.
-    const body = create_element({ tag: 'div', root: doc }, {
+    const body = create_element({ tag: 'div' }, {
         class: 'ui-scrollbar',
         id: 'editor-panel'
     }, code.element);
@@ -106,15 +103,15 @@ function buildSourceWindow(doc: Document): {
 }
 
 /** 参数窗口正文:只有参数列表(诊断已经独立成窗,见 `buildDiagnosticsWindow`). */
-function buildParamsWindow(doc: Document): {
+function buildParamsWindow(): {
     body: HTMLElement;
     paramsPanel: HTMLElement;
 } {
-    const paramsPanel = create_element({ tag: 'div', root: doc }, {
+    const paramsPanel = create_element({ tag: 'div' }, {
         class: 'ui-scrollbar',
         id: 'params-panel'
     });
-    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, paramsPanel);
+    const body = create_element({ tag: 'div' }, { class: 'right-page' }, paramsPanel);
     return { body, paramsPanel };
 }
 
@@ -141,12 +138,11 @@ function buildParamsWindow(doc: Document): {
  * 字体与字号不给库的类写规则:`#diagnostics-panel` 上的排版由容器里的文本继承
  * (--code-font-family 与字号都写在 `css/panels.css` 的应用规则里).
  */
-function buildDiagnosticsWindow(doc: Document): {
+function buildDiagnosticsWindow(): {
     body: HTMLElement;
     diagnostics: MessageAreaHandle;
 } {
     const messageArea = createMessageArea({
-        root: doc,
         modifier: 'message-area--unframed',
         class: 'ui-scrollbar',
     });
@@ -155,12 +151,12 @@ function buildDiagnosticsWindow(doc: Document): {
 }
 
 /** 过程窗口正文:通高的递等式视图. */
-function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: HTMLElement } {
-    const processPanel = create_element({ tag: 'div', root: doc }, {
+function buildProcessWindow(): { body: HTMLElement; processPanel: HTMLElement } {
+    const processPanel = create_element({ tag: 'div' }, {
         class: 'process-panel',
         id: 'process-panel'
     });
-    const body = create_element({ tag: 'div', root: doc }, { class: 'right-page' }, processPanel);
+    const body = create_element({ tag: 'div' }, { class: 'right-page' }, processPanel);
     return { body, processPanel };
 }
 
@@ -174,11 +170,11 @@ function buildProcessWindow(doc: Document): { body: HTMLElement; processPanel: H
  * 正文只有一层:`.object-panel` 既是宿主也是滚动区(`display:flex` + `overflow-y`,
  * 见 `css/panels.css`),与 `#params-panel` / `#view-controls` 同形 -- 滑条贴窗口边,
  * 不再缩在一个卡片里.行引擎归库的 `RowList`(构造时给容器挂 `role="list"`). */
-function buildEntitiesWindow(doc: Document): {
+function buildEntitiesWindow(): {
     body: HTMLElement;
     entity: HTMLElement;
 } {
-    const entity = create_element({ tag: 'div', root: doc }, {
+    const entity = create_element({ tag: 'div' }, {
         class: 'object-panel ui-scrollbar',
         id: 'entity-object-list'
     });
@@ -189,12 +185,12 @@ function buildEntitiesWindow(doc: Document): {
  *
  * 与实体窗口同形:正文根就是滚动容器,六个 kind 各占一个 `.object-sublist`
  * (应用类,空的时候由 CSS 收起),它们是各自的 `RowList` 容器. */
-function buildEvaluationsWindow(doc: Document): {
+function buildEvaluationsWindow(): {
     body: HTMLElement;
     objectLists: Omit<ObjectListContainers, 'entity'>;
 } {
     const list = (id: string, className: string): HTMLElement =>
-        create_element({ tag: 'div', root: doc }, { class: className, id });
+        create_element({ tag: 'div' }, { class: className, id });
 
     const sublists = {
         analysis: list('analysis-object-list', 'object-sublist'),
@@ -205,7 +201,7 @@ function buildEvaluationsWindow(doc: Document): {
         ode: list('ode-object-list', 'object-sublist'),
     };
 
-    const body = create_element({ tag: 'div', root: doc }, {
+    const body = create_element({ tag: 'div' }, {
         class: 'object-panel ui-scrollbar',
         id: 'evaluation-object-list'
     },
@@ -221,22 +217,21 @@ function buildEvaluationsWindow(doc: Document): {
 
 /** 建好全部应用内容;不碰桌面容器(那是 `mountDesktop()` 的事). */
 export function buildAppViews(root: HTMLElement): AppViews {
-    const doc = root.ownerDocument;
     const chrome = createWindowChrome();
     const slots = windowSlotsProvider(UI_CONFIG.window.adopted, chrome);
 
-    const viewport = create_element({ tag: 'div', root: doc }, { id: 'viewport' });
-    const source = buildSourceWindow(doc);
+    const viewport = create_element({ tag: 'div' }, { id: 'viewport' });
+    const source = buildSourceWindow();
     // 视图窗口正文:`ui-scrollbar` 是库的滚动条类(见 css/panels.css 的说明).
-    const viewControls = create_element({ tag: 'div', root: doc }, {
+    const viewControls = create_element({ tag: 'div' }, {
         class: 'ui-scrollbar',
         id: 'view-controls'
     });
-    const params = buildParamsWindow(doc);
-    const diagnosticsWindow = buildDiagnosticsWindow(doc);
-    const process = buildProcessWindow(doc);
-    const entities = buildEntitiesWindow(doc);
-    const evaluations = buildEvaluationsWindow(doc);
+    const params = buildParamsWindow();
+    const diagnosticsWindow = buildDiagnosticsWindow();
+    const process = buildProcessWindow();
+    const entities = buildEntitiesWindow();
+    const evaluations = buildEvaluationsWindow();
 
     const bodies: Readonly<Record<WindowId, readonly Child[]>> = {
         source: [source.body],
