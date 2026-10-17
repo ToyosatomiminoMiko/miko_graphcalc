@@ -52,19 +52,19 @@ body {
     font-family: var(--font-family-base, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
 
-/* 应用根节点:3D 视口 + 窗口层 + Dock 的桌面 */
+/* 应用根节点 = **桌面**:3D 视口(背景)+ 窗口层 + Dock 都长在它里面.
+   这里只给尺寸 -- `position: relative`(窗口层是 `absolute; inset: 0`,参照物必须
+   是这个根)与 `overflow: hidden`(窗口几何按根的 clientWidth/Height 算,桌面这层
+   不该有滑条)由库的 `.desktop-root` 给:那两条是窗口系统的硬要求,由库在
+   `mountDesktop()` 里挂类,不再由每个应用各抄一遍(见 miko_ui 的
+   styles/desktop.css 的"桌面骨架"). */
 #app {
-    position: relative;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
 }
 
 /* 3D 视口铺满整个应用,位于所有窗口下方.
-   视口是**应用内容**(由 src/app/appViews.ts 建),所以它的样式留在应用侧:
-   库不认识"3D 视口"是什么,只知道窗口层要压在某个背景之上. */
-#viewport {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-}
+   视口是**应用内容**(由 src/app/appViews.ts 建),所以"它是什么,画什么"留在应用
+   侧:库不认识 3D 视口,只知道窗口层要压在某个背景之上.定位与底色不再在这里写 --
+   节点挂着库的 `.desktop-background`(见上面 `#app` 的注释),应用这一侧没有要补的
+   声明. */

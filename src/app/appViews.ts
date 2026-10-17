@@ -220,7 +220,12 @@ export function buildAppViews(root: HTMLElement): AppViews {
     const chrome = createWindowChrome();
     const slots = windowSlotsProvider(UI_CONFIG.window.adopted, chrome);
 
-    const viewport = create_element({ tag: 'div' }, { id: 'viewport' });
+    // 3D 视口 = 桌面背景:挂库的 `.desktop-background` 拿定位与底色(见 miko_ui 的
+    // styles/desktop.css),尺寸与绘制仍归本应用(three.js 的画布铺在里面).
+    const viewport = create_element({ tag: 'div' }, {
+        id: 'viewport',
+        class: 'desktop-background'
+    });
     const source = buildSourceWindow();
     // 视图窗口正文:`ui-scrollbar` 是库的滚动条类(见 css/panels.css 的说明).
     const viewControls = create_element({ tag: 'div' }, {

@@ -119,6 +119,12 @@ source code(源码)  参数(参数滑块)   视图(视图控件)
   (库 `miko_ui` 的 `mountDesktop` / `WindowFrame` / `Dock`):`index.html`
   里只有一个空 `#app`,窗口层 / 吸附预览 / 任务栏 / 每个窗口的正文容器都由库建;
   加窗口只改 `UI_CONFIG.window.windows` 一处.
+- **桌面背景与桌面根归库定口径**(2026-10 与 `miko_datastruct` 对齐):`#viewport`
+  由 `buildAppViews()` 建好交给 `mountDesktop` 的 `background`,节点挂库的
+  `.desktop-background`(铺满根,压在窗口层之下,底色取 `--color-bg-desktop`);
+  `#app` 的 `position: relative` 与 `overflow: hidden` 由库的 `.desktop-root` 给.
+  应用侧因此不再各写一份定位样板,`css/base.css` 的 `#viewport` 规则随之删掉.
+  3D 场景色(`RENDER_CONFIG.scene.background`)是**应用属性**,不受这条口径约束.
 - 能力:拖动标题栏移动,八向缩放,最小化(再点任务栏按钮恢复),最大化(填满任务栏
   之下的工作区),边缘吸附(左/右半屏,拖到顶部任务栏附近最大化)与窗口间磁吸.
   **没有关闭与全屏**:没有真正的进程可关,关闭与最小化在观感上就是同一件事;
