@@ -52,9 +52,7 @@ mod test_support;
 
 use crate::transform_core::{apply_to_point, Mat4};
 
-// ================================================================
 // 公开面:geometry_core 转发 + 顶层入口
-// ================================================================
 
 /// 对象描述符模型与解析由共享几何层统一提供(求交与体积积分同一口径),
 /// 参与方/域仍以 ObjectDescriptor 描述;布局见 [`crate::geometry_core`].
@@ -63,9 +61,7 @@ pub use crate::geometry_core::{parse_object_descriptor, ObjectDescriptor, Object
 /// 这条既有路径不变(lib.rs 的 WASM 皮只认这个名字).
 pub use pipeline::{compute_pair, IntersectionCoreOutput};
 
-// ================================================================
 // 共享向量小工具:各子模块通过 `super::` 复用,不重复定义
-// ================================================================
 
 /// 向量小工具与去重原语统一由 [`crate::numeric_core`] 提供,这里转发给
 /// 子模块的 `super::` 路径,避免每个子模块各抄一份.

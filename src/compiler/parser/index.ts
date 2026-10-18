@@ -13,7 +13,6 @@ import type { AstProgram } from '@/contract/ast';
  * WASM 矩阵后端见 `wasm/matrixOps.ts`,不在这里混入解析入口.
  */
 
-/** 调用 Rust pest 解析器,把 `.miko` 源码解析成 JSON AST. */
 export async function parseMiko(source: string): Promise<AstProgram> {
     await ensureWasmReady();
     // pub fn parse_miko(source: &str) -> Result<String, JsValue>

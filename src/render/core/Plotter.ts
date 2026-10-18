@@ -30,7 +30,7 @@ interface UpdatableRenderer extends IRenderer {
     updateRef?(data: SceneObject): void;
 }
 
-// ---- Plotter.applyTransform 的模块级暂存(见方法注释,勿跨调用持有) ----
+// Plotter.applyTransform 的模块级暂存(见方法注释,勿跨调用持有)
 const applyTransformScratch = new Array<number>(16);
 const applyTransformMatrix = new THREE.Matrix4();
 
@@ -68,9 +68,7 @@ export class Plotter {
         this.scene.add(this.plotContainer);
     }
 
-    // ============================================================
     //  公开绘制 API
-    // ============================================================
 
     drawCurve(curve: CurveObject): void {
         const renderer = this._getOrCreate(curve.id, CurveRenderer, curve);
@@ -102,9 +100,7 @@ export class Plotter {
         this._draw(renderer, solid);
     }
 
-    // ============================================================
     //  生命周期 & 可见性
-    // ============================================================
 
     /**
      * @cache_access
@@ -267,9 +263,7 @@ export class Plotter {
         this.scene.remove(this.plotContainer);
     }
 
-    // ============================================================
     //  内部工具
-    // ============================================================
 
     private _draw(renderer: UpdatableRenderer, data: SceneObject): void {
         renderer.updateRef?.(data);

@@ -5,7 +5,7 @@
 //! - 缺省与边界写法(`a in[..]` / `1in[0,1,1]` / `2sin(x)`)由
 //!   [`split_cyclic_param_value`] 在值原文上兜底,不改 pest 规则(理由见该函数).
 //!
-//! 字段形状见 `compiler/ast/types.ts`:不写 `cyclic` 的参数 JSON 里**没有**
+//! 字段形状见 `contract/ast.ts`:不写 `cyclic` 的参数 JSON 里**没有**
 //! `cyclic` 键,下游据此区分普通参数与循环类系数.
 
 use pest::iterators::Pair;
@@ -119,7 +119,6 @@ fn split_cyclic_param_value(raw: &str) -> Option<(String, Value)> {
 }
 
 /// 将参数语句(param_stmt)转换为 JSON AST 节点.
-/// 包含类型,名称,值,位置,以及可选的 UI 约束与 cyclic 标记.
 pub(super) fn param_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let name = pair_ident(pair);
     let raw = pair

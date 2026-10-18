@@ -9,10 +9,8 @@ export interface IRenderer {
     /** THREE.Group 容器,挂载到场景中 */
     readonly group: THREE.Group;
 
-    /** 当前可见性 */
     readonly visible: boolean;
 
-    /** 更新渲染内容 */
     draw(): void;
 
     /** 设置用户控制的可见性 */

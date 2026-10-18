@@ -1,7 +1,7 @@
 /**
  * 求值条目的 DOM 外壳(与具体类型无关).
  *
- * 三类求值对象(分析/积分/求交)共用同一副骨架,差异由各 item 子类的构造函数
+ * 六类求值对象(分析/积分/求交/求解/原函数/微分方程)共用同一副骨架,差异由各 item 子类的构造函数
  * 决定往里面放什么:
  *
  * ```text
@@ -256,7 +256,6 @@ export function createEvaluationRow(
 
     const details = document.createElement('details');
     details.className = 'eval-details';
-    // 默认折叠:全部条目在首次渲染时都是收起状态.
     details.open = false;
     details.append(summary);
     if (detail.formulas !== null) details.append(detail.formulas);

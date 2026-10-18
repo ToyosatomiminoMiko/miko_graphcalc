@@ -27,7 +27,6 @@ import type { SphericalAngleConvention } from '@/config/numericConfig';
 /** 坐标值三元组;`dim = 2` 时只读前两位,第三位恒为 0. */
 export type CoordinateTriple = [number, number, number];
 
-/** 坐标表示的种类. */
 export type CoordinateKind = 'cartesian' | 'spherical';
 
 function clampUnit(value: number): number {
@@ -67,7 +66,6 @@ export class CoordinateSystem {
         return new CoordinateSystem('spherical', dim, convention);
     }
 
-    /** 二维球坐标就是极坐标. */
     get isPolar(): boolean {
         return this.kind === 'spherical' && this.dim === 2;
     }

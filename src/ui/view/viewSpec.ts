@@ -57,7 +57,6 @@ import {
 } from 'miko_ui';
 import type { ViewState } from './viewState';
 
-/** 视图状态的键全集. */
 export type ViewStateKey = keyof ViewState;
 
 /**

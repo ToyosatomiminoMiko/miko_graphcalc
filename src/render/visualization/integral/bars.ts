@@ -1,4 +1,3 @@
-// ============================================================
 // integral/bars.ts - 积分可视化柱条的无状态构建工具
 //
 // 柱条(BarDef)是黎曼 / 勒贝格 / 3D 实体体元共用的最小渲染单元,
@@ -8,7 +7,6 @@
 //   - disposeObjectGroup:     本簇各类 group 的统一 GPU 资源释放
 // 共享单位立方体/线框几何(只读,随页面存活)也收在这里.
 // 不依赖 IntegralVisualizer,仅由它调用.
-// ============================================================
 import * as THREE from 'three';
 import {
     createSolidEdgeMaterial,

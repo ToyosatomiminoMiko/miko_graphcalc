@@ -78,7 +78,7 @@ describe('积分 latest-only 按任务隔离', () => {
     it('跨任务不互相顶掉;同任务刷新只顶掉自己的旧请求且最新请求仍返回结果', async () => {
         stubWorkerGlobal();
 
-        // --- 跨任务:A 与 B 都必须被派出(共用 executor 时 B 只会在 A 之后)---
+        // 跨任务:A 与 B 都必须被派出(共用 executor 时 B 只会在 A 之后)
         const a = integrate(spec('A'));
         const b = integrate(spec('B'));
         ignored(a);
@@ -86,7 +86,7 @@ describe('积分 latest-only 按任务隔离', () => {
         await tick();
         expect(sent.length).toBe(2);
 
-        // --- 同任务刷新:新 A 顶掉旧 A,但不影响 B ---
+        // 同任务刷新:新 A 顶掉旧 A,但不影响 B
         const a2 = integrate(spec('A'));
         ignored(a2);
         await tick();

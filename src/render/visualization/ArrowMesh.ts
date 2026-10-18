@@ -27,7 +27,7 @@ export class ArrowMesh {
     constructor(color: string = '#ffffff') {
         this.group = new THREE.Group();
 
-        // ---------- 杆 ----------
+        // 杆
         const shaftGeo = new THREE.CylinderGeometry(
             RENDER_CONFIG.arrowMesh.shaftRadius,
             RENDER_CONFIG.arrowMesh.shaftRadius,
@@ -44,7 +44,7 @@ export class ArrowMesh {
         // 默认 CylinderGeometry 中心在原点,高度为 1,Y 轴方向
         this.group.add(this._shaft);
 
-        // ---------- 头 ----------
+        // 头
         const headGeo = new THREE.ConeGeometry(
             RENDER_CONFIG.arrowMesh.headRadius,
             RENDER_CONFIG.arrowMesh.headLength,
@@ -60,7 +60,6 @@ export class ArrowMesh {
         // 默认 ConeGeometry 尖端在 +Y,底部中心在 -Y/2
         this.group.add(this._head);
 
-        // 预分配
         this._tempDir = new THREE.Vector3();
         this._tempUp = new THREE.Vector3(0, 1, 0);
     }
@@ -104,7 +103,6 @@ export class ArrowMesh {
         this.group.position.copy(origin);
     }
 
-    /** 设置颜色 */
     setColor(color: string): void {
         this._shaftMaterial.color.set(color);
         this._headMaterial.color.set(color);
@@ -117,7 +115,6 @@ export class ArrowMesh {
         this._headMaterial.emissive.copy(emissive);
     }
 
-    /** 释放 GPU 资源 */
     dispose(): void {
         this._shaft.geometry.dispose();
         this._head.geometry.dispose();

@@ -1,7 +1,6 @@
 import init, { sample_and_process_surface } from '@/generated/render_rs/render_rs';
 import { createWasmWorker } from '@/wasm/workerRuntime';
 
-// ================================================================
 // SurfaceWorker - 曲面采样 Worker
 //
 // 架构流程:
@@ -25,7 +24,6 @@ import { createWasmWorker } from '@/wasm/workerRuntime';
 // sample_and_process_surface 统一完成采样+后处理;math/core 的其它采样
 // (曲线/向量场/求交/积分)则走 math_rs.刻意为之,勿为了"math 只用 math_rs"
 // 而把它搬回 math_rs.
-// ================================================================
 
 export type SurfaceWorkerRequest = {
     /** 请求序号,由主线程递增,用来丢弃过期结果 */
@@ -77,8 +75,7 @@ createWasmWorker<SurfaceWorkerRequest, SurfaceWorkerResponse>(
         const coeffValues = new Float64Array(req.coeffValues);
         // 方案 A(曲面,多数组打包):Rust 现在直接返回一块打包好的 `Vec<u8>`
         // (glue 只做一次 `.slice()`,已消除 wasm-bindgen 结构体 getter 的 wasm 内
-        // 克隆),不再是一个带 getter 的结构体对象.见
-        // prompt/JS_WASM_BOUNDARY_COPY_REPORT.md.
+        // 克隆),不再是一个带 getter 的结构体对象.
         const packed = sample_and_process_surface(
             req.expr,
             req.coeffNames,

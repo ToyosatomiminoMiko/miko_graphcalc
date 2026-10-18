@@ -515,7 +515,7 @@ export class DslApp {
 
     /**
      * 切换原函数条目的显隐:隐藏 = 列表保留占位,既不再调用积分内核,也不再
-     * 下发对应的曲线/曲面,所以必须重新编译(见 compileAntiderivatives).
+     * 下发对应的曲线/曲面,所以必须重新编译(见 `DslCompiler` 的隐藏分支).
      */
     private _toggleAntiderivative(name: string): void {
         const scene = this.compileController.toggleAntiderivative(

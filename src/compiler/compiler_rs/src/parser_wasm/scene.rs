@@ -14,7 +14,6 @@ use serde_json::{json, Value};
 use super::{child_text, pair_ident, span_of, stmt_expr, stmt_options, Rule};
 
 /// 将张量语句(tensor_stmt)转换为 JSON AST 节点.
-/// 包含 kind(如 buffer, texture 等),名称,表达式(expr)和位置.
 pub(super) fn tensor_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     json!({
         "type": "tensor",
@@ -26,7 +25,6 @@ pub(super) fn tensor_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 }
 
 /// 将动画语句(animation_stmt)转换为 JSON AST 节点.
-/// 包含名称,表达式,选项列表和位置.
 pub(super) fn animation_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     json!({
         "type": "animation",
@@ -38,7 +36,6 @@ pub(super) fn animation_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 }
 
 /// 将对象语句(object_stmt)转换为 JSON AST 节点.
-/// 包含 kind(如 mesh, light 等),名称,表达式,选项列表和位置.
 pub(super) fn object_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     json!({
         "type": "object",

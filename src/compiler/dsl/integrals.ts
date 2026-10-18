@@ -7,7 +7,7 @@
  * (interval/rectangle/region/solid),不再用 range 长度推断维度;
  * region/solid 域因此可以自然进入同一张 task 形状.
  *
- * 方法 × 域矩阵(与 prompt/feature.md §方法矩阵一致):
+ * 方法 × 域矩阵:
  * | 域 | riemann:left | right/mid | trapezoid | simpson | lebesgue |
  * | curve(1D) | ✅ | ✅ | ✅ | ✅ | ✅ |
  * | surface 矩形(2D) | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -181,7 +181,7 @@ export function compileIntegralTask(
         source.kind as keyof typeof DOMAIN_KIND_BY_SOURCE
     ];
 
-    // ---- range:按域种类显式解析,不再用长度推断 ----
+    // range:按域种类显式解析,不再用长度推断
     const rawRange = findOption(statement.options, 'range');
     let range: [number, number] | [number, number, number, number] | undefined;
 
@@ -223,7 +223,7 @@ export function compileIntegralTask(
         }
     }
 
-    // ---- 被积函数 ----
+    // 被积函数
     // curve/surface 的对象自带表达式即被积函数;region/solid 用 `integrand`,
     // 缺省 "1".region 在 z=0 平面,y 上下界由边界曲线给出,被积函数是 g(x,y).
     let integrand: string;

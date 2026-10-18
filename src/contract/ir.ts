@@ -77,7 +77,7 @@ export interface AntiderivativeOrigin {
 
 /**
  * 微分方程来源:只有 `ode` 语句下发的 surface/curve 才携带(设计文档
- * `docs/plan3.md` 的 P1/P2:斜率场复用 `surface z = f(x,y)`,解族按常数取值
+ * `docs/calculus-suite-plan.md` 第 4.3 节:斜率场复用 `surface z = f(x,y)`,解族按常数取值
  * 各下发一条 `curve`).
  *
  * 与 `DerivativeOrigin`/`AntiderivativeOrigin` 同样的存在意义:产物在数值/
@@ -175,7 +175,7 @@ export interface VectorFieldObject {
  *
  * 语义边界(V1):
  * - 它只声明"哪个水平集",**不携带自己的网格几何**;本体的 marching
- *   squares/cubes 采网渲染留到后续(见 prompt/roadmap),当前作为
+ *   squares/cubes 采网渲染留到后续,当前作为
  *   `gradient` / `derivative` 的分析源参与编译;
  * - `dim` 由表达式里出现的坐标变量推断(含 z 为 3,否则为 2),不在语法里
  *   写死;`level` 是把方程写成 `f = level` 的右端(缺省 0);
@@ -418,7 +418,6 @@ export interface AnalysisResult {
     enabled: boolean;
 }
 
-/** 数值积分任务. */
 export type RiemannSide = 'left' | 'right' | 'mid';
 
 /**
@@ -426,7 +425,7 @@ export type RiemannSide = 'left' | 'right' | 'mid';
  * - 黎曼区分端点:`riemann:left` / `riemann:right` / `riemann:mid`;
  * - DSL 里写裸 `riemann` 时编译期归一化为 `riemann:left`(兼容旧写法).
  *
- * 方法 × 域矩阵(见 prompt/feature.md §方法矩阵)放宽后,right/mid 对所有
+ * 方法 × 域矩阵放宽后,right/mid 对所有
  * 域(1D 曲线 / 2D 矩形 / 2D 区域 / 3D 实体)统一取"格点采样端 = 方法端",
  * 数值与可视化同源.
  *
@@ -838,11 +837,9 @@ export interface SceneIR {
     odes: OdeTask[];
 }
 
-// ================================================================
 // 数值积分辅助类型
 //
 // 这些类型原本混在 `math/objects/types.ts`,现迁移到 IR 层,
 // 因为它们描述的是编译后的积分计算输入/输出形状.
-// ================================================================
 
 export type Range1D = [number, number];

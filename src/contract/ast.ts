@@ -248,8 +248,8 @@ export interface AntiderivativeStatement {
 }
 
 /**
- * `ode 名称 = 方程[, 初值...] [选项];` 微分方程语句(设计文档 `docs/plan3.md`
- * 第 1.1 节).
+ * `ode 名称 = 方程[, 初值...] [选项];` 微分方程语句(设计文档
+ * `docs/calculus-suite-plan.md` 第 4.1 节).
  *
  * 整段方程(含导数记号与初值)由 pest 的 `expr` 捕获,Rust 解析器按**首个顶层
  * 逗号**切成"方程 + 各条初值":`equation` 是第一段(含顶层 `=`),

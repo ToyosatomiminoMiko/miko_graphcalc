@@ -193,7 +193,7 @@ export function compileScene(
         solves: compileSolves(ast, params, paramOverrides, hiddenSolveNames),
         // 不定积分同为声明级编译;实体侧的新对象已并入上面的 `objects`/`objectByName`.
         antiderivatives,
-        // 微分方程(设计文档 docs/plan3.md 第 1.3 节):同为声明级编译;实体侧的
+        // 微分方程(设计文档 docs/calculus-suite-plan.md 第 4.3 节):同为声明级编译;实体侧的
         // 斜率场与解曲线已并入上面的 `objects`/`objectByName`.
         odes: odeTasks,
     };

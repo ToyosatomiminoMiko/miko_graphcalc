@@ -1,4 +1,4 @@
-//! 微分方程求解内核(设计文档 `docs/plan3.md` 第 1.2 节).
+//! 微分方程求解内核(设计文档 `docs/calculus-suite-plan.md` 第 4.2 节).
 //!
 //! 产物是**独立类型** [`OdeOutcome`] / [`OdeStep`]:只有字符串与计数,不含
 //! `Expr`(符号引擎内部表示不越过这一层,路线图 §7.1 的口径与 `solve.rs` /
@@ -125,9 +125,7 @@ fn step(latex: impl Into<String>, reason: &str, kind: &str) -> OdeStep {
     }
 }
 
-// ============================================================
 // 表达式小工具(与 integral.rs 同形:内核内部各自一份,不跨界共用)
-// ============================================================
 
 fn num(value: f64) -> Expr {
     Expr::Num(value)
@@ -1025,9 +1023,7 @@ fn invert_dependent(lhs: &Expr, target: &Expr, dependent: &str) -> Option<Expr> 
     }
 }
 
-// ============================================================
 // 文本切分与导数记号归一
-// ============================================================
 
 /// 按**顶层**等号切分(`solve.rs` 同款:只数括号深度).
 fn split_top_level_eq(source: &str) -> Result<(&str, &str), String> {
@@ -1122,9 +1118,7 @@ fn normalize_derivative_notation(source: &str) -> Result<(String, Vec<(String, u
     Ok((out, marks))
 }
 
-// ============================================================
 // 求解主流程
-// ============================================================
 
 /// 一条解(通解)的内部表示.
 struct OdeSolution {
@@ -1987,9 +1981,7 @@ fn latex_number(value: f64) -> String {
     super::latex::latex_number(value)
 }
 
-// ============================================================
 // 初值条件
-// ============================================================
 
 /// 一条初值:槽位(0 = `y(x0)`,1 = `y'(x0)`)+ 取值点 + 取值.
 struct InitialCondition {
@@ -2054,9 +2046,7 @@ fn parse_initial_conditions(
     Ok(parsed)
 }
 
-// ============================================================
 // 回代验证
-// ============================================================
 
 /// 抽样求值:自变量取 `x`,其余符号取 `extra` 里的绑定或默认参数值.
 fn eval_sample(expr: &Expr, independent: &str, x: f64, extra: &[(&str, f64)]) -> Option<f64> {
@@ -2170,9 +2160,7 @@ fn verify_implicit(dependent: &str, independent: &str, phi: &Expr, slope: &Expr)
     compared > 0
 }
 
-// ============================================================
 // WASM 入口对应的内核函数
-// ============================================================
 
 /// 求解一条微分方程.
 ///
@@ -2698,9 +2686,7 @@ fn eval_constant_at(expr: &Expr, independent: &str, value: f64) -> Option<f64> {
     eval_sample(expr, independent, value, &[])
 }
 
-// ============================================================
 // 单测
-// ============================================================
 
 #[cfg(test)]
 mod tests {
@@ -2719,7 +2705,7 @@ mod tests {
         names.iter().map(|name| name.to_string()).collect()
     }
 
-    // ---- 导数记号归一 ----
+    // 导数记号归一
 
     #[test]
     fn normalizes_derivative_marks_with_identifier_boundaries() {
@@ -2747,7 +2733,7 @@ mod tests {
         assert_eq!(text, "a*yp = 2");
     }
 
-    // ---- 一阶可分离 ----
+    // 一阶可分离
 
     #[test]
     fn solves_separable_equation_explicitly() {
@@ -2789,7 +2775,7 @@ mod tests {
         assert!(!outcome.notes.is_empty());
     }
 
-    // ---- 一阶线性 ----
+    // 一阶线性
 
     #[test]
     fn solves_linear_first_order_with_symbolic_coefficients() {
@@ -2834,7 +2820,7 @@ mod tests {
         );
     }
 
-    // ---- Bernoulli ----
+    // Bernoulli
 
     #[test]
     fn solves_bernoulli_equation() {
@@ -2858,7 +2844,7 @@ mod tests {
         );
     }
 
-    // ---- 齐次 ----
+    // 齐次
 
     #[test]
     fn solves_homogeneous_equation() {
@@ -2874,7 +2860,7 @@ mod tests {
         assert!(outcome.general_text.contains('C'));
     }
 
-    // ---- 恰当 ----
+    // 恰当
 
     #[test]
     fn solves_exact_equation_implicitly() {
@@ -2885,7 +2871,7 @@ mod tests {
         assert!(outcome.general_latex.unwrap().contains("C"));
     }
 
-    // ---- 二阶常系数齐次 ----
+    // 二阶常系数齐次
 
     #[test]
     fn solves_second_order_distinct_real_roots_with_initial_values() {
@@ -2922,7 +2908,7 @@ mod tests {
         assert!(outcome.general_text.contains("sin"));
     }
 
-    // ---- 初值 ----
+    // 初值
 
     #[test]
     fn initial_value_fixes_the_constant() {
@@ -3008,7 +2994,7 @@ mod tests {
         assert!(error.contains("初值重复"), "{error}");
     }
 
-    // ---- 能力边界与输入错误 ----
+    // 能力边界与输入错误
 
     #[test]
     fn unsupported_equation_reports_capability_error() {
@@ -3063,7 +3049,7 @@ mod tests {
         assert!(error.contains("未声明符号 k"), "{error}");
     }
 
-    // ---- 每类第二条例子(第 3.1 节:每类至少 2 例) ----
+    // 每类第二条例子(每类至少 2 例)
 
     #[test]
     fn solves_separable_second_example() {
@@ -3103,7 +3089,7 @@ mod tests {
         assert!(outcome.implicit);
     }
 
-    /// 超长输入不给 panic,只给可读错误(编码规范第 5 条).
+    /// 超长输入不给 panic,只给可读错误.
     #[test]
     fn oversized_equation_reports_error_without_panic() {
         let long = std::iter::repeat_n("x", 400)

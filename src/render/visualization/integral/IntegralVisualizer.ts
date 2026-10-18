@@ -1,4 +1,3 @@
-// ============================================================
 // integral/IntegralVisualizer.ts - 积分可视化门面(状态 + 采样 + 缓存)
 //
 // IntegralVisualizer 是黎曼 / 梯形 / 辛普森 / 勒贝格积分可视化的入口类,
@@ -10,7 +9,6 @@
 //      THREE.Group,再挂入场景并登记缓存(见 _register).
 // 几何生成本身不在这里,便于对纯构建函数单独测试.
 // 公开 API(9 个 visualize* + clear/clearAll/dispose + group)供上层调用.
-// ============================================================
 import * as THREE from 'three';
 import type { RiemannSide, SceneObject } from '@/contract/ir';
 import { RENDER_CONFIG } from '@/config/renderConfig';
@@ -28,9 +26,7 @@ import {
     createTrapezoidGridGroup,
 } from './grids';
 
-// ============================================================
 // 渲染常量
-// ============================================================
 const {
     barGap: BAR_GAP,
     depth2D: DEPTH_2D,
@@ -129,9 +125,7 @@ export class IntegralVisualizer {
         this.cache.set(cacheKey, { type: cacheType, objects: group });
     }
 
-    // ============================================================
     // 2D / 3D 黎曼和可视化
-    // ============================================================
 
     /**
      * @cache_access
@@ -230,9 +224,7 @@ export class IntegralVisualizer {
         this._register(group, '3d', cacheKey);
     }
 
-    // ============================================================
     // 2D / 3D 梯形积分可视化
-    // ============================================================
 
     /**
      * @cache_access
@@ -367,9 +359,7 @@ export class IntegralVisualizer {
         this._register(group, '3d_simpson', cacheKey);
     }
 
-    // ============================================================
     // 2D / 3D 勒贝格可视化
-    // ============================================================
 
     /**
      * @cache_access
@@ -513,13 +503,10 @@ export class IntegralVisualizer {
 
         if (slices.length === 0) return;
         const group = createInstancedBarGroup(slices, { opacity: OPACITY_LEBESGUE - 0.1 });
-        // id + 后缀
         this._register(group, '3d', `${cacheKey}_lebesgue`);
     }
 
-    // ============================================================
     // 3D 实体域体元可视化
-    // ============================================================
 
     /**
      * @cache_access

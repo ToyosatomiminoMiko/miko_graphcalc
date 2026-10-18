@@ -53,7 +53,6 @@ pub fn sample_and_process_surface(
 /// normals / valid_indices 连同 z_min / z_max 一并塞进一个 `Vec<u8>` 由函数
 /// 直接返回.返回的 `Vec<u8>` 走 glue 的"函数直返"路径(只做一次 `.slice()`),
 /// 消除了原先 `getter_with_clone` 结构体 getter 在 wasm 内的那次全量克隆.
-/// 见 prompt/JS_WASM_BOUNDARY_COPY_REPORT.md.
 fn pack_surface_result(r: &surface_utils::SurfaceSampleResult) -> Vec<u8> {
     let n_pos = r.positions.len();
     let n_nor = r.normals.len();

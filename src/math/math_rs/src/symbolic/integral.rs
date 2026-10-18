@@ -135,9 +135,7 @@ pub fn antiderivative_with_parameters(
     Ok(state.run(&integrand))
 }
 
-// ============================================================
 // 表达式小工具
-// ============================================================
 
 fn num(value: f64) -> Expr {
     Expr::Num(value)
@@ -179,7 +177,6 @@ fn pow(base: Expr, exponent: Expr) -> Expr {
     bin(BinOp::Pow, base, exponent)
 }
 
-/// 子树里是否出现积分变量.
 fn contains_var(expr: &Expr, variable: &str) -> bool {
     match expr {
         Expr::Num(_) => false,
@@ -362,9 +359,7 @@ fn is_numeric_one(expr: &Expr) -> bool {
     matches!(expr, Expr::Num(value) if *value == 1.0)
 }
 
-// ============================================================
 // 积分主状态机
-// ============================================================
 
 struct IntegrationState<'a> {
     variable: String,
@@ -700,9 +695,7 @@ impl<'a> IntegrationState<'a> {
         ));
     }
 
-    // --------------------------------------------------------
     // 基本公式表
-    // --------------------------------------------------------
 
     fn table(&mut self, expr: &Expr, depth: usize) -> Result<Option<Expr>, String> {
         let variable = self.variable.clone();
@@ -1126,9 +1119,7 @@ impl<'a> IntegrationState<'a> {
         Some(simplify(antiderivative))
     }
 
-    // --------------------------------------------------------
     // 有理函数
-    // --------------------------------------------------------
 
     fn rational(&mut self, expr: &Expr, depth: usize) -> Result<Option<Expr>, String> {
         let variable = self.variable.clone();
@@ -1193,9 +1184,7 @@ impl<'a> IntegrationState<'a> {
         Ok(Some(simplify(result)))
     }
 
-    // --------------------------------------------------------
     // 分部积分
-    // --------------------------------------------------------
 
     fn parts(&mut self, expr: &Expr, depth: usize) -> Result<Option<Expr>, String> {
         let Expr::Binary(BinOp::Mul, left, right) = expr else {
@@ -1448,9 +1437,7 @@ fn liate_priority(expr: &Expr, variable: &str) -> u8 {
     }
 }
 
-// ============================================================
 // 多项式与部分分式
-// ============================================================
 
 /// 数值系数多项式(升幂系数表);用于有理函数路径.
 #[derive(Debug, Clone, PartialEq)]
@@ -1932,9 +1919,7 @@ fn integrate_fraction_part(part: &FractionPart, variable: &str) -> Expr {
     }
 }
 
-// ============================================================
 // 验证与边界
-// ============================================================
 
 /// 对原函数求导,与被积函数抽样对拍.
 ///
@@ -2068,7 +2053,6 @@ fn latex(expr: &Expr) -> String {
     }
 }
 
-// latex_number 目前只在个别公式里用到;保留导入会触发未使用告警.
 #[cfg(test)]
 mod tests {
     use super::*;

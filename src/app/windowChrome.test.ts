@@ -1,7 +1,7 @@
 /**
  * 标题栏应用节点的结构契约.
  *
- * 这四个节点从 `index.html` 搬进 TS 之后(见 docs/windowing-plan.md §5.3),
+ * 这五个节点从 `index.html` 搬进 TS 之后(见 docs/windowing-plan.md §5.3),
  * 它们的"标记长什么样"就没有 HTML 可以对照了,这张断言就是新的真相源:文案来自
  * `UI_CONFIG.window.chrome`,`Popover` 需要的 aria 配对齐全,`UI_CONFIG.window
  * .adopted` 声明的落点与 `windowSlotsProvider()` 的输出一致.

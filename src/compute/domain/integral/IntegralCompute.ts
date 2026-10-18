@@ -80,7 +80,7 @@ export type IntegralSpec = {
     layers?: number;
 };
 
-// ---------- Worker 管理 ----------
+// Worker 管理
 /**
  * @cache
  * 缓存目的:积分计算复用同一个 Worker client.
@@ -211,10 +211,6 @@ function buildRequest(spec: IntegralSpec): Omit<IntegralWorkerRequest, 'id'> {
     return { ...base, solid: spec.solid, n: spec.segments, m: spec.segments };
 }
 
-/**
- * 应用级释放积分计算资源.
- * 先停掉每个任务的 LatestRequestExecutor 逻辑调度,再 terminate 共享 Worker.
- */
 /**
  * @cache_access
  * 释放所有任务的 latest-only 调度器和共享 Worker.

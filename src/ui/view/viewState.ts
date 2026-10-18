@@ -63,12 +63,10 @@ function baseRadius(): number {
     return RENDER_CONFIG.scene.point.radius;
 }
 
-/** 显示值 -> 实际半径(比例模式乘基准半径). */
 function radiusFromDisplay(display: number, mode: PointMode): number {
     return mode === 'size' ? display : baseRadius() * display;
 }
 
-/** 实际半径 -> 显示值(比例模式除以基准半径). */
 function displayFromRadius(radius: number, mode: PointMode): number {
     if (mode === 'size') return radius;
     return baseRadius() > 0 ? radius / baseRadius() : 0;
@@ -90,13 +88,13 @@ function boundedInput(truth: Signal<number>, min: number): Signal<number> {
 
 /** 视图面板的全部状态;由 `createViewState()` 建一次,跟随应用存活. */
 export interface ViewState {
-    // ── 相机 ────────────────────────────────────────────────────────────
+    // 相机
     readonly camMode: Signal<CamMode>;
     /** 开关与文字标签用的派生视图:勾选 = 正交. */
     readonly camIsOrtho: Signal<boolean>;
     readonly viewHome: Signal<ViewHome>;
     readonly rotationLock: Signal<boolean>;
-    // ── 点 ──────────────────────────────────────────────────────────────
+    // 点
     readonly pointVisible: Signal<boolean>;
     readonly pointMode: Signal<PointMode>;
     /** 真相:点的**实际半径**. */
@@ -105,7 +103,7 @@ export interface ViewState {
     readonly pointDisplay: Signal<number>;
     /** 数字框步长随模式变(绝对值一档,比例一档). */
     readonly pointStep: ReadonlySignal<number>;
-    // ── 坐标轴 ──────────────────────────────────────────────────────────
+    // 坐标轴
     readonly upAxis: Signal<UpAxis>;
     readonly axisLineWidth: Signal<number>;
     readonly axisLineWidthInput: Signal<number>;
@@ -121,7 +119,7 @@ export interface ViewState {
     readonly gridMajorWidthInput: Signal<number>;
     readonly gridMinorWidth: Signal<number>;
     readonly gridMinorWidthInput: Signal<number>;
-    // ── 曲面 ────────────────────────────────────────────────────────────
+    // 曲面
     readonly surfaceWireframe: Signal<boolean>;
     readonly surfaceColorMap: Signal<boolean>;
 }

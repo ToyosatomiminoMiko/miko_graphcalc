@@ -47,9 +47,7 @@ fn to_local(inverse: Option<Mat4>, world: V3) -> V3 {
     to_world(inverse, world)
 }
 
-// ================================================================
 // 对象描述符
-// ================================================================
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ObjectKind {
@@ -206,9 +204,7 @@ fn kind_name(kind: ObjectKind) -> &'static str {
     }
 }
 
-// ================================================================
 // 隐式场
-// ================================================================
 
 enum FieldKind {
     Surface {

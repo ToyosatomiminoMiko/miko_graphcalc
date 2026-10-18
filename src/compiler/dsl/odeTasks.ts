@@ -1,5 +1,5 @@
 /**
- * 微分方程编译:设计文档 `docs/plan3.md` 第 1.3 节(求值层).
+ * 微分方程编译:设计文档 `docs/calculus-suite-plan.md` 第 4.3 节(求值层).
  *
  * 分工与不定积分完全一致,**两层都不重复调内核**:
  * - 实体层(`odeBlueprint.ts` 的 `buildOdeBlueprints`)调一次内核,把斜率场

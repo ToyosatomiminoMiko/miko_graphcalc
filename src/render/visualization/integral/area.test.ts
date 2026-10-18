@@ -1,4 +1,3 @@
-// ============================================================
 // integral/area.test.ts - 一维面积几何的单元测试
 //
 // 覆盖三处纯构建逻辑:
@@ -9,7 +8,6 @@
 // 注意: vitest 无法对 ESM 命名空间导出做 vi.spyOn(报
 // "Module namespace is not configurable in ESM"),因此这里不守护
 // "ExtrudeGeometry 只构造一次"的分配次数,只守护构建结果.
-// ============================================================
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 

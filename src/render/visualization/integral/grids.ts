@@ -1,4 +1,3 @@
-// ============================================================
 // integral/grids.ts - 二维网格域(矩形 / 区域)的实体几何
 //
 // 被积函数在 nx×ny 网格上采样,生成两类可视化几何:
@@ -8,7 +7,6 @@
 //     四角都有限(带内)的单元才生成顶面三角形.
 // 两函数均为纯构建,共用 solidPrimitives 的 wrapSolid 收尾;
 // 返回 null 表示没有可绘制单元,调用方不应登记缓存.
-// ============================================================
 import * as THREE from 'three';
 import { wrapSolid } from '@/render/visualization/solidPrimitives';
 

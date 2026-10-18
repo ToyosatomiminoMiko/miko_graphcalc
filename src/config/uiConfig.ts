@@ -428,7 +428,7 @@ export const UI_CONFIG = {
          * ViewCube 暴露的预置视角:顺序即按钮顺序,列数取它的长度.
          *
          * 只列 UI 真正给出口的四个(`ViewHome` 还有 bottom/back/left);需要时
-         * 在这里加一条即可,值域与 `render/types` 的 `ViewHome` 同域.
+         * 在这里加一条即可.
          */
         viewCube: [
             { value: 'top', label: '上' },

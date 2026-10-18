@@ -1,4 +1,3 @@
-// ============================================================
 // integral/area.ts - 一维面积(梯形 / 辛普森)的可视化几何
 //
 // 把被积曲线下的有向面积建成实体棱柱:先按符号把每个区间拆成不跨零的
@@ -6,7 +5,6 @@
 // Simpson 需要的抛物线细分点由 quadraticPoints(拉格朗日插值)给出.
 // 实体与线框的收尾统一走 solidPrimitives 的 wrapSolid,grids.ts 也复用它.
 // 本文件不触碰场景与缓存,构建结果返回 null 表示无可绘制内容.
-// ============================================================
 import * as THREE from 'three';
 import { RENDER_CONFIG } from '@/config/renderConfig';
 import { wrapSolid } from '@/render/visualization/solidPrimitives';

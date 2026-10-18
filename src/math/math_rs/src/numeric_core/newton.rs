@@ -75,7 +75,6 @@ fn norm_inf(values: &[f64]) -> f64 {
         .fold(0.0f64, |acc, value| acc.max(value.abs()))
 }
 
-/// 两点的欧氏距离.
 fn distance(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
         .zip(b)

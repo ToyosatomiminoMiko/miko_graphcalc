@@ -3,7 +3,7 @@
 //! 这一层从 `integral.rs` 提出(原先只有部分分式分解在用),目的是让"解一次
 //! 线性方程组"这件事全项目只有一个实现:
 //! - 不定积分的部分分式定系数(`integral.rs::decompose`);
-//! - 后续**联立方程**的线性精确解(消元/克拉默之前的底层求解).
+//! - **联立方程**的线性精确解(消元/克拉默之前的底层求解).
 //!
 //! 与 `derivative` / `poly` 同级:纯数值,不引用 `Expr`,不碰 WASM 边界,
 //! 可以在 `cargo test` 里直接验证.
@@ -27,7 +27,6 @@ pub(crate) const SINGULAR_THRESHOLD: f64 = 1e-12;
 /// 消元时小于它的行倍数直接跳过(数值上是空操作,跳过省一次整行乘法).
 const ELIMINATION_SKIP: f64 = 1e-15;
 
-/// 主元是否可用(有限且不为 0).
 fn is_usable_pivot(value: f64) -> bool {
     value.is_finite() && value.abs() >= SINGULAR_THRESHOLD
 }

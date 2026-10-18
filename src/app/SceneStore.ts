@@ -191,7 +191,6 @@ export class SceneStore {
 
     /**
      * @cache_access
-     * 更新方程求解对象显隐缓存.
      */
     toggleAntiderivativeHidden(name: string): void {
         if (this._hiddenAntiderivativeNames.has(name)) {

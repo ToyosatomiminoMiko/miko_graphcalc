@@ -38,7 +38,7 @@ import type { CurveBlueprint, SurfaceBlueprint } from './objects/types';
 
 /**
  * 一条微分方程的编译事实:实体 blueprint + 求值条目要用的展示数据
- * (设计文档 `docs/plan3.md` 第 1.3 节).
+ * (设计文档 `docs/calculus-suite-plan.md` 第 4.3 节).
  *
  * 与不定积分同一条分工:内核只调**一次**(在静态场景层),表达式(实体侧)与
  * 步骤链(展示侧)天然同源;`odeTasks.ts` 只消费这份事实.
@@ -91,7 +91,7 @@ interface OdeOutcomeJson {
 
 /**
  * 把 `ode 名称 = 方程[, 初值...] [选项];` 编译成实体对象 + 展示事实
- * (设计文档 `docs/plan3.md` 的 P1-A/P2-A).
+ * (设计文档 `docs/calculus-suite-plan.md` 第 4.1/4.3 节).
  *
  * 下发的对象(**P1-A:复用既有渲染器,零新增**):
  * 1. `<名字>`:`surface z = f(x, y)` -- 方程右端就是**斜率场**(高度图);

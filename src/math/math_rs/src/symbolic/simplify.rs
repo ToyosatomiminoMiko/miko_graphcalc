@@ -49,9 +49,7 @@ pub(crate) fn evaluate_constant(expr: &Expr) -> Result<Option<f64>, String> {
     }
 }
 
-// ============================================================
 // 化简
-// ============================================================
 
 pub(crate) fn simplify(expr: Expr) -> Expr {
     match expr {

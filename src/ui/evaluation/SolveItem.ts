@@ -90,8 +90,7 @@ export class SolveItem extends EvaluationItem<SolveTask, void> {
             }),
         });
 
-        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达
-        // (与实体行同一套).
+        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片表达(与实体行同一套).
         const { row } = createEvaluationRow(
             summary,
             detail,

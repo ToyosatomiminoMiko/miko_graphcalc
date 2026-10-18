@@ -367,7 +367,7 @@ function collectAntiderivativeObjects(ast: AstProgram, draft: SceneDraft): void 
 }
 
 /**
- * 微分方程语句(设计文档 docs/plan3.md 第 1.3 节):放在 antiderivative
+ * 微分方程语句(设计文档 docs/calculus-suite-plan.md 第 4.3 节):放在 antiderivative
  * pass **之后**,derivative pass **之前**--这样 ode 下发的解曲线也能被
  * 后面的 `derivative D = derivative(O1_c1)` 引用(靠 draft.resolvable).
  *
@@ -464,9 +464,8 @@ function registerCoefficientParams(draft: SceneDraft): void {
  * - 边界曲线不得带静态变换或动画--否则 y=f(x) 的带状语义(曲线必须保持在
  *   z=0 平面)会被破坏,报错文案由调用方 UI 直接展示.
  *
- * 只依赖 blueprint 与 objectTransforms/objectAnimations,与参数无关;
- * 202609 review 结论:该检查原先在 compileScene 对"物化对象"每次参数刷新
- * 重跑,且每个 region 各重建一次全对象索引,现上收到这里只跑一次.
+ * 只依赖 blueprint 与 objectTransforms/objectAnimations,与参数无关(为什么要在
+ * 这里一次跑完,不能退回 compileScene,见文件头 202609 review 结论).
  */
 function finalizeRegionBlueprints(
     objectBlueprints: ObjectBlueprint[],

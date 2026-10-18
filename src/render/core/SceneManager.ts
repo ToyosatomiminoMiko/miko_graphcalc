@@ -66,11 +66,9 @@ export class SceneManager {
     constructor(container: HTMLElement) {
         this.container = container;
 
-        // --- 场景 ---
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(RENDER_CONFIG.scene.background);
 
-        // --- 光源 ---
         const ambientLight = new THREE.AmbientLight(0x404060);
         this.scene.add(ambientLight);
 
@@ -78,13 +76,12 @@ export class SceneManager {
         dirLight.position.set(5, 10, 7);
         this.scene.add(dirLight);
 
-        // --- 渲染器 ---
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(container.clientWidth, container.clientHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         container.appendChild(this.renderer.domElement);
 
-        // --- 辅助元素 ---
+        // 辅助元素
         // XYZ 坐标轴改用 Line2 绘制,支持像素线宽
         this.createAxisLine(
             [0, 0, 0],
@@ -301,7 +298,7 @@ export class SceneManager {
         const { minorStep, majorEvery } = this.activeSteps();
         const gridLineCount = stepCount(minorStep, half);
 
-        // --- 三个坐标平面的网格线(XZ/XY/YZ,大/小刻度同风格)---
+        // 三个坐标平面的网格线(XZ/XY/YZ,大/小刻度同风格)
         for (const plane of ['xz', 'xy', 'yz'] as const) {
             const majorSegments: number[] = [];
             const minorSegments: number[] = [];
@@ -338,7 +335,7 @@ export class SceneManager {
             }
         }
 
-        // --- 坐标轴刻度线 ---
+        // 坐标轴刻度线
         const axisLength = RENDER_CONFIG.scene.axesLength;
         const tickMajorSegments: number[] = [];
         const tickMinorSegments: number[] = [];
@@ -364,7 +361,7 @@ export class SceneManager {
             this.tickGroup.add(new LineSegments2(geometry, this.tickMinorMaterial));
         }
 
-        // --- 刻度数字(与 XYZ 轴标签共用字体/画布尺寸/缩放)---
+        // 刻度数字(与 XYZ 轴标签共用字体/画布尺寸/缩放)
         this.buildTickNumbers(tickPositions);
     }
 

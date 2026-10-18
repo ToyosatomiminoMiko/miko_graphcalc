@@ -5,7 +5,7 @@
  * 1. 抽取规则本身(用合成语法,不依赖真实 `miko.pest` 的当前内容);
  * 2. 真实语法:枚举规则的关键字与**独立实现**的正则读法一致(互为对照),
  *    内联在语句规则里的字面量也确实被收到,而且删掉分支不会有残留;
- * 3. `ast/types.ts` 的 `TENSOR_KINDS` / `OBJECT_KINDS` / `ANALYSIS_OP_KINDS`
+ * 3. `contract/ast.ts` 的 `TENSOR_KINDS` / `OBJECT_KINDS` / `ANALYSIS_OP_KINDS`
  *    与语法分支逐字同序--AST 那三个字面量联合由这些常量派生,所以这就是
  *    "AST 类型与语法不漂移"的对账点.
  */

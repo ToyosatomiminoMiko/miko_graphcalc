@@ -244,7 +244,6 @@ impl Poly {
     }
 }
 
-/// 子树里是否出现未知量.
 pub(crate) fn contains_variable(expr: &Expr, variable: &str) -> bool {
     match expr {
         Expr::Num(_) => false,

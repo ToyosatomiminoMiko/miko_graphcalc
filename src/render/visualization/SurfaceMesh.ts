@@ -15,7 +15,6 @@ import {
 } from './surfaceColorMap';
 import type { SurfaceStyle } from '@/contract/view';
 
-// ============================================================
 // SurfaceMesh - 可复用的 3D 曲面网格封装
 //
 // 架构流程:
@@ -36,7 +35,6 @@ import type { SurfaceStyle } from '@/contract/view';
 //   - uSurfaceColorMapEnabled:颜色映射全局开关(关闭时曲面显示基色);
 //   - uSurfaceBaseColor:颜色映射关闭时的均匀基色(曲面对象的 color).
 // 这两个值由 setSurfaceStyle()/setBaseColor() 刷新,不需要重建材质.
-// ============================================================
 export class SurfaceMesh {
     cols: number;
     rows: number;
@@ -204,7 +202,6 @@ export class SurfaceMesh {
      */
     private _applyResult(result: SurfaceWorkerResponse): void {
         if (this._disposed) return;
-        // positions 写入
         const posAttr = this.geometry.attributes.position;
         posAttr.array.set(result.positions);
         posAttr.needsUpdate = true;

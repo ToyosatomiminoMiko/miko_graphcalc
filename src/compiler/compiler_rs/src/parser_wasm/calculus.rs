@@ -102,8 +102,6 @@ fn analysis_call(pair: &Pair<'_, Rule>) -> AnalysisCall {
 }
 
 /// 将分析语句(analysis_stmt)转换为 JSON AST 节点.
-/// 包含操作符(op),名称,调用(call),源(source),
-/// 可选的 at 参数及其形式(atForm,球坐标时显式给出),选项列表和位置.
 pub(super) fn analysis_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let AnalysisCall {
         call,
@@ -131,7 +129,6 @@ pub(super) fn analysis_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 }
 
 /// 将积分语句(integral_stmt)转换为 JSON AST 节点.
-/// 包含名称,源(source),选项列表和位置.
 pub(super) fn integral_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     json!({
         "type": "integral",
@@ -168,7 +165,6 @@ fn unary_call_to_stmt(pair: &Pair<'_, Rule>, ty: &str, call: Rule) -> Value {
 }
 
 /// 将求导语句(derivative_stmt)转换为 JSON AST 节点.
-/// 包含名称,源对象(source),可选求导变量(variable),选项列表和位置.
 /// 函数名遵循项目全名习惯(derivative),见 miko.pest 的 derivative_stmt.
 pub(super) fn derivative_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     unary_call_to_stmt(pair, "derivative", Rule::derivative_call)
@@ -182,7 +178,6 @@ pub(super) fn antiderivative_to_stmt(pair: &Pair<'_, Rule>) -> Value {
 }
 
 /// 将交集语句(intersection_stmt)转换为 JSON AST 节点.
-/// 包含名称,两个操作数 a 和 b,选项列表和位置.
 pub(super) fn intersection_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let mut operands = call_idents(pair, Rule::intersection_call).into_iter();
     let a = operands.next().unwrap_or_default();

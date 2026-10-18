@@ -68,9 +68,7 @@ fn sample_curve(
     Ok(samples)
 }
 
-// ================================================================
 // 曲线 ∩ 曲线
-// ================================================================
 
 fn planar_curve_intersections(
     a: &ObjectDescriptor,
@@ -306,9 +304,7 @@ pub(crate) fn curve_curve_intersections(
     }
 }
 
-// ================================================================
 // 曲线 ∩ 隐式场
-// ================================================================
 
 pub(crate) fn curve_field_intersections(
     curve: &ObjectDescriptor,

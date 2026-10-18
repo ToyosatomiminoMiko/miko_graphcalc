@@ -58,7 +58,7 @@ function interpolateMat4(start: Mat4, end: Mat4, t: number): Mat4 {
     );
 }
 
-// ---- interpolateMat4 的模块级暂存(见函数注释,勿跨调用持有) ----
+// interpolateMat4 的模块级暂存(见函数注释,勿跨调用持有)
 const scratchStartMatrix = new THREE.Matrix4();
 const scratchEndMatrix = new THREE.Matrix4();
 const scratchResultMatrix = new THREE.Matrix4();

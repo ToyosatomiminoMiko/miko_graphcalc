@@ -90,7 +90,7 @@ fn split_ode_conditions(text: &str) -> (String, Vec<String>) {
 /// 形状:`{ type, name, equation, initialConditions, options, span }`.
 /// `equation` 是首个顶层逗号之前的原文(含顶层 `=`),`initialConditions` 是
 /// 其余各段原文(如 `y(0) = 1` / `y'(0) = 1`)--内核负责解析与校验,
-/// AST 只负责如实切分(见 compiler/ast/types.ts 的 OdeStatement).
+/// AST 只负责如实切分(见 contract/ast.ts 的 OdeStatement).
 pub(super) fn ode_to_stmt(pair: &Pair<'_, Rule>) -> Value {
     let (equation, initial_conditions) = split_ode_conditions(&stmt_expr(pair));
 

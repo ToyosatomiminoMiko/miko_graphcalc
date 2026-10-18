@@ -191,7 +191,7 @@ export class DslIntegralRenderer {
                 onError?.(task.name, message);
                 continue;
             }
-            // 区域实体被隐藏 => 不参与计算(语义见 feature.md).
+            // 区域实体被隐藏 => 不参与计算.
             if (source.kind === 'region' && !source.enabled) {
                 this.visualizer.clear(task.name);
                 continue;
@@ -259,7 +259,7 @@ export class DslIntegralRenderer {
         }
     }
 
-    // ---- 1D 曲线域 ----
+    // 1D 曲线域
     private _visualize1D(
         task: IntegralTask,
         source: Extract<SceneObject, { kind: 'curve' }>,
@@ -328,7 +328,7 @@ export class DslIntegralRenderer {
         );
     }
 
-    // ---- 2D 曲面矩形域 ----
+    // 2D 曲面矩形域
     private _visualize2DRect(
         task: IntegralTask,
         source: Extract<SceneObject, { kind: 'surface' }>,
@@ -347,7 +347,7 @@ export class DslIntegralRenderer {
         );
     }
 
-    // ---- 2D 区域(带)域 ----
+    // 2D 区域(带)域
     private _visualize2DRegion(
         task: IntegralTask,
         source: Extract<SceneObject, { kind: 'region' }>,
@@ -452,7 +452,7 @@ export class DslIntegralRenderer {
         }
     }
 
-    // ---- 3D 实体域 ----
+    // 3D 实体域
     private _visualize3DSolid(
         task: IntegralTask,
         source: Extract<SceneObject, { kind: 'sphere' | 'box' | 'conic' }>,

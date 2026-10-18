@@ -16,7 +16,7 @@
 import { normalizeExpression } from './expression';
 
 /**
- * `ode` 语句允许的选项白名单(**唯一来源**,设计文档 `docs/plan3.md` 第 1.1 节).
+ * `ode` 语句允许的选项白名单(**唯一来源**,设计文档 `docs/calculus-suite-plan.md` 第 4.1 节).
  *
  * 静态场景层与求值层都要按它做声明级校验,放在这个叶子模块里两边共用
  * (两边互相 import 会成环,见文件头).

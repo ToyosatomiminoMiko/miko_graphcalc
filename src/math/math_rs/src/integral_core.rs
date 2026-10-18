@@ -154,7 +154,6 @@ pub(crate) fn lebesgue_over_cells(
     })
 }
 
-/// 辛普森法则的节点权重.
 pub(crate) fn simpson_weight(idx: usize, total: usize) -> f64 {
     if idx == 0 || idx == total {
         SIMPSON_WEIGHT_EDGE
@@ -165,9 +164,7 @@ pub(crate) fn simpson_weight(idx: usize, total: usize) -> f64 {
     }
 }
 
-// ================================================================
 // 基于预计算值数组的一维积分函数
-// ================================================================
 
 pub fn trapz1d_from_values(values: &[f64], a: f64, b: f64) -> Result<f64, String> {
     validate_1d_interval(a, b)?;
@@ -239,9 +236,7 @@ pub fn riemann1d_mid_from_values(values: &[f64], a: f64, b: f64) -> Result<f64, 
     Ok(sum * h)
 }
 
-// ================================================================
 // 基于预计算值数组的二维积分函数
-// ================================================================
 
 pub fn trapz2d_from_values(
     values: &[f64],
@@ -378,9 +373,7 @@ pub fn riemann2d_mid_from_values(
     riemann2d_endpoint_from_values(values, x_range, y_range, n, m, "中点")
 }
 
-// ================================================================
 // 勒贝格积分(基于值数组,扫描在 Rust 内完成,零 FFI 回调)
-// ================================================================
 
 pub fn lebesgue1d_from_values(
     values: &[f64],

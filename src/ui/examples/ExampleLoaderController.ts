@@ -73,7 +73,7 @@ export class ExampleLoaderController {
         return this.menu.isOpen;
     }
 
-    /** 把"点浮层外部关闭"挂到根节点(键盘不在这里,见文件头). */
+    /** 把"点浮层外部关闭"挂到根节点. */
     bind(root: HTMLElement): void {
         this.menu.bind(root);
     }

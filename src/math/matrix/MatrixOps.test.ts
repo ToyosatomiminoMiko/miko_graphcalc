@@ -10,8 +10,7 @@ import { describe, expect, it } from 'vitest';
 import type { MatrixOps } from './MatrixOps';
 import { testMatrixOps } from '@/testing/matrixOps';
 
-// 曾经的 createMatrixOps 只是 `(args) => backend.method(args)` 的零逻辑包装,
-// 已删除:实现对象本身就是 MatrixOps,这行类型标注守住这个契约形状.
+// 实现对象本身就是 MatrixOps(零逻辑包装已删除,理由见 ./MatrixOps.ts),这行类型标注守住契约形状.
 const ops: MatrixOps = testMatrixOps;
 
 const TRANSLATION = [

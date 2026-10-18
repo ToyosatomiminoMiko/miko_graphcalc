@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-// ============================================================
 // 曲面伪彩色:顶点着色器配色
 //
 // CPU 侧的 map_surface_colors(HSL 伪彩色)已从 render_rs 移除,
@@ -13,7 +12,6 @@ import * as THREE from 'three';
 //   SURFACE_LIGHTNESS_BASE = 0.5  SURFACE_LIGHTNESS_RANGE = 0.3
 //   FLAT_COLOR_T = 0.5
 // 修改任一侧时都要同步另一侧.
-// ============================================================
 
 /**
  * 注入到顶点着色器 <common> 之后的上色代码:声明 uniform/varying 与

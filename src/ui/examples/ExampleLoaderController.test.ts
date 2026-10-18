@@ -10,7 +10,7 @@
  * - 当前项:setActive 由库写成 `.is-active` + `aria-current`;
  * - 销毁:dispose 关闭浮层并摘掉监听.
  *
- * 键盘已从上下游一并移除,这里不再有键盘用例.桩不冒泡,所以"点到菜单项内部
+ * 桩不冒泡,所以"点到菜单项内部
  * 子元素"这类依赖真 DOM 冒泡的行为没法在桩里伪造,交给浏览器.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';

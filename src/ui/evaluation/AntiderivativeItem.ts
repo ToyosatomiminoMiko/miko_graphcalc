@@ -12,7 +12,7 @@
  *   (隐藏 = 不调内核,也不下发实体对象,列表保留占位).
  *
  * 与求解的唯一差别在下发对象:原函数同时是一条 curve/surface,所以隐藏它
- * 会连实体一起消失(编译期就不生成对象,见 `compileAntiderivatives`).
+ * 会连实体一起消失(编译期就不生成对象,见 `collectAntiderivativeTasks`).
  */
 import type { AntiderivativeTask } from '@/contract/ir';
 import {
@@ -93,8 +93,7 @@ export class AntiderivativeItem extends EvaluationItem<AntiderivativeTask, void>
             }),
         });
 
-        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片与整行变淡表达
-        // (与实体行同一套).
+        // 隐藏项没有状态行:隐藏态由摘要行的"已隐藏"芯片表达(与实体行同一套).
         const { row } = createEvaluationRow(
             summary,
             detail,

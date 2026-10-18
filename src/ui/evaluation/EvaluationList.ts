@@ -102,7 +102,7 @@ export class EvaluationList {
         containers: EvaluationListContainers,
         private readonly handlers: EvaluationListHandlers,
     ) {
-        // 三个容器在 DOM 里只是普通 <div>;各 Section 构造时显式给列表语义,
+        // 六个容器在 DOM 里只是普通 <div>;各 Section 构造时显式给列表语义,
         // 读屏才会报"列表/列表项",而不是把每条读成孤立的一段.
         this.analysis = new EvaluationSection(containers.analysis, AnalysisItem);
         this.integral = new EvaluationSection(containers.integral, IntegralItem);
@@ -119,7 +119,7 @@ export class EvaluationList {
     }
 
     render(scene: SceneIR): void {
-        // 三个子列表的显隐回调各自绑定到对应的切换入口:item 只管把按钮接上
+        // 六个子列表的显隐回调各自绑定到对应的切换入口:item 只管把按钮接上
         // `context.toggleHidden`,不关心重新编译的流程.
         this.analysis.render(scene.analyses, {
             objects: scene.objects,

@@ -1,11 +1,9 @@
-// ================================================================
 // surface_utils.rs -- 曲面生成:数值采样 + 网格后处理(Rust/WASM 侧)
 //
 // 职责:把 "z = f(x, y)" 表达式变成可直接交给 Three.js 的网格数据,
 // 产出 positions / valid_indices / normals 以及 z_min / z_max.
 // 本文件只做几何,不做颜色.
 //
-// ------------------------------------------------------------------
 // 颜色映射已拆到渲染侧(着色器),见 src/render/visualization/
 // surfaceColorMap.ts:旧的 CPU 路径 map_surface_colors(HSL 伪彩色 +
 // color attribute + vertexColors)已从 render_rs 移除;同一套 z->HSL
@@ -82,7 +80,6 @@
 // 同步约束:config.rs 中的配色常量(SURFACE_HUE_START / SURFACE_SATURATION /
 // SURFACE_LIGHTNESS_BASE / SURFACE_LIGHTNESS_RANGE / FLAT_COLOR_T)必须与
 // surfaceColorMap.ts 内嵌的 GLSL 常量保持一致 -- 改任一侧都要同步另一侧.
-// ================================================================
 use crate::config::{
     COLOR_AUTO_SWITCH_FACTOR, COLOR_PERCENTILE_HI, COLOR_PERCENTILE_LO, DEGENERATE_Z_MAX,
     DEGENERATE_Z_MIN,
@@ -189,9 +186,7 @@ fn generate_valid_indices(cols: usize, rows: usize, valid: &[bool]) -> Vec<u32> 
     }
     indices
 }
-// ================================================================
 // 统一后处理结果结构体
-// ================================================================
 pub struct SurfaceSampleResult {
     pub positions: Vec<f32>,
     pub valid_indices: Vec<u32>,
@@ -199,9 +194,7 @@ pub struct SurfaceSampleResult {
     pub z_min: f64,
     pub z_max: f64,
 }
-// ================================================================
 // 采样/索引过滤和法线计算
-// ================================================================
 
 /// 数组按升序排序后取第 `p` 分位的值(最近秩法).
 fn percentile(sorted: &[f64], p: f64) -> f64 {
@@ -353,10 +346,6 @@ pub fn sample_and_process_surface(
         z_max,
     })
 }
-
-// ================================================================
-// 顶点法线计算
-// ================================================================
 
 /// 根据有效三角形索引计算平滑顶点法线
 ///

@@ -56,9 +56,7 @@ fn parse_payload<T: serde::de::DeserializeOwned>(payload: &str) -> Result<T, JsV
     serde_json::from_str::<T>(payload).map_err(|e| math_error(format!("请求参数解析失败: {e}")))
 }
 
-// ================================================================
 // 4x4 矩阵变换
-// ================================================================
 
 #[wasm_bindgen]
 pub fn mat4_identity() -> Vec<f64> {
@@ -93,9 +91,7 @@ pub fn mat4_apply_point(matrix: Vec<f64>, x: f64, y: f64, z: f64) -> Result<Vec<
     Ok(transform_core::apply_to_point(matrix, x, y, z).to_vec())
 }
 
-// ================================================================
 // 曲线 / 向量场采样
-// ================================================================
 
 /// 曲线采样结果:扁平顶点 + 每段起始顶点下标.
 ///
@@ -148,9 +144,7 @@ pub fn sample_vector_field(payload: &str) -> Result<Vec<f32>, JsValue> {
     .map_err(math_error)
 }
 
-// ================================================================
 // 表达式级积分
-// ================================================================
 
 /// 积分采样结果:积分值 + 采样网格 + 域包围盒.
 ///
@@ -197,7 +191,6 @@ impl IntegralSampleResult {
         self.samples = samples;
     }
 
-    /// JS 侧 `string`.
     #[wasm_bindgen(getter)]
     pub fn sample_shape(&self) -> String {
         self.sample_shape.clone()
@@ -338,9 +331,7 @@ pub fn integrate2d(payload: &str) -> Result<IntegralSampleResult, JsValue> {
     })
 }
 
-// ================================================================
 // 带域积分:region(2D 面积图形)/ solid(3D 实体)
-// ================================================================
 
 /// region(2D, x 型带状)域积分统一入口;参数走 JSON 请求(见 `wasm_payloads`).
 ///
@@ -470,9 +461,7 @@ pub fn integrate_solid(payload: &str) -> Result<IntegralSampleResult, JsValue> {
     })
 }
 
-// ================================================================
 // 梯度 / 散度 / 旋度
-// ================================================================
 
 #[wasm_bindgen]
 pub struct GradientPointResult {
@@ -576,9 +565,7 @@ pub fn intersect_pair(payload: &str) -> Result<IntersectionOutput, JsValue> {
     })
 }
 
-// ================================================================
 // 符号解析 / 求导 / 变量提取 / 数组与矩阵解析
-// ================================================================
 
 #[wasm_bindgen]
 pub fn normalize_expression(expr: &str) -> Result<String, JsValue> {
@@ -782,7 +769,7 @@ pub fn antiderivative(
         .map_err(|error| math_error(format!("积分结果序列化失败: {error}")))
 }
 
-/// 微分方程求解入口(设计文档 `docs/plan3.md` 第 1.2 节).
+/// 微分方程求解入口(设计文档 `docs/calculus-suite-plan.md` 第 4.2 节).
 ///
 /// 返回**独立步骤产物的 JSON**:`{ equation_latex, independent, dependent,
 /// order, general_latex, particular_latex, general_text, particular_text,
@@ -941,7 +928,6 @@ pub fn evaluate_laplacian_point(payload: &str) -> Result<f64, JsValue> {
     .map_err(math_error)
 }
 
-// ================================================================
 // 分发层 / 契约层测试
 //
 // 审查报告指出:Rust 测试全是"核函数对拍",没有任何一项覆盖 lib.rs 的
@@ -950,7 +936,6 @@ pub fn evaluate_laplacian_point(payload: &str) -> Result<f64, JsValue> {
 // 这里为每个积分 wasm 入口放一条"真值已知"的黄金用例,直接以 wasm 层
 // 参数语义调用导出函数(宿主测试只走成功路径,Err 由 JsValue 构造,见
 // integral_core/domain_integral 的纯 Rust 错误用例).
-// ================================================================
 #[cfg(test)]
 mod glue_tests {
     use super::*;

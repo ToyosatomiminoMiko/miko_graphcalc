@@ -101,9 +101,7 @@ pub(crate) fn evaluate_with_lookup(
     }
 }
 
-// ============================================================
 // 预绑定求值(202609 性能改造 P0)
-// ============================================================
 //
 // 背景:`evaluate_with_lookup` 每个点都要按**名字**查一次上下文,而
 // `CompiledEvaluator` 旧实现更是每点 `ctx.insert(name.to_string(), value)`
@@ -297,8 +295,7 @@ pub(crate) fn evaluate_bound(expr: &BoundExpr, ctx: &EvalContext) -> Result<Opti
 /// 实数幂语义:负底数的非整数次幂只在指数是"约分后分母为奇数"的有理数
 /// m/n 时有实值((−x)^(m/n) = (−1)^m·|x|^(m/n));否则返回 NaN.
 /// 避免 `(-8)^(1/3)` 之类数学上可定义的实值运算被 `powf` 一律给 NaN
-/// (见 prompt/review_report.md SYM-P1.1 的字符串往返教训与 `eval_core.rs`
-/// 的回归用例).正底/整数指数仍直接走 `powf`.
+/// (见 `eval_core.rs` 的回归用例).正底/整数指数仍直接走 `powf`.
 ///
 /// 编码注意:`odd_denominator_rational` 是"容差内最接近奇分母有理数"的
 /// 识别器,不是精确判定;因此微小但非零的指数(如 1e-9)若被归约为 0/1
@@ -418,9 +415,7 @@ pub(crate) fn evaluate_runtime_expr(
     evaluate_with_lookup(expr, &|name| variables.get(name).copied()).map_err(runtime_error)
 }
 
-// ============================================================
 // 回归测试
-// ============================================================
 
 #[cfg(test)]
 mod tests {

@@ -20,7 +20,7 @@
  * region(面积图形)实体:V1 只支持 x 型带状区域,不持有曲线几何拷贝,只按
  * 名引用两条边界 `curve`;后续规划(y 型 / 极坐标 r-θ / 多曲线边界 /
  * region 参与求交 / region 作为曲面底域)见 `contract/ir.ts` 的
- * `RegionObject` 注释与 `prompt/feature.md`.
+ * `RegionObject` 注释.
  *
  * 物化阶段(blueprint + 参数值 -> 数值 IR)见同目录 ./materialize.ts;本文件与
  * 物化是对象子系统的两个独立 switch(各自按 9 种 kind 分派),只共享

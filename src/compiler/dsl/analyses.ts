@@ -286,7 +286,7 @@ function compileAnalysisStatement(
         throw new Error(`分析算子 ${statement.op} 暂未实现`);
     }
 
-    // ---- 校验面 1:对象 kind × 算子 可用矩阵 ----
+    // 校验面 1:对象 kind × 算子 可用矩阵
     // 标量场源(curve/surface/implicit/球体)支持 gradient 与 laplacian;
     // vector_field 只支持 divergence/curl.这里只读"隐式维度"这个声明级
     // 信息,真正的隐式场闭包(含符号偏导)推迟到 hidden 分支之后再建,保证
@@ -325,7 +325,7 @@ function compileAnalysisStatement(
         throw new Error(`分析 ${statement.name} 不能应用于 ${object.kind} 类型对象`);
     }
 
-    // ---- 校验面 2:at 坐标 ----
+    // 校验面 2:at 坐标
     // scope 直接由 buildParamScope(params, overrides) 提供,不再依赖
     // "先 applyParamOverrides 改 map 再建 scope"的副作用通道
     // (202609 review:见 params.ts 注释).
@@ -386,7 +386,7 @@ function compileAnalysisStatement(
             : ['point', 'normal'];
     const show = parseShowOption(statement.options, defaultShow);
 
-    // ---- 隐藏:仅保留列表项,不执行数值计算 ----
+    // 隐藏:仅保留列表项,不执行数值计算
     if (hiddenNames.has(statement.name)) {
         results.push({
             name: statement.name,
@@ -401,7 +401,7 @@ function compileAnalysisStatement(
         return;
     }
 
-    // ---- 隐式场(implicit / sphere):投影到等值面的点分析 ----
+    // 隐式场(implicit / sphere):投影到等值面的点分析
     // 与 curve/surface 的差别:at 给的是空间点而不是"因变量已解出"的
     // 自变量,∇f 在空间处处有定义,但"拉普拉斯/切平面"要落在等值面上谈
     // 才有几何意义,因此先沿 ∇f 牛顿投影到 f = level,再在该点取值:
@@ -455,8 +455,6 @@ function compileAnalysisStatement(
         return;
     }
 
-    // 经过 op×kind gate,此处的曲线/曲面 + 标量算子只剩 gradient:
-    // laplacian 已在上面的分支内就地消费并 return.
     if (object.kind === 'curve' || object.kind === 'surface') {
         const isCurve = object.kind === 'curve';
         const { names: coeffNames, values: coeffValues } = splitCoefficients(

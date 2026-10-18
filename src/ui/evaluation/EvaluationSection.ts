@@ -5,7 +5,7 @@
  * 与类型无关:一类条目长什么样,异步数值怎么落到行上,全在传入的
  * {@link EvaluationItemClass}(即 item 类本身)里;行缓存/顺序那套增删复用循环由
  * {@link RowList} 承担(与实体列表共用同一份,见 UI-P3.8).`EvaluationList`
- * 的三个子列表(分析/积分/求交)各是一个 `EvaluationSection`,于是"增删行,保持
+ * 的六个子列表(分析/积分/求交/求解/原函数/微分方程)各是一个 `EvaluationSection`,于是"增删行,保持
  * 顺序,替换行时保留展开态,数值回填命中缓存"这套逻辑只有一份.
  *
  * 行句柄就是 item 实例本身:不再有 `{ row, result, bodyLatex }` 这种与行为分离
@@ -50,7 +50,7 @@ export class EvaluationSection<
     /** 按 item 类增量刷新:删消失的,复用键相同的,重建键变了的. */
     render(tasks: readonly TTask[], context: EvaluationContext): void {
         this.list.sync(tasks, {
-            // 三类任务的 IR 都有 `name`,条目标识直接用字段(item 类不再各写一遍).
+            // 六类任务的 IR 都有 `name`,条目标识直接用字段(item 类不再各写一遍).
             name: (task) => task.name,
             // 内容键必须在建行之前算出来:先建再比会让每次 sync 都白排一遍 KaTeX.
             key: (task) => this.itemClass.cacheKey(task, context),

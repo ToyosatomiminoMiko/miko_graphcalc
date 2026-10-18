@@ -501,9 +501,7 @@ pub(crate) fn parse_expr(source: &str) -> Result<Expr, String> {
     Parser::new(tokens).parse()
 }
 
-// ============================================================
 // 别名归一化
-// ============================================================
 
 pub(crate) fn rewrite_aliases(expr: &Expr) -> Result<Expr, String> {
     let mut expr = expr.clone();

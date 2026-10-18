@@ -19,7 +19,6 @@ const FRACTION_EPSILON = 1e-9;
 /** 普通模式保留的小数位数,避免 0.30000000000000004 之类的噪声. */
 const DECIMAL_DIGITS = 6;
 
-/** 格式化一个刻度数字. */
 export function formatTickLabel(value: number, piUnit: boolean): string {
     if (!Number.isFinite(value)) return String(value);
     return piUnit ? formatPiTickLabel(value) : formatNumberTickLabel(value);

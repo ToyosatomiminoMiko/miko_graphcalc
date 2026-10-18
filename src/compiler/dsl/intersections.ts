@@ -123,7 +123,7 @@ function compileIntersectionStatement(
         )
         ?? NUMERIC_CONFIG.intersection.defaultSegments;
 
-    // ---- 完整校验面(先于 hidden 分支,见文件头结论)----
+    // 完整校验面(先于 hidden 分支,见文件头结论)
     const a = objects.get(statement.a);
     const b = objects.get(statement.b);
     if (!a) {
@@ -154,7 +154,7 @@ function compileIntersectionStatement(
     const method = 'numeric' as const;
     const unknowns = ['x', 'y', 'z'];
 
-    // ---- 隐藏:保留占位项但不调度计算 ----
+    // 隐藏:保留占位项但不调度计算
     if (hidden) {
         return {
             name,
