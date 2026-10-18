@@ -18,6 +18,7 @@
 import type {
     AxisSpec,
     DesktopConfig,
+    DockActionSpec,
     WindowActionId,
     RelativeGeometry,
     WindowSlot,
@@ -94,6 +95,13 @@ export interface AppWindowConfig {
         /** 按钮的可见文案(不随状态变).库的 `WindowAction` 只读 `text` 这一个字段. */
         readonly text: string;
     }[];
+    /**
+     * 任务栏动作区里的**应用级动作**:顺序即显示顺序,整组排在库的「全部还原」左边.
+     *
+     * 本应用没有这类动作(「全部还原」是库的全局入口),给空数组;字段本身是库的
+     * `DesktopConfig` 必填项,所以这里显式写出"没有",而不是省略成 `undefined`.
+     */
+    readonly dockActions: readonly DockActionSpec[];
     readonly adopted: readonly AdoptedNodeSpec[];
     readonly chrome: {
         /** 示例按钮的可见文案. */
@@ -319,6 +327,9 @@ export const UI_CONFIG = {
             { id: 'minimize', text: 'min' },
             { id: 'maximize', text: 'max' },
         ],
+        // 任务栏动作区:本应用没有应用级动作(唯一的桌面动作「全部还原」归库),
+        // 所以给空清单;库仍会按它建出动作区(里面只有「全部还原」).
+        dockActions: [],
         // 五个应用节点由 createWindowChrome() 用 create_element() 建,这里只声明它们落在哪
         adopted: [
             { node: 'exampleButton', window: 'source', slot: 'actions' },
@@ -451,6 +462,7 @@ export function desktopConfig(): DesktopConfig {
     const {
         windows,
         actions,
+        dockActions,
         edgeKeep,
         edgeGap,
         headerMinVisible,
@@ -462,6 +474,7 @@ export function desktopConfig(): DesktopConfig {
     return {
         windows,
         actions,
+        dockActions,
         edgeKeep,
         edgeGap,
         headerMinVisible,
